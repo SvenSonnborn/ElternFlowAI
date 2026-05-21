@@ -8,7 +8,39 @@ import { useMemo } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { ThemeProvider } from "@/design-system/ThemeProvider";
+import { ThemeProvider, useTheme } from "@/design-system/ThemeProvider";
+
+function ThemedStack() {
+  const { theme } = useTheme();
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen
+        name="recipe/[id]"
+        options={{ presentation: "modal", headerShown: false }}
+      />
+      <Stack.Screen name="child/[id]" options={{ presentation: "card", headerShown: false }} />
+      <Stack.Screen name="child/new" options={{ presentation: "card", headerShown: false }} />
+      <Stack.Screen
+        name="settings"
+        options={{
+          presentation: "formSheet",
+          headerShown: false,
+          gestureEnabled: true,
+          sheetAllowedDetents: [0.82],
+          sheetCornerRadius: 26,
+          sheetGrabberVisible: true,
+          sheetExpandsWhenScrolledToEdge: false,
+          // Container must fill the sheet — otherwise iOS UIKit sheet animation
+          // + RN flex layout race and content gets clipped/offset. Background
+          // tracks the active theme so dark-mode users don't see a light flash.
+          contentStyle: { flex: 1, backgroundColor: theme.bg },
+        }}
+      />
+      <Stack.Screen name="+not-found" options={{ presentation: "modal" }} />
+    </Stack>
+  );
+}
 
 export default function RootLayout() {
   const queryClient = useMemo(
@@ -27,34 +59,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>
             <StatusBar style="auto" />
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen
-                name="recipe/[id]"
-                options={{ presentation: "modal", headerShown: false }}
-              />
-              <Stack.Screen
-                name="child/[id]"
-                options={{ presentation: "card", headerShown: false }}
-              />
-              <Stack.Screen
-                name="child/new"
-                options={{ presentation: "card", headerShown: false }}
-              />
-              <Stack.Screen
-                name="settings"
-                options={{
-                  presentation: "formSheet",
-                  headerShown: false,
-                  gestureEnabled: true,
-                  sheetAllowedDetents: [0.82],
-                  sheetCornerRadius: 26,
-                  sheetGrabberVisible: true,
-                  sheetExpandsWhenScrolledToEdge: false,
-                }}
-              />
-              <Stack.Screen name="+not-found" options={{ presentation: "modal" }} />
-            </Stack>
+            <ThemedStack />
           </ThemeProvider>
         </QueryClientProvider>
       </SafeAreaProvider>
