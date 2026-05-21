@@ -1,0 +1,240 @@
+{
+  "app": {
+    "name": "Eltern Flow"
+  },
+  "nav": {
+    "dashboard": "Home",
+    "calendar": "Calendar",
+    "meals": "Meals",
+    "homework": "Homework",
+    "family": "Family"
+  },
+  "action": {
+    "save": "Save",
+    "next": "Next",
+    "back": "Back",
+    "skip": "Skip",
+    "done": "Done",
+    "seeAll": "See all",
+    "cancel": "Cancel",
+    "on": "On",
+    "off": "Off",
+    "manage": "Manage"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signUp": "Create account",
+    "email": "Email",
+    "password": "Password",
+    "forgot": "Forgot password?",
+    "stay": "Stay signed in",
+    "or": "OR",
+    "google": "Continue with Google",
+    "apple": "Continue with Apple",
+    "tagline": "The AI assistant for modern families.",
+    "magicLink": "Send magic link by email",
+    "newHere": "New here?",
+    "error": {
+      "title": "Email or password incorrect",
+      "help": "Try again or reset your password."
+    }
+  },
+  "onb": {
+    "stepCounter": "Step {{n}} of {{total}}",
+    "s1": {
+      "title": "Create your account",
+      "sub": "You'll use this email to share calendar and lists with your partner.",
+      "terms": "I agree to the terms and privacy policy."
+    },
+    "s2": {
+      "title": "What's your family called?",
+      "sub": "You'll see this name at the top of your dashboard.",
+      "field": "Family name",
+      "privacy": {
+        "title": "Your data is yours",
+        "sub": "Encrypted, stored in the EU. No ads."
+      }
+    },
+    "s3": {
+      "title": "Invite your partner",
+      "sub": "Events, tasks and shopping lists sync in real time.",
+      "send": "Send invite",
+      "later": "Invite later"
+    },
+    "s4": {
+      "title": "Tell us about your child",
+      "sub": "You can add more kids later — or use your voice.",
+      "voice": "Or tell us by voice"
+    },
+    "s5": {
+      "title": "All set!",
+      "sub": "Eltern Flow is ready. {{partner}} got an invite, {{child}} is set up.",
+      "cta": "Open dashboard"
+    }
+  },
+  "dash": {
+    "greeting": {
+      "morning": "Good morning, {{name}}",
+      "day": "Have a great day, {{name}}"
+    },
+    "subtitle": "{{family}} · {{date}}",
+    "subtitleDate": "Wed, May 14",
+    "addPerson": "Add person",
+    "section": {
+      "today": "Today",
+      "tomorrow": "Prep for tomorrow"
+    },
+    "meal": {
+      "question": "What's for dinner today?",
+      "badge": "Perfect for your family",
+      "reasonExample": "Ben loves pasta · no allergies · 20 min",
+      "openRecipe": "Open recipe",
+      "toShopping": "Add to shopping list",
+      "refresh": "Refresh"
+    },
+    "empty": {
+      "title": "Your family awaits",
+      "sub": "Add child profiles or invite your partner. Eltern Flow then plans events, meals and tasks automatically.",
+      "addChild": "Add child",
+      "invite": "Invite partner",
+      "welcome": {
+        "title": "Welcome!",
+        "sub": "Let's set up your family"
+      }
+    }
+  },
+  "voice": {
+    "fab": {
+      "label": "Voice assistant"
+    },
+    "overlay": {
+      "eyebrow": "Voice assistant",
+      "listening": "Listening",
+      "prompt": "\"Talk to Eltern Flow…\"",
+      "exampleEvent": "\"Add football practice for Ben tomorrow at 4 pm.\""
+    },
+    "chip": {
+      "event": "Add event",
+      "task": "Task for {{name}}",
+      "meal": "What's for dinner?",
+      "shopping": "Add to shopping"
+    }
+  },
+  "cal": {
+    "title": {
+      "month": "{{monthName}} {{year}}",
+      "week": "This week",
+      "agenda": "Agenda"
+    },
+    "sub": "Family calendar",
+    "selectedDay": "Wednesday, May 14",
+    "add": {
+      "voice": "Add by voice"
+    },
+    "legend": {
+      "arzt": "Doctor",
+      "schule": "School",
+      "sport": "Sport",
+      "ha": "Tasks"
+    }
+  },
+  "meals": {
+    "title": "Meal plan",
+    "weekLabel": "Week 20 · May 12–18",
+    "aiPlan": "Let AI plan the week",
+    "aiPlanSub": "Tailored to your family in 5 sec",
+    "shoppingSub": "23 ingredients · auto from plan",
+    "today": "today",
+    "duration": "{{n}} min",
+    "tabs": {
+      "dinner": "Dinner",
+      "lunch": "Lunch",
+      "breakfast": "Breakfast"
+    },
+    "shopping": {
+      "title": "Shopping list",
+      "sub": "{{n}} ingredients · auto from plan"
+    },
+    "suggest": {
+      "why": "Why this pick",
+      "other": "Other suggestion",
+      "alternatives": "{{n}} alternatives"
+    },
+    "coach": {
+      "title": "Meal coach",
+      "note": "AI tuned to your family"
+    },
+    "recipe": {
+      "cta": "Start cooking",
+      "note": "Note"
+    }
+  },
+  "hw": {
+    "title": "Homework",
+    "sub": "Wed · {{open}} open · {{done}} done",
+    "dueToday": "Due today",
+    "thisWeek": "This week",
+    "longTerm": "Long term",
+    "upcoming": "Upcoming",
+    "doneToday": "Done today",
+    "doneRate": "Done rate",
+    "openCount_one": "{{count}} open",
+    "openCount_other": "{{count}} open",
+    "due": "Due: {{when}}",
+    "addVoice": "Add by voice"
+  },
+  "familie": {
+    "parents": "Parents",
+    "children": "Children",
+    "parentsCount": "{{n}} parents",
+    "childrenCount_one": "{{count}} child",
+    "childrenCount_other": "{{count}} children",
+    "addChild": "Add child",
+    "invitePartner": "Invite partner",
+    "yearsOld_one": "{{count}} year",
+    "yearsOld_other": "{{count}} years"
+  },
+  "child": {
+    "name": "Name",
+    "age": "Age",
+    "birthday": "Birthday",
+    "school": "School",
+    "allergies": "Allergies & intolerances",
+    "likes": "Favourite foods",
+    "dislikes": "Dislikes",
+    "voiceAdd": "Add by voice",
+    "editTitle": "Edit {{name}}",
+    "editSub": "Child profile · age {{age}}",
+    "newTitle": "New child",
+    "newSub": "Create profile",
+    "avatarHint": "Tap pencil to change",
+    "addOther": "Other"
+  },
+  "recipe": {
+    "title": "Pumpkin risotto with sage",
+    "servings_one": "{{count}} serving",
+    "servings_other": "{{count}} servings",
+    "tab": {
+      "ingredients": "Ingredients",
+      "steps": "Steps",
+      "nutrition": "Nutrition"
+    },
+    "noteLabel": "Note",
+    "note": "Mia: lactose-free — Parmesan omitted.",
+    "shopping": "List",
+    "startCooking": "Start cooking"
+  },
+  "set": {
+    "title": "Settings",
+    "language": "Language",
+    "darkMode": "Dark mode",
+    "notifications": "Notifications",
+    "voice": "Voice assistant",
+    "familyMembers": "Family members",
+    "privacy": "Privacy",
+    "connectedApps": "Connected apps",
+    "subscription": "Eltern Flow Plus",
+    "help": "Help & support",
+    "logout": "Sign out"
+  }
+}

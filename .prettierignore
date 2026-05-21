@@ -1,0 +1,22 @@
+node_modules
+.expo
+dist
+web-build
+android
+ios
+package-lock.json
+bun.lock
+bun.lockb
+
+# HANDOFF bundle — designer-owned, off-limits for auto-formatting (see CLAUDE.md)
+design-system/colors.ts
+design-system/typography.ts
+design-system/spacing.ts
+design-system/themes.ts
+design-system/components.ts
+design-system/index.ts
+docs/HANDOFF.md
+docs/COPY.md
+docs/ICONS.md
+docs/README.md
+patterns/

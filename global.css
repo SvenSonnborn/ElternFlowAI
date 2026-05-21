@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Theme tokens — source of truth lives in design-system/themes.ts.
+ * Light defaults render correctly at SSR / cold start before
+ * ThemeProvider injects the runtime values for the active theme.
+ */
+
+:root {
+  --bg: #f8f1eb;
+  --bg-raised: #f1e7dc;
+  --card: #ffffff;
+  --card-subtle: #fffbf6;
+  --overlay: rgba(20, 24, 31, 0.55);
+
+  --ink: #2c3e50;
+  --ink-secondary: #6b7280;
+  --ink-tertiary: #94a3b8;
+  --on-mint: #0b3936;
+  --on-orange: #5a2e00;
+
+  --primary: #4ecdc4;
+  --primary-soft: #e6f8f6;
+  --primary-strong: #2bafa5;
+  --accent: #ff9f1c;
+  --accent-soft: #ffefd6;
+  --accent-strong: #d67d00;
+
+  --success: #34d399;
+  --success-soft: #dcfce7;
+  --warning: #f59e0b;
+  --warning-soft: #fef3c7;
+  --danger: #ef4444;
+  --danger-soft: #fee2e2;
+
+  --line: rgba(44, 62, 80, 0.08);
+  --line-strong: rgba(44, 62, 80, 0.14);
+  --fab-from: #ffb94b;
+  --fab-to: #e68500;
+}
+
+:root.dark,
+.dark {
+  --bg: #14181f;
+  --bg-raised: #1b2129;
+  --card: #232a33;
+  --card-subtle: #2a323d;
+  --overlay: rgba(0, 0, 0, 0.6);
+
+  --ink: #f1f5f9;
+  --ink-secondary: #b3bcc7;
+  --ink-tertiary: #7b8492;
+  --on-mint: #0b3936;
+  --on-orange: #ffffff;
+
+  --primary: #4ecdc4;
+  --primary-soft: rgba(78, 205, 196, 0.14);
+  --primary-strong: #8fe2dc;
+  --accent: #ff9f1c;
+  --accent-soft: rgba(255, 159, 28, 0.16);
+  --accent-strong: #ffcb7a;
+
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.16);
+  --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.18);
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.18);
+
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.13);
+  --fab-from: #ffb94b;
+  --fab-to: #e68500;
+}

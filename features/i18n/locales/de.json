@@ -1,0 +1,240 @@
+{
+  "app": {
+    "name": "Eltern Flow"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "calendar": "Kalender",
+    "meals": "Essen",
+    "homework": "Aufgaben",
+    "family": "Familie"
+  },
+  "action": {
+    "save": "Speichern",
+    "next": "Weiter",
+    "back": "Zurück",
+    "skip": "Überspringen",
+    "done": "Fertig",
+    "seeAll": "Alle ansehen",
+    "cancel": "Abbrechen",
+    "on": "An",
+    "off": "Aus",
+    "manage": "Verwalten"
+  },
+  "auth": {
+    "signIn": "Anmelden",
+    "signUp": "Konto erstellen",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "forgot": "Passwort vergessen?",
+    "stay": "Eingeloggt bleiben",
+    "or": "ODER",
+    "google": "Mit Google anmelden",
+    "apple": "Mit Apple anmelden",
+    "tagline": "Der KI-Assistent für moderne Familien.",
+    "magicLink": "Magic-Link per E-Mail senden",
+    "newHere": "Neu hier?",
+    "error": {
+      "title": "E-Mail oder Passwort falsch",
+      "help": "Versuch es noch einmal oder setze dein Passwort zurück."
+    }
+  },
+  "onb": {
+    "stepCounter": "Schritt {{n}} von {{total}}",
+    "s1": {
+      "title": "Erstelle dein Konto",
+      "sub": "Mit dieser E-Mail teilst du später Kalender und Listen mit deinem Partner.",
+      "terms": "Ich stimme den AGB und der Datenschutzerklärung zu."
+    },
+    "s2": {
+      "title": "Wie heißt deine Familie?",
+      "sub": "Du siehst diesen Namen oben auf dem Dashboard.",
+      "field": "Familienname",
+      "privacy": {
+        "title": "Eure Daten gehören euch",
+        "sub": "Verschlüsselt in der EU gespeichert. Keine Werbung."
+      }
+    },
+    "s3": {
+      "title": "Lade deinen Partner ein",
+      "sub": "Termine, Aufgaben und Einkaufslisten werden in Echtzeit geteilt.",
+      "send": "Einladung senden",
+      "later": "Später einladen"
+    },
+    "s4": {
+      "title": "Erzähl uns von deinem Kind",
+      "sub": "Du kannst weitere Kinder später anlegen — oder die KI mit deiner Stimme bitten.",
+      "voice": "Lieber per Sprache erzählen"
+    },
+    "s5": {
+      "title": "Alles bereit!",
+      "sub": "Eltern Flow ist eingerichtet. {{partner}} wurde eingeladen und {{child}} ist angelegt.",
+      "cta": "Zum Dashboard"
+    }
+  },
+  "dash": {
+    "greeting": {
+      "morning": "Guten Morgen, {{name}}",
+      "day": "Schönen Tag, {{name}}"
+    },
+    "subtitle": "{{family}} · {{date}}",
+    "subtitleDate": "Mittwoch, 14. Mai",
+    "addPerson": "Person hinzufügen",
+    "section": {
+      "today": "Heute",
+      "tomorrow": "Morgen vorbereiten"
+    },
+    "meal": {
+      "question": "Was essen wir heute?",
+      "badge": "Passt perfekt zu deiner Familie",
+      "reasonExample": "Ben liebt Nudeln · keine Allergien · 20 Min.",
+      "openRecipe": "Rezept öffnen",
+      "toShopping": "Zur Einkaufsliste",
+      "refresh": "Neu"
+    },
+    "empty": {
+      "title": "Deine Familie wartet",
+      "sub": "Lege Profile für deine Kinder an oder lade deinen Partner ein. Eltern Flow plant dann automatisch Termine, Essen und Aufgaben.",
+      "addChild": "Kind hinzufügen",
+      "invite": "Partner einladen",
+      "welcome": {
+        "title": "Willkommen!",
+        "sub": "Lass uns deine Familie einrichten"
+      }
+    }
+  },
+  "voice": {
+    "fab": {
+      "label": "Sprachassistent"
+    },
+    "overlay": {
+      "eyebrow": "Sprachassistent",
+      "listening": "Höre zu",
+      "prompt": "„Sprich mit Eltern Flow…“",
+      "exampleEvent": "„Trag bitte für Ben morgen um 16 Uhr Fußballtraining ein.“"
+    },
+    "chip": {
+      "event": "Termin anlegen",
+      "task": "Aufgabe für {{name}}",
+      "meal": "Was kochen wir?",
+      "shopping": "Einkauf hinzufügen"
+    }
+  },
+  "cal": {
+    "title": {
+      "month": "{{monthName}} {{year}}",
+      "week": "Diese Woche",
+      "agenda": "Agenda"
+    },
+    "sub": "Familien-Kalender",
+    "selectedDay": "Mittwoch, 14. Mai",
+    "add": {
+      "voice": "Termin per Sprache"
+    },
+    "legend": {
+      "arzt": "Arzt",
+      "schule": "Schule",
+      "sport": "Sport",
+      "ha": "HA"
+    }
+  },
+  "meals": {
+    "title": "Essensplanung",
+    "weekLabel": "Woche 20 · 12.–18. Mai",
+    "aiPlan": "KI plant die Woche",
+    "aiPlanSub": "In 5 Sek. auf eure Familie zugeschnitten",
+    "shoppingSub": "23 Zutaten · automatisch aus Plan",
+    "today": "heute",
+    "duration": "{{n}} Min.",
+    "tabs": {
+      "dinner": "Abendessen",
+      "lunch": "Mittag",
+      "breakfast": "Frühstück"
+    },
+    "shopping": {
+      "title": "Einkaufsliste",
+      "sub": "{{n}} Zutaten · automatisch aus Plan"
+    },
+    "suggest": {
+      "why": "Warum dieser Vorschlag",
+      "other": "Anderer Vorschlag",
+      "alternatives": "{{n}} Alternativen"
+    },
+    "coach": {
+      "title": "Essens-Coach",
+      "note": "KI auf Familie angepasst"
+    },
+    "recipe": {
+      "cta": "Kochen starten",
+      "note": "Hinweis"
+    }
+  },
+  "hw": {
+    "title": "Hausaufgaben",
+    "sub": "Mittwoch · {{open}} offen · {{done}} erledigt",
+    "dueToday": "Heute fällig",
+    "thisWeek": "Diese Woche",
+    "longTerm": "Langfristig",
+    "upcoming": "Demnächst",
+    "doneToday": "Erledigt heute",
+    "doneRate": "Quote",
+    "openCount_one": "{{count}} offen",
+    "openCount_other": "{{count}} offen",
+    "due": "Fällig: {{when}}",
+    "addVoice": "Aufgabe per Sprache"
+  },
+  "familie": {
+    "parents": "Eltern",
+    "children": "Kinder",
+    "parentsCount": "{{n}} Eltern",
+    "childrenCount_one": "{{count}} Kind",
+    "childrenCount_other": "{{count}} Kinder",
+    "addChild": "Kind hinzufügen",
+    "invitePartner": "Partner einladen",
+    "yearsOld_one": "{{count}} Jahr",
+    "yearsOld_other": "{{count}} Jahre"
+  },
+  "child": {
+    "name": "Name",
+    "age": "Alter",
+    "birthday": "Geburtstag",
+    "school": "Schule / Kita",
+    "allergies": "Allergien & Unverträglichkeiten",
+    "likes": "Lieblingsessen",
+    "dislikes": "Mag nicht",
+    "voiceAdd": "Per Sprache ergänzen",
+    "editTitle": "{{name}} bearbeiten",
+    "editSub": "Kind-Profil · {{age}} Jahre",
+    "newTitle": "Neues Kind",
+    "newSub": "Profil anlegen",
+    "avatarHint": "Tippe auf Stift zum Ändern",
+    "addOther": "Andere"
+  },
+  "recipe": {
+    "title": "Kürbis-Risotto mit Salbei",
+    "servings_one": "{{count}} Portion",
+    "servings_other": "{{count}} Portionen",
+    "tab": {
+      "ingredients": "Zutaten",
+      "steps": "Zubereitung",
+      "nutrition": "Nährwerte"
+    },
+    "noteLabel": "Hinweis",
+    "note": "Mia: laktosefrei zubereitet — Parmesan weggelassen.",
+    "shopping": "Einkauf",
+    "startCooking": "Kochen starten"
+  },
+  "set": {
+    "title": "Einstellungen",
+    "language": "Sprache",
+    "darkMode": "Dunkles Design",
+    "notifications": "Mitteilungen",
+    "voice": "Sprachassistent",
+    "familyMembers": "Familienmitglieder",
+    "privacy": "Datenschutz",
+    "connectedApps": "Verknüpfte Apps",
+    "subscription": "Eltern Flow Plus",
+    "help": "Hilfe & Support",
+    "logout": "Abmelden"
+  }
+}
