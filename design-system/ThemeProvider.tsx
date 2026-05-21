@@ -1,6 +1,6 @@
 import { vars } from "nativewind";
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
-import { Platform, View } from "react-native";
+import { Platform, View, type ViewStyle } from "react-native";
 
 import { themes, type Theme, type ThemeName } from "./themes";
 import { useThemeStore } from "./themeStore";
@@ -10,6 +10,10 @@ interface ThemeContextValue {
   themeName: ThemeName;
   setTheme: (name: ThemeName) => void;
   toggle: () => void;
+  // Re-apply on roots of native modals (formSheet/modal/card) — react-native-screens
+  // hosts modal content in a separate UIViewController, so style inheritance from
+  // the provider's root View doesn't reach them. Spread onto the modal's root View.
+  nativeVars: ViewStyle;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -66,12 +70,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.classList.toggle("dark", themeName === "dark");
   }, [cssVars, themeName]);
 
-  const value = useMemo<ThemeContextValue>(
-    () => ({ theme, themeName, setTheme, toggle }),
-    [theme, themeName, setTheme, toggle],
-  );
+  const nativeVars = useMemo(() => vars(cssVars) as ViewStyle, [cssVars]);
 
-  const nativeVars = useMemo(() => vars(cssVars), [cssVars]);
+  const value = useMemo<ThemeContextValue>(
+    () => ({ theme, themeName, setTheme, toggle, nativeVars }),
+    [theme, themeName, setTheme, toggle, nativeVars],
+  );
 
   return (
     <ThemeContext.Provider value={value}>

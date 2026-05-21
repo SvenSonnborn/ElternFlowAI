@@ -1,8 +1,7 @@
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Pressable, Switch, View } from "react-native";
-import { ScrollView } from "react-native-gesture-handler";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Pressable, ScrollView, Switch, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { IconName } from "@/app-sections/shared/Icon";
 
@@ -79,7 +78,7 @@ function GroupLabel({ children }: { children: string }) {
 
 export function SettingsScreen() {
   const { t, i18n } = useTranslation();
-  const { theme } = useTheme();
+  const { theme, nativeVars } = useTheme();
   const themeName = useThemeStore((s) => s.themeName);
   const toggleTheme = useThemeStore((s) => s.toggle);
   const isDark = themeName === "dark";
@@ -89,10 +88,23 @@ export function SettingsScreen() {
   const insets = useSafeAreaInsets();
 
   return (
-    <View className="flex-1 bg-bg">
+    <SafeAreaView
+      edges={["bottom"]}
+      style={[{ flex: 1, backgroundColor: theme.bg }, nativeVars]}
+      className="flex-1 bg-bg"
+    >
+      <Stack.Screen
+        options={{
+          contentStyle: { flex: 1, backgroundColor: theme.bg },
+        }}
+      />
       <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 48 + insets.bottom }}
+        style={{ flex: 1, backgroundColor: theme.bg }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 4,
+          paddingBottom: 48 + insets.bottom,
+        }}
         keyboardShouldPersistTaps="handled"
       >
         <View className="flex-row items-center justify-between pb-3 pt-4">
@@ -190,6 +202,6 @@ export function SettingsScreen() {
           </Text>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

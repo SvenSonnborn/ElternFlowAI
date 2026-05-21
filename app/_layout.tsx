@@ -51,6 +51,10 @@ export default function RootLayout() {
                   sheetCornerRadius: 26,
                   sheetGrabberVisible: true,
                   sheetExpandsWhenScrolledToEdge: false,
+                  // Container must fill the sheet — otherwise iOS UIKit sheet
+                  // animation + RN flex layout race and content gets clipped/offset.
+                  // Background is overridden dynamically per theme inside SettingsScreen.
+                  contentStyle: { flex: 1, backgroundColor: "#F8F1EB" },
                 }}
               />
               <Stack.Screen name="+not-found" options={{ presentation: "modal" }} />
