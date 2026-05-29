@@ -103,3 +103,37 @@ Bevor Auth, Schema oder Realtime gebaut werden können, braucht das Projekt eine
 ### Out of Scope (für spätere ADRs)
 
 - Schema, RLS-Policies, Auth-Flow, Realtime-Subscriptions, Edge Functions, generated TypeScript-Types.
+
+## ADR-004 — DB-Schema für Family-Organizer (2026-05-29)
+
+### Status
+
+Accepted. Implementiert die Spec [docs/superpowers/specs/2026-05-29-supabase-schema-design.md](superpowers/specs/2026-05-29-supabase-schema-design.md).
+
+### Context
+
+Vor diesem ADR war das Supabase-Projekt leer (nur Auth + Client-Verdrahtung aus ADR-003). Auth-Flow, Login-Screen, oder irgendein Datenpfad waren blockiert bis das Kern-Schema steht. Brainstorming-Session hat die Architektur festgelegt; dieser ADR fasst die finalen Entscheidungen zusammen.
+
+### Decisions (Kurzfassung — Details in der Spec)
+
+1. **Login = pro Elternteil ein Auth-Account**, beide Eltern → gleiche `family_id`.
+2. **Recurring Events via RRULE-Pattern** (eine Row, Vorkommen zur Laufzeit berechnet), Ausnahmen via `event_exceptions`.
+3. **Events vs Tasks getrennt** — Events haben Zeit-Slot, Tasks nur Deadline.
+4. **Lookup-Tabellen für Types** mit System-Defaults (`family_id IS NULL`) + Family-Custom.
+5. **Reminders als eigene Tabelle** (n:1 zu events/tasks, mehrere Reminders pro Event möglich).
+6. **Recipes als globaler Pool** mit `contains_allergens text[]` als source-of-truth für Filter (NICHT `diet_tags`).
+7. **Dedup über Hash** (lower(title) + sorted(ingredients)).
+8. **i18n via JSONB** für übersetzbare Felder — skalierbar ohne Schema-Migration.
+9. **Allergien/Vorlieben** auf parents UND children dupliziert (pragmatisch statt Inheritance-Hierarchie).
+10. **Mehrere Meal-Slots pro Tag** (breakfast/lunch/dinner/snack).
+11. **RLS via `current_family_id()` Helper-Function**, `SECURITY DEFINER` RPCs nur für Onboarding (`create_family`, `accept_invitation`).
+
+### Consequences
+
+- 12 Tabellen + 2 RPCs + 1 Trigger; alle RLS-protected.
+- TypeScript-Types generiert in `features/supabase/database.types.ts`; Client typisiert mit `createClient<Database>()`.
+- Folge-Specs benötigt für: Auth-Flow (Login/Onboarding-Screens), gustar.io Edge Function (Cache-Hit + Allergen-Klassifizierung), Push-Notification-Pipeline (pg_cron + Expo Push).
+
+### Out of Scope (für spätere ADRs)
+
+- Realtime-Subscriptions, Cross-Family-Sharing, Soft-Delete, Storage-Bucket für Profilfotos.

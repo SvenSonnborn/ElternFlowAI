@@ -58,9 +58,9 @@ bunx expo export --platform web --output-dir /tmp/eltern-web
 - **react-i18next + expo-localization** — DE default, EN switch
 - **react-native-reanimated v4 + react-native-worklets** — last babel plugin must be `react-native-worklets/plugin`
 - **ESLint 9 (flat config)** + Prettier + jest-expo
-- **Supabase JS Client** (`@supabase/supabase-js` + AsyncStorage session) via [features/supabase/](features/supabase/). MCP via Supabases hosted HTTP-Server (`mcp.supabase.com`, project-scoped, OAuth) — Konfig in `.mcp.json`. App-ENV in `.env.local` (siehe `.env.example`). Auth-Flow, Schema, RLS, Realtime sind die nächsten Iterationen.
+- **Supabase JS Client** (`@supabase/supabase-js` + AsyncStorage session) via [features/supabase/](features/supabase/). MCP via Supabases hosted HTTP-Server (`mcp.supabase.com`, project-scoped, OAuth) — Konfig in `.mcp.json`. App-ENV in `.env.local` (siehe `.env.example`). Schema mit RLS-Policies in `supabase/migrations/`, TypeScript-Types in `features/supabase/database.types.ts` (generiert). Auth-Flow + Edge Functions sind die nächsten Iterationen.
 
-Deferred to later iterations (not yet wired): Supabase-Schema + RLS-Policies + Auth-Flow + Realtime + Edge Functions, Edamam API, Stripe, real STT + LLM, Expo Notifications.
+Deferred to later iterations (not yet wired): Auth-Flow + Realtime + Edge Functions, gustar.io Worker, Stripe, real STT + LLM, Expo Notifications.
 
 ## Folder structure
 
