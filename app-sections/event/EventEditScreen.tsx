@@ -1,0 +1,271 @@
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { format, set } from "date-fns";
+import { de as deLocale, enUS as enLocale } from "date-fns/locale";
+import { router, useLocalSearchParams } from "expo-router";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Platform, ScrollView, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { Field } from "@/app-sections/shared";
+import { useTheme } from "@/design-system/ThemeProvider";
+import { Button, Text } from "@/design-system/ui";
+import { useEvent, useUpdateEvent, type EditScope } from "@/features/calendar";
+
+import { pickScope } from "./scopeDialog";
+
+function isMultiDay(start: Date, end: Date): boolean {
+  return (
+    end.getTime() - start.getTime() > 24 * 3600_000 ||
+    format(start, "yyyy-MM-dd") !== format(end, "yyyy-MM-dd")
+  );
+}
+
+function mergeDateAndTime(date: Date, time: Date): Date {
+  return set(date, {
+    hours: time.getHours(),
+    minutes: time.getMinutes(),
+    seconds: 0,
+    milliseconds: 0,
+  });
+}
+
+export function EventEditScreen() {
+  const { id, occ } = useLocalSearchParams<{ id?: string; occ?: string }>();
+  const { t, i18n } = useTranslation();
+  const { theme } = useTheme();
+  const lang = i18n.language.startsWith("de") ? "de" : "en";
+  const dateLocale = lang === "de" ? deLocale : enLocale;
+
+  const { data: occurrence, isLoading } = useEvent(id ?? "", occ);
+  const updateMutation = useUpdateEvent();
+
+  const initial = useMemo(() => {
+    if (!occurrence) return null;
+    return {
+      title: occurrence.title,
+      startAt: occurrence.startAt,
+      endAt: occurrence.endAt,
+      location: occurrence.location ?? "",
+      notes: occurrence.description ?? "",
+    };
+  }, [occurrence]);
+
+  const [title, setTitle] = useState("");
+  const [startAt, setStartAt] = useState<Date>(new Date());
+  const [endAt, setEndAt] = useState<Date>(new Date());
+  const [location, setLocation] = useState("");
+  const [notes, setNotes] = useState("");
+  const [picker, setPicker] = useState<"date" | "startTime" | "endTime" | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  if (initial && !hydrated) {
+    setTitle(initial.title);
+    setStartAt(initial.startAt);
+    setEndAt(initial.endAt);
+    setLocation(initial.location);
+    setNotes(initial.notes);
+    setHydrated(true);
+  }
+
+  const multiDay = useMemo(() => isMultiDay(startAt, endAt), [startAt, endAt]);
+  const titleError = !title.trim() ? t("cal.edit.error.titleRequired") : "";
+  const timeError =
+    endAt.getTime() <= startAt.getTime() ? t("cal.edit.error.invalidTimeRange") : "";
+  const multiDayError = multiDay ? t("cal.edit.error.multiDay") : "";
+  const canSave =
+    hydrated && !titleError && !timeError && !multiDayError && !updateMutation.isPending;
+
+  const onPickerChange = (event: { type: string }, selected?: Date) => {
+    if (Platform.OS !== "ios") setPicker(null);
+    if (event.type === "dismissed" || !selected) return;
+    if (picker === "date") {
+      setStartAt(mergeDateAndTime(selected, startAt));
+      setEndAt(mergeDateAndTime(selected, endAt));
+    } else if (picker === "startTime") {
+      setStartAt(mergeDateAndTime(startAt, selected));
+    } else if (picker === "endTime") {
+      setEndAt(mergeDateAndTime(endAt, selected));
+    }
+    if (Platform.OS === "ios") setPicker(null);
+  };
+
+  async function onSave() {
+    if (!occurrence || !canSave) return;
+    const isRecurring = !occurrence.eventId.startsWith("sample-");
+    let scope: EditScope = "all";
+    if (isRecurring) {
+      const labels = {
+        title: t("cal.scope.title"),
+        this: t("cal.scope.this"),
+        forward: t("cal.scope.forward"),
+        all: t("cal.scope.all"),
+        cancel: t("action.cancel"),
+      };
+      const chosen = await pickScope(labels);
+      if (!chosen) return;
+      scope = chosen;
+    }
+    updateMutation.mutate(
+      {
+        scope,
+        eventId: occurrence.eventId,
+        occurrenceDate: occurrence.occurrenceDate,
+        isRecurring,
+        // master row is reconstructed from the occurrence — the mutations
+        // only consume master for `forward`-edit's insertSplitEvent, and
+        // sample-mode events never reach this branch (Detail-Sheet gates).
+        master: {
+          id: occurrence.eventId,
+          family_id: "",
+          type_id: "",
+          child_id: occurrence.childId,
+          title: occurrence.title,
+          description: occurrence.description,
+          location: occurrence.location,
+          start_at: occurrence.startAt.toISOString(),
+          end_at: occurrence.endAt.toISOString(),
+          all_day: occurrence.allDay,
+          rrule_freq: isRecurring ? "weekly" : null,
+          rrule_interval: 1,
+          rrule_byweekday: null,
+          rrule_until: null,
+          rrule_count: null,
+          created_by: null,
+          created_at: "",
+          updated_at: "",
+        },
+        changes: {
+          title: title.trim(),
+          start_at: startAt.toISOString(),
+          end_at: endAt.toISOString(),
+          location: location.trim() || null,
+          description: notes.trim() || null,
+        },
+      },
+      {
+        onSuccess: () => router.back(),
+      },
+    );
+  }
+
+  return (
+    <SafeAreaView edges={["bottom"]} className="flex-1 bg-card">
+      <View className="items-center pb-1 pt-2.5">
+        <View className="h-1 w-10 rounded-full" style={{ backgroundColor: theme.lineStrong }} />
+      </View>
+
+      {isLoading || !occurrence ? (
+        <View className="flex-1 items-center justify-center px-6">
+          <View className="h-24 w-full rounded-2xl" style={{ backgroundColor: theme.cardSubtle }} />
+        </View>
+      ) : (
+        <>
+          <ScrollView
+            className="flex-1"
+            contentContainerStyle={{
+              paddingHorizontal: 20,
+              paddingTop: 14,
+              paddingBottom: 24,
+              gap: 14,
+            }}
+          >
+            <Text variant="h2">{t("cal.edit.title")}</Text>
+
+            {multiDayError ? (
+              <View className="rounded-xl bg-warning-soft px-3 py-2">
+                <Text variant="caption" tone="accentStrong">
+                  {multiDayError}
+                </Text>
+              </View>
+            ) : null}
+
+            <Field
+              label={t("cal.edit.fieldTitle")}
+              value={title}
+              onChangeText={setTitle}
+              error={titleError}
+            />
+
+            <Field
+              label={t("cal.edit.fieldDate")}
+              iconName="calendar"
+              value={format(startAt, "EEEE, d. MMMM yyyy", { locale: dateLocale })}
+              onPress={() => setPicker("date")}
+            />
+
+            <View className="flex-row gap-3">
+              <View className="flex-1">
+                <Field
+                  label={t("cal.edit.fieldStart")}
+                  iconName="clock"
+                  value={format(startAt, "HH:mm")}
+                  onPress={() => setPicker("startTime")}
+                />
+              </View>
+              <View className="flex-1">
+                <Field
+                  label={t("cal.edit.fieldEnd")}
+                  iconName="clock"
+                  value={format(endAt, "HH:mm")}
+                  onPress={() => setPicker("endTime")}
+                  error={timeError}
+                />
+              </View>
+            </View>
+
+            <Field
+              label={t("cal.edit.fieldLocation")}
+              iconName="map-pin"
+              value={location}
+              onChangeText={setLocation}
+              placeholder="—"
+            />
+
+            <Field
+              label={t("cal.edit.fieldNotes")}
+              value={notes}
+              onChangeText={setNotes}
+              type="multiline"
+              placeholder="—"
+            />
+
+            {updateMutation.error ? (
+              <Text variant="caption" tone="danger">
+                {t("cal.edit.error.network")}
+                {": "}
+                {updateMutation.error instanceof Error ? updateMutation.error.message : ""}
+              </Text>
+            ) : null}
+          </ScrollView>
+
+          {picker ? (
+            <DateTimePicker
+              value={picker === "date" ? startAt : picker === "startTime" ? startAt : endAt}
+              mode={picker === "date" ? "date" : "time"}
+              onChange={onPickerChange}
+              display={Platform.OS === "ios" ? "spinner" : "default"}
+            />
+          ) : null}
+
+          <View className="flex-row gap-2.5 border-t border-line bg-card px-4 py-3">
+            <Button
+              label={t("action.cancel")}
+              variant="soft"
+              tone="neutral"
+              className="flex-1"
+              onPress={() => router.back()}
+            />
+            <Button
+              label={updateMutation.isPending ? t("cal.edit.saving") : t("cal.edit.save")}
+              tone="primary"
+              className="flex-1"
+              disabled={!canSave}
+              onPress={() => void onSave()}
+            />
+          </View>
+        </>
+      )}
+    </SafeAreaView>
+  );
+}
