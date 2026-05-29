@@ -152,7 +152,37 @@
       "edit": "Edit",
       "delete": "Delete",
       "editSoon": "Coming soon",
-      "close": "Close"
+      "close": "Close",
+      "requiresAuth": "Sign in to edit events."
+    },
+    "edit": {
+      "title": "Edit event",
+      "fieldTitle": "Title",
+      "fieldDate": "Date",
+      "fieldStart": "From",
+      "fieldEnd": "To",
+      "fieldLocation": "Location",
+      "fieldNotes": "Notes",
+      "save": "Save",
+      "saving": "Saving…",
+      "error": {
+        "titleRequired": "Title cannot be empty",
+        "invalidTimeRange": "End time must be after start time",
+        "multiDay": "Multi-day events are not editable in this version",
+        "network": "Save failed"
+      }
+    },
+    "delete": {
+      "confirmTitle": "Delete event?",
+      "confirmBody": "This cannot be undone.",
+      "confirmOk": "Delete",
+      "error": "Delete failed"
+    },
+    "scope": {
+      "title": "Which events?",
+      "this": "Only this one",
+      "forward": "This and all following",
+      "all": "All events"
     }
   },
   "meals": {
