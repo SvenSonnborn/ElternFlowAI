@@ -1,3 +1,5 @@
+import { t as i18nT } from "i18next";
+
 import type { IconName } from "@/app-sections/shared";
 import type { Theme } from "@/design-system/themes";
 
@@ -46,13 +48,23 @@ export function eventIconFor(slug: string, dbIcon: string): IconName {
   return SLUG_TO_ICON[slug] ?? DB_ICON_TO_ICON[dbIcon] ?? "calendar";
 }
 
-export const FALLBACK_TYPE_LABEL: Record<string, { de: string; en: string }> = {
-  schule: { de: "Schule", en: "School" },
-  arzt: { de: "Arzt", en: "Doctor" },
-  sport: { de: "Sport", en: "Sport" },
-  training: { de: "Training", en: "Training" },
-  ha: { de: "Hausaufgaben", en: "Tasks" },
-  hausaufgaben: { de: "Hausaufgaben", en: "Tasks" },
-  family: { de: "Familie", en: "Family" },
-  meal: { de: "Essen", en: "Meal" },
+// Map non-canonical slugs to their cal.legend.* equivalent for label lookup.
+// (DB seeds `training` for sport-style events; `hausaufgaben` is task-side,
+// listed defensively in case it ever surfaces in event_types.)
+const SLUG_LABEL_ALIAS: Record<string, string> = {
+  training: "sport",
+  hausaufgaben: "ha",
 };
+
+/**
+ * Resolves user-visible DE/EN labels for an event_types slug via the i18n
+ * catalogs (`cal.legend.<slug>`). Falls back to the slug itself when no key
+ * matches, preserving the previous "{ de: slug, en: slug }" default.
+ */
+export function typeLabelsForSlug(slug: string): { de: string; en: string } {
+  const aliased = SLUG_LABEL_ALIAS[slug] ?? slug;
+  return {
+    de: i18nT(`cal.legend.${aliased}`, { lng: "de", defaultValue: slug }),
+    en: i18nT(`cal.legend.${aliased}`, { lng: "en", defaultValue: slug }),
+  };
+}

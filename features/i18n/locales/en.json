@@ -132,6 +132,10 @@
     "fallback": {
       "banner": "Sample data – not signed in yet"
     },
+    "duration": {
+      "hourShort": "hr",
+      "minuteShort": "min"
+    },
     "add": {
       "voice": "Add by voice"
     },

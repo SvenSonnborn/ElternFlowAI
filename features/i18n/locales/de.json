@@ -132,6 +132,10 @@
     "fallback": {
       "banner": "Sample-Daten – noch nicht eingeloggt"
     },
+    "duration": {
+      "hourShort": "Std.",
+      "minuteShort": "Min."
+    },
     "add": {
       "voice": "Termin per Sprache"
     },

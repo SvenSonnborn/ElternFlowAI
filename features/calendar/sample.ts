@@ -4,7 +4,7 @@ import { lightTheme } from "@/design-system/themes";
 
 import type { CalendarOccurrence } from "./types";
 
-import { eventColorFor, eventIconFor, FALLBACK_TYPE_LABEL } from "./palette";
+import { eventColorFor, eventIconFor, typeLabelsForSlug } from "./palette";
 
 interface Seed {
   dayOffset: number;
@@ -147,7 +147,7 @@ function seedToOccurrence(seed: Seed, base: Date): CalendarOccurrence {
     seed.minute,
   );
   const endAt = new Date(startAt.getTime() + seed.durationMin * 60_000);
-  const label = FALLBACK_TYPE_LABEL[seed.slug] ?? { de: seed.slug, en: seed.slug };
+  const label = typeLabelsForSlug(seed.slug);
   return {
     eventId: `sample-${seed.slug}-${seed.dayOffset}-${seed.hour}`,
     occurrenceDate: format(startAt, "yyyy-MM-dd"),

@@ -1,6 +1,7 @@
 import { format, parseISO } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { useRouter } from "expo-router";
+import { type TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, View } from "react-native";
@@ -29,12 +30,12 @@ const LEGEND: { slug: "arzt" | "schule" | "sport" | "ha" | "family" | "meal"; co
   { slug: "meal", color: palette.event.meal },
 ];
 
-function formatDurationLabel(durationMin: number): string {
+function formatDurationLabel(durationMin: number, t: TFunction): string {
   if (durationMin >= 60) {
     const h = Math.round(durationMin / 60);
-    return `${h} h`;
+    return `${h} ${t("cal.duration.hourShort")}`;
   }
-  return `${durationMin} m`;
+  return `${durationMin} ${t("cal.duration.minuteShort")}`;
 }
 
 export function KalenderScreen() {
@@ -147,7 +148,7 @@ export function KalenderScreen() {
                     {timeLabel}
                   </Text>
                   <Text variant="caption" tone="inkSecondary">
-                    {formatDurationLabel(durationMin)}
+                    {formatDurationLabel(durationMin, t)}
                   </Text>
                 </View>
                 <View className="flex-1">

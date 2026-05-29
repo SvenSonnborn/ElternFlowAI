@@ -6,7 +6,7 @@ import type { Database, Json } from "@/features/supabase/database.types";
 
 import type { CalendarOccurrence } from "./types";
 
-import { eventColorFor, eventIconFor, FALLBACK_TYPE_LABEL } from "./palette";
+import { eventColorFor, eventIconFor, typeLabelsForSlug } from "./palette";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
@@ -29,7 +29,7 @@ function isJsonObject(j: Json | null | undefined): j is { [k: string]: Json | un
 }
 
 function readLabel(slug: string, label: Json | null | undefined): { de: string; en: string } {
-  const fallback = FALLBACK_TYPE_LABEL[slug] ?? { de: slug, en: slug };
+  const fallback = typeLabelsForSlug(slug);
   if (!isJsonObject(label)) return fallback;
   const de = label.de;
   const en = label.en;
