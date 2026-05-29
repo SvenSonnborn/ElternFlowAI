@@ -96,8 +96,8 @@ export function expandEvents(
     const exceptions = new Map((row.event_exceptions ?? []).map((ex) => [ex.occurrence_date, ex]));
 
     for (const occurrenceStart of occurrences) {
-      const occurrenceDate = format(occurrenceStart, "yyyy-MM-dd");
-      const ex = exceptions.get(occurrenceDate);
+      const lookupDate = format(occurrenceStart, "yyyy-MM-dd");
+      const ex = exceptions.get(lookupDate);
       if (ex?.action === "cancelled") continue;
 
       let resolved: Resolved = {
@@ -109,6 +109,10 @@ export function expandEvents(
       if (ex?.action === "modified") {
         resolved = applyOverride(resolved, ex.override ?? null);
       }
+
+      // Date may shift if a modified exception overrode start_at to a different day —
+      // recompute from the resolved value so the returned record reflects the actual date.
+      const occurrenceDate = format(resolved.startAt, "yyyy-MM-dd");
 
       out.push({
         eventId: row.id,
