@@ -3,14 +3,16 @@ import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, Switch, View } from "react-native";
+import { Alert, ScrollView, Switch, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ChildAvatar, Icon } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
-import { useEvent } from "@/features/calendar";
+import { useDeleteEvent, useEvent, useSessionStore, type EditScope } from "@/features/calendar";
 import { children as sampleChildren } from "@/features/sample-data";
+
+import { pickScope } from "./scopeDialog";
 
 function ReminderRow({
   label,
@@ -53,6 +55,68 @@ export function EventDetailScreen() {
   const [reminder1, setReminder1] = useState(false);
 
   const { data, isLoading, error } = useEvent(id ?? "", occ);
+
+  const session = useSessionStore((s) => s.session);
+  const deleteMutation = useDeleteEvent();
+
+  const isSampleMode = !session;
+
+  const onEditPress = () => {
+    if (isSampleMode) {
+      Alert.alert(t("cal.detail.requiresAuth"));
+      return;
+    }
+    if (!data) return;
+    router.push({
+      pathname: "/event/edit/[id]",
+      params: { id: data.eventId, occ: data.occurrenceDate },
+    });
+  };
+
+  const onDeletePress = () => {
+    if (isSampleMode) {
+      Alert.alert(t("cal.detail.requiresAuth"));
+      return;
+    }
+    if (!data) return;
+    Alert.alert(t("cal.delete.confirmTitle"), t("cal.delete.confirmBody"), [
+      { text: t("action.cancel"), style: "cancel" },
+      {
+        text: t("cal.delete.confirmOk"),
+        style: "destructive",
+        onPress: () => {
+          void (async () => {
+            const isRecurring = data.isRecurring;
+            let scope: EditScope = "all";
+            if (isRecurring) {
+              const labels = {
+                title: t("cal.scope.title"),
+                this: t("cal.scope.this"),
+                forward: t("cal.scope.forward"),
+                all: t("cal.scope.all"),
+                cancel: t("action.cancel"),
+              };
+              const chosen = await pickScope(labels);
+              if (!chosen) return;
+              scope = chosen;
+            }
+            deleteMutation.mutate(
+              {
+                scope,
+                eventId: data.eventId,
+                occurrenceDate: data.occurrenceDate,
+                isRecurring,
+                masterStartAt: data.startAt,
+              },
+              {
+                onSuccess: () => router.back(),
+              },
+            );
+          })();
+        },
+      },
+    ]);
+  };
 
   return (
     <SafeAreaView edges={["bottom"]} className="flex-1 bg-card">
@@ -151,31 +215,25 @@ export function EventDetailScreen() {
                 onValueChange={setReminder1}
               />
             </View>
-
-            <Pressable
-              onPress={() => router.back()}
-              className="mt-5 flex-row items-center justify-center gap-1 active:opacity-70"
-              accessibilityRole="button"
-            >
-              <Text variant="caption" tone="inkTertiary">
-                {t("cal.detail.editSoon")}
-              </Text>
-            </Pressable>
           </ScrollView>
 
-          <View className="flex-row gap-2.5 border-t border-line bg-card px-4 py-3">
+          <View
+            className="flex-row gap-2.5 border-t border-line bg-card px-4 py-3"
+            style={{ opacity: isSampleMode ? 0.5 : 1 }}
+          >
             <Button
-              label={t("cal.detail.delete")}
+              label={deleteMutation.isPending ? t("cal.edit.saving") : t("cal.detail.delete")}
               variant="soft"
               tone="danger"
               className="flex-1"
-              onPress={() => router.back()}
+              disabled={deleteMutation.isPending}
+              onPress={onDeletePress}
             />
             <Button
               label={t("cal.detail.edit")}
               tone="primary"
               className="flex-1"
-              onPress={() => router.back()}
+              onPress={onEditPress}
             />
           </View>
         </>
