@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { addDays, format, parseISO } from "date-fns";
 
 import type { Database } from "@/features/supabase/database.types";
@@ -108,4 +110,84 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
 
   // scope === "all"
   await ops.updateMaster(eventId, changes);
+}
+
+export function createSupabaseEventOps(client: SupabaseClient<Database>): EventOps {
+  return {
+    cancelOccurrence: async (eventId, occurrenceDate) => {
+      const { error } = await client
+        .from("event_exceptions")
+        .upsert(
+          {
+            event_id: eventId,
+            occurrence_date: occurrenceDate,
+            action: "cancelled",
+            override: null,
+          },
+          { onConflict: "event_id,occurrence_date" },
+        );
+      if (error) throw error;
+    },
+
+    modifyOccurrence: async (eventId, occurrenceDate, override) => {
+      const { error } = await client.from("event_exceptions").upsert(
+        {
+          event_id: eventId,
+          occurrence_date: occurrenceDate,
+          action: "modified",
+          override,
+        },
+        { onConflict: "event_id,occurrence_date" },
+      );
+      if (error) throw error;
+    },
+
+    deleteMaster: async (eventId) => {
+      const { error } = await client.from("events").delete().eq("id", eventId);
+      if (error) throw error;
+    },
+
+    updateMaster: async (eventId, changes) => {
+      const { error } = await client.from("events").update(changes).eq("id", eventId);
+      if (error) throw error;
+    },
+
+    setRruleUntil: async (eventId, until) => {
+      const { error } = await client
+        .from("events")
+        .update({ rrule_until: until })
+        .eq("id", eventId);
+      if (error) throw error;
+    },
+
+    deleteExceptionsFromDate: async (eventId, fromDateInclusive) => {
+      const { error } = await client
+        .from("event_exceptions")
+        .delete()
+        .eq("event_id", eventId)
+        .gte("occurrence_date", fromDateInclusive);
+      if (error) throw error;
+    },
+
+    insertSplitEvent: async (master, changes) => {
+      const { error } = await client.from("events").insert({
+        family_id: master.family_id,
+        type_id: master.type_id,
+        child_id: master.child_id,
+        title: changes.title,
+        description: changes.description,
+        location: changes.location,
+        start_at: changes.start_at,
+        end_at: changes.end_at,
+        all_day: master.all_day,
+        rrule_freq: master.rrule_freq,
+        rrule_interval: master.rrule_interval,
+        rrule_byweekday: master.rrule_byweekday,
+        rrule_until: null,
+        rrule_count: null,
+        created_by: master.created_by,
+      });
+      if (error) throw error;
+    },
+  };
 }
