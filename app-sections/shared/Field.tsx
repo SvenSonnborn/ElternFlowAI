@@ -17,8 +17,9 @@ export interface FieldProps {
   error?: string;
   editable?: boolean;
   /**
-   * If provided, replaces the TextInput with a pressable surface that calls
-   * this on press (useful for date/time pickers that own their own overlay).
+   * Callback when the field is pressed. When provided, the TextInput becomes
+   * non-editable (display-only) and onPressIn fires on tap, allowing an
+   * external picker (e.g., DateTimePicker) to own the interaction.
    */
   onPress?: () => void;
   keyboardType?: TextInputProps["keyboardType"];
@@ -54,8 +55,7 @@ export function Field({
       >
         {iconName ? <Icon name={iconName} size={18} color={theme.inkTertiary} /> : null}
         <TextInput
-          value={value}
-          onChangeText={onChangeText}
+          {...(onChangeText ? { value, onChangeText } : { defaultValue: value })}
           placeholder={placeholder}
           placeholderTextColor={theme.inkTertiary}
           editable={editable && !onPress}
