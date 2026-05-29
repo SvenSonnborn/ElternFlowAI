@@ -127,7 +127,11 @@
       "agenda": "Agenda"
     },
     "sub": "Familien-Kalender",
-    "selectedDay": "Mittwoch, 14. Mai",
+    "today": "Heute",
+    "empty": "Keine Termine an diesem Tag",
+    "fallback": {
+      "banner": "Sample-Daten – noch nicht eingeloggt"
+    },
     "add": {
       "voice": "Termin per Sprache"
     },
@@ -135,7 +139,20 @@
       "arzt": "Arzt",
       "schule": "Schule",
       "sport": "Sport",
-      "ha": "HA"
+      "ha": "HA",
+      "family": "Familie",
+      "meal": "Essen"
+    },
+    "detail": {
+      "title": "Termin",
+      "location": "Ort",
+      "reminder24h": "Erinnerung 24 Std. vorher",
+      "reminder1h": "Erinnerung 1 Std. vorher",
+      "notes": "Notizen",
+      "edit": "Bearbeiten",
+      "delete": "Löschen",
+      "editSoon": "Bald verfügbar",
+      "close": "Schließen"
     }
   },
   "meals": {

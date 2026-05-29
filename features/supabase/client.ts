@@ -1,6 +1,7 @@
 import "react-native-url-polyfill/auto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
+import { Platform } from "react-native";
 
 import type { Database } from "./database.types";
 
@@ -13,11 +14,23 @@ if (!url || !publishableKey) {
   );
 }
 
+// AsyncStorage greift bei `import` direkt auf `window.localStorage` zu, was
+// während Expos Static-HTML-Pre-Render (Node, kein window) crasht. In SSR/Node
+// liefern wir einen No-Op-Storage; sobald window verfügbar ist (Browser/Native),
+// nutzt Supabase wieder die echte Persistenz.
+const isBrowser = typeof window !== "undefined";
+const storage =
+  Platform.OS === "web"
+    ? isBrowser
+      ? (window.localStorage as unknown as typeof AsyncStorage)
+      : undefined
+    : AsyncStorage;
+
 export const supabase = createClient<Database>(url, publishableKey, {
   auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
+    storage,
+    autoRefreshToken: isBrowser || Platform.OS !== "web",
+    persistSession: isBrowser || Platform.OS !== "web",
     detectSessionInUrl: false,
   },
 });

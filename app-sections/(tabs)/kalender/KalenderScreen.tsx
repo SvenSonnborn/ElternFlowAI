@@ -1,143 +1,172 @@
+import { format, parseISO } from "date-fns";
+import { de as deLocale, enUS as enLocale } from "date-fns/locale";
+import { useRouter } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, View } from "react-native";
+import { Calendar } from "react-native-calendars";
 
 import { ChildAvatar, Icon, SectionHeader, TopBar } from "@/app-sections/shared";
 import { palette } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
-import { monthGridMay2026, selectedDayEvents } from "@/features/sample-data";
+import {
+  buildCalendarTheme,
+  setCalendarLocale,
+  useFamilyEvents,
+  useMarkedDates,
+} from "@/features/calendar";
+import { children as sampleChildren } from "@/features/sample-data";
 
-const WEEKDAYS_DE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-const WEEKDAYS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+import { CalendarDay } from "./CalendarDay";
+
+const LEGEND: { slug: "arzt" | "schule" | "sport" | "ha" | "family" | "meal"; color: string }[] = [
+  { slug: "arzt", color: palette.event.arzt },
+  { slug: "schule", color: palette.event.schule },
+  { slug: "sport", color: palette.event.sport },
+  { slug: "ha", color: palette.event.ha },
+  { slug: "family", color: palette.event.family },
+  { slug: "meal", color: palette.event.meal },
+];
+
+function formatDurationLabel(durationMin: number): string {
+  if (durationMin >= 60) {
+    const h = Math.round(durationMin / 60);
+    return `${h} h`;
+  }
+  return `${durationMin} m`;
+}
 
 export function KalenderScreen() {
   const { t, i18n } = useTranslation();
-  const { theme } = useTheme();
+  const router = useRouter();
+  const { theme, themeName } = useTheme();
   const lang = i18n.language.startsWith("de") ? "de" : "en";
-  const weekdays = lang === "de" ? WEEKDAYS_DE : WEEKDAYS_EN;
-  const monthLabel = t("cal.title.month", { monthName: lang === "de" ? "Mai" : "May", year: 2026 });
+  const dateLocale = lang === "de" ? deLocale : enLocale;
 
-  const legend = [
-    { k: t("cal.legend.arzt"), c: palette.event.arzt },
-    { k: t("cal.legend.schule"), c: palette.event.schule },
-    { k: t("cal.legend.sport"), c: palette.event.sport },
-    { k: t("cal.legend.ha"), c: palette.event.ha },
-  ];
+  const [selectedDate, setSelectedDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date());
+
+  useEffect(() => {
+    setCalendarLocale(lang);
+  }, [lang]);
+
+  const { data: occurrences, isFallback } = useFamilyEvents(visibleMonth);
+  const markedDates = useMarkedDates(occurrences, selectedDate, theme.primarySoft);
+
+  const dayEvents = useMemo(
+    () =>
+      occurrences
+        .filter((o) => o.occurrenceDate === selectedDate)
+        .sort((a, b) => a.startAt.getTime() - b.startAt.getTime()),
+    [occurrences, selectedDate],
+  );
+
+  const monthName = format(visibleMonth, "LLLL", { locale: dateLocale });
+  const year = format(visibleMonth, "yyyy");
+  const monthLabel = t("cal.title.month", { monthName, year });
+  const selectedDayLabel = format(parseISO(selectedDate), "EEEE, d. MMMM", { locale: dateLocale });
+
+  const calendarTheme = useMemo(() => buildCalendarTheme(theme), [theme]);
 
   return (
     <Screen scroll>
       <TopBar title={monthLabel} sub={t("cal.sub")} />
 
-      <View className="mb-3 flex-row items-center justify-between">
-        <Pressable className="h-8 w-8 items-center justify-center rounded-lg border border-line bg-card active:opacity-70">
-          <Icon name="chevron-left" size={14} color={theme.inkSecondary} />
-        </Pressable>
-        <Text variant="bodyEmph">{lang === "de" ? "Mai" : "May"}</Text>
-        <Pressable className="h-8 w-8 items-center justify-center rounded-lg border border-line bg-card active:opacity-70">
-          <Icon name="chevron-right" size={14} color={theme.inkSecondary} />
-        </Pressable>
-      </View>
+      {isFallback ? (
+        <View
+          className="mb-3 rounded-xl border border-line bg-card-subtle px-3 py-2"
+          style={{ borderColor: theme.lineStrong }}
+        >
+          <Text variant="caption" tone="inkSecondary">
+            {t("cal.fallback.banner")}
+          </Text>
+        </View>
+      ) : null}
 
       <Card className="p-2">
-        <View className="flex-row">
-          {weekdays.map((w) => (
-            <View key={w} className="flex-1 items-center py-2">
+        <Calendar
+          key={`${themeName}-${lang}`}
+          current={format(visibleMonth, "yyyy-MM-dd")}
+          markingType="multi-dot"
+          markedDates={markedDates}
+          dayComponent={CalendarDay}
+          onDayPress={(d) => setSelectedDate(d.dateString)}
+          onMonthChange={(m) => setVisibleMonth(parseISO(m.dateString))}
+          theme={calendarTheme}
+          firstDay={1}
+          enableSwipeMonths
+          hideExtraDays={false}
+        />
+        <View className="mt-2 flex-row flex-wrap items-center justify-around gap-y-2 border-t border-line pt-3">
+          {LEGEND.map((item) => (
+            <View key={item.slug} className="flex-row items-center gap-1.5">
+              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: item.color }} />
               <Text variant="caption" tone="inkSecondary">
-                {w}
-              </Text>
-            </View>
-          ))}
-        </View>
-        <View className="flex-row flex-wrap">
-          {monthGridMay2026.map((cell, i) => {
-            const ink = cell.isToday ? "white" : cell.isCurrentMonth ? "ink" : "inkTertiary";
-            return (
-              <View
-                key={i}
-                className="items-center justify-start py-1.5"
-                style={{ width: `${100 / 7}%`, minHeight: 44 }}
-              >
-                <View
-                  className={`h-9 w-9 items-center justify-center rounded-pill ${
-                    cell.isToday ? "bg-primary" : ""
-                  }`}
-                >
-                  <Text
-                    variant="caption"
-                    tone={ink}
-                    style={{
-                      fontVariant: ["tabular-nums"],
-                      fontWeight: cell.isToday ? "700" : "500",
-                    }}
-                  >
-                    {cell.day}
-                  </Text>
-                </View>
-                {cell.dots.length > 0 && cell.isCurrentMonth ? (
-                  <View className="mt-1 flex-row gap-0.5">
-                    {cell.dots.slice(0, 3).map((dotColor, di) => (
-                      <View
-                        key={di}
-                        style={{
-                          width: 4,
-                          height: 4,
-                          borderRadius: 2,
-                          backgroundColor: cell.isToday ? "rgba(255,255,255,0.9)" : dotColor,
-                        }}
-                      />
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-            );
-          })}
-        </View>
-        <View className="mt-2 flex-row items-center justify-around border-t border-line pt-3">
-          {legend.map((l) => (
-            <View key={l.k} className="flex-row items-center gap-1.5">
-              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: l.c }} />
-              <Text variant="caption" tone="inkSecondary">
-                {l.k}
+                {t(`cal.legend.${item.slug}`)}
               </Text>
             </View>
           ))}
         </View>
       </Card>
 
-      <SectionHeader title={t("cal.selectedDay")} />
-      <View className="gap-2">
-        {selectedDayEvents.slice(0, 3).map((event) => (
-          <View
-            key={event.id}
-            className="flex-row items-center gap-3 overflow-hidden rounded-2xl border border-line bg-card p-3 pl-4"
-          >
-            <View
-              className="absolute bottom-2 left-1.5 top-2 w-1 rounded-full"
-              style={{ backgroundColor: event.tone }}
-            />
-            <View className="w-12">
-              <Text variant="bodyEmph">{event.time}</Text>
-              <Text variant="caption" tone="inkSecondary">
-                {Math.round(event.durationMin / 60) >= 1
-                  ? `${Math.round(event.durationMin / 60)} h`
-                  : `${event.durationMin} m`}
-              </Text>
-            </View>
-            <View className="flex-1">
-              <Text variant="listTitle" numberOfLines={1}>
-                {event.title}
-              </Text>
-              <View className="mt-0.5 flex-row items-center gap-1.5">
-                <ChildAvatar name={event.who.split(" ")[0]} color={event.tone} size="sm" />
-                <Text variant="caption" tone="inkSecondary">
-                  {event.who}
-                </Text>
-              </View>
-            </View>
-            <Icon name={event.iconName} size={16} color={event.tone} />
-          </View>
-        ))}
-      </View>
+      <SectionHeader title={selectedDayLabel} />
+      {dayEvents.length === 0 ? (
+        <View className="items-center rounded-2xl border border-line bg-card px-4 py-6">
+          <Text variant="caption" tone="inkSecondary">
+            {t("cal.empty")}
+          </Text>
+        </View>
+      ) : (
+        <View className="gap-2">
+          {dayEvents.map((occ) => {
+            const child = occ.childId ? sampleChildren.find((c) => c.id === occ.childId) : null;
+            const durationMin = Math.max(
+              0,
+              Math.round((occ.endAt.getTime() - occ.startAt.getTime()) / 60_000),
+            );
+            const timeLabel = occ.allDay ? "—" : format(occ.startAt, "HH:mm");
+            const typeLabel = lang === "de" ? occ.type.labelDe : occ.type.labelEn;
+            return (
+              <Pressable
+                key={`${occ.eventId}-${occ.occurrenceDate}`}
+                onPress={() =>
+                  router.push({
+                    pathname: "/event/[id]",
+                    params: { id: occ.eventId, occ: occ.occurrenceDate },
+                  })
+                }
+                className="flex-row items-center gap-3 overflow-hidden rounded-2xl border border-line bg-card p-3 pl-4 active:opacity-70"
+              >
+                <View
+                  className="absolute bottom-2 left-1.5 top-2 w-1 rounded-full"
+                  style={{ backgroundColor: occ.type.color }}
+                />
+                <View className="w-12">
+                  <Text variant="bodyEmph" style={{ fontVariant: ["tabular-nums"] }}>
+                    {timeLabel}
+                  </Text>
+                  <Text variant="caption" tone="inkSecondary">
+                    {formatDurationLabel(durationMin)}
+                  </Text>
+                </View>
+                <View className="flex-1">
+                  <Text variant="listTitle" numberOfLines={1}>
+                    {occ.title}
+                  </Text>
+                  <View className="mt-0.5 flex-row items-center gap-1.5">
+                    {child ? <ChildAvatar name={child.name} color={child.color} size="sm" /> : null}
+                    <Text variant="caption" tone="inkSecondary" numberOfLines={1}>
+                      {child ? `${child.name} · ${typeLabel}` : typeLabel}
+                    </Text>
+                  </View>
+                </View>
+                <Icon name={occ.type.iconName} size={16} color={occ.type.color} />
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
 
       <Button label={t("cal.add.voice")} variant="soft" tone="accent" block className="mt-4" />
     </Screen>

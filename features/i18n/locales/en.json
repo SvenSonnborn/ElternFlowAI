@@ -127,7 +127,11 @@
       "agenda": "Agenda"
     },
     "sub": "Family calendar",
-    "selectedDay": "Wednesday, May 14",
+    "today": "Today",
+    "empty": "No events on this day",
+    "fallback": {
+      "banner": "Sample data – not signed in yet"
+    },
     "add": {
       "voice": "Add by voice"
     },
@@ -135,7 +139,20 @@
       "arzt": "Doctor",
       "schule": "School",
       "sport": "Sport",
-      "ha": "Tasks"
+      "ha": "Tasks",
+      "family": "Family",
+      "meal": "Meal"
+    },
+    "detail": {
+      "title": "Event",
+      "location": "Location",
+      "reminder24h": "Remind 24 hr before",
+      "reminder1h": "Remind 1 hr before",
+      "notes": "Notes",
+      "edit": "Edit",
+      "delete": "Delete",
+      "editSoon": "Coming soon",
+      "close": "Close"
     }
   },
   "meals": {
