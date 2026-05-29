@@ -110,6 +110,10 @@ export function EventDetailScreen() {
               },
               {
                 onSuccess: () => router.back(),
+                onError: (err) => {
+                  const msg = err instanceof Error ? err.message : "";
+                  Alert.alert(t("cal.delete.error"), msg);
+                },
               },
             );
           })();
@@ -222,7 +226,7 @@ export function EventDetailScreen() {
             style={{ opacity: isSampleMode ? 0.5 : 1 }}
           >
             <Button
-              label={deleteMutation.isPending ? t("cal.edit.saving") : t("cal.detail.delete")}
+              label={deleteMutation.isPending ? t("cal.delete.deleting") : t("cal.detail.delete")}
               variant="soft"
               tone="danger"
               className="flex-1"
@@ -233,6 +237,7 @@ export function EventDetailScreen() {
               label={t("cal.detail.edit")}
               tone="primary"
               className="flex-1"
+              disabled={deleteMutation.isPending}
               onPress={onEditPress}
             />
           </View>

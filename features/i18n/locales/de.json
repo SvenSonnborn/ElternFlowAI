@@ -176,6 +176,7 @@
       "confirmTitle": "Termin löschen?",
       "confirmBody": "Diese Aktion kann nicht rückgängig gemacht werden.",
       "confirmOk": "Löschen",
+      "deleting": "Lösche…",
       "error": "Löschen fehlgeschlagen"
     },
     "scope": {

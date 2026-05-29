@@ -176,6 +176,7 @@
       "confirmTitle": "Delete event?",
       "confirmBody": "This cannot be undone.",
       "confirmOk": "Delete",
+      "deleting": "Deleting…",
       "error": "Delete failed"
     },
     "scope": {
