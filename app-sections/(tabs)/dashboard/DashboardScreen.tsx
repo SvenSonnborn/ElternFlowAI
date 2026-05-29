@@ -46,7 +46,7 @@ export function DashboardScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={t("dash.addPerson")}
-          className="h-8 w-8 items-center justify-center rounded-pill border border-dashed border-line-strong active:opacity-80"
+          className="h-11 w-11 items-center justify-center rounded-pill border border-dashed border-line-strong active:opacity-80"
         >
           <Icon name="plus" size={14} color={theme.inkTertiary} />
         </Pressable>
