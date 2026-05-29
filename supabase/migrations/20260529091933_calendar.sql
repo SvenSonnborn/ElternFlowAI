@@ -42,6 +42,13 @@ create table public.events (
 
 comment on table public.events is 'Calendar events. Single-occurrence when all rrule_* cols are NULL; recurring when rrule_freq is set. Exceptions are stored in event_exceptions.';
 
+-- Column-level documentation for the non-obvious RRULE-related columns
+comment on column public.events.rrule_freq      is 'iCal RFC 5545 FREQ. NULL = single occurrence event.';
+comment on column public.events.rrule_interval  is 'iCal INTERVAL. e.g. with freq=weekly and interval=2 → every 2 weeks.';
+comment on column public.events.rrule_byweekday is 'iCal BYDAY as ISO weekday ints (1=Mon … 7=Sun). NULL = no day filter.';
+comment on column public.events.rrule_until     is 'iCal UNTIL. End-bound for recurrence. Mutually exclusive with rrule_count.';
+comment on column public.events.rrule_count     is 'iCal COUNT. Max number of occurrences. Mutually exclusive with rrule_until.';
+
 create index events_family_start_idx on public.events(family_id, start_at);
 create index events_child_id_idx on public.events(child_id) where child_id is not null;
 
@@ -90,6 +97,9 @@ create table public.event_exceptions (
 
 comment on table public.event_exceptions is 'Per-occurrence overrides for recurring events. action=cancelled removes the occurrence; action=modified applies override jsonb (title, start_at, end_at, location).';
 
+comment on column public.event_exceptions.override is
+  'JSON patch applied when action=modified. Recognised keys: title, description, start_at, end_at, location.';
+
 alter table public.event_exceptions enable row level security;
 alter table public.event_exceptions force row level security;
 
@@ -97,23 +107,53 @@ drop policy if exists "event_exceptions: select via event" on public.event_excep
 create policy "event_exceptions: select via event"
   on public.event_exceptions for select
   to authenticated
-  using ( event_id in (select id from public.events where family_id = public.current_family_id()) );
+  using (
+    exists (
+      select 1 from public.events
+      where public.events.id = public.event_exceptions.event_id
+        and public.events.family_id = public.current_family_id()
+    )
+  );
 
 drop policy if exists "event_exceptions: insert via event" on public.event_exceptions;
 create policy "event_exceptions: insert via event"
   on public.event_exceptions for insert
   to authenticated
-  with check ( event_id in (select id from public.events where family_id = public.current_family_id()) );
+  with check (
+    exists (
+      select 1 from public.events
+      where public.events.id = public.event_exceptions.event_id
+        and public.events.family_id = public.current_family_id()
+    )
+  );
 
 drop policy if exists "event_exceptions: update via event" on public.event_exceptions;
 create policy "event_exceptions: update via event"
   on public.event_exceptions for update
   to authenticated
-  using ( event_id in (select id from public.events where family_id = public.current_family_id()) )
-  with check ( event_id in (select id from public.events where family_id = public.current_family_id()) );
+  using (
+    exists (
+      select 1 from public.events
+      where public.events.id = public.event_exceptions.event_id
+        and public.events.family_id = public.current_family_id()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.events
+      where public.events.id = public.event_exceptions.event_id
+        and public.events.family_id = public.current_family_id()
+    )
+  );
 
 drop policy if exists "event_exceptions: delete via event" on public.event_exceptions;
 create policy "event_exceptions: delete via event"
   on public.event_exceptions for delete
   to authenticated
-  using ( event_id in (select id from public.events where family_id = public.current_family_id()) );
+  using (
+    exists (
+      select 1 from public.events
+      where public.events.id = public.event_exceptions.event_id
+        and public.events.family_id = public.current_family_id()
+    )
+  );
