@@ -82,7 +82,30 @@ export async function applyDeleteScope(args: ApplyDeleteScopeArgs): Promise<void
   await ops.deleteMaster(eventId);
 }
 
-// eslint-disable-next-line @typescript-eslint/require-await -- TDD stubs; replaced with real impls in Tasks 5 & 6
-export async function applyEditScope(_args: ApplyEditScopeArgs): Promise<void> {
-  throw new Error("not implemented");
+export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
+  const { ops, scope, eventId, occurrenceDate, isRecurring, master, changes } = args;
+
+  if (scope === "this") {
+    if (isRecurring) {
+      await ops.modifyOccurrence(eventId, occurrenceDate, changes);
+      return;
+    }
+    await ops.updateMaster(eventId, changes);
+    return;
+  }
+
+  if (scope === "forward") {
+    const cutoff = dayBefore(occurrenceDate);
+    if (cutoff < dateOnly(new Date(master.start_at))) {
+      await ops.updateMaster(eventId, changes);
+      return;
+    }
+    await ops.setRruleUntil(eventId, cutoff);
+    await ops.insertSplitEvent(master, changes);
+    await ops.deleteExceptionsFromDate(eventId, occurrenceDate);
+    return;
+  }
+
+  // scope === "all"
+  await ops.updateMaster(eventId, changes);
 }
