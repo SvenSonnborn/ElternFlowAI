@@ -69,7 +69,7 @@ export async function applyDeleteScope(args: ApplyDeleteScopeArgs): Promise<void
     return;
   }
 
-  if (scope === "forward") {
+  if (scope === "forward" && isRecurring) {
     const cutoff = dayBefore(occurrenceDate);
     if (cutoff < dateOnly(masterStartAt)) {
       await ops.deleteMaster(eventId);
@@ -80,7 +80,7 @@ export async function applyDeleteScope(args: ApplyDeleteScopeArgs): Promise<void
     return;
   }
 
-  // scope === "all"
+  // scope === "all" (or "forward" on a non-recurring event — same outcome)
   await ops.deleteMaster(eventId);
 }
 
@@ -96,7 +96,7 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
     return;
   }
 
-  if (scope === "forward") {
+  if (scope === "forward" && isRecurring) {
     const cutoff = dayBefore(occurrenceDate);
     if (cutoff < dateOnly(new Date(master.start_at))) {
       await ops.updateMaster(eventId, changes);
@@ -108,24 +108,22 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
     return;
   }
 
-  // scope === "all"
+  // scope === "all" (or "forward" on a non-recurring event — same outcome)
   await ops.updateMaster(eventId, changes);
 }
 
 export function createSupabaseEventOps(client: SupabaseClient<Database>): EventOps {
   return {
     cancelOccurrence: async (eventId, occurrenceDate) => {
-      const { error } = await client
-        .from("event_exceptions")
-        .upsert(
-          {
-            event_id: eventId,
-            occurrence_date: occurrenceDate,
-            action: "cancelled",
-            override: null,
-          },
-          { onConflict: "event_id,occurrence_date" },
-        );
+      const { error } = await client.from("event_exceptions").upsert(
+        {
+          event_id: eventId,
+          occurrence_date: occurrenceDate,
+          action: "cancelled",
+          override: null,
+        },
+        { onConflict: "event_id,occurrence_date" },
+      );
       if (error) throw error;
     },
 

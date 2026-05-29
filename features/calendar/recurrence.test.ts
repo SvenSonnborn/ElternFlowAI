@@ -90,6 +90,21 @@ describe("applyDeleteScope", () => {
     });
     expect(ops.deleteMaster).toHaveBeenCalledWith("evt-1");
   });
+
+  test("scope=forward on non-recurring event → deleteMaster (no rrule ops)", async () => {
+    const ops = makeOps();
+    await applyDeleteScope({
+      ops,
+      scope: "forward",
+      eventId: "evt-1",
+      occurrenceDate: "2026-05-11",
+      isRecurring: false,
+      masterStartAt: MASTER_START,
+    });
+    expect(ops.deleteMaster).toHaveBeenCalledWith("evt-1");
+    expect(ops.setRruleUntil).not.toHaveBeenCalled();
+    expect(ops.deleteExceptionsFromDate).not.toHaveBeenCalled();
+  });
 });
 
 const CHANGES: EventChanges = {
@@ -200,5 +215,21 @@ describe("applyEditScope", () => {
     });
     expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
+  });
+
+  test("scope=forward on non-recurring event → updateMaster (no split)", async () => {
+    const ops = makeOps();
+    await applyEditScope({
+      ops,
+      scope: "forward",
+      eventId: "evt-1",
+      occurrenceDate: "2026-06-15",
+      isRecurring: false,
+      master: makeMaster({ rrule_freq: null }),
+      changes: CHANGES,
+    });
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES);
+    expect(ops.insertSplitEvent).not.toHaveBeenCalled();
+    expect(ops.setRruleUntil).not.toHaveBeenCalled();
   });
 });
