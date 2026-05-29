@@ -25,11 +25,23 @@ export function useInitSession(): void {
 
   useEffect(() => {
     let mounted = true;
-    void supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data.session);
-      setInitialized(true);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!mounted) return;
+        setSession(data.session);
+      })
+      .catch((err: unknown) => {
+        if (!mounted) return;
+        // If session retrieval fails (e.g. AsyncStorage read error), fall back
+        // to no-session so the app can boot. Logged so it surfaces in DEV.
+        console.warn("supabase.auth.getSession failed", err);
+        setSession(null);
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setInitialized(true);
+      });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
       if (!mounted) return;
       setSession(sess);
