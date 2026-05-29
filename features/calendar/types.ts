@@ -11,6 +11,7 @@ export interface CalendarOccurrence {
   allDay: boolean;
   childId: string | null;
   isException: boolean;
+  isRecurring: boolean;
   type: {
     slug: string;
     color: string;

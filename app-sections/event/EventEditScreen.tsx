@@ -92,7 +92,7 @@ export function EventEditScreen() {
 
   async function onSave() {
     if (!occurrence || !canSave) return;
-    const isRecurring = !occurrence.eventId.startsWith("sample-");
+    const isRecurring = occurrence.isRecurring;
     let scope: EditScope = "all";
     if (isRecurring) {
       const labels = {
@@ -126,6 +126,10 @@ export function EventEditScreen() {
           start_at: occurrence.startAt.toISOString(),
           end_at: occurrence.endAt.toISOString(),
           all_day: occurrence.allDay,
+          // NOTE: actual rrule_freq is lost in CalendarOccurrence — this placeholder only
+          // affects the "forward" scope path's insertSplitEvent (which would also fail
+          // with the empty family_id placeholder above until auth + master-row refetch
+          // land in a follow-up iteration).
           rrule_freq: isRecurring ? "weekly" : null,
           rrule_interval: 1,
           rrule_byweekday: null,
@@ -155,9 +159,18 @@ export function EventEditScreen() {
         <View className="h-1 w-10 rounded-full" style={{ backgroundColor: theme.lineStrong }} />
       </View>
 
-      {isLoading || !occurrence ? (
+      {isLoading ? (
         <View className="flex-1 items-center justify-center px-6">
           <View className="h-24 w-full rounded-2xl" style={{ backgroundColor: theme.cardSubtle }} />
+        </View>
+      ) : !occurrence ? (
+        <View className="flex-1 items-center justify-center px-6">
+          <Text variant="listTitle" tone="danger">
+            {t("cal.edit.title")}
+          </Text>
+          <View className="mt-4">
+            <Button label={t("cal.detail.close")} variant="soft" onPress={() => router.back()} />
+          </View>
         </View>
       ) : (
         <>
