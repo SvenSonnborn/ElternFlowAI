@@ -45,10 +45,12 @@ export interface ApplyEditScopeArgs {
   changes: EventChanges;
 }
 
-export function applyDeleteScope(_args: ApplyDeleteScopeArgs): Promise<void> {
-  return Promise.reject(new Error("not implemented"));
+// eslint-disable-next-line @typescript-eslint/require-await -- TDD stubs; replaced with real impls in Tasks 5 & 6
+export async function applyDeleteScope(_args: ApplyDeleteScopeArgs): Promise<void> {
+  throw new Error("not implemented");
 }
 
-export function applyEditScope(_args: ApplyEditScopeArgs): Promise<void> {
-  return Promise.reject(new Error("not implemented"));
+// eslint-disable-next-line @typescript-eslint/require-await -- TDD stubs; replaced with real impls in Tasks 5 & 6
+export async function applyEditScope(_args: ApplyEditScopeArgs): Promise<void> {
+  throw new Error("not implemented");
 }
