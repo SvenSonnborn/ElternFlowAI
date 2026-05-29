@@ -1,3 +1,5 @@
+import { addDays, format, parseISO } from "date-fns";
+
 import type { Database } from "@/features/supabase/database.types";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
@@ -46,13 +48,11 @@ export interface ApplyEditScopeArgs {
 }
 
 function dayBefore(isoDate: string): string {
-  const d = new Date(`${isoDate}T00:00:00.000Z`);
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
+  return format(addDays(parseISO(isoDate), -1), "yyyy-MM-dd");
 }
 
 function dateOnly(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return format(d, "yyyy-MM-dd");
 }
 
 export async function applyDeleteScope(args: ApplyDeleteScopeArgs): Promise<void> {
