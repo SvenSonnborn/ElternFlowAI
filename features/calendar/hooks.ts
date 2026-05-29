@@ -1,5 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { addDays, endOfMonth, startOfMonth } from "date-fns";
+import {
+  addDays,
+  endOfMonth,
+  max as dateMax,
+  min as dateMin,
+  parseISO,
+  startOfMonth,
+} from "date-fns";
 import { useMemo } from "react";
 
 import { useTheme } from "@/design-system/ThemeProvider";
@@ -46,7 +53,7 @@ export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
 
   return {
     data,
-    isLoading: hasSession ? query.isLoading : false,
+    isLoading: !initialized || (hasSession && query.isLoading),
     isFallback: !hasSession,
     error: query.error,
   };
@@ -76,8 +83,11 @@ export function useEvent(id: string, occurrenceDate?: string): UseEventResult {
     const row = query.data;
     if (!row) return null;
     const start = new Date(row.start_at);
-    const fallbackStart = addDays(start, -1);
-    const fallbackEnd = addDays(start, 366);
+    // Ensure the requested occurrenceDate falls inside the expansion window —
+    // a far-future RRULE occurrence (>1y out) would otherwise be cut off.
+    const requested = occurrenceDate ? parseISO(occurrenceDate) : null;
+    const fallbackStart = requested ? dateMin([addDays(start, -1), requested]) : addDays(start, -1);
+    const fallbackEnd = requested ? dateMax([addDays(start, 366), requested]) : addDays(start, 366);
     const expanded = expandEvents([row], fallbackStart, fallbackEnd, theme);
     if (occurrenceDate) {
       return expanded.find((o) => o.occurrenceDate === occurrenceDate) ?? expanded[0] ?? null;
@@ -87,7 +97,7 @@ export function useEvent(id: string, occurrenceDate?: string): UseEventResult {
 
   return {
     data: occurrence,
-    isLoading: hasSession ? query.isLoading : false,
+    isLoading: !initialized || (hasSession && query.isLoading),
     isFallback: !hasSession,
     error: query.error,
   };
