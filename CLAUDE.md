@@ -173,3 +173,17 @@ When you change code that's documented, update the doc in the same commit:
 - Anything visible to engineers (folder moves, new conventions, renamed routes) → this file
 
 When in doubt, the **handoff bundle wins**. CLAUDE.md and decision-log.md adapt around it.
+
+## Commits
+
+- **Never add a `Co-Authored-By: Claude …` trailer** to commit messages. The repo policy is human-authored attribution only. This applies to every `git commit` regardless of context (regular work, fix-ups, amends, PR squashes).
+- Conventional-commits prefix (`feat`, `fix`, `refactor`, `docs`, …) + scoped to the affected area.
+- Pre-commit hooks (`lint-staged`) must never be bypassed (`--no-verify`).
+
+## Out-of-scope TODOs
+
+Living follow-up list lives at [docs/TODO.md](docs/TODO.md). Workflow:
+
+- **When you find something during a task that should be done but is out of scope** (V1 limitation, deferred refactor, follow-up to fix in a later iteration), **append it to `docs/TODO.md`** in the same commit that introduces the limitation. Each entry: one bullet, references the file/area, explains _why_ it's deferred.
+- **When you finish a TODO**, **delete the entry from `docs/TODO.md`** in the same commit that resolves it. Do not just check it off — remove the line entirely. The file is the active backlog, not a history.
+- Re-read `docs/TODO.md` at the start of every new task so you know what's already on the list before adding duplicates.
