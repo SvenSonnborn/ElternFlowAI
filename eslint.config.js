@@ -25,6 +25,8 @@ module.exports = [
       "design-system/themes.ts",
       "design-system/components.ts",
       "design-system/index.ts",
+      // Generated file — re-created by MCP after schema migrations, do not lint
+      "features/supabase/database.types.ts",
     ],
   },
 
