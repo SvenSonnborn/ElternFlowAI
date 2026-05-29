@@ -75,3 +75,31 @@ The full handoff bundle ([HANDOFF.md](./HANDOFF.md), `design-system/{colors,typo
 - `app.name` is now `Eltern Flow` (no "AI") per COPY.md, even though HANDOFF.md and the project folder still say "Eltern Flow AI".
 - Smoke test rewritten to assert the new theme shape (light/dark roles + DS barrel groups).
 - 5 ESLint warnings remain on `design-system/index.ts` (`import/first`) because the handoff file intentionally puts `export *` before internal imports. Left as-is to avoid editing handoff files.
+
+## ADR-003 — Supabase-Anbindung initialisiert (2026-05-28)
+
+### Status
+
+Accepted. Ergänzt ADR-001 (dort als "Out of scope" geführt).
+
+### Context
+
+Bevor Auth, Schema oder Realtime gebaut werden können, braucht das Projekt eine reproduzierbare Grundverdrahtung zu Supabase: ein leeres Cloud-Projekt, eine MCP-Verbindung für Iterations-Workflows, und einen Client der in Expo (iOS/Android/Web) funktioniert. Vorher war `features/supabase/` reiner Placeholder.
+
+### Decisions
+
+1. **Supabase-Projekt manuell im Dashboard angelegt** (eu-central-1, Free Tier). Keine Account-weiten Permissions für den MCP nötig — saubere Trennung.
+2. **MCP via Supabases hosted HTTP-Server (`mcp.supabase.com`), project-scoped, read-write.** Konfig in `.mcp.json` (committed) — nur die URL mit `?project_ref=…`, keine Secrets. Authentifizierung läuft per OAuth-Flow (`claude /mcp` → Authenticate); der Token wird vom Claude-CLI verwaltet, nicht im Repo. Hosted statt lokalem `npx @supabase/mcp-server-supabase` gewählt: kein PAT-Management in der Shell, kein lokaler Node-Prozess pro Session, automatische Server-Updates.
+3. **Client in `features/supabase/client.ts`.** `createClient` mit AsyncStorage für Session-Persistenz, `react-native-url-polyfill/auto` als Side-Effect-Import (RN hat kein vollständiges `URL`-Global), `detectSessionInUrl: false` (kein Browser-Redirect in RN). Barrel-Export via `features/supabase/index.ts`.
+4. **ENV via `EXPO_PUBLIC_*`-Präfix in `.env.local`** (gitignored). Expo SDK 49+ bundlet diese Variablen automatisch in den Client. `.env.example` als committed Vorlage. App.json bleibt unverändert (kein `extra`-Block — `EXPO_PUBLIC_*` reicht). Verwendet wird der **publishable** Key (Supabase-Nachfolger von `anon` — gleiche Eigenschaften, neue Naming-Konvention); der legacy `anon`-Key funktioniert nur noch aus Kompatibilität, neue Projekte sollten direkt `publishable` nutzen. Der `secret` / legacy `service_role` Key landet **nie** im Mobile-Bundle (bypassed RLS).
+5. **AsyncStorage statt SecureStore** für die anon-Session. Begründung: anon-JWT ist kein langlebiges Geheimnis (kurze Lebensdauer, refreshed automatisch), und SecureStore hat strenge Größenlimits (2 KB iOS Keychain item) die Supabase-Sessions sprengen können. Re-Evaluierung sobald Service-Role-Tokens oder PII direkt auf dem Gerät persistiert werden.
+
+### Consequences
+
+- Neue Dependencies: `@supabase/supabase-js`, `@react-native-async-storage/async-storage`, `react-native-url-polyfill`.
+- Erster Bootstrap-Trigger: Import des Clients wirft hart, wenn ENV fehlt. Bewusst — verhindert dass spätere Auth-Calls mit kryptischen Netzwerk-Fehlern scheitern.
+- Folge-ADRs nötig für: Auth-Flow (Email + OAuth?), Schema-Design (aus `sample-data/` ableiten), RLS-Policies, Realtime, Edge Functions, TS-Type-Generation.
+
+### Out of Scope (für spätere ADRs)
+
+- Schema, RLS-Policies, Auth-Flow, Realtime-Subscriptions, Edge Functions, generated TypeScript-Types.

@@ -58,8 +58,9 @@ bunx expo export --platform web --output-dir /tmp/eltern-web
 - **react-i18next + expo-localization** — DE default, EN switch
 - **react-native-reanimated v4 + react-native-worklets** — last babel plugin must be `react-native-worklets/plugin`
 - **ESLint 9 (flat config)** + Prettier + jest-expo
+- **Supabase JS Client** (`@supabase/supabase-js` + AsyncStorage session) via [features/supabase/](features/supabase/). MCP via Supabases hosted HTTP-Server (`mcp.supabase.com`, project-scoped, OAuth) — Konfig in `.mcp.json`. App-ENV in `.env.local` (siehe `.env.example`). Auth-Flow, Schema, RLS, Realtime sind die nächsten Iterationen.
 
-Deferred to later iterations (not yet wired): Supabase (Auth, Postgres + RLS, Realtime, Edge Functions), Edamam API, Stripe, real STT + LLM, Expo Notifications.
+Deferred to later iterations (not yet wired): Supabase-Schema + RLS-Policies + Auth-Flow + Realtime + Edge Functions, Edamam API, Stripe, real STT + LLM, Expo Notifications.
 
 ## Folder structure
 
@@ -97,7 +98,7 @@ features/                Cross-cutting feature logic
 ├─ i18n/                 react-i18next init + de.json + en.json
 ├─ voice-assistant/      (placeholder)
 ├─ meal-planner/         (placeholder)
-├─ supabase/             (placeholder)
+├─ supabase/             client.ts (createClient + AsyncStorage session) + barrel
 └─ notifications/        (placeholder)
 
 patterns/                Per-screen design docs (HANDOFF — required reading per screen)
@@ -126,6 +127,9 @@ import { Button, Card, Screen, Text } from "@/design-system/ui";
 import { useTranslation } from "react-i18next";
 const { t } = useTranslation();
 t("dash.greeting.morning", { name });
+
+// Supabase:
+import { supabase } from "@/features/supabase";
 ```
 
 Path alias `@/*` → repo root (see [tsconfig.json](tsconfig.json)).

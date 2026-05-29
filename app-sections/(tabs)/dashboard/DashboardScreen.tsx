@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { ChildAvatar, EventRow, Icon, SectionHeader, TopBar } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
@@ -41,9 +41,15 @@ export function DashboardScreen() {
         {avatarRow.map((p) => (
           <ChildAvatar key={p.key} name={p.label} color={p.color} />
         ))}
-        <View className="h-8 w-8 items-center justify-center rounded-pill border border-dashed border-line-strong">
+        <Pressable
+          onPress={() => router.push("/child/new")}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t("dash.addPerson")}
+          className="h-8 w-8 items-center justify-center rounded-pill border border-dashed border-line-strong active:opacity-80"
+        >
           <Icon name="plus" size={14} color={theme.inkTertiary} />
-        </View>
+        </Pressable>
       </View>
 
       <SectionHeader title={t("dash.section.today")} action={t("action.seeAll")} />
