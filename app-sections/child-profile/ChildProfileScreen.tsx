@@ -1,9 +1,9 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, TextInput, View } from "react-native";
+import { Pressable, View } from "react-native";
 
-import { ChildAvatar, Icon, Pill, TopBar } from "@/app-sections/shared";
+import { ChildAvatar, Field, Icon, Pill, TopBar } from "@/app-sections/shared";
 import { palette } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Screen, Text } from "@/design-system/ui";
@@ -11,36 +11,6 @@ import { children } from "@/features/sample-data";
 
 const ALLERGY_SUGGESTIONS_DE = ["Laktose", "Gluten", "Nüsse", "Soja", "Eier"];
 const ALLERGY_SUGGESTIONS_EN = ["Lactose", "Gluten", "Nuts", "Soy", "Eggs"];
-
-interface FieldProps {
-  label: string;
-  iconName?: React.ComponentProps<typeof Icon>["name"];
-  value: string;
-}
-
-function Field({ label, iconName, value }: FieldProps) {
-  const { theme } = useTheme();
-  return (
-    <View>
-      <Text
-        variant="caption"
-        tone="inkSecondary"
-        style={{ textTransform: "uppercase", fontWeight: "700", letterSpacing: 1.2 }}
-      >
-        {label}
-      </Text>
-      <View className="mt-1.5 h-12 flex-row items-center gap-2 rounded-xl border border-line bg-card px-3.5">
-        {iconName ? <Icon name={iconName} size={18} color={theme.inkTertiary} /> : null}
-        <TextInput
-          defaultValue={value}
-          className="flex-1 text-base text-ink"
-          style={{ fontFamily: "Inter", fontSize: 14, color: theme.ink }}
-          placeholderTextColor={theme.inkTertiary}
-        />
-      </View>
-    </View>
-  );
-}
 
 export function ChildProfileScreen() {
   const { t, i18n } = useTranslation();
