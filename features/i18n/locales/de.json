@@ -127,7 +127,15 @@
       "agenda": "Agenda"
     },
     "sub": "Familien-Kalender",
-    "selectedDay": "Mittwoch, 14. Mai",
+    "today": "Heute",
+    "empty": "Keine Termine an diesem Tag",
+    "fallback": {
+      "banner": "Sample-Daten – noch nicht eingeloggt"
+    },
+    "duration": {
+      "hourShort": "Std.",
+      "minuteShort": "Min."
+    },
     "add": {
       "voice": "Termin per Sprache"
     },
@@ -135,7 +143,51 @@
       "arzt": "Arzt",
       "schule": "Schule",
       "sport": "Sport",
-      "ha": "HA"
+      "ha": "HA",
+      "family": "Familie",
+      "meal": "Essen"
+    },
+    "detail": {
+      "title": "Termin",
+      "location": "Ort",
+      "reminder24h": "Erinnerung 24 Std. vorher",
+      "reminder1h": "Erinnerung 1 Std. vorher",
+      "notes": "Notizen",
+      "edit": "Bearbeiten",
+      "delete": "Löschen",
+      "editSoon": "Bald verfügbar",
+      "close": "Schließen",
+      "requiresAuth": "Melde dich an, um Termine zu bearbeiten."
+    },
+    "edit": {
+      "title": "Termin bearbeiten",
+      "fieldTitle": "Titel",
+      "fieldDate": "Datum",
+      "fieldStart": "Von",
+      "fieldEnd": "Bis",
+      "fieldLocation": "Ort",
+      "fieldNotes": "Notizen",
+      "save": "Speichern",
+      "saving": "Speichere…",
+      "error": {
+        "titleRequired": "Titel darf nicht leer sein",
+        "invalidTimeRange": "Endzeit muss nach Startzeit liegen",
+        "multiDay": "Mehrtägige Termine sind in dieser Version nicht editierbar",
+        "network": "Speichern fehlgeschlagen"
+      }
+    },
+    "delete": {
+      "confirmTitle": "Termin löschen?",
+      "confirmBody": "Diese Aktion kann nicht rückgängig gemacht werden.",
+      "confirmOk": "Löschen",
+      "deleting": "Lösche…",
+      "error": "Löschen fehlgeschlagen"
+    },
+    "scope": {
+      "title": "Welche Termine?",
+      "this": "Nur diesen",
+      "forward": "Diesen und alle folgenden",
+      "all": "Alle Termine"
     }
   },
   "meals": {

@@ -9,15 +9,38 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ThemeProvider, useTheme } from "@/design-system/ThemeProvider";
+import { useInitSession } from "@/features/calendar";
 
 function ThemedStack() {
   const { theme } = useTheme();
+  useInitSession();
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="recipe/[id]" options={{ presentation: "modal", headerShown: false }} />
       <Stack.Screen
-        name="recipe/[id]"
-        options={{ presentation: "modal", headerShown: false }}
+        name="event/[id]"
+        options={{
+          presentation: "formSheet",
+          headerShown: false,
+          gestureEnabled: true,
+          sheetAllowedDetents: [0.72],
+          sheetCornerRadius: 26,
+          sheetGrabberVisible: true,
+          contentStyle: { flex: 1, backgroundColor: theme.bg },
+        }}
+      />
+      <Stack.Screen
+        name="event/edit/[id]"
+        options={{
+          presentation: "formSheet",
+          headerShown: false,
+          gestureEnabled: true,
+          sheetAllowedDetents: [0.85],
+          sheetCornerRadius: 26,
+          sheetGrabberVisible: true,
+          contentStyle: { flex: 1, backgroundColor: theme.bg },
+        }}
       />
       <Stack.Screen name="child/[id]" options={{ presentation: "card", headerShown: false }} />
       <Stack.Screen name="child/new" options={{ presentation: "card", headerShown: false }} />

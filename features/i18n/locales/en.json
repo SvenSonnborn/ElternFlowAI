@@ -127,7 +127,15 @@
       "agenda": "Agenda"
     },
     "sub": "Family calendar",
-    "selectedDay": "Wednesday, May 14",
+    "today": "Today",
+    "empty": "No events on this day",
+    "fallback": {
+      "banner": "Sample data – not signed in yet"
+    },
+    "duration": {
+      "hourShort": "hr",
+      "minuteShort": "min"
+    },
     "add": {
       "voice": "Add by voice"
     },
@@ -135,7 +143,51 @@
       "arzt": "Doctor",
       "schule": "School",
       "sport": "Sport",
-      "ha": "Tasks"
+      "ha": "Tasks",
+      "family": "Family",
+      "meal": "Meal"
+    },
+    "detail": {
+      "title": "Event",
+      "location": "Location",
+      "reminder24h": "Remind 24 hr before",
+      "reminder1h": "Remind 1 hr before",
+      "notes": "Notes",
+      "edit": "Edit",
+      "delete": "Delete",
+      "editSoon": "Coming soon",
+      "close": "Close",
+      "requiresAuth": "Sign in to edit events."
+    },
+    "edit": {
+      "title": "Edit event",
+      "fieldTitle": "Title",
+      "fieldDate": "Date",
+      "fieldStart": "From",
+      "fieldEnd": "To",
+      "fieldLocation": "Location",
+      "fieldNotes": "Notes",
+      "save": "Save",
+      "saving": "Saving…",
+      "error": {
+        "titleRequired": "Title cannot be empty",
+        "invalidTimeRange": "End time must be after start time",
+        "multiDay": "Multi-day events are not editable in this version",
+        "network": "Save failed"
+      }
+    },
+    "delete": {
+      "confirmTitle": "Delete event?",
+      "confirmBody": "This cannot be undone.",
+      "confirmOk": "Delete",
+      "deleting": "Deleting…",
+      "error": "Delete failed"
+    },
+    "scope": {
+      "title": "Which events?",
+      "this": "Only this one",
+      "forward": "This and all following",
+      "all": "All events"
     }
   },
   "meals": {

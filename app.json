@@ -31,7 +31,7 @@
       "bundler": "metro",
       "output": "static"
     },
-    "plugins": ["expo-router", "expo-localization"],
+    "plugins": ["expo-router", "expo-localization", "@react-native-community/datetimepicker"],
     "experiments": {
       "typedRoutes": true
     }
