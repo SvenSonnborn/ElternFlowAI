@@ -181,7 +181,12 @@ export function createSupabaseEventOps(client: SupabaseClient<Database>): EventO
         rrule_freq: master.rrule_freq,
         rrule_interval: master.rrule_interval,
         rrule_byweekday: master.rrule_byweekday,
-        rrule_until: null,
+        // Preserve absolute end date — still applies after split.
+        rrule_until: master.rrule_until,
+        // rrule_count intentionally null after split: count is relative to
+        // dtstart, so a bounded series can't be split correctly without
+        // tracking how many occurrences were consumed before the cutoff.
+        // See docs/TODO.md for the follow-up.
         rrule_count: null,
         created_by: master.created_by,
       });
