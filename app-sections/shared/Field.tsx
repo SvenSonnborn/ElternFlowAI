@@ -55,10 +55,14 @@ export function Field({
       >
         {iconName ? <Icon name={iconName} size={18} color={theme.inkTertiary} /> : null}
         <TextInput
-          {...(onChangeText ? { value, onChangeText } : { defaultValue: value })}
+          value={value}
+          {...(onChangeText ? { onChangeText } : {})}
           placeholder={placeholder}
           placeholderTextColor={theme.inkTertiary}
-          editable={editable && !onPress}
+          // Without onChangeText the field is display-only: external value
+          // updates (e.g. picker selections) still propagate because we always
+          // pass `value`, but the keyboard input is locked.
+          editable={editable && !onPress && !!onChangeText}
           onPressIn={onPress}
           multiline={multiline}
           keyboardType={keyboardType}
