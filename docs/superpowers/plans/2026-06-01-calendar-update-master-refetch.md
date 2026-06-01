@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Add `updateEvent` orchestrator with DI
+## Task 1: Add `updateEvent` orchestrator with DI
 
 Extract the master-refetch + apply-scope logic into a plain async function that takes its dependencies via parameter. Lets us test the refetch behavior without React or a real Supabase client. The existing `useUpdateEvent` hook becomes a thin wrapper that wires real deps.
 
@@ -245,7 +245,7 @@ unchanged — DI keeps the orchestrator testable without React or Supabase."
 
 ---
 
-### Task 2: Drop the fake-master construction in `EventEditScreen`
+## Task 2: Drop the fake-master construction in `EventEditScreen`
 
 Now that `useUpdateEvent` no longer accepts a `master` field, the screen stops building one. Removes ~30 lines of dead state plus the inline comments warning about the workaround.
 
@@ -308,7 +308,7 @@ state plus the inline comments warning about the workaround."
 
 ---
 
-### Task 3: Resolve `docs/TODO.md` entries
+## Task 3: Resolve `docs/TODO.md` entries
 
 Two TODO bullets were explicitly blocked on this fix and are now resolved. Per CLAUDE.md, **delete** the entries — don't just check them off.
 
@@ -318,7 +318,7 @@ Two TODO bullets were explicitly blocked on this fix and are now resolved. Per C
 
 - [ ] **Step 1: Delete the Calendar bullet**
 
-In `docs/TODO.md`, delete the entire bullet that starts with `**EventEditScreen rekonstruiert `master`-Row aus der `CalendarOccurrence`**` (it spans roughly lines 7 in the current file, including its full multi-line body that ends with "den `master`-Parameter aus dem Screen entfernen.").
+In `docs/TODO.md`, delete the entire bullet that starts with **EventEditScreen rekonstruiert `master`-Row aus der `CalendarOccurrence`** (it spans roughly line 7 in the current file, including its full multi-line body that ends with "den `master`-Parameter aus dem Screen entfernen.").
 
 - [ ] **Step 2: Delete the Auth bullet**
 
