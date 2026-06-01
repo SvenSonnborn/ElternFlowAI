@@ -86,6 +86,11 @@
   },
   "onb": {
     "stepCounter": "Step {{n}} of {{total}}",
+    "actions": {
+      "next": "Next",
+      "back": "Back",
+      "skip": "Skip"
+    },
     "s1": {
       "title": "Create your account",
       "sub": "You'll use this email to share calendar and lists with your partner.",
@@ -94,7 +99,16 @@
     "s2": {
       "title": "What's your family called?",
       "sub": "You'll see this name at the top of your dashboard.",
-      "field": "Family name",
+      "familyField": "Family name",
+      "parentName": {
+        "label": "Your name",
+        "placeholder": "Anna"
+      },
+      "color": {
+        "label": "Your color"
+      },
+      "submit": "Next",
+      "submitInvite": "Join family",
       "privacy": {
         "title": "Your data is yours",
         "sub": "Encrypted, stored in the EU. No ads."
@@ -103,18 +117,47 @@
     "s3": {
       "title": "Invite your partner",
       "sub": "Events, tasks and shopping lists sync in real time.",
+      "partnerField": "Partner's email",
       "send": "Send invite",
-      "later": "Invite later"
+      "later": "Invite later",
+      "shareSubject": "Join our Eltern Flow family",
+      "shareMessage": "Join our family on Eltern Flow",
+      "pendingPill": "Invited",
+      "shared": {
+        "calendar": "Shared calendar",
+        "tasks": "Task lists",
+        "meals": "Meal plan",
+        "children": "Child profiles"
+      }
     },
     "s4": {
       "title": "Tell us about your child",
-      "sub": "You can add more kids later — or use your voice.",
-      "voice": "Or tell us by voice"
+      "sub": "You can add more kids later — or ask the AI with your voice.",
+      "nameField": "Name",
+      "birthdayField": "Birthday",
+      "schoolField": "School / daycare",
+      "allergiesLabel": "Allergies & intolerances",
+      "voice": "Or tell us by voice",
+      "save": "Next",
+      "skip": "Skip"
     },
     "s5": {
       "title": "All set!",
-      "sub": "Eltern Flow is ready. {{partner}} got an invite, {{child}} is set up.",
-      "cta": "Open dashboard"
+      "sub": "Eltern Flow is ready.",
+      "cta": "Open dashboard",
+      "secondary": "Add another child",
+      "recap": {
+        "you": "You",
+        "partner": "Partner",
+        "partnerPending": "Invited (not yet accepted)",
+        "partnerNone": "Nobody invited",
+        "children": "Children",
+        "childrenNone": "No child added yet"
+      },
+      "empty": {
+        "title": "Almost done",
+        "sub": "You can add a partner and children anytime."
+      }
     }
   },
   "dash": {

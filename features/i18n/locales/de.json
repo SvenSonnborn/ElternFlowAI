@@ -86,6 +86,11 @@
   },
   "onb": {
     "stepCounter": "Schritt {{n}} von {{total}}",
+    "actions": {
+      "next": "Weiter",
+      "back": "Zurück",
+      "skip": "Überspringen"
+    },
     "s1": {
       "title": "Erstelle dein Konto",
       "sub": "Mit dieser E-Mail teilst du später Kalender und Listen mit deinem Partner.",
@@ -94,7 +99,16 @@
     "s2": {
       "title": "Wie heißt deine Familie?",
       "sub": "Du siehst diesen Namen oben auf dem Dashboard.",
-      "field": "Familienname",
+      "familyField": "Familienname",
+      "parentName": {
+        "label": "Dein Name",
+        "placeholder": "Anna"
+      },
+      "color": {
+        "label": "Deine Farbe"
+      },
+      "submit": "Weiter",
+      "submitInvite": "Familie beitreten",
       "privacy": {
         "title": "Eure Daten gehören euch",
         "sub": "Verschlüsselt in der EU gespeichert. Keine Werbung."
@@ -103,18 +117,47 @@
     "s3": {
       "title": "Lade deinen Partner ein",
       "sub": "Termine, Aufgaben und Einkaufslisten werden in Echtzeit geteilt.",
+      "partnerField": "E-Mail des Partners",
       "send": "Einladung senden",
-      "later": "Später einladen"
+      "later": "Später einladen",
+      "shareSubject": "Komm in unsere Eltern-Flow-Familie",
+      "shareMessage": "Tritt unserer Familie auf Eltern Flow bei",
+      "pendingPill": "Eingeladen",
+      "shared": {
+        "calendar": "Gemeinsamer Kalender",
+        "tasks": "Aufgabenlisten",
+        "meals": "Essensplan",
+        "children": "Kinderprofile"
+      }
     },
     "s4": {
       "title": "Erzähl uns von deinem Kind",
       "sub": "Du kannst weitere Kinder später anlegen — oder die KI mit deiner Stimme bitten.",
-      "voice": "Lieber per Sprache erzählen"
+      "nameField": "Name",
+      "birthdayField": "Geburtstag",
+      "schoolField": "Schule / Kita",
+      "allergiesLabel": "Allergien & Unverträglichkeiten",
+      "voice": "Lieber per Sprache erzählen",
+      "save": "Weiter",
+      "skip": "Überspringen"
     },
     "s5": {
       "title": "Alles bereit!",
-      "sub": "Eltern Flow ist eingerichtet. {{partner}} wurde eingeladen und {{child}} ist angelegt.",
-      "cta": "Zum Dashboard"
+      "sub": "Eltern Flow ist eingerichtet.",
+      "cta": "Zum Dashboard",
+      "secondary": "Weiteres Kind anlegen",
+      "recap": {
+        "you": "Du",
+        "partner": "Partner",
+        "partnerPending": "Eingeladen (noch nicht angenommen)",
+        "partnerNone": "Niemand eingeladen",
+        "children": "Kinder",
+        "childrenNone": "Noch kein Kind angelegt"
+      },
+      "empty": {
+        "title": "Fast geschafft",
+        "sub": "Du kannst Partner und Kinder jederzeit hinzufügen."
+      }
     }
   },
   "dash": {
