@@ -164,7 +164,7 @@ export function Step4FirstChild() {
           label={t("onb.s4.nameField")}
           value={name}
           onChangeText={setName}
-          placeholder="Ben"
+          placeholder={t("onb.s4.namePlaceholder")}
         />
 
         <Field
@@ -172,7 +172,7 @@ export function Step4FirstChild() {
           iconName="calendar"
           value={birthday ? format(birthday, "dd.MM.yyyy") : ""}
           onPress={() => setPickerOpen(true)}
-          placeholder="TT.MM.JJJJ"
+          placeholder={t("onb.s4.birthdayPlaceholder")}
         />
 
         {pickerOpen ? (
@@ -194,7 +194,7 @@ export function Step4FirstChild() {
           iconName="book-open"
           value={school}
           onChangeText={setSchool}
-          placeholder="Grundschule am Park"
+          placeholder={t("onb.s4.schoolPlaceholder")}
         />
 
         <View>
