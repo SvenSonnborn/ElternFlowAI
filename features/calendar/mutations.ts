@@ -15,6 +15,14 @@ import {
   type EventOps,
 } from "./recurrence";
 
+export {
+  useCreateEvent,
+  recurrenceToRrule,
+  type CreateEventVars,
+  type RecurrenceOption,
+  type RruleFields,
+} from "./createMutation";
+
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
 type DeleteVars = Omit<ApplyDeleteScopeArgs, "ops">;

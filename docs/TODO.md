@@ -6,9 +6,9 @@ Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope 
 
 - **Recurring-Series mit `rrule_count` lassen sich nicht sauber per `forward`-Edit splitten** ([features/calendar/recurrence.ts](features/calendar/recurrence.ts) → `insertSplitEvent`). Count ist relativ zu `dtstart`; nach Split wäre der korrekte Wert `master.rrule_count − (Anzahl bereits konsumierter Occurrences)`. Aktuell setzen wir `rrule_count: null` (mit Code-Kommentar). Sauberer Fix erfordert Occurrence-Tracking oder Konversion zu `rrule_until`-Bounds vor dem Split.
 - **Reminder-Switches im EventDetailScreen sind stateless** ([app-sections/event/EventDetailScreen.tsx](app-sections/event/EventDetailScreen.tsx) — `ReminderRow`). Zustand wird nicht persistiert. Bei Push-Notification-Iteration: an `reminders`-Tabelle binden.
-- **Multi-Day-Events sind im Edit-Form gesperrt** ([app-sections/event/EventEditScreen.tsx](app-sections/event/EventEditScreen.tsx) — `isMultiDay` Banner). Eigener Editor folgt in V2.
-- **Add-Event-Flow** existiert noch nicht. `EventEditScreen` ist als Basis wiederverwendbar (mit `id=undefined` → INSERT statt UPDATE). Voice-Add-Flow ist eigene Iteration (an STT/LLM-Provider gekoppelt).
-- **Recurrence-Editor**: `rrule_freq`, `rrule_interval`, `rrule_byweekday` sind im Edit-Form nicht änderbar. Eigener Spec für V2.
+- **Multi-Day-Events sind im Edit-Form gesperrt** ([app-sections/event/EventEditScreen.tsx](app-sections/event/EventEditScreen.tsx) — `isMultiDay` Banner). Eigener Editor folgt in V2. Im Create-Form ([app-sections/event/EventCreateScreen.tsx](app-sections/event/EventCreateScreen.tsx)) ebenfalls noch nicht abgebildet — All-day deckt den 1-Tag-Fall ab.
+- **Voice-Add-Flow** ist eigene Iteration (an STT/LLM-Provider gekoppelt). Pattern-doc-Eintrag bleibt offen, getypter Form-Flow ist mit V1 jetzt da.
+- **Recurrence-Editor (Edit-Form)**: `rrule_freq`, `rrule_interval`, `rrule_byweekday` sind im Edit-Form nicht änderbar. Create-Form unterstützt jetzt die 5 Optionen (none/daily/weekdays/weekly/monthly) — Edit muss in V2 nachziehen, sonst kann der User einen wiederkehrenden Termin anlegen aber die Wiederholung nicht später anpassen.
 
 ## Auth / Onboarding
 

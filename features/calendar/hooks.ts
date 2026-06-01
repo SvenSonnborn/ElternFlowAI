@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import {
   addDays,
   endOfMonth,
@@ -9,12 +9,16 @@ import {
 } from "date-fns";
 import { useMemo } from "react";
 
+import type { Database } from "@/features/supabase/database.types";
+
 import { useTheme } from "@/design-system/ThemeProvider";
 
 import type { CalendarOccurrence, MarkedDates, MarkedDot } from "./types";
 
 import { expandEvents } from "./expand";
-import { calendarKeys, fetchEventById, fetchEventsInRange } from "./queries";
+import { calendarKeys, fetchEventById, fetchEventsInRange, fetchEventTypes } from "./queries";
+
+type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
 
 interface UseFamilyEventsResult {
   data: CalendarOccurrence[];
@@ -84,6 +88,14 @@ export function useEvent(id: string, occurrenceDate?: string): UseEventResult {
     isLoading: query.isLoading,
     error: query.error,
   };
+}
+
+export function useEventTypes(): UseQueryResult<EventTypeRow[], Error> {
+  return useQuery({
+    queryKey: calendarKeys.types,
+    queryFn: fetchEventTypes,
+    staleTime: 5 * 60_000,
+  });
 }
 
 export function useMarkedDates(

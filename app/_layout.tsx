@@ -46,6 +46,18 @@ function ThemedStack() {
             contentStyle: { flex: 1, backgroundColor: theme.bg },
           }}
         />
+        <Stack.Screen
+          name="event/new"
+          options={{
+            presentation: "formSheet",
+            headerShown: false,
+            gestureEnabled: true,
+            sheetAllowedDetents: [0.9],
+            sheetCornerRadius: 26,
+            sheetGrabberVisible: true,
+            contentStyle: { flex: 1, backgroundColor: theme.bg },
+          }}
+        />
         <Stack.Screen name="child/[id]" options={{ presentation: "card", headerShown: false }} />
         <Stack.Screen name="child/new" options={{ presentation: "card", headerShown: false }} />
         <Stack.Screen
