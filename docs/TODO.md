@@ -15,6 +15,7 @@ Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope 
 
 - **Auth-Flow + Login/Onboarding-Screens fehlen** (ADR-004 hat das explizit als Out-of-Scope markiert). Bis dahin greift im Calendar der Sample-Data-Fallback, und Edit/Delete-Buttons zeigen den `cal.detail.requiresAuth`-Alert.
 - Sobald Auth lebt: Konfig + Onboarding-Patterns aus `patterns/login.md` + `patterns/onboarding.md` implementieren, dann der EventEditScreen-Master-Row-Fix oben.
+- **Onboarding-Resume nach Abbruch** (Approach C — Auth-Spec): User mit `current_family_id() !== null` aber abgebrochenem Onboarding (kein Partner eingeladen, kein Kind angelegt) landet aktuell direkt auf Dashboard, statt Step 3/4 wieder aufzunehmen. Aktuell durch Empty-State auf [patterns/dashboard-empty.md](../patterns/dashboard-empty.md) abgefangen — V2 sollte eine "Onboarding fortsetzen"-CTA auf dem Dashboard zeigen (sobald `children`-Count == 0 oder `family_invitations`-Count == 0), die per Deep-Link wieder in den passenden Step springt. Dezimiert die Re-Entry-Friction.
 
 ## Weitere Out-of-Scope-Items
 
