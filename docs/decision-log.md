@@ -137,3 +137,37 @@ Vor diesem ADR war das Supabase-Projekt leer (nur Auth + Client-Verdrahtung aus 
 ### Out of Scope (für spätere ADRs)
 
 - Realtime-Subscriptions, Cross-Family-Sharing, Soft-Delete, Storage-Bucket für Profilfotos.
+
+## ADR-005 — Supabase Auth + Onboarding (Approach C) (2026-06-01)
+
+### Status
+
+Accepted. Ergänzt ADR-003 (Supabase-Anbindung) und ADR-004 (DB-Schema).
+
+### Context
+
+Supabase Auth, das 5-Step-Onboarding, der Reset-Password-Flow und der Partner-Invite waren als „Out of Scope" in ADR-001 markiert. Mit dem Spec-Doc [docs/superpowers/specs/2026-06-01-supabase-auth-design.md](./superpowers/specs/2026-06-01-supabase-auth-design.md) wurde der Plan dafür festgelegt; diese ADR fixiert die Architektur-Entscheidungen.
+
+### Decisions
+
+1. **Approach C — Incremental Real-Inserts.** Statt eines lokalen Onboarding-Drafts oder eines server-side `family_drafts`-Schemas committed Step 2 direkt via `rpc("create_family", …)`. Steps 3 + 4 sind optionale INSERTs gegen `family_invitations` und `children`. Step 5 ist eine read-only Recap. Begründung: Pattern Step 5 ist ohnehin kein Commit-Punkt, Approach C nutzt die bereits existierenden RPCs, bringt keine neue Migration mit und ist robust gegen App-Crashes.
+
+2. **Strict Email-Confirm.** Supabase-Setting „Confirm Email" eingeschaltet. Zwischen Step 1 (`RegisterScreen` in `(auth)`) und Step 2 (`(onboarding)/2`) liegt der `CheckEmailScreen`, der dem User signalisiert, dass die Mail-Bestätigung pending ist. Deep-Link `elternflow://auth/confirm` verifiziert die OTP und löst über `onAuthStateChange` → `AuthGate` den Übergang zu Onboarding aus.
+
+3. **V1 only Email + Password.** Magic-Link und Social-Logins (Google / Apple) sind als disabled-Buttons sichtbar mit `auth.soon`-Suffix. Reason: jeder Provider bringt eigene Iterationen mit (Cert / Console / Deep-Link-Setup, Apple Sign In ist auf iOS App Store Pflicht sobald irgendein Social-Provider live geht).
+
+4. **Partner-Invite via Share-Sheet, nicht Edge Function.** Step 3 erzeugt eine `family_invitations`-Row (RPC) und öffnet `Share.share` (RN built-in) mit `elternflow://invite/<token>`. Server-Side-Mail ist out-of-scope (eigene Iteration mit Mail-Provider). Race-Condition zwischen zwei Klicks fängt der `FOR UPDATE`-Lock in `accept_invitation` ab; zweite Klick kriegt Postgres-Code `22023` → UI mapped auf `auth.error.linkExpired`.
+
+5. **AuthGate als einziger Routing-Entscheider.** `<AuthGate>` im Root-Layout, gespeist von `useSession()` (Zustand-Store, von `features/calendar/sessionStore.ts` nach `features/auth/session.ts` migriert) und `useCurrentParent()` (TanStack-Query). Die Routing-Logik ist als pure Function `decideRoute(...)` extrahiert und exhaustiv getestet (9 State-Combos). Wichtige Subtlety: AuthGate wirft NICHT aus `(onboarding)` raus, wenn der `parents`-Row mid-flow (Step 2 → Step 3) entsteht — nur Step 5's explizites „Zum Dashboard" verlässt die Gruppe.
+
+6. **AsyncStorage statt SecureStore für die Session.** Übernommen von ADR-003. Re-Evaluierung sobald PII direkt auf dem Gerät persistiert wird.
+
+7. **Sample-Data-Fallback im Kalender entfernt.** AuthGate garantiert eine echte Supabase-Session, bevor `(tabs)` rendert. `features/calendar/sessionStore.ts` ist gelöscht (Move nach `features/auth/session.ts`); `cal.detail.requiresAuth`-Alert in EventDetailScreen entfällt. `features/calendar/sample.ts` bleibt als Smoke-Test-Artifact.
+
+### Consequences
+
+- Patches im Bestand: `app/_layout.tsx` (AuthGate + DeepLink-Init), `app/(tabs)/_layout.tsx` (unverändert, aber die Sample-Fallback-Pfade in `features/calendar/hooks.ts` raus), `app-sections/event/EventDetailScreen.tsx` (`requiresAuth`-Alert raus), `features/calendar/index.ts` (Session-Re-Exports raus), `patterns/onboarding.md` (Step 2 erweitert auf „Familienname + Dein Name + Avatar-Color"; „draft Family server-side" entschärft auf „Step 2 commited direkt"), `app-sections/shared/Icon.tsx` (neue Aliases `user`, `check-square`).
+- Neuer Pattern-Doc: [patterns/reset-password.md](../patterns/reset-password.md) (im Spec war kein Reset-Pattern vorhanden).
+- Dashboard-Settings nicht via Migration: separate Checkliste in [supabase/SETUP.md](../supabase/SETUP.md).
+- Resume-nach-Abbruch-CTA auf Dashboard wurde bewusst nicht V1 — siehe [docs/TODO.md](./TODO.md).
+- Neue Test-Infrastruktur: `bunfig.toml` + `bun.test.preload.ts` mockt RN + AsyncStorage + Expo-Router/Linking für Bun-Tests, weil die Module sonst beim Import unter Bun crashen.
