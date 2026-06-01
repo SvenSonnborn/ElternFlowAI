@@ -24,6 +24,8 @@
   "auth": {
     "signIn": "Anmelden",
     "signUp": "Konto erstellen",
+    "signOut": "Abmelden",
+    "soon": "Bald verfügbar",
     "email": "E-Mail",
     "password": "Passwort",
     "forgot": "Passwort vergessen?",
@@ -34,9 +36,52 @@
     "tagline": "Der KI-Assistent für moderne Familien.",
     "magicLink": "Magic-Link per E-Mail senden",
     "newHere": "Neu hier?",
+    "register": {
+      "title": "Konto erstellen",
+      "sub": "Mit dieser E-Mail teilst du später Kalender und Listen mit deinem Partner.",
+      "terms": "Ich stimme den AGB und der Datenschutzerklärung zu.",
+      "submit": "Konto erstellen"
+    },
+    "checkEmail": {
+      "title": "Schau in dein Postfach",
+      "sub": "Wir haben dir einen Link an {{email}} geschickt. Tippe ihn an, um deine E-Mail zu bestätigen.",
+      "resend": "Mail erneut senden",
+      "wrongEmail": "Falsche E-Mail? Zurück"
+    },
+    "reset": {
+      "title": "Passwort zurücksetzen",
+      "sub": "Wir senden dir einen Link an deine E-Mail.",
+      "submit": "Link senden",
+      "success": "Falls die E-Mail registriert ist, findest du gleich einen Link in deinem Postfach.",
+      "backToLogin": "Doch wieder eingefallen? Anmelden"
+    },
+    "newPassword": {
+      "title": "Neues Passwort wählen",
+      "sub": "Mind. 8 Zeichen. Buchstaben und Zahlen empfohlen.",
+      "newField": "Neues Passwort",
+      "confirmField": "Bestätigen",
+      "save": "Passwort speichern",
+      "pwMismatch": "Die Passwörter stimmen nicht überein.",
+      "saved": "Passwort geändert. Bitte erneut anmelden."
+    },
+    "passwordStrength": {
+      "weak": "Schwach",
+      "fair": "Okay",
+      "good": "Gut",
+      "strong": "Stark"
+    },
     "error": {
       "title": "E-Mail oder Passwort falsch",
-      "help": "Versuch es noch einmal oder setze dein Passwort zurück."
+      "help": "Versuch es noch einmal oder setze dein Passwort zurück.",
+      "invalidCredentials": "E-Mail oder Passwort falsch.",
+      "emailTaken": "Diese E-Mail ist bereits registriert.",
+      "emailNotConfirmed": "Bitte bestätige zuerst deine E-Mail.",
+      "weakPassword": "Mindestens 8 Zeichen, bitte.",
+      "alreadyInFamily": "Du gehörst bereits zu einer Familie.",
+      "linkExpired": "Der Link ist abgelaufen oder wurde bereits verwendet.",
+      "notAuthenticated": "Bitte erneut anmelden.",
+      "network": "Verbindung fehlgeschlagen. Bitte später erneut versuchen.",
+      "generic": "Etwas ist schiefgelaufen. Bitte später erneut versuchen."
     }
   },
   "onb": {

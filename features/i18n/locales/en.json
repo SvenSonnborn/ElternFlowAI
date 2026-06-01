@@ -24,6 +24,8 @@
   "auth": {
     "signIn": "Sign in",
     "signUp": "Create account",
+    "signOut": "Sign out",
+    "soon": "Coming soon",
     "email": "Email",
     "password": "Password",
     "forgot": "Forgot password?",
@@ -34,9 +36,52 @@
     "tagline": "The AI assistant for modern families.",
     "magicLink": "Send magic link by email",
     "newHere": "New here?",
+    "register": {
+      "title": "Create your account",
+      "sub": "You'll use this email to share calendar and lists with your partner.",
+      "terms": "I agree to the terms and privacy policy.",
+      "submit": "Create account"
+    },
+    "checkEmail": {
+      "title": "Check your inbox",
+      "sub": "We sent a link to {{email}}. Tap it to confirm your email.",
+      "resend": "Resend email",
+      "wrongEmail": "Wrong email? Go back"
+    },
+    "reset": {
+      "title": "Reset password",
+      "sub": "We'll send a link to your email.",
+      "submit": "Send link",
+      "success": "If that email is registered, you'll find a link in your inbox shortly.",
+      "backToLogin": "Remembered it? Sign in"
+    },
+    "newPassword": {
+      "title": "Pick a new password",
+      "sub": "At least 8 characters. Letters and numbers recommended.",
+      "newField": "New password",
+      "confirmField": "Confirm",
+      "save": "Save password",
+      "pwMismatch": "Passwords do not match.",
+      "saved": "Password updated. Please sign in again."
+    },
+    "passwordStrength": {
+      "weak": "Weak",
+      "fair": "OK",
+      "good": "Good",
+      "strong": "Strong"
+    },
     "error": {
       "title": "Email or password incorrect",
-      "help": "Try again or reset your password."
+      "help": "Try again or reset your password.",
+      "invalidCredentials": "Email or password incorrect.",
+      "emailTaken": "This email is already registered.",
+      "emailNotConfirmed": "Please confirm your email first.",
+      "weakPassword": "At least 8 characters, please.",
+      "alreadyInFamily": "You're already part of a family.",
+      "linkExpired": "This link has expired or was already used.",
+      "notAuthenticated": "Please sign in again.",
+      "network": "Connection failed. Please try again later.",
+      "generic": "Something went wrong. Please try again later."
     }
   },
   "onb": {
