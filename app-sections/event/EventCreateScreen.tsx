@@ -152,7 +152,7 @@ export function EventCreateScreen() {
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingTop: 4,
-          paddingBottom: 96 + insets.bottom,
+          paddingBottom: 24,
           gap: 14,
         }}
         keyboardShouldPersistTaps="handled"
@@ -296,36 +296,26 @@ export function EventCreateScreen() {
           onChange={onPickerChange}
           display={Platform.OS === "ios" ? "spinner" : "default"}
         />
-      ) : (
-        <View
-          pointerEvents="box-none"
-          style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-          }}
-        >
-          <View
-            style={{
-              paddingHorizontal: 20,
-              paddingTop: 12,
-              paddingBottom: 12,
-              backgroundColor: theme.card,
-              borderTopWidth: 1,
-              borderTopColor: theme.line,
-            }}
-          >
-            <Button
-              block
-              label={createMutation.isPending ? t("cal.create.saving") : t("cal.create.save")}
-              tone="primary"
-              disabled={!canSave}
-              onPress={onSave}
-            />
-          </View>
-        </View>
-      )}
+      ) : null}
+
+      <View
+        style={{
+          paddingHorizontal: 20,
+          paddingTop: 12,
+          paddingBottom: 12,
+          backgroundColor: theme.card,
+          borderTopWidth: 1,
+          borderTopColor: theme.line,
+        }}
+      >
+        <Button
+          block
+          label={createMutation.isPending ? t("cal.create.saving") : t("cal.create.save")}
+          tone="primary"
+          disabled={!canSave}
+          onPress={onSave}
+        />
+      </View>
     </SafeAreaView>
   );
 }
