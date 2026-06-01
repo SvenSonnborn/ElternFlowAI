@@ -140,7 +140,16 @@
       "allergiesLabel": "Allergien & Unverträglichkeiten",
       "voice": "Lieber per Sprache erzählen",
       "save": "Weiter",
-      "skip": "Überspringen"
+      "skip": "Überspringen",
+      "avatarFallback": "?",
+      "allergies": {
+        "peanuts": "Erdnüsse",
+        "milk": "Milch",
+        "eggs": "Eier",
+        "gluten": "Gluten",
+        "soy": "Soja",
+        "nuts": "Nüsse"
+      }
     },
     "s5": {
       "title": "Alles bereit!",

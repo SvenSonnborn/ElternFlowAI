@@ -140,7 +140,16 @@
       "allergiesLabel": "Allergies & intolerances",
       "voice": "Or tell us by voice",
       "save": "Next",
-      "skip": "Skip"
+      "skip": "Skip",
+      "avatarFallback": "?",
+      "allergies": {
+        "peanuts": "Peanuts",
+        "milk": "Milk",
+        "eggs": "Eggs",
+        "gluten": "Gluten",
+        "soy": "Soy",
+        "nuts": "Nuts"
+      }
     },
     "s5": {
       "title": "All set!",
