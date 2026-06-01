@@ -112,33 +112,6 @@ export function EventEditScreen() {
         eventId: occurrence.eventId,
         occurrenceDate: occurrence.occurrenceDate,
         isRecurring,
-        // master row is reconstructed from the occurrence — the mutations
-        // only consume master for `forward`-edit's insertSplitEvent, and
-        // sample-mode events never reach this branch (Detail-Sheet gates).
-        master: {
-          id: occurrence.eventId,
-          family_id: "",
-          type_id: "",
-          child_id: occurrence.childId,
-          title: occurrence.title,
-          description: occurrence.description,
-          location: occurrence.location,
-          start_at: occurrence.startAt.toISOString(),
-          end_at: occurrence.endAt.toISOString(),
-          all_day: occurrence.allDay,
-          // NOTE: actual rrule_freq is lost in CalendarOccurrence — this placeholder only
-          // affects the "forward" scope path's insertSplitEvent (which would also fail
-          // with the empty family_id placeholder above until auth + master-row refetch
-          // land in a follow-up iteration).
-          rrule_freq: isRecurring ? "weekly" : null,
-          rrule_interval: 1,
-          rrule_byweekday: null,
-          rrule_until: null,
-          rrule_count: null,
-          created_by: null,
-          created_at: "",
-          updated_at: "",
-        },
         changes: {
           title: title.trim(),
           start_at: startAt.toISOString(),

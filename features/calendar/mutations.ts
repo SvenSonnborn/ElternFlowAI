@@ -1,18 +1,52 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import type { Database } from "@/features/supabase/database.types";
+
 import { supabase } from "@/features/supabase";
 
-import { calendarKeys } from "./queries";
+import { calendarKeys, fetchEventById } from "./queries";
 import {
   applyDeleteScope,
   applyEditScope,
   createSupabaseEventOps,
   type ApplyDeleteScopeArgs,
-  type ApplyEditScopeArgs,
+  type EditScope,
+  type EventChanges,
+  type EventOps,
 } from "./recurrence";
 
+type EventRow = Database["public"]["Tables"]["events"]["Row"];
+
 type DeleteVars = Omit<ApplyDeleteScopeArgs, "ops">;
-type UpdateVars = Omit<ApplyEditScopeArgs, "ops">;
+
+export interface UpdateEventVars {
+  scope: EditScope;
+  eventId: string;
+  occurrenceDate: string;
+  isRecurring: boolean;
+  changes: EventChanges;
+}
+
+export interface UpdateEventDeps {
+  fetchMaster: (eventId: string) => Promise<EventRow | null>;
+  ops: EventOps;
+}
+
+export async function updateEvent(vars: UpdateEventVars, deps: UpdateEventDeps): Promise<void> {
+  const master = await deps.fetchMaster(vars.eventId);
+  if (!master) {
+    throw new Error(`Event ${vars.eventId} not found`);
+  }
+  await applyEditScope({
+    scope: vars.scope,
+    eventId: vars.eventId,
+    occurrenceDate: vars.occurrenceDate,
+    isRecurring: vars.isRecurring,
+    master,
+    changes: vars.changes,
+    ops: deps.ops,
+  });
+}
 
 export function useDeleteEvent() {
   const qc = useQueryClient();
@@ -30,22 +64,9 @@ export function useDeleteEvent() {
 export function useUpdateEvent() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (vars: UpdateVars) => {
-      // Forward-edit on a recurring series needs the canonical master row for
-      // insertSplitEvent (family_id/type_id/rrule_*). EventEditScreen currently
-      // reconstructs `master` from CalendarOccurrence with empty placeholders —
-      // safe for sample-mode (isRecurring=false) and for scope this/all on real
-      // events (master isn't consumed), but the forward path would hit a FK
-      // violation. See docs/TODO.md for the planned fetchEventById refetch fix.
-      if (vars.scope === "forward" && vars.isRecurring && !vars.master.family_id) {
-        throw new Error(
-          "forward-edit on a recurring event requires the real master row; " +
-            "load it via fetchEventById(eventId) before calling useUpdateEvent.mutate. " +
-            "See docs/TODO.md.",
-        );
-      }
+    mutationFn: async (vars: UpdateEventVars) => {
       const ops = createSupabaseEventOps(supabase);
-      await applyEditScope({ ...vars, ops });
+      await updateEvent(vars, { fetchMaster: fetchEventById, ops });
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.all });
