@@ -159,12 +159,13 @@ export function EventEditScreen() {
             contentContainerStyle={{
               paddingHorizontal: 20,
               paddingTop: 4,
-              paddingBottom: 48 + insets.bottom,
+              paddingBottom: 96 + insets.bottom,
               gap: 14,
             }}
             keyboardShouldPersistTaps="handled"
           >
             <View className="flex-row items-center justify-between pb-3 pt-4">
+              <Text variant="h2">{t("cal.edit.title")}</Text>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t("action.cancel")}
@@ -174,20 +175,6 @@ export function EventEditScreen() {
               >
                 <Text variant="bodyEmph" tone="inkSecondary">
                   {t("action.cancel")}
-                </Text>
-              </Pressable>
-              <Text variant="h2">{t("cal.edit.title")}</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("cal.edit.save")}
-                onPress={() => void onSave()}
-                disabled={!canSave}
-                className="px-2 py-1 active:opacity-70"
-                hitSlop={12}
-                style={{ opacity: canSave ? 1 : 0.4 }}
-              >
-                <Text variant="bodyEmph" tone="primaryStrong">
-                  {updateMutation.isPending ? t("cal.edit.saving") : t("cal.edit.save")}
                 </Text>
               </Pressable>
             </View>
@@ -266,7 +253,36 @@ export function EventEditScreen() {
               onChange={onPickerChange}
               display={Platform.OS === "ios" ? "spinner" : "default"}
             />
-          ) : null}
+          ) : (
+            <View
+              pointerEvents="box-none"
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+              }}
+            >
+              <View
+                style={{
+                  paddingHorizontal: 20,
+                  paddingTop: 12,
+                  paddingBottom: 12,
+                  backgroundColor: theme.card,
+                  borderTopWidth: 1,
+                  borderTopColor: theme.line,
+                }}
+              >
+                <Button
+                  block
+                  label={updateMutation.isPending ? t("cal.edit.saving") : t("cal.edit.save")}
+                  tone="primary"
+                  disabled={!canSave}
+                  onPress={() => void onSave()}
+                />
+              </View>
+            </View>
+          )}
         </>
       )}
     </SafeAreaView>
