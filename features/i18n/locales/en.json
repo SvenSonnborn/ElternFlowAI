@@ -236,7 +236,9 @@
       "minuteShort": "min"
     },
     "add": {
-      "voice": "Add by voice"
+      "voice": "Add by voice",
+      "new": "Add event",
+      "requiresAuth": "Sign in to add events."
     },
     "legend": {
       "arzt": "Doctor",
@@ -286,6 +288,29 @@
       "this": "Only this one",
       "forward": "This and all following",
       "all": "All events"
+    },
+    "create": {
+      "title": "Add event",
+      "fieldType": "Type",
+      "fieldChild": "Child",
+      "fieldAllDay": "All day",
+      "fieldRecurrence": "Repeat",
+      "noChild": "Nobody",
+      "save": "Add",
+      "saving": "Saving…",
+      "conflict_one": "Conflicts with {{title}} · {{from}}–{{to}}",
+      "conflict_other": "{{count}} conflicts — {{title}} · {{from}}–{{to}} and more",
+      "error": {
+        "typeRequired": "Pick a type",
+        "noFamily": "Family not set up yet"
+      }
+    },
+    "recur": {
+      "none": "None",
+      "daily": "Daily",
+      "weekdays": "Weekdays",
+      "weekly": "Weekly",
+      "monthly": "Monthly"
     }
   },
   "meals": {

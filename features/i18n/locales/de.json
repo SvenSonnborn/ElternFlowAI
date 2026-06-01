@@ -236,7 +236,9 @@
       "minuteShort": "Min."
     },
     "add": {
-      "voice": "Termin per Sprache"
+      "voice": "Termin per Sprache",
+      "new": "Termin hinzufügen",
+      "requiresAuth": "Melde dich an, um Termine hinzuzufügen."
     },
     "legend": {
       "arzt": "Arzt",
@@ -286,6 +288,29 @@
       "this": "Nur diesen",
       "forward": "Diesen und alle folgenden",
       "all": "Alle Termine"
+    },
+    "create": {
+      "title": "Termin hinzufügen",
+      "fieldType": "Typ",
+      "fieldChild": "Kind",
+      "fieldAllDay": "Ganztägig",
+      "fieldRecurrence": "Wiederholung",
+      "noChild": "Niemand",
+      "save": "Hinzufügen",
+      "saving": "Speichere…",
+      "conflict_one": "Kollision mit {{title}} · {{from}}–{{to}}",
+      "conflict_other": "{{count}} Kollisionen — {{title}} · {{from}}–{{to}} u.a.",
+      "error": {
+        "typeRequired": "Bitte einen Typ wählen",
+        "noFamily": "Familie noch nicht eingerichtet"
+      }
+    },
+    "recur": {
+      "none": "Keine",
+      "daily": "Täglich",
+      "weekdays": "Werktags",
+      "weekly": "Wöchentlich",
+      "monthly": "Monatlich"
     }
   },
   "meals": {
