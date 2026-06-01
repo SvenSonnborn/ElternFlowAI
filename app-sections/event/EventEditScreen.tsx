@@ -4,7 +4,7 @@ import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Platform, Pressable, ScrollView, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Field } from "@/app-sections/shared";
@@ -201,28 +201,8 @@ export function EventEditScreen() {
               label={t("cal.edit.fieldDate")}
               iconName="calendar"
               value={format(startAt, "EEEE, d. MMMM yyyy", { locale: dateLocale })}
-              onPress={() => setPicker(picker === "date" ? null : "date")}
+              onPress={() => setPicker("date")}
             />
-
-            {picker === "date" ? (
-              <View
-                style={{
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: theme.line,
-                  backgroundColor: theme.cardSubtle,
-                  padding: 8,
-                }}
-              >
-                <DateTimePicker
-                  value={startAt}
-                  mode="date"
-                  display={Platform.OS === "ios" ? "inline" : "default"}
-                  onChange={onPickerChange}
-                  themeVariant={theme.card === "#FFFFFF" ? "light" : "dark"}
-                />
-              </View>
-            ) : null}
 
             <View className="flex-row gap-3">
               <View className="flex-1">
@@ -230,7 +210,7 @@ export function EventEditScreen() {
                   label={t("cal.edit.fieldStart")}
                   iconName="clock"
                   value={format(startAt, "HH:mm")}
-                  onPress={() => setPicker(picker === "startTime" ? null : "startTime")}
+                  onPress={() => setPicker("startTime")}
                 />
               </View>
               <View className="flex-1">
@@ -238,31 +218,11 @@ export function EventEditScreen() {
                   label={t("cal.edit.fieldEnd")}
                   iconName="clock"
                   value={format(endAt, "HH:mm")}
-                  onPress={() => setPicker(picker === "endTime" ? null : "endTime")}
+                  onPress={() => setPicker("endTime")}
                   error={timeError}
                 />
               </View>
             </View>
-
-            {picker === "startTime" || picker === "endTime" ? (
-              <View
-                style={{
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: theme.line,
-                  backgroundColor: theme.cardSubtle,
-                  padding: 8,
-                }}
-              >
-                <DateTimePicker
-                  value={picker === "startTime" ? startAt : endAt}
-                  mode="time"
-                  display={Platform.OS === "ios" ? "spinner" : "default"}
-                  onChange={onPickerChange}
-                  themeVariant={theme.card === "#FFFFFF" ? "light" : "dark"}
-                />
-              </View>
-            ) : null}
 
             <Field
               label={t("cal.edit.fieldLocation")}
@@ -305,6 +265,67 @@ export function EventEditScreen() {
               />
             </View>
           </ScrollView>
+
+          {Platform.OS === "ios" ? (
+            <Modal
+              visible={picker !== null}
+              transparent
+              animationType="slide"
+              onRequestClose={() => setPicker(null)}
+            >
+              <Pressable
+                style={{ flex: 1, backgroundColor: theme.overlay, justifyContent: "flex-end" }}
+                onPress={() => setPicker(null)}
+              >
+                <Pressable
+                  onPress={(e) => e.stopPropagation()}
+                  style={{
+                    backgroundColor: theme.card,
+                    borderTopLeftRadius: 20,
+                    borderTopRightRadius: 20,
+                    paddingHorizontal: 16,
+                    paddingTop: 12,
+                    paddingBottom: 16 + insets.bottom,
+                  }}
+                >
+                  <View style={{ alignItems: "center", marginBottom: 8 }}>
+                    <View
+                      style={{
+                        width: 40,
+                        height: 4,
+                        borderRadius: 2,
+                        backgroundColor: theme.lineStrong,
+                      }}
+                    />
+                  </View>
+                  {picker ? (
+                    <DateTimePicker
+                      value={picker === "date" ? startAt : picker === "startTime" ? startAt : endAt}
+                      mode={picker === "date" ? "date" : "time"}
+                      display={picker === "date" ? "inline" : "spinner"}
+                      onChange={onPickerChange}
+                      themeVariant={theme.card === "#FFFFFF" ? "light" : "dark"}
+                    />
+                  ) : null}
+                  <View style={{ marginTop: 8 }}>
+                    <Button
+                      block
+                      label={t("action.done")}
+                      tone="primary"
+                      onPress={() => setPicker(null)}
+                    />
+                  </View>
+                </Pressable>
+              </Pressable>
+            </Modal>
+          ) : picker ? (
+            <DateTimePicker
+              value={picker === "date" ? startAt : picker === "startTime" ? startAt : endAt}
+              mode={picker === "date" ? "date" : "time"}
+              display="default"
+              onChange={onPickerChange}
+            />
+          ) : null}
         </>
       )}
     </SafeAreaView>
