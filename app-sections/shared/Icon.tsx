@@ -16,6 +16,7 @@ type LucideAlias =
   | "mic"
   | "plus"
   | "check"
+  | "check-square"
   | "chevron-right"
   | "chevron-left"
   | "chevron-down"
@@ -56,6 +57,7 @@ const featherMap: Partial<Record<LucideAlias, FeatherName>> = {
   mic: "mic",
   plus: "plus",
   check: "check",
+  "check-square": "check-square",
   "chevron-right": "chevron-right",
   "chevron-left": "chevron-left",
   "chevron-down": "chevron-down",
