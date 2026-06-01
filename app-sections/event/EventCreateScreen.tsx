@@ -9,7 +9,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Field } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
-import { Text } from "@/design-system/ui";
+import { Button, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren } from "@/features/auth";
 import {
   useCreateEvent,
@@ -152,12 +152,13 @@ export function EventCreateScreen() {
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingTop: 4,
-          paddingBottom: 48 + insets.bottom,
+          paddingBottom: 96 + insets.bottom,
           gap: 14,
         }}
         keyboardShouldPersistTaps="handled"
       >
         <View className="flex-row items-center justify-between pb-3 pt-4">
+          <Text variant="h2">{t("cal.create.title")}</Text>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("action.cancel")}
@@ -167,20 +168,6 @@ export function EventCreateScreen() {
           >
             <Text variant="bodyEmph" tone="inkSecondary">
               {t("action.cancel")}
-            </Text>
-          </Pressable>
-          <Text variant="h2">{t("cal.create.title")}</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("cal.create.save")}
-            onPress={onSave}
-            disabled={!canSave}
-            className="px-2 py-1 active:opacity-70"
-            hitSlop={12}
-            style={{ opacity: canSave ? 1 : 0.4 }}
-          >
-            <Text variant="bodyEmph" tone="primaryStrong">
-              {createMutation.isPending ? t("cal.create.saving") : t("cal.create.save")}
             </Text>
           </Pressable>
         </View>
@@ -309,7 +296,36 @@ export function EventCreateScreen() {
           onChange={onPickerChange}
           display={Platform.OS === "ios" ? "spinner" : "default"}
         />
-      ) : null}
+      ) : (
+        <View
+          pointerEvents="box-none"
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+          }}
+        >
+          <View
+            style={{
+              paddingHorizontal: 20,
+              paddingTop: 12,
+              paddingBottom: 12,
+              backgroundColor: theme.card,
+              borderTopWidth: 1,
+              borderTopColor: theme.line,
+            }}
+          >
+            <Button
+              block
+              label={createMutation.isPending ? t("cal.create.saving") : t("cal.create.save")}
+              tone="primary"
+              disabled={!canSave}
+              onPress={onSave}
+            />
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
