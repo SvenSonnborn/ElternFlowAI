@@ -34,9 +34,13 @@ export function useSession(): {
   session: Session | null;
   userId: string | null;
 } {
-  const snapshot = useSessionStore((s) => ({ session: s.session, initialized: s.initialized }));
-  const status = selectStatus(snapshot);
-  return { status, session: snapshot.session, userId: snapshot.session?.user.id ?? null };
+  // Subscribe to each field individually — Zustand compares with Object.is,
+  // so a selector that returns a fresh object every call would trigger an
+  // infinite render loop (the new object reference always !== the previous).
+  const session = useSessionStore((s) => s.session);
+  const initialized = useSessionStore((s) => s.initialized);
+  const status = selectStatus({ session, initialized });
+  return { status, session, userId: session?.user.id ?? null };
 }
 
 export function useInitSession(): void {
