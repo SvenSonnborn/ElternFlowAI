@@ -86,6 +86,7 @@ export function EventEditScreen() {
     if (picker === "date") {
       setStartAt(mergeDateAndTime(selected, startAt));
       setEndAt(mergeDateAndTime(selected, endAt));
+      if (Platform.OS === "ios") setPicker(null);
     } else if (picker === "startTime") {
       setStartAt(mergeDateAndTime(startAt, selected));
     } else if (picker === "endTime") {
