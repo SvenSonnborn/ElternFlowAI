@@ -13,7 +13,7 @@ interface ChildOption {
 interface ChildPickerProps {
   label: string;
   noChildLabel: string;
-  children: ChildOption[];
+  options: ChildOption[];
   selectedChildId: string | null;
   onSelect: (id: string | null) => void;
 }
@@ -21,12 +21,12 @@ interface ChildPickerProps {
 export function ChildPicker({
   label,
   noChildLabel,
-  children,
+  options,
   selectedChildId,
   onSelect,
 }: ChildPickerProps) {
   const { theme } = useTheme();
-  if (children.length === 0) return null;
+  if (options.length === 0) return null;
 
   return (
     <View>
@@ -38,7 +38,7 @@ export function ChildPicker({
         {label}
       </Text>
       <View className="mt-1.5 flex-row flex-wrap items-center gap-3">
-        {children.map((child) => {
+        {options.map((child) => {
           const isSelected = child.id === selectedChildId;
           return (
             <Pressable
