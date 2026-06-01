@@ -64,6 +64,10 @@ export function LoginScreen() {
             onChangeText={setEmail}
             keyboardType="email-address"
             placeholder="name@example.com"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            textContentType="emailAddress"
           />
           <Field
             label={t("auth.password")}
@@ -71,11 +75,16 @@ export function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             placeholder="••••••••"
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="current-password"
+            textContentType="password"
           />
         </View>
 
         <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 12 }}>
-          <Link href={"/(auth)/reset-password" as never} asChild>
+          <Link href={"/(auth)/reset-password"} asChild>
             <Pressable hitSlop={10}>
               <Text variant="caption" tone="primaryStrong">
                 {t("auth.forgot")}
@@ -126,7 +135,7 @@ export function LoginScreen() {
         </View>
 
         <Pressable
-          onPress={() => router.push("/(auth)/register" as never)}
+          onPress={() => router.push("/(auth)/register")}
           style={{ flexDirection: "row", justifyContent: "center", marginTop: 24, gap: 4 }}
           hitSlop={10}
         >

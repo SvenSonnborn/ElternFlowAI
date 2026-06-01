@@ -1,9 +1,8 @@
 import { router } from "expo-router";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Share, View } from "react-native";
 
-import { Field, Icon, type IconName } from "@/app-sections/shared";
+import { Icon, type IconName } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { mapAuthError, useCreateInvitation, useCurrentParent } from "@/features/auth";
@@ -15,7 +14,6 @@ export function Step3InvitePartner() {
   const { theme } = useTheme();
   const parent = useCurrentParent();
   const createInvitation = useCreateInvitation();
-  const [partnerEmail, setPartnerEmail] = useState("");
 
   const errorKey = createInvitation.error ? mapAuthError(createInvitation.error) : null;
   const familyId = parent.data?.family_id;
@@ -33,7 +31,7 @@ export function Step3InvitePartner() {
         { url: link, message, title: t("onb.s3.shareSubject") },
         { subject: t("onb.s3.shareSubject"), dialogTitle: t("onb.s3.shareSubject") },
       );
-      router.push("/(onboarding)/4" as never);
+      router.push("/(onboarding)/4");
     } catch {
       /* error rendered below; Share.share rejects when the user dismisses,
          which we treat as a soft-skip — don't navigate. */
@@ -41,7 +39,7 @@ export function Step3InvitePartner() {
   }
 
   function onLater() {
-    router.push("/(onboarding)/4" as never);
+    router.push("/(onboarding)/4");
   }
 
   const shared: { icon: IconName; key: "calendar" | "tasks" | "meals" | "children" }[] = [
@@ -98,17 +96,6 @@ export function Step3InvitePartner() {
           </Text>
         </View>
       ) : null}
-
-      <View style={{ marginTop: 24 }}>
-        <Field
-          label={t("onb.s3.partnerField")}
-          iconName="mail"
-          value={partnerEmail}
-          onChangeText={setPartnerEmail}
-          keyboardType="email-address"
-          placeholder="partner@example.com"
-        />
-      </View>
 
       <View className="mt-6 rounded-2xl border border-line bg-card p-4">
         {shared.map((s) => (

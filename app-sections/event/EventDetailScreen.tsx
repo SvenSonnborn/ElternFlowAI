@@ -9,8 +9,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ChildAvatar, Icon } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
+import { useCurrentParent, useFamilyChildren } from "@/features/auth";
 import { useDeleteEvent, useEvent, type EditScope } from "@/features/calendar";
-import { children as sampleChildren } from "@/features/sample-data";
 
 import { pickScope } from "./scopeDialog";
 
@@ -55,6 +55,8 @@ export function EventDetailScreen() {
   const [reminder1, setReminder1] = useState(false);
 
   const { data, isLoading, error } = useEvent(id ?? "", occ);
+  const parent = useCurrentParent();
+  const familyChildren = useFamilyChildren(parent.data?.family_id);
 
   const deleteMutation = useDeleteEvent();
 
@@ -173,7 +175,7 @@ export function EventDetailScreen() {
               ) : null}
               {data.childId
                 ? (() => {
-                    const child = sampleChildren.find((c) => c.id === data.childId);
+                    const child = (familyChildren.data ?? []).find((c) => c.id === data.childId);
                     if (!child) return null;
                     return (
                       <View className="mt-1 flex-row items-center gap-2">

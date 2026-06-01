@@ -11,13 +11,13 @@ import { ChildAvatar, Icon, SectionHeader, TopBar } from "@/app-sections/shared"
 import { palette } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
+import { useCurrentParent, useFamilyChildren } from "@/features/auth";
 import {
   buildCalendarTheme,
   setCalendarLocale,
   useFamilyEvents,
   useMarkedDates,
 } from "@/features/calendar";
-import { children as sampleChildren } from "@/features/sample-data";
 
 import { CalendarDay } from "./CalendarDay";
 
@@ -54,6 +54,8 @@ export function KalenderScreen() {
 
   const { data: occurrences } = useFamilyEvents(visibleMonth);
   const markedDates = useMarkedDates(occurrences, selectedDate, theme.primarySoft);
+  const parent = useCurrentParent();
+  const familyChildren = useFamilyChildren(parent.data?.family_id);
 
   const dayEvents = useMemo(
     () =>
@@ -110,7 +112,9 @@ export function KalenderScreen() {
       ) : (
         <View className="gap-2">
           {dayEvents.map((occ) => {
-            const child = occ.childId ? sampleChildren.find((c) => c.id === occ.childId) : null;
+            const child = occ.childId
+              ? (familyChildren.data ?? []).find((c) => c.id === occ.childId)
+              : null;
             const durationMin = Math.max(
               0,
               Math.round((occ.endAt.getTime() - occ.startAt.getTime()) / 60_000),

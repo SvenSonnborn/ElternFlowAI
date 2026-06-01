@@ -71,7 +71,7 @@ export function Step5Done() {
               variant="ghost"
               size="lg"
               block
-              onPress={() => router.push("/(onboarding)/4" as never)}
+              onPress={() => router.push("/(onboarding)/4")}
             />
           ) : null}
         </View>

@@ -39,7 +39,12 @@ export function OnboardingShell({
           paddingVertical: 12,
         }}
       >
-        <Pressable onPress={() => router.back()} hitSlop={10}>
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={t("onb.actions.back")}
+        >
           <Icon name="chevron-left" size={24} color={theme.ink} />
         </Pressable>
         <View style={{ flexDirection: "row", gap: 6 }}>

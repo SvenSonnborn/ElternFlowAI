@@ -74,47 +74,56 @@ export async function clearPendingInviteToken(): Promise<void> {
 /** Called from app/_layout.tsx. Returns a cleanup function. */
 export function initDeepLinkHandler(): () => void {
   const handle = async (rawUrl: string | null) => {
-    if (!rawUrl) return;
-    const parsed = parseDeepLink(rawUrl);
-    if (!parsed) return;
+    try {
+      if (!rawUrl) return;
+      const parsed = parseDeepLink(rawUrl);
+      if (!parsed) return;
 
-    if (parsed.kind === "auth-confirm" || parsed.kind === "auth-recovery") {
-      const { error } = await supabase.auth.verifyOtp({
-        token_hash: parsed.tokenHash,
-        type: parsed.otpType,
-      });
-      if (error) {
-        console.warn("[deepLinkHandler] verifyOtp failed", error);
-        if (parsed.kind === "auth-recovery") {
-          router.replace("/(auth)/reset-password" as never);
+      if (parsed.kind === "auth-confirm" || parsed.kind === "auth-recovery") {
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: parsed.tokenHash,
+          type: parsed.otpType,
+        });
+        if (error) {
+          console.warn("[deepLinkHandler] verifyOtp failed", error);
+          if (parsed.kind === "auth-recovery") {
+            router.replace("/(auth)/reset-password");
+          }
+          return;
         }
+        if (parsed.kind === "auth-recovery") {
+          router.replace("/(auth)/new-password");
+        }
+        // For confirm: AuthGate will route to /(onboarding)/2 once the session is set.
         return;
       }
-      if (parsed.kind === "auth-recovery") {
-        router.replace("/(auth)/new-password" as never);
-      }
-      // For confirm: AuthGate will route to /(onboarding)/2 once the session is set.
-      return;
-    }
 
-    if (parsed.kind === "invite") {
-      // Stash so onboarding can pick it up after sign-in.
-      try {
-        await AsyncStorage.setItem(PENDING_INVITE_KEY, parsed.token);
-      } catch (e) {
-        console.warn("[deepLinkHandler] failed to stash invite", e);
-      }
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        router.replace("/(auth)/login" as never);
+      if (parsed.kind === "invite") {
+        // Stash so onboarding can pick it up after sign-in.
+        try {
+          await AsyncStorage.setItem(PENDING_INVITE_KEY, parsed.token);
+        } catch (e) {
+          console.warn("[deepLinkHandler] failed to stash invite", e);
+        }
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) {
+          router.replace("/(auth)/login");
+          return;
+        }
+        router.replace("/(onboarding)/2");
         return;
       }
-      router.replace("/(onboarding)/2" as never);
-      return;
+    } catch (e) {
+      // Any unexpected throw (network blip, native bridge, router) is logged
+      // and swallowed — a failed deep-link must not crash the app; AuthGate
+      // still routes correctly from the current session state on next render.
+      console.warn("[deepLinkHandler] handle failed", e);
     }
   };
 
-  void Linking.getInitialURL().then(handle);
+  Linking.getInitialURL()
+    .then(handle)
+    .catch((e: unknown) => console.warn("[deepLinkHandler] getInitialURL failed", e));
   const sub = Linking.addEventListener("url", ({ url }) => void handle(url));
   return () => sub.remove();
 }

@@ -63,14 +63,14 @@ export function Step4FirstChild() {
         // (e.g. ChildProfileScreen, sample data) can keep rendering raw strings.
         allergies: Array.from(allergies).map((a) => t(`onb.s4.allergies.${a}`)),
       });
-      router.push("/(onboarding)/5" as never);
+      router.push("/(onboarding)/5");
     } catch {
       /* error rendered below */
     }
   }
 
   function onSkip() {
-    router.push("/(onboarding)/5" as never);
+    router.push("/(onboarding)/5");
   }
 
   const initial = name.charAt(0).toUpperCase() || t("onb.s4.avatarFallback");
@@ -144,6 +144,7 @@ export function Step4FirstChild() {
               <Pressable
                 key={c}
                 onPress={() => setColor(c)}
+                hitSlop={8}
                 style={{
                   width: 28,
                   height: 28,

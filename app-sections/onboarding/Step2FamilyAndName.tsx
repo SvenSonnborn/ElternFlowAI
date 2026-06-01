@@ -68,7 +68,7 @@ export function Step2FamilyAndName() {
           color,
         });
       }
-      router.push("/(onboarding)/3" as never);
+      router.push("/(onboarding)/3");
     } catch (err) {
       // If the user already belongs to a family (23505), the AuthGate would
       // route to /(tabs) on its next render anyway — make it explicit.
@@ -144,6 +144,7 @@ export function Step2FamilyAndName() {
               <Pressable
                 key={c}
                 onPress={() => setColor(c)}
+                hitSlop={4}
                 style={{
                   width: 36,
                   height: 36,

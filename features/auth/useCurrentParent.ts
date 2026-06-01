@@ -32,6 +32,5 @@ export function useCurrentParent(): UseQueryResult<ParentRow | null, Error> {
     queryKey: currentParentKey(userId),
     queryFn: () => fetchCurrentParent(userId as string),
     enabled: shouldFetchParent(status) && userId !== null,
-    staleTime: 60_000,
   });
 }

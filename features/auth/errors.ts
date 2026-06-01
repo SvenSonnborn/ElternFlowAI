@@ -25,7 +25,9 @@ export function mapAuthError(input: unknown): AuthErrorKey {
   const err = asErrorLike(input);
   if (!err) {
     if (input !== null && input !== undefined) {
-      console.error("[mapAuthError] non-object input", input);
+      // Log only the runtime type — the raw value may contain PII (e.g. an
+      // email/password if a caller mistakenly passed it through).
+      console.error("[mapAuthError] non-object input", { type: typeof input });
     }
     return "auth.error.generic";
   }
@@ -45,6 +47,12 @@ export function mapAuthError(input: unknown): AuthErrorKey {
   if (/email not confirmed/i.test(message)) return "auth.error.emailNotConfirmed";
   if (/password.*(at least|too short|short)/i.test(message)) return "auth.error.weakPassword";
 
-  console.error("[mapAuthError] unmapped error", input);
+  // Log only safe primitives — Supabase error messages can include the
+  // submitted email, and we never want that on the device's logs.
+  console.error("[mapAuthError] unmapped error", {
+    code: err.code ?? null,
+    name: err.name ?? null,
+    hasMessage: message.length > 0,
+  });
   return "auth.error.generic";
 }

@@ -35,6 +35,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (status === "loading") return <SplashFallback />;
   if (status === "authenticated" && parent.isLoading) return <SplashFallback />;
-  if (target) return <Redirect href={target as never} />;
+  if (target) return <Redirect href={target} />;
   return <>{children}</>;
 }

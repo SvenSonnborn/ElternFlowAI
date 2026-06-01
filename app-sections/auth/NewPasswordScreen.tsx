@@ -17,19 +17,30 @@ export function NewPasswordScreen() {
 
   const strength = passwordStrength(password);
   const matches = password.length > 0 && password === confirm;
-  const errorKey = update.error ? mapAuthError(update.error) : null;
+  const errorKey = update.error
+    ? mapAuthError(update.error)
+    : signOut.error
+      ? mapAuthError(signOut.error)
+      : null;
   const canSubmit = strength.acceptable && matches && !update.isPending && !signOut.isPending;
 
   async function onSubmit() {
     if (!canSubmit) return;
     try {
       await update.mutateAsync({ password });
-      await signOut.mutateAsync();
-      Alert.alert(t("auth.newPassword.saved"));
-      router.replace("/(auth)/login" as never);
     } catch {
-      /* error rendered below */
+      return; // password update failed — banner renders, do not navigate
     }
+    // Password was changed. Whether or not signOut succeeds, navigate to login —
+    // staying on this screen with a recovery session would let the user back
+    // into tabs without re-authenticating with the new password.
+    try {
+      await signOut.mutateAsync();
+    } catch {
+      /* signOut error surfaced via errorKey; still proceed to login */
+    }
+    Alert.alert(t("auth.newPassword.saved"));
+    router.replace("/(auth)/login");
   }
 
   return (
@@ -60,6 +71,11 @@ export function NewPasswordScreen() {
             value={password}
             onChangeText={setPassword}
             placeholder="••••••••"
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="new-password"
+            textContentType="newPassword"
           />
           <Field
             label={t("auth.newPassword.confirmField")}
@@ -68,6 +84,11 @@ export function NewPasswordScreen() {
             onChangeText={setConfirm}
             placeholder="••••••••"
             error={confirm.length > 0 && !matches ? t("auth.newPassword.pwMismatch") : undefined}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="new-password"
+            textContentType="newPassword"
           />
         </View>
 

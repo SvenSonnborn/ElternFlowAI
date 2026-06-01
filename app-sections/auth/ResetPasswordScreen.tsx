@@ -74,7 +74,7 @@ export function ResetPasswordScreen() {
           </View>
         ) : null}
         <Pressable
-          onPress={() => router.replace("/(auth)/login" as never)}
+          onPress={() => router.replace("/(auth)/login")}
           style={{ marginTop: 24, alignSelf: "center" }}
           hitSlop={10}
         >

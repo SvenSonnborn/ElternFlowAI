@@ -57,7 +57,13 @@ export function RegisterScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={{ padding: 24 }} keyboardShouldPersistTaps="handled">
-        <Pressable onPress={() => router.back()} style={{ marginBottom: 16 }} hitSlop={10}>
+        <Pressable
+          onPress={() => router.back()}
+          style={{ marginBottom: 16 }}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={t("action.back")}
+        >
           <Icon name="chevron-left" size={24} color={theme.ink} />
         </Pressable>
 
@@ -87,6 +93,10 @@ export function RegisterScreen() {
             onChangeText={setEmail}
             keyboardType="email-address"
             placeholder="name@example.com"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            textContentType="emailAddress"
           />
           <View>
             <Field
@@ -95,6 +105,11 @@ export function RegisterScreen() {
               value={password}
               onChangeText={setPassword}
               placeholder="••••••••"
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="new-password"
+              textContentType="newPassword"
             />
             {password.length > 0 ? (
               <View style={{ marginTop: 8 }}>
