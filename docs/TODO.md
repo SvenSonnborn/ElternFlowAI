@@ -4,7 +4,6 @@ Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope 
 
 ## Calendar (Edit/Delete V1 — `feature/calendar-v1`)
 
-- **EventEditScreen rekonstruiert `master`-Row aus der `CalendarOccurrence`** ([app-sections/event/EventEditScreen.tsx:111-134](app-sections/event/EventEditScreen.tsx)) statt sie frisch aus Supabase zu laden. Damit funktioniert der `forward`-Edit-Split heute nur auf der Mock-Ebene — sobald Auth lebt, würde `insertSplitEvent` mit `family_id=""` / `type_id=""` an FK-Constraints scheitern. Außerdem geht der echte `rrule_freq` (daily/monthly/yearly) verloren — Placeholder ist hardgecodet `"weekly"`. Defensive Notbremse ist bereits in [features/calendar/mutations.ts](features/calendar/mutations.ts) verdrahtet: `useUpdateEvent.mutationFn` wirft mit klarer Botschaft, sobald `scope === "forward" && isRecurring && !master.family_id`. Fix: Im `useUpdateEvent`-Hook bei `scope === "forward"` den Master via `fetchEventById(eventId)` refetchen und dort übergeben; den `master`-Parameter aus dem Screen entfernen.
 - **Recurring-Series mit `rrule_count` lassen sich nicht sauber per `forward`-Edit splitten** ([features/calendar/recurrence.ts](features/calendar/recurrence.ts) → `insertSplitEvent`). Count ist relativ zu `dtstart`; nach Split wäre der korrekte Wert `master.rrule_count − (Anzahl bereits konsumierter Occurrences)`. Aktuell setzen wir `rrule_count: null` (mit Code-Kommentar). Sauberer Fix erfordert Occurrence-Tracking oder Konversion zu `rrule_until`-Bounds vor dem Split.
 - **Reminder-Switches im EventDetailScreen sind stateless** ([app-sections/event/EventDetailScreen.tsx](app-sections/event/EventDetailScreen.tsx) — `ReminderRow`). Zustand wird nicht persistiert. Bei Push-Notification-Iteration: an `reminders`-Tabelle binden.
 - **Multi-Day-Events sind im Edit-Form gesperrt** ([app-sections/event/EventEditScreen.tsx](app-sections/event/EventEditScreen.tsx) — `isMultiDay` Banner). Eigener Editor folgt in V2.
@@ -13,7 +12,6 @@ Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope 
 
 ## Auth / Onboarding
 
-- Sobald Auth lebt: EventEditScreen-Master-Row-Fix oben (siehe Calendar-Sektion).
 - **Onboarding-Resume nach Abbruch** (Approach C — Auth-Spec): User mit `current_family_id() !== null` aber abgebrochenem Onboarding (kein Partner eingeladen, kein Kind angelegt) landet aktuell direkt auf Dashboard, statt Step 3/4 wieder aufzunehmen. Aktuell durch Empty-State auf [patterns/dashboard-empty.md](../patterns/dashboard-empty.md) abgefangen — V2 sollte eine "Onboarding fortsetzen"-CTA auf dem Dashboard zeigen (sobald `children`-Count == 0 oder `family_invitations`-Count == 0), die per Deep-Link wieder in den passenden Step springt. Dezimiert die Re-Entry-Friction.
 
 ## Auth UX follow-ups

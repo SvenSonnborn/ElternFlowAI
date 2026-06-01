@@ -89,6 +89,9 @@ module.exports = [
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-member-access": "off",
       "@typescript-eslint/no-unsafe-call": "off",
+      // bun:test's expect(...).rejects chain is not typed as Promise in @types/bun,
+      // so await-thenable incorrectly flags `await expect(...).rejects.toThrow(...)`.
+      "@typescript-eslint/await-thenable": "off",
     },
   },
 
