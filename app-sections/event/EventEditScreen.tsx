@@ -244,6 +244,23 @@ export function EventEditScreen() {
                 {updateMutation.error instanceof Error ? updateMutation.error.message : ""}
               </Text>
             ) : null}
+
+            <View
+              style={{
+                marginTop: 12,
+                paddingTop: 18,
+                borderTopWidth: 1,
+                borderTopColor: theme.line,
+              }}
+            >
+              <Button
+                block
+                label={updateMutation.isPending ? t("cal.edit.saving") : t("cal.edit.save")}
+                tone="primary"
+                disabled={!canSave}
+                onPress={() => void onSave()}
+              />
+            </View>
           </ScrollView>
 
           {picker ? (
@@ -254,25 +271,6 @@ export function EventEditScreen() {
               display={Platform.OS === "ios" ? "spinner" : "default"}
             />
           ) : null}
-
-          <View
-            style={{
-              paddingHorizontal: 20,
-              paddingTop: 12,
-              paddingBottom: 12,
-              backgroundColor: theme.card,
-              borderTopWidth: 1,
-              borderTopColor: theme.line,
-            }}
-          >
-            <Button
-              block
-              label={updateMutation.isPending ? t("cal.edit.saving") : t("cal.edit.save")}
-              tone="primary"
-              disabled={!canSave}
-              onPress={() => void onSave()}
-            />
-          </View>
         </>
       )}
     </SafeAreaView>
