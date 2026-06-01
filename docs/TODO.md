@@ -20,6 +20,7 @@ Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope 
 ## Auth UX follow-ups
 
 - **Field-Component erweitern** ([app-sections/shared/Field.tsx](../app-sections/shared/Field.tsx)) — fehlt `secureTextEntry` (Password-Reveal-Eye), `autoCapitalize`, `autoComplete`. Passwords rendern aktuell als Plaintext im LoginScreen / RegisterScreen / NewPasswordScreen. `patterns/login.md` erwähnt explizit `eye`-Toggle und `autocomplete=email` / `current-password`. V1 funktional OK (Smoke-Tests), aber UX-Issue. Eigene kleine Iteration: Field um diese 3 Props erweitern, dann in den 3 Auth-Screens nutzen.
+- **`StrengthMeter` als shared Component extrahieren** ([app-sections/auth/RegisterScreen.tsx](../app-sections/auth/RegisterScreen.tsx) hat sie inline; [NewPasswordScreen.tsx](../app-sections/auth/NewPasswordScreen.tsx) hat _keinen_ visual meter obwohl [patterns/reset-password.md](../patterns/reset-password.md) ihn erwähnt). Extract nach `app-sections/auth/StrengthMeter.tsx`, dann in beiden Screens nutzen.
 
 ## Weitere Out-of-Scope-Items
 
