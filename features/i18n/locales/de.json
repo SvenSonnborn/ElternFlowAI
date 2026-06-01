@@ -100,6 +100,7 @@
       "title": "Wie heißt deine Familie?",
       "sub": "Du siehst diesen Namen oben auf dem Dashboard.",
       "familyField": "Familienname",
+      "familyPlaceholder": "Familie Becker",
       "parentName": {
         "label": "Dein Name",
         "placeholder": "Anna"

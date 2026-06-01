@@ -11,6 +11,7 @@ type LucideAlias =
   | "calendar"
   | "book-open"
   | "users"
+  | "user"
   | "settings"
   | "mic"
   | "plus"
@@ -50,6 +51,7 @@ const featherMap: Partial<Record<LucideAlias, FeatherName>> = {
   calendar: "calendar",
   "book-open": "book-open",
   users: "users",
+  user: "user",
   settings: "settings",
   mic: "mic",
   plus: "plus",
