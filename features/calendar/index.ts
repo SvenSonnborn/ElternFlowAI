@@ -2,7 +2,15 @@ export { setCalendarLocale } from "./locale";
 export { useFamilyEvents, useEvent, useEventTypes, useMarkedDates } from "./hooks";
 export { buildCalendarTheme } from "./calendarTheme";
 export { eventColorFor, eventIconFor, typeLabelsForSlug } from "./palette";
-export { useUpdateEvent, useDeleteEvent } from "./mutations";
+export {
+  useCreateEvent,
+  useUpdateEvent,
+  useDeleteEvent,
+  recurrenceToRrule,
+  type CreateEventVars,
+  type RecurrenceOption,
+  type RruleFields,
+} from "./mutations";
 export {
   applyDeleteScope,
   applyEditScope,
