@@ -4,8 +4,8 @@ import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Platform, ScrollView, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Platform, Pressable, ScrollView, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Field } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
@@ -33,7 +33,8 @@ function mergeDateAndTime(date: Date, time: Date): Date {
 export function EventEditScreen() {
   const { id, occ } = useLocalSearchParams<{ id?: string; occ?: string }>();
   const { t, i18n } = useTranslation();
-  const { theme } = useTheme();
+  const { theme, nativeVars } = useTheme();
+  const insets = useSafeAreaInsets();
   const lang = i18n.language.startsWith("de") ? "de" : "en";
   const dateLocale = lang === "de" ? deLocale : enLocale;
 
@@ -129,7 +130,7 @@ export function EventEditScreen() {
   return (
     <SafeAreaView
       edges={["bottom"]}
-      style={{ flex: 1, backgroundColor: theme.card }}
+      style={[{ flex: 1, backgroundColor: theme.card }, nativeVars]}
       className="flex-1 bg-card"
     >
       <Stack.Screen
@@ -137,9 +138,6 @@ export function EventEditScreen() {
           contentStyle: { flex: 1, backgroundColor: theme.card },
         }}
       />
-      <View className="items-center pb-1 pt-2.5">
-        <View className="h-1 w-10 rounded-full" style={{ backgroundColor: theme.lineStrong }} />
-      </View>
 
       {isLoading ? (
         <View className="flex-1 items-center justify-center px-6">
@@ -157,16 +155,42 @@ export function EventEditScreen() {
       ) : (
         <>
           <ScrollView
-            style={{ flex: 1 }}
+            style={{ flex: 1, backgroundColor: theme.card }}
             contentContainerStyle={{
               paddingHorizontal: 20,
-              paddingTop: 14,
-              paddingBottom: 24,
+              paddingTop: 4,
+              paddingBottom: 48 + insets.bottom,
               gap: 14,
             }}
             keyboardShouldPersistTaps="handled"
           >
-            <Text variant="h2">{t("cal.edit.title")}</Text>
+            <View className="flex-row items-center justify-between pb-3 pt-4">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("action.cancel")}
+                onPress={() => router.back()}
+                className="px-2 py-1 active:opacity-70"
+                hitSlop={12}
+              >
+                <Text variant="bodyEmph" tone="inkSecondary">
+                  {t("action.cancel")}
+                </Text>
+              </Pressable>
+              <Text variant="h2">{t("cal.edit.title")}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("cal.edit.save")}
+                onPress={() => void onSave()}
+                disabled={!canSave}
+                className="px-2 py-1 active:opacity-70"
+                hitSlop={12}
+                style={{ opacity: canSave ? 1 : 0.4 }}
+              >
+                <Text variant="bodyEmph" tone="primaryStrong">
+                  {updateMutation.isPending ? t("cal.edit.saving") : t("cal.edit.save")}
+                </Text>
+              </Pressable>
+            </View>
 
             {multiDayError ? (
               <View className="rounded-xl bg-warning-soft px-3 py-2">
@@ -243,23 +267,6 @@ export function EventEditScreen() {
               display={Platform.OS === "ios" ? "spinner" : "default"}
             />
           ) : null}
-
-          <View className="flex-row gap-2.5 border-t border-line bg-card px-4 py-3">
-            <Button
-              label={t("action.cancel")}
-              variant="soft"
-              tone="neutral"
-              className="flex-1"
-              onPress={() => router.back()}
-            />
-            <Button
-              label={updateMutation.isPending ? t("cal.edit.saving") : t("cal.edit.save")}
-              tone="primary"
-              className="flex-1"
-              disabled={!canSave}
-              onPress={() => void onSave()}
-            />
-          </View>
         </>
       )}
     </SafeAreaView>
