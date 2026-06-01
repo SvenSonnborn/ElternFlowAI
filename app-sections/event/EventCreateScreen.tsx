@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { Modal, Platform, Pressable, ScrollView, Switch, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Field } from "@/app-sections/shared";
+import { Field, Icon } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren } from "@/features/auth";
@@ -205,20 +205,29 @@ export function EventCreateScreen() {
           onPress={() => setPicker("date")}
         />
 
-        <View
-          className="flex-row items-center justify-between rounded-xl border bg-card px-3.5 py-2.5"
-          style={{ borderColor: theme.line }}
+        <Pressable
+          accessibilityRole="switch"
+          accessibilityState={{ checked: allDay }}
+          accessibilityLabel={t("cal.create.fieldAllDay")}
+          onPress={() => setAllDay(!allDay)}
+          className="flex-row items-center justify-center gap-3 rounded-xl border px-4 active:opacity-70"
+          style={{
+            minHeight: 52,
+            borderColor: allDay ? theme.primary : theme.line,
+            backgroundColor: allDay ? theme.primarySoft : theme.card,
+          }}
         >
-          <Text variant="body" tone="ink">
+          <Icon name="clock" size={18} color={allDay ? theme.primaryStrong : theme.inkTertiary} />
+          <Text variant="body" tone={allDay ? "primaryStrong" : "ink"}>
             {t("cal.create.fieldAllDay")}
           </Text>
           <Switch
             value={allDay}
             onValueChange={setAllDay}
             trackColor={{ false: theme.line, true: theme.primary }}
-            thumbColor={theme.card}
+            ios_backgroundColor={theme.line}
           />
-        </View>
+        </Pressable>
 
         {!allDay ? (
           <View className="flex-row gap-3">
