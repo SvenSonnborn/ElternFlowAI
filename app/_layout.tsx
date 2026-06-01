@@ -32,7 +32,7 @@ function ThemedStack() {
             sheetCornerRadius: 26,
             sheetGrabberVisible: true,
             sheetExpandsWhenScrolledToEdge: false,
-            contentStyle: { flex: 1, backgroundColor: theme.bg },
+            contentStyle: { flex: 1, backgroundColor: theme.card },
           }}
         />
         <Stack.Screen
@@ -45,7 +45,7 @@ function ThemedStack() {
             sheetCornerRadius: 26,
             sheetGrabberVisible: true,
             sheetExpandsWhenScrolledToEdge: false,
-            contentStyle: { flex: 1, backgroundColor: theme.bg },
+            contentStyle: { flex: 1, backgroundColor: theme.card },
           }}
         />
         <Stack.Screen
@@ -58,7 +58,7 @@ function ThemedStack() {
             sheetCornerRadius: 26,
             sheetGrabberVisible: true,
             sheetExpandsWhenScrolledToEdge: false,
-            contentStyle: { flex: 1, backgroundColor: theme.bg },
+            contentStyle: { flex: 1, backgroundColor: theme.card },
           }}
         />
         <Stack.Screen name="child/[id]" options={{ presentation: "card", headerShown: false }} />

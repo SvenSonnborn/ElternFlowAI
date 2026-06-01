@@ -26,5 +26,6 @@ Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope 
 - **Toast-Component** statt `Alert.alert` für transiente Hinweise (Edit-Save-Done, Delete-Done).
 - **Undo nach Delete** (Snackbar mit Re-Insert-Logic).
 - **Conflict-Detection** beim Anlegen/Editieren (Pattern erwähnt es, gekoppelt an Add-Flow).
+- **Same-Family-FK auch für `events.child_id` (und ggf. `created_by`)** ([supabase/migrations/20260529091933_calendar.sql](../supabase/migrations/20260529091933_calendar.sql)). `parent_id` ist seit [20260602100000_events_parent_id.sql](../supabase/migrations/20260602100000_events_parent_id.sql) per Composite-FK `(family_id, parent_id) → parents(family_id, id)` familien-gebunden. `child_id` referenziert weiterhin nur `children(id)` — ein Kind aus einer fremden Familie ließe sich DB-seitig zuweisen (durch RLS unwahrscheinlich, aber kein DB-Guard). Analoger Composite-FK + `unique index children(family_id, id)` zieht das nach.
 - **Sample-Daten-Strings via i18n** ([features/calendar/sample.ts](features/calendar/sample.ts) — `SAMPLE_SEEDS`). Title/Location sind aktuell DE-Literals. ~26 neue Catalog-Keys nötig (13 Events × 2 Sprachen); lohnt sich erst wenn Sample-Daten länger leben als die Auth-Iteration.
 - **gustar.io Worker + Stripe + Expo Notifications** — eigene Iterationen.
