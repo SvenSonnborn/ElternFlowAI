@@ -17,6 +17,10 @@ Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope 
 - Sobald Auth lebt: Konfig + Onboarding-Patterns aus `patterns/login.md` + `patterns/onboarding.md` implementieren, dann der EventEditScreen-Master-Row-Fix oben.
 - **Onboarding-Resume nach Abbruch** (Approach C — Auth-Spec): User mit `current_family_id() !== null` aber abgebrochenem Onboarding (kein Partner eingeladen, kein Kind angelegt) landet aktuell direkt auf Dashboard, statt Step 3/4 wieder aufzunehmen. Aktuell durch Empty-State auf [patterns/dashboard-empty.md](../patterns/dashboard-empty.md) abgefangen — V2 sollte eine "Onboarding fortsetzen"-CTA auf dem Dashboard zeigen (sobald `children`-Count == 0 oder `family_invitations`-Count == 0), die per Deep-Link wieder in den passenden Step springt. Dezimiert die Re-Entry-Friction.
 
+## Auth UX follow-ups
+
+- **Field-Component erweitern** ([app-sections/shared/Field.tsx](../app-sections/shared/Field.tsx)) — fehlt `secureTextEntry` (Password-Reveal-Eye), `autoCapitalize`, `autoComplete`. Passwords rendern aktuell als Plaintext im LoginScreen / RegisterScreen / NewPasswordScreen. `patterns/login.md` erwähnt explizit `eye`-Toggle und `autocomplete=email` / `current-password`. V1 funktional OK (Smoke-Tests), aber UX-Issue. Eigene kleine Iteration: Field um diese 3 Props erweitern, dann in den 3 Auth-Screens nutzen.
+
 ## Weitere Out-of-Scope-Items
 
 - **Realtime-Subscription** auf `events` / `event_exceptions` für Multi-User-Sync.
