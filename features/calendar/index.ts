@@ -1,5 +1,5 @@
 export { setCalendarLocale } from "./locale";
-export { useFamilyEvents, useEvent, useMarkedDates } from "./hooks";
+export { useFamilyEvents, useEvent, useEventTypes, useMarkedDates } from "./hooks";
 export { buildCalendarTheme } from "./calendarTheme";
 export { eventColorFor, eventIconFor, typeLabelsForSlug } from "./palette";
 export { useUpdateEvent, useDeleteEvent } from "./mutations";

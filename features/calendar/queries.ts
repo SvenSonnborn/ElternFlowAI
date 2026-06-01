@@ -1,6 +1,10 @@
+import type { Database } from "@/features/supabase/database.types";
+
 import { supabase } from "@/features/supabase";
 
 import type { EventWithRelations } from "./expand";
+
+type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
 
 const SELECT = "*, event_types(*), event_exceptions(*)";
 
@@ -8,6 +12,7 @@ export const calendarKeys = {
   all: ["calendar"] as const,
   range: (start: string, end: string) => ["calendar", "events", start, end] as const,
   one: (id: string) => ["calendar", "event", id] as const,
+  types: ["calendar", "types"] as const,
 };
 
 export async function fetchEventsInRange(
@@ -29,4 +34,10 @@ export async function fetchEventById(id: string): Promise<EventWithRelations | n
   const { data, error } = await supabase.from("events").select(SELECT).eq("id", id).maybeSingle();
   if (error) throw error;
   return data ?? null;
+}
+
+export async function fetchEventTypes(): Promise<EventTypeRow[]> {
+  const { data, error } = await supabase.from("event_types").select("*").order("slug");
+  if (error) throw error;
+  return data ?? [];
 }
