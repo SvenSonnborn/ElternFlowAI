@@ -94,8 +94,11 @@ export function EventCreateScreen() {
     !titleError && !timeError && !typeError && !!familyId && !createMutation.isPending;
 
   const onPickerChange = (event: { type: string }, selected?: Date) => {
-    if (Platform.OS !== "ios") setPicker(null);
-    if (event.type === "dismissed" || !selected) return;
+    if (Platform.OS === "android") setPicker(null);
+    if (event.type === "dismissed" || !selected) {
+      if (Platform.OS === "ios") setPicker(null);
+      return;
+    }
     if (picker === "date") {
       setStartAt(mergeDateAndTime(selected, startAt));
       setEndAt(mergeDateAndTime(selected, endAt));
@@ -104,7 +107,6 @@ export function EventCreateScreen() {
     } else if (picker === "endTime") {
       setEndAt(mergeDateAndTime(endAt, selected));
     }
-    if (Platform.OS === "ios") setPicker(null);
   };
 
   function onSave() {
@@ -199,8 +201,28 @@ export function EventCreateScreen() {
           label={t("cal.edit.fieldDate")}
           iconName="calendar"
           value={format(startAt, "EEEE, d. MMMM yyyy", { locale: dateLocale })}
-          onPress={() => setPicker("date")}
+          onPress={() => setPicker(picker === "date" ? null : "date")}
         />
+
+        {picker === "date" ? (
+          <View
+            style={{
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: theme.line,
+              backgroundColor: theme.cardSubtle,
+              padding: 8,
+            }}
+          >
+            <DateTimePicker
+              value={startAt}
+              mode="date"
+              display={Platform.OS === "ios" ? "inline" : "default"}
+              onChange={onPickerChange}
+              themeVariant={theme.card === "#FFFFFF" ? "light" : "dark"}
+            />
+          </View>
+        ) : null}
 
         <View
           className="flex-row items-center justify-between rounded-xl border bg-card px-3.5 py-2.5"
@@ -218,25 +240,47 @@ export function EventCreateScreen() {
         </View>
 
         {!allDay ? (
-          <View className="flex-row gap-3">
-            <View className="flex-1">
-              <Field
-                label={t("cal.edit.fieldStart")}
-                iconName="clock"
-                value={format(startAt, "HH:mm")}
-                onPress={() => setPicker("startTime")}
-              />
+          <>
+            <View className="flex-row gap-3">
+              <View className="flex-1">
+                <Field
+                  label={t("cal.edit.fieldStart")}
+                  iconName="clock"
+                  value={format(startAt, "HH:mm")}
+                  onPress={() => setPicker(picker === "startTime" ? null : "startTime")}
+                />
+              </View>
+              <View className="flex-1">
+                <Field
+                  label={t("cal.edit.fieldEnd")}
+                  iconName="clock"
+                  value={format(endAt, "HH:mm")}
+                  onPress={() => setPicker(picker === "endTime" ? null : "endTime")}
+                  error={timeError}
+                />
+              </View>
             </View>
-            <View className="flex-1">
-              <Field
-                label={t("cal.edit.fieldEnd")}
-                iconName="clock"
-                value={format(endAt, "HH:mm")}
-                onPress={() => setPicker("endTime")}
-                error={timeError}
-              />
-            </View>
-          </View>
+
+            {picker === "startTime" || picker === "endTime" ? (
+              <View
+                style={{
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: theme.line,
+                  backgroundColor: theme.cardSubtle,
+                  padding: 8,
+                }}
+              >
+                <DateTimePicker
+                  value={picker === "startTime" ? startAt : endAt}
+                  mode="time"
+                  display={Platform.OS === "ios" ? "spinner" : "default"}
+                  onChange={onPickerChange}
+                  themeVariant={theme.card === "#FFFFFF" ? "light" : "dark"}
+                />
+              </View>
+            ) : null}
+          </>
         ) : null}
 
         {conflicts.length > 0 ? (
@@ -305,15 +349,6 @@ export function EventCreateScreen() {
           />
         </View>
       </ScrollView>
-
-      {picker ? (
-        <DateTimePicker
-          value={picker === "date" ? startAt : picker === "startTime" ? startAt : endAt}
-          mode={picker === "date" ? "date" : "time"}
-          onChange={onPickerChange}
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-        />
-      ) : null}
     </SafeAreaView>
   );
 }
