@@ -1,6 +1,15 @@
 export { AuthGate } from "./AuthGate";
 export { AVATAR_COLORS, deriveShort } from "./avatarColor";
 export {
+  useFamily,
+  useFamilyChildren,
+  useFamilyParents,
+  useFamilyPendingInvitations,
+  type ChildRow,
+  type FamilyRow,
+  type InvitationRow,
+} from "./familyQueries";
+export {
   decideRoute,
   type RouteDecisionInput,
   type RouteGroup,
