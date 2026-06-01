@@ -14,6 +14,7 @@ export {
 } from "./deepLinkHandler";
 export { mapAuthError, type AuthErrorKey } from "./errors";
 export { useSignUp, useSignIn, useSignOut, useResetPassword, useUpdatePassword } from "./mutations";
+export { passwordStrength, type PasswordStrength, type StrengthLabel } from "./passwordStrength";
 export {
   useCreateFamily,
   useAcceptInvitation,
