@@ -28,6 +28,7 @@ function makeMaster(overrides: Partial<EventRow> = {}): EventRow {
     family_id: "fam-1",
     type_id: "type-1",
     child_id: null,
+    parent_id: null,
     title: "Original",
     description: null,
     location: null,

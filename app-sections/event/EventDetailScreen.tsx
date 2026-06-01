@@ -9,7 +9,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { ChildAvatar, Icon } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
-import { useCurrentParent, useFamilyChildren } from "@/features/auth";
+import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
 import { useDeleteEvent, useEvent, type EditScope } from "@/features/calendar";
 
 import { pickScope } from "./scopeDialog";
@@ -58,6 +58,7 @@ export function EventDetailScreen() {
   const { data, isLoading, error } = useEvent(id ?? "", occ);
   const parent = useCurrentParent();
   const familyChildren = useFamilyChildren(parent.data?.family_id);
+  const familyParents = useFamilyParents(parent.data?.family_id);
 
   const deleteMutation = useDeleteEvent();
 
@@ -214,20 +215,22 @@ export function EventDetailScreen() {
                 </Text>
               </View>
             ) : null}
-            {data.childId
-              ? (() => {
-                  const child = (familyChildren.data ?? []).find((c) => c.id === data.childId);
-                  if (!child) return null;
-                  return (
-                    <View className="mt-1 flex-row items-center gap-2">
-                      <ChildAvatar name={child.name} color={child.color} size="sm" />
-                      <Text variant="caption" tone="inkSecondary">
-                        {child.name}
-                      </Text>
-                    </View>
-                  );
-                })()
-              : null}
+            {(() => {
+              const person = data.childId
+                ? (familyChildren.data ?? []).find((c) => c.id === data.childId)
+                : data.parentId
+                  ? (familyParents.data ?? []).find((p) => p.id === data.parentId)
+                  : null;
+              if (!person) return null;
+              return (
+                <View className="mt-1 flex-row items-center gap-2">
+                  <ChildAvatar name={person.name} color={person.color} size="sm" />
+                  <Text variant="caption" tone="inkSecondary">
+                    {person.name}
+                  </Text>
+                </View>
+              );
+            })()}
           </View>
 
           <View className="mt-5">

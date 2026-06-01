@@ -292,10 +292,10 @@
     "create": {
       "title": "Add event",
       "fieldType": "Type",
-      "fieldChild": "Child",
+      "fieldMember": "Family member",
       "fieldAllDay": "All day",
       "fieldRecurrence": "Repeat",
-      "noChild": "Nobody",
+      "noMember": "Nobody",
       "save": "Add",
       "saving": "Saving…",
       "conflict_one": "Conflicts with {{title}} · {{from}}–{{to}}",

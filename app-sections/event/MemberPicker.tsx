@@ -4,27 +4,39 @@ import { ChildAvatar } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Text } from "@/design-system/ui";
 
-interface ChildOption {
+export type MemberKind = "parent" | "child";
+
+export interface MemberOption {
   id: string;
   name: string;
   color: string;
+  kind: MemberKind;
 }
 
-interface ChildPickerProps {
+export interface SelectedMember {
+  id: string;
+  kind: MemberKind;
+}
+
+interface MemberPickerProps {
   label: string;
-  noChildLabel: string;
-  options: ChildOption[];
-  selectedChildId: string | null;
-  onSelect: (id: string | null) => void;
+  noMemberLabel: string;
+  options: MemberOption[];
+  selected: SelectedMember | null;
+  onSelect: (next: SelectedMember | null) => void;
 }
 
-export function ChildPicker({
+function isSelected(member: MemberOption, sel: SelectedMember | null): boolean {
+  return sel !== null && sel.kind === member.kind && sel.id === member.id;
+}
+
+export function MemberPicker({
   label,
-  noChildLabel,
+  noMemberLabel,
   options,
-  selectedChildId,
+  selected,
   onSelect,
-}: ChildPickerProps) {
+}: MemberPickerProps) {
   const { theme } = useTheme();
   if (options.length === 0) return null;
 
@@ -38,15 +50,15 @@ export function ChildPicker({
         {label}
       </Text>
       <View className="mt-1.5 flex-row flex-wrap items-center gap-3">
-        {options.map((child) => {
-          const isSelected = child.id === selectedChildId;
+        {options.map((member) => {
+          const active = isSelected(member, selected);
           return (
             <Pressable
-              key={child.id}
+              key={`${member.kind}-${member.id}`}
               accessibilityRole="button"
-              accessibilityLabel={child.name}
-              accessibilityState={{ selected: isSelected }}
-              onPress={() => onSelect(child.id)}
+              accessibilityLabel={member.name}
+              accessibilityState={{ selected: active }}
+              onPress={() => onSelect({ kind: member.kind, id: member.id })}
               className="items-center active:opacity-70"
             >
               <View
@@ -54,35 +66,35 @@ export function ChildPicker({
                 style={{
                   padding: 2,
                   borderWidth: 2,
-                  borderColor: isSelected ? theme.primaryStrong : "transparent",
+                  borderColor: active ? theme.primaryStrong : "transparent",
                 }}
               >
-                <ChildAvatar name={child.name} color={child.color} size="md" />
+                <ChildAvatar name={member.name} color={member.color} size="md" />
               </View>
               <Text variant="caption" tone="inkSecondary" className="mt-1">
-                {child.name}
+                {member.name}
               </Text>
             </Pressable>
           );
         })}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={noChildLabel}
-          accessibilityState={{ selected: selectedChildId === null }}
+          accessibilityLabel={noMemberLabel}
+          accessibilityState={{ selected: selected === null }}
           onPress={() => onSelect(null)}
           className="h-9 flex-row items-center rounded-pill border px-3 active:opacity-70"
           style={{
-            backgroundColor: selectedChildId === null ? theme.primarySoft : theme.cardSubtle,
-            borderColor: selectedChildId === null ? theme.primary : theme.line,
+            backgroundColor: selected === null ? theme.primarySoft : theme.cardSubtle,
+            borderColor: selected === null ? theme.primary : theme.line,
           }}
         >
           <Text
             variant="pill"
             style={{
-              color: selectedChildId === null ? theme.primaryStrong : theme.inkSecondary,
+              color: selected === null ? theme.primaryStrong : theme.inkSecondary,
             }}
           >
-            {noChildLabel}
+            {noMemberLabel}
           </Text>
         </Pressable>
       </View>

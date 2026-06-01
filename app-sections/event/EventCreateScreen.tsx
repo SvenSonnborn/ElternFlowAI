@@ -10,7 +10,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Field, Icon } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
-import { useCurrentParent, useFamilyChildren } from "@/features/auth";
+import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
 import {
   useCreateEvent,
   useEventTypes,
@@ -18,7 +18,7 @@ import {
   type RecurrenceOption,
 } from "@/features/calendar";
 
-import { ChildPicker } from "./ChildPicker";
+import { MemberPicker, type MemberOption, type SelectedMember } from "./MemberPicker";
 import { RecurrenceRadio } from "./RecurrenceRadio";
 import { TypePicker } from "./TypePicker";
 
@@ -51,6 +51,7 @@ export function EventCreateScreen() {
   const parent = useCurrentParent();
   const familyId = parent.data?.family_id ?? null;
   const familyChildren = useFamilyChildren(familyId ?? undefined);
+  const familyParents = useFamilyParents(familyId ?? undefined);
   const eventTypes = useEventTypes();
   const createMutation = useCreateEvent();
 
@@ -61,7 +62,7 @@ export function EventCreateScreen() {
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
   const [typeId, setTypeId] = useState<string | null>(null);
-  const [childId, setChildId] = useState<string | null>(null);
+  const [member, setMember] = useState<SelectedMember | null>(null);
   const [recurrence, setRecurrence] = useState<RecurrenceOption>("none");
   const [picker, setPicker] = useState<"date" | "startTime" | "endTime" | null>(null);
   const [typeHydrated, setTypeHydrated] = useState(false);
@@ -78,13 +79,20 @@ export function EventCreateScreen() {
     const dateStr = format(startAt, "yyyy-MM-dd");
     const checkStart = allDay ? startOfDay(startAt) : startAt;
     const checkEnd = allDay ? set(startAt, { hours: 23, minutes: 59 }) : endAt;
+    const samePerson = (o: { childId: string | null; parentId: string | null }) => {
+      if (member === null) return true; // family-wide event conflicts with everything that day
+      if (o.childId === null && o.parentId === null) return true; // existing family-wide conflicts with anyone
+      if (member.kind === "child" && o.childId === member.id) return true;
+      if (member.kind === "parent" && o.parentId === member.id) return true;
+      return false;
+    };
     return occurrences.filter(
       (o) =>
         o.occurrenceDate === dateStr &&
-        (childId === null || o.childId === null || o.childId === childId) &&
+        samePerson(o) &&
         rangesOverlap(o.startAt, o.endAt, checkStart, checkEnd),
     );
-  }, [occurrences, startAt, endAt, childId, allDay]);
+  }, [occurrences, startAt, endAt, member, allDay]);
 
   const titleError = !title.trim() ? t("cal.edit.error.titleRequired") : "";
   const timeError =
@@ -116,11 +124,14 @@ export function EventCreateScreen() {
       ? set(startAt, { hours: 0, minutes: 0, seconds: 0, milliseconds: 0 })
       : startAt;
     const finalEnd = allDay ? set(startAt, { hours: 23, minutes: 59, seconds: 0 }) : endAt;
+    const childId = member?.kind === "child" ? member.id : null;
+    const parentId = member?.kind === "parent" ? member.id : null;
     createMutation.mutate(
       {
         familyId,
         typeId,
         childId,
+        parentId,
         title: title.trim(),
         startAt: finalStart.toISOString(),
         endAt: finalEnd.toISOString(),
@@ -136,8 +147,20 @@ export function EventCreateScreen() {
     );
   }
 
-  const childOptions =
-    familyChildren.data?.map((c) => ({ id: c.id, name: c.name, color: c.color })) ?? [];
+  const memberOptions: MemberOption[] = [
+    ...(familyParents.data ?? []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      color: p.color,
+      kind: "parent" as const,
+    })),
+    ...(familyChildren.data ?? []).map((c) => ({
+      id: c.id,
+      name: c.name,
+      color: c.color,
+      kind: "child" as const,
+    })),
+  ];
 
   return (
     <SafeAreaView
@@ -183,12 +206,12 @@ export function EventCreateScreen() {
           error={typeError}
         />
 
-        <ChildPicker
-          label={t("cal.create.fieldChild")}
-          noChildLabel={t("cal.create.noChild")}
-          options={childOptions}
-          selectedChildId={childId}
-          onSelect={setChildId}
+        <MemberPicker
+          label={t("cal.create.fieldMember")}
+          noMemberLabel={t("cal.create.noMember")}
+          options={memberOptions}
+          selected={member}
+          onSelect={setMember}
         />
 
         <Field

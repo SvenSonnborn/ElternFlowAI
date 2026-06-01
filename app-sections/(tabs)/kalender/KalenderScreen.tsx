@@ -11,7 +11,12 @@ import { ChildAvatar, Icon, SectionHeader, TopBar } from "@/app-sections/shared"
 import { palette } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
-import { useCurrentParent, useFamilyChildren, useSessionStore } from "@/features/auth";
+import {
+  useCurrentParent,
+  useFamilyChildren,
+  useFamilyParents,
+  useSessionStore,
+} from "@/features/auth";
 import {
   buildCalendarTheme,
   setCalendarLocale,
@@ -56,6 +61,7 @@ export function KalenderScreen() {
   const markedDates = useMarkedDates(occurrences, selectedDate, theme.primarySoft);
   const parent = useCurrentParent();
   const familyChildren = useFamilyChildren(parent.data?.family_id);
+  const familyParents = useFamilyParents(parent.data?.family_id);
   const session = useSessionStore((s) => s.session);
 
   const openAdd = (date?: string) => {
@@ -130,9 +136,11 @@ export function KalenderScreen() {
       ) : (
         <View className="gap-2">
           {dayEvents.map((occ) => {
-            const child = occ.childId
+            const person = occ.childId
               ? (familyChildren.data ?? []).find((c) => c.id === occ.childId)
-              : null;
+              : occ.parentId
+                ? (familyParents.data ?? []).find((p) => p.id === occ.parentId)
+                : null;
             const durationMin = Math.max(
               0,
               Math.round((occ.endAt.getTime() - occ.startAt.getTime()) / 60_000),
@@ -167,9 +175,11 @@ export function KalenderScreen() {
                     {occ.title}
                   </Text>
                   <View className="mt-0.5 flex-row items-center gap-1.5">
-                    {child ? <ChildAvatar name={child.name} color={child.color} size="sm" /> : null}
+                    {person ? (
+                      <ChildAvatar name={person.name} color={person.color} size="sm" />
+                    ) : null}
                     <Text variant="caption" tone="inkSecondary" numberOfLines={1}>
-                      {child ? `${child.name} · ${typeLabel}` : typeLabel}
+                      {person ? `${person.name} · ${typeLabel}` : typeLabel}
                     </Text>
                   </View>
                 </View>
