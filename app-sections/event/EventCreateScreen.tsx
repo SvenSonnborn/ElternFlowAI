@@ -232,27 +232,29 @@ export function EventCreateScreen() {
           />
         </Pressable>
 
-        {!allDay ? (
-          <View className="flex-row gap-3">
-            <View className="flex-1">
-              <Field
-                label={t("cal.edit.fieldStart")}
-                iconName="clock"
-                value={format(startAt, "HH:mm")}
-                onPress={() => setPicker("startTime")}
-              />
-            </View>
-            <View className="flex-1">
-              <Field
-                label={t("cal.edit.fieldEnd")}
-                iconName="clock"
-                value={format(endAt, "HH:mm")}
-                onPress={() => setPicker("endTime")}
-                error={timeError}
-              />
-            </View>
+        <View
+          className="flex-row gap-3"
+          pointerEvents={allDay ? "none" : "auto"}
+          style={{ opacity: allDay ? 0.4 : 1 }}
+        >
+          <View className="flex-1">
+            <Field
+              label={t("cal.edit.fieldStart")}
+              iconName="clock"
+              value={allDay ? "—" : format(startAt, "HH:mm")}
+              onPress={allDay ? undefined : () => setPicker("startTime")}
+            />
           </View>
-        ) : null}
+          <View className="flex-1">
+            <Field
+              label={t("cal.edit.fieldEnd")}
+              iconName="clock"
+              value={allDay ? "—" : format(endAt, "HH:mm")}
+              onPress={allDay ? undefined : () => setPicker("endTime")}
+              error={allDay ? undefined : timeError}
+            />
+          </View>
+        </View>
 
         {conflicts.length > 0 ? (
           <View className="rounded-xl bg-warning-soft px-3 py-2">
