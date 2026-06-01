@@ -30,11 +30,14 @@
 - Below password: 4-bar strength meter. Mint when ≥ 3 bars.
 - Required: terms checkbox (checked = primary becomes enabled).
 
-## Step 2 · Family name
+## Step 2 · Family name + Your name
 
-- Single field with `users` leading icon.
-- Suggestion chips below ("Familie Becker", "Team Becker", "Becker-WG", "Die Beckis"). Tap fills the field.
+- Family-name field with `users` leading icon. Suggestion chips: "Familie {Localpart}", "Team {Localpart}", … (tap fills the field). **Hidden when the user arrived via an invitation** (`elternflow://invite/<token>` was stashed by deepLinkHandler) — the invited partner joins the existing family rather than naming a new one.
+- Parent-name field with `user` leading icon (your own name).
+- Avatar color picker: 6 chips from `AVATAR_COLORS`. The initial `short` (e.g. "AN" for "Anna") is auto-derived from the parent name on submit.
 - Privacy assurance card at the bottom: shield icon, "Eure Daten gehören euch", "Verschlüsselt in der EU gespeichert. Keine Werbung."
+
+**Commit-Pfad:** Step 2 is the only step that commits a row before the user reaches Step 5 — Submit calls `rpc("create_family")` (or `rpc("accept_invitation")` on the invite path). From this point on, the user has a `parents` row and the AuthGate would in principle allow `(tabs)`, but the AuthGate has an explicit carve-out so the user stays in `(onboarding)` until Step 5 explicitly leaves.
 
 ## Step 3 · Invite partner
 
@@ -59,7 +62,9 @@
 
 ## Persistence
 
-Each step writes to a draft `Family` record server-side so a refresh restores progress. The draft becomes a real family on Step 5 completion.
+Approach C (per ADR-005): Step 2 commits via `rpc("create_family")`. Steps 3 + 4 are optional INSERTs (skip = no INSERT). Step 5 is a read-only recap — it never commits, it just reads. No `family_drafts` table, no local-only buffer.
+
+If the user closes the app between Step 2 and Step 5: the `parents` row already exists, so on re-open AuthGate routes to `/(tabs)`. The dashboard's empty-state ([dashboard-empty.md](./dashboard-empty.md)) catches missing children and partners.
 
 ## Out of flow
 

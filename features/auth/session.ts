@@ -5,9 +5,14 @@ import { create } from "zustand";
 
 import { supabase } from "@/features/supabase";
 
-interface SessionState {
+export type SessionStatus = "loading" | "unauthenticated" | "authenticated";
+
+export interface SessionStoreSnapshot {
   session: Session | null;
   initialized: boolean;
+}
+
+interface SessionState extends SessionStoreSnapshot {
   setSession: (s: Session | null) => void;
   setInitialized: (b: boolean) => void;
 }
@@ -18,6 +23,25 @@ export const useSessionStore = create<SessionState>((set) => ({
   setSession: (s) => set({ session: s }),
   setInitialized: (b) => set({ initialized: b }),
 }));
+
+export function selectStatus(snapshot: SessionStoreSnapshot): SessionStatus {
+  if (!snapshot.initialized) return "loading";
+  return snapshot.session ? "authenticated" : "unauthenticated";
+}
+
+export function useSession(): {
+  status: SessionStatus;
+  session: Session | null;
+  userId: string | null;
+} {
+  // Subscribe to each field individually — Zustand compares with Object.is,
+  // so a selector that returns a fresh object every call would trigger an
+  // infinite render loop (the new object reference always !== the previous).
+  const session = useSessionStore((s) => s.session);
+  const initialized = useSessionStore((s) => s.initialized);
+  const status = selectStatus({ session, initialized });
+  return { status, session, userId: session?.user.id ?? null };
+}
 
 export function useInitSession(): void {
   const setSession = useSessionStore((s) => s.setSession);
@@ -33,8 +57,6 @@ export function useInitSession(): void {
       })
       .catch((err: unknown) => {
         if (!mounted) return;
-        // If session retrieval fails (e.g. AsyncStorage read error), fall back
-        // to no-session so the app can boot. Logged so it surfaces in DEV.
         console.warn("supabase.auth.getSession failed", err);
         setSession(null);
       })

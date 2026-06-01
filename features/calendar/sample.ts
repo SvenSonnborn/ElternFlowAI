@@ -1,3 +1,8 @@
+/**
+ * Sample calendar seeds — kept for Smoke-Test / Storybook-style verification only.
+ * The app no longer imports this in production paths; AuthGate guarantees a real
+ * Supabase session before any calendar screen mounts.
+ */
 import { addDays, format, setHours, setMinutes, startOfDay } from "date-fns";
 
 import { lightTheme } from "@/design-system/themes";

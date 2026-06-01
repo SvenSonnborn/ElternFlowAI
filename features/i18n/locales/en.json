@@ -24,6 +24,8 @@
   "auth": {
     "signIn": "Sign in",
     "signUp": "Create account",
+    "signOut": "Sign out",
+    "soon": "Coming soon",
     "email": "Email",
     "password": "Password",
     "forgot": "Forgot password?",
@@ -34,13 +36,61 @@
     "tagline": "The AI assistant for modern families.",
     "magicLink": "Send magic link by email",
     "newHere": "New here?",
+    "register": {
+      "title": "Create your account",
+      "sub": "You'll use this email to share calendar and lists with your partner.",
+      "terms": "I agree to the terms and privacy policy.",
+      "submit": "Create account"
+    },
+    "checkEmail": {
+      "title": "Check your inbox",
+      "sub": "We sent a link to {{email}}. Tap it to confirm your email.",
+      "resend": "Resend email",
+      "wrongEmail": "Wrong email? Go back"
+    },
+    "reset": {
+      "title": "Reset password",
+      "sub": "We'll send a link to your email.",
+      "submit": "Send link",
+      "success": "If that email is registered, you'll find a link in your inbox shortly.",
+      "backToLogin": "Remembered it? Sign in"
+    },
+    "newPassword": {
+      "title": "Pick a new password",
+      "sub": "At least 8 characters. Letters and numbers recommended.",
+      "newField": "New password",
+      "confirmField": "Confirm",
+      "save": "Save password",
+      "pwMismatch": "Passwords do not match.",
+      "saved": "Password updated. Please sign in again."
+    },
+    "passwordStrength": {
+      "weak": "Weak",
+      "fair": "OK",
+      "good": "Good",
+      "strong": "Strong"
+    },
     "error": {
       "title": "Email or password incorrect",
-      "help": "Try again or reset your password."
+      "help": "Try again or reset your password.",
+      "invalidCredentials": "Email or password incorrect.",
+      "emailTaken": "This email is already registered.",
+      "emailNotConfirmed": "Please confirm your email first.",
+      "weakPassword": "At least 8 characters, please.",
+      "alreadyInFamily": "You're already part of a family.",
+      "linkExpired": "This link has expired or was already used.",
+      "notAuthenticated": "Please sign in again.",
+      "network": "Connection failed. Please try again later.",
+      "generic": "Something went wrong. Please try again later."
     }
   },
   "onb": {
     "stepCounter": "Step {{n}} of {{total}}",
+    "actions": {
+      "next": "Next",
+      "back": "Back",
+      "skip": "Skip"
+    },
     "s1": {
       "title": "Create your account",
       "sub": "You'll use this email to share calendar and lists with your partner.",
@@ -49,7 +99,17 @@
     "s2": {
       "title": "What's your family called?",
       "sub": "You'll see this name at the top of your dashboard.",
-      "field": "Family name",
+      "familyField": "Family name",
+      "familyPlaceholder": "The Becker family",
+      "parentName": {
+        "label": "Your name",
+        "placeholder": "Anna"
+      },
+      "color": {
+        "label": "Your color"
+      },
+      "submit": "Next",
+      "submitInvite": "Join family",
       "privacy": {
         "title": "Your data is yours",
         "sub": "Encrypted, stored in the EU. No ads."
@@ -58,18 +118,60 @@
     "s3": {
       "title": "Invite your partner",
       "sub": "Events, tasks and shopping lists sync in real time.",
+      "partnerField": "Partner's email",
       "send": "Send invite",
-      "later": "Invite later"
+      "later": "Invite later",
+      "shareSubject": "Join our Eltern Flow family",
+      "shareMessage": "Join our family on Eltern Flow",
+      "pendingPill": "Invited",
+      "shared": {
+        "calendar": "Shared calendar",
+        "tasks": "Task lists",
+        "meals": "Meal plan",
+        "children": "Child profiles"
+      }
     },
     "s4": {
       "title": "Tell us about your child",
-      "sub": "You can add more kids later — or use your voice.",
-      "voice": "Or tell us by voice"
+      "sub": "You can add more kids later — or ask the AI with your voice.",
+      "nameField": "Name",
+      "namePlaceholder": "Ben",
+      "birthdayField": "Birthday",
+      "birthdayPlaceholder": "DD.MM.YYYY",
+      "schoolField": "School / daycare",
+      "schoolPlaceholder": "Riverside Primary",
+      "allergiesLabel": "Allergies & intolerances",
+      "voice": "Or tell us by voice",
+      "save": "Next",
+      "skip": "Skip",
+      "avatarFallback": "?",
+      "allergies": {
+        "peanuts": "Peanuts",
+        "milk": "Milk",
+        "eggs": "Eggs",
+        "gluten": "Gluten",
+        "soy": "Soy",
+        "nuts": "Nuts"
+      }
     },
     "s5": {
       "title": "All set!",
-      "sub": "Eltern Flow is ready. {{partner}} got an invite, {{child}} is set up.",
-      "cta": "Open dashboard"
+      "sub": "Eltern Flow is ready.",
+      "cta": "Open dashboard",
+      "secondary": "Add another child",
+      "checkmark": "✓",
+      "recap": {
+        "you": "You",
+        "partner": "Partner",
+        "partnerPending": "Invited (not yet accepted)",
+        "partnerNone": "Nobody invited",
+        "children": "Children",
+        "childrenNone": "No child added yet"
+      },
+      "empty": {
+        "title": "Almost done",
+        "sub": "You can add a partner and children anytime."
+      }
     }
   },
   "dash": {
@@ -129,9 +231,6 @@
     "sub": "Family calendar",
     "today": "Today",
     "empty": "No events on this day",
-    "fallback": {
-      "banner": "Sample data – not signed in yet"
-    },
     "duration": {
       "hourShort": "hr",
       "minuteShort": "min"
@@ -156,8 +255,7 @@
       "edit": "Edit",
       "delete": "Delete",
       "editSoon": "Coming soon",
-      "close": "Close",
-      "requiresAuth": "Sign in to edit events."
+      "close": "Close"
     },
     "edit": {
       "title": "Edit event",

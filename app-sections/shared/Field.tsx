@@ -23,6 +23,11 @@ export interface FieldProps {
    */
   onPress?: () => void;
   keyboardType?: TextInputProps["keyboardType"];
+  secureTextEntry?: boolean;
+  autoCapitalize?: TextInputProps["autoCapitalize"];
+  autoCorrect?: boolean;
+  autoComplete?: TextInputProps["autoComplete"];
+  textContentType?: TextInputProps["textContentType"];
 }
 
 export function Field({
@@ -36,6 +41,11 @@ export function Field({
   editable = true,
   onPress,
   keyboardType,
+  secureTextEntry,
+  autoCapitalize,
+  autoCorrect,
+  autoComplete,
+  textContentType,
 }: FieldProps) {
   const { theme } = useTheme();
   const multiline = type === "multiline";
@@ -66,6 +76,11 @@ export function Field({
           onPressIn={onPress}
           multiline={multiline}
           keyboardType={keyboardType}
+          secureTextEntry={secureTextEntry}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={autoCorrect}
+          autoComplete={autoComplete}
+          textContentType={textContentType}
           className="flex-1 text-base"
           style={{
             fontFamily: "Inter",

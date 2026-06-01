@@ -24,6 +24,8 @@
   "auth": {
     "signIn": "Anmelden",
     "signUp": "Konto erstellen",
+    "signOut": "Abmelden",
+    "soon": "Bald verfügbar",
     "email": "E-Mail",
     "password": "Passwort",
     "forgot": "Passwort vergessen?",
@@ -34,13 +36,61 @@
     "tagline": "Der KI-Assistent für moderne Familien.",
     "magicLink": "Magic-Link per E-Mail senden",
     "newHere": "Neu hier?",
+    "register": {
+      "title": "Konto erstellen",
+      "sub": "Mit dieser E-Mail teilst du später Kalender und Listen mit deinem Partner.",
+      "terms": "Ich stimme den AGB und der Datenschutzerklärung zu.",
+      "submit": "Konto erstellen"
+    },
+    "checkEmail": {
+      "title": "Schau in dein Postfach",
+      "sub": "Wir haben dir einen Link an {{email}} geschickt. Tippe ihn an, um deine E-Mail zu bestätigen.",
+      "resend": "Mail erneut senden",
+      "wrongEmail": "Falsche E-Mail? Zurück"
+    },
+    "reset": {
+      "title": "Passwort zurücksetzen",
+      "sub": "Wir senden dir einen Link an deine E-Mail.",
+      "submit": "Link senden",
+      "success": "Falls die E-Mail registriert ist, findest du gleich einen Link in deinem Postfach.",
+      "backToLogin": "Doch wieder eingefallen? Anmelden"
+    },
+    "newPassword": {
+      "title": "Neues Passwort wählen",
+      "sub": "Mind. 8 Zeichen. Buchstaben und Zahlen empfohlen.",
+      "newField": "Neues Passwort",
+      "confirmField": "Bestätigen",
+      "save": "Passwort speichern",
+      "pwMismatch": "Die Passwörter stimmen nicht überein.",
+      "saved": "Passwort geändert. Bitte erneut anmelden."
+    },
+    "passwordStrength": {
+      "weak": "Schwach",
+      "fair": "Okay",
+      "good": "Gut",
+      "strong": "Stark"
+    },
     "error": {
       "title": "E-Mail oder Passwort falsch",
-      "help": "Versuch es noch einmal oder setze dein Passwort zurück."
+      "help": "Versuch es noch einmal oder setze dein Passwort zurück.",
+      "invalidCredentials": "E-Mail oder Passwort falsch.",
+      "emailTaken": "Diese E-Mail ist bereits registriert.",
+      "emailNotConfirmed": "Bitte bestätige zuerst deine E-Mail.",
+      "weakPassword": "Mindestens 8 Zeichen, bitte.",
+      "alreadyInFamily": "Du gehörst bereits zu einer Familie.",
+      "linkExpired": "Der Link ist abgelaufen oder wurde bereits verwendet.",
+      "notAuthenticated": "Bitte erneut anmelden.",
+      "network": "Verbindung fehlgeschlagen. Bitte später erneut versuchen.",
+      "generic": "Etwas ist schiefgelaufen. Bitte später erneut versuchen."
     }
   },
   "onb": {
     "stepCounter": "Schritt {{n}} von {{total}}",
+    "actions": {
+      "next": "Weiter",
+      "back": "Zurück",
+      "skip": "Überspringen"
+    },
     "s1": {
       "title": "Erstelle dein Konto",
       "sub": "Mit dieser E-Mail teilst du später Kalender und Listen mit deinem Partner.",
@@ -49,7 +99,17 @@
     "s2": {
       "title": "Wie heißt deine Familie?",
       "sub": "Du siehst diesen Namen oben auf dem Dashboard.",
-      "field": "Familienname",
+      "familyField": "Familienname",
+      "familyPlaceholder": "Familie Becker",
+      "parentName": {
+        "label": "Dein Name",
+        "placeholder": "Anna"
+      },
+      "color": {
+        "label": "Deine Farbe"
+      },
+      "submit": "Weiter",
+      "submitInvite": "Familie beitreten",
       "privacy": {
         "title": "Eure Daten gehören euch",
         "sub": "Verschlüsselt in der EU gespeichert. Keine Werbung."
@@ -58,18 +118,60 @@
     "s3": {
       "title": "Lade deinen Partner ein",
       "sub": "Termine, Aufgaben und Einkaufslisten werden in Echtzeit geteilt.",
+      "partnerField": "E-Mail des Partners",
       "send": "Einladung senden",
-      "later": "Später einladen"
+      "later": "Später einladen",
+      "shareSubject": "Komm in unsere Eltern-Flow-Familie",
+      "shareMessage": "Tritt unserer Familie auf Eltern Flow bei",
+      "pendingPill": "Eingeladen",
+      "shared": {
+        "calendar": "Gemeinsamer Kalender",
+        "tasks": "Aufgabenlisten",
+        "meals": "Essensplan",
+        "children": "Kinderprofile"
+      }
     },
     "s4": {
       "title": "Erzähl uns von deinem Kind",
       "sub": "Du kannst weitere Kinder später anlegen — oder die KI mit deiner Stimme bitten.",
-      "voice": "Lieber per Sprache erzählen"
+      "nameField": "Name",
+      "namePlaceholder": "Ben",
+      "birthdayField": "Geburtstag",
+      "birthdayPlaceholder": "TT.MM.JJJJ",
+      "schoolField": "Schule / Kita",
+      "schoolPlaceholder": "Grundschule am Park",
+      "allergiesLabel": "Allergien & Unverträglichkeiten",
+      "voice": "Lieber per Sprache erzählen",
+      "save": "Weiter",
+      "skip": "Überspringen",
+      "avatarFallback": "?",
+      "allergies": {
+        "peanuts": "Erdnüsse",
+        "milk": "Milch",
+        "eggs": "Eier",
+        "gluten": "Gluten",
+        "soy": "Soja",
+        "nuts": "Nüsse"
+      }
     },
     "s5": {
       "title": "Alles bereit!",
-      "sub": "Eltern Flow ist eingerichtet. {{partner}} wurde eingeladen und {{child}} ist angelegt.",
-      "cta": "Zum Dashboard"
+      "sub": "Eltern Flow ist eingerichtet.",
+      "cta": "Zum Dashboard",
+      "secondary": "Weiteres Kind anlegen",
+      "checkmark": "✓",
+      "recap": {
+        "you": "Du",
+        "partner": "Partner",
+        "partnerPending": "Eingeladen (noch nicht angenommen)",
+        "partnerNone": "Niemand eingeladen",
+        "children": "Kinder",
+        "childrenNone": "Noch kein Kind angelegt"
+      },
+      "empty": {
+        "title": "Fast geschafft",
+        "sub": "Du kannst Partner und Kinder jederzeit hinzufügen."
+      }
     }
   },
   "dash": {
@@ -129,9 +231,6 @@
     "sub": "Familien-Kalender",
     "today": "Heute",
     "empty": "Keine Termine an diesem Tag",
-    "fallback": {
-      "banner": "Sample-Daten – noch nicht eingeloggt"
-    },
     "duration": {
       "hourShort": "Std.",
       "minuteShort": "Min."
@@ -156,8 +255,7 @@
       "edit": "Bearbeiten",
       "delete": "Löschen",
       "editSoon": "Bald verfügbar",
-      "close": "Schließen",
-      "requiresAuth": "Melde dich an, um Termine zu bearbeiten."
+      "close": "Schließen"
     },
     "edit": {
       "title": "Termin bearbeiten",

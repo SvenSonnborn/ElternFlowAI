@@ -9,8 +9,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ChildAvatar, Icon } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
-import { useDeleteEvent, useEvent, useSessionStore, type EditScope } from "@/features/calendar";
-import { children as sampleChildren } from "@/features/sample-data";
+import { useCurrentParent, useFamilyChildren } from "@/features/auth";
+import { useDeleteEvent, useEvent, type EditScope } from "@/features/calendar";
 
 import { pickScope } from "./scopeDialog";
 
@@ -55,17 +55,12 @@ export function EventDetailScreen() {
   const [reminder1, setReminder1] = useState(false);
 
   const { data, isLoading, error } = useEvent(id ?? "", occ);
+  const parent = useCurrentParent();
+  const familyChildren = useFamilyChildren(parent.data?.family_id);
 
-  const session = useSessionStore((s) => s.session);
   const deleteMutation = useDeleteEvent();
 
-  const isSampleMode = !session;
-
   const onEditPress = () => {
-    if (isSampleMode) {
-      Alert.alert(t("cal.detail.requiresAuth"));
-      return;
-    }
     if (!data) return;
     router.push({
       pathname: "/event/edit/[id]",
@@ -74,10 +69,6 @@ export function EventDetailScreen() {
   };
 
   const onDeletePress = () => {
-    if (isSampleMode) {
-      Alert.alert(t("cal.detail.requiresAuth"));
-      return;
-    }
     if (!data) return;
     Alert.alert(t("cal.delete.confirmTitle"), t("cal.delete.confirmBody"), [
       { text: t("action.cancel"), style: "cancel" },
@@ -184,7 +175,7 @@ export function EventDetailScreen() {
               ) : null}
               {data.childId
                 ? (() => {
-                    const child = sampleChildren.find((c) => c.id === data.childId);
+                    const child = (familyChildren.data ?? []).find((c) => c.id === data.childId);
                     if (!child) return null;
                     return (
                       <View className="mt-1 flex-row items-center gap-2">
@@ -221,10 +212,7 @@ export function EventDetailScreen() {
             </View>
           </ScrollView>
 
-          <View
-            className="flex-row gap-2.5 border-t border-line bg-card px-4 py-3"
-            style={{ opacity: isSampleMode ? 0.5 : 1 }}
-          >
+          <View className="flex-row gap-2.5 border-t border-line bg-card px-4 py-3">
             <Button
               label={deleteMutation.isPending ? t("cal.delete.deleting") : t("cal.detail.delete")}
               variant="soft"
