@@ -3,8 +3,8 @@ import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, ScrollView, Switch, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Alert, Pressable, ScrollView, Switch, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ChildAvatar, Icon } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
@@ -48,7 +48,8 @@ function ReminderRow({
 export function EventDetailScreen() {
   const { id, occ } = useLocalSearchParams<{ id?: string; occ?: string }>();
   const { t, i18n } = useTranslation();
-  const { theme } = useTheme();
+  const { theme, nativeVars } = useTheme();
+  const insets = useSafeAreaInsets();
   const lang = i18n.language.startsWith("de") ? "de" : "en";
   const dateLocale = lang === "de" ? deLocale : enLocale;
   const [reminder24, setReminder24] = useState(true);
@@ -116,7 +117,7 @@ export function EventDetailScreen() {
   return (
     <SafeAreaView
       edges={["bottom"]}
-      style={{ flex: 1, backgroundColor: theme.card }}
+      style={[{ flex: 1, backgroundColor: theme.card }, nativeVars]}
       className="flex-1 bg-card"
     >
       <Stack.Screen
@@ -124,9 +125,6 @@ export function EventDetailScreen() {
           contentStyle: { flex: 1, backgroundColor: theme.card },
         }}
       />
-      <View className="items-center pb-1 pt-2.5">
-        <View className="h-1 w-10 rounded-full" style={{ backgroundColor: theme.lineStrong }} />
-      </View>
 
       {isLoading ? (
         <View className="flex-1 items-center justify-center px-6">
@@ -145,101 +143,126 @@ export function EventDetailScreen() {
           </View>
         </View>
       ) : (
-        <>
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 24 }}
-            keyboardShouldPersistTaps="handled"
-          >
-            <View
-              className="flex-row items-center gap-1.5 self-start rounded-pill px-2.5 py-1"
-              style={{ backgroundColor: `${data.type.color}26` }}
+        <ScrollView
+          style={{ flex: 1, backgroundColor: theme.card }}
+          contentContainerStyle={{
+            paddingHorizontal: 20,
+            paddingTop: 4,
+            paddingBottom: 48 + insets.bottom,
+          }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View className="flex-row items-center justify-between pb-3 pt-4">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("cal.detail.close")}
+              onPress={() => router.back()}
+              className="px-2 py-1 active:opacity-70"
+              hitSlop={12}
             >
-              <Icon name={data.type.iconName} size={11} color={data.type.color} />
-              <Text variant="pill" style={{ color: data.type.color }}>
-                {lang === "de" ? data.type.labelDe : data.type.labelEn}
+              <Text variant="bodyEmph" tone="inkSecondary">
+                {t("cal.detail.close")}
+              </Text>
+            </Pressable>
+            <Text variant="caption" tone="inkTertiary">
+              {t("cal.detail.title")}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("cal.detail.edit")}
+              onPress={onEditPress}
+              disabled={deleteMutation.isPending}
+              className="px-2 py-1 active:opacity-70"
+              hitSlop={12}
+              style={{ opacity: deleteMutation.isPending ? 0.4 : 1 }}
+            >
+              <Text variant="bodyEmph" tone="primaryStrong">
+                {t("cal.detail.edit")}
+              </Text>
+            </Pressable>
+          </View>
+
+          <View
+            className="flex-row items-center gap-1.5 self-start rounded-pill px-2.5 py-1"
+            style={{ backgroundColor: `${data.type.color}26` }}
+          >
+            <Icon name={data.type.iconName} size={11} color={data.type.color} />
+            <Text variant="pill" style={{ color: data.type.color }}>
+              {lang === "de" ? data.type.labelDe : data.type.labelEn}
+            </Text>
+          </View>
+          <Text variant="h2" className="mt-2" numberOfLines={3}>
+            {data.title}
+          </Text>
+
+          <View className="mt-3 gap-2">
+            <View className="flex-row items-center gap-2">
+              <Icon name="clock" size={14} color={theme.inkSecondary} />
+              <Text variant="caption" tone="inkSecondary">
+                {format(data.startAt, "EEEE, d. MMMM", { locale: dateLocale })}
+                {" · "}
+                {data.allDay
+                  ? "—"
+                  : `${format(data.startAt, "HH:mm")} – ${format(data.endAt, "HH:mm")}`}
               </Text>
             </View>
-            <Text variant="h2" className="mt-2" numberOfLines={3}>
-              {data.title}
-            </Text>
-
-            <View className="mt-3 gap-2">
+            {data.location ? (
               <View className="flex-row items-center gap-2">
-                <Icon name="clock" size={14} color={theme.inkSecondary} />
-                <Text variant="caption" tone="inkSecondary">
-                  {format(data.startAt, "EEEE, d. MMMM", { locale: dateLocale })}
-                  {" · "}
-                  {data.allDay
-                    ? "—"
-                    : `${format(data.startAt, "HH:mm")} – ${format(data.endAt, "HH:mm")}`}
+                <Icon name="map-pin" size={14} color={theme.inkSecondary} />
+                <Text variant="caption" tone="inkSecondary" numberOfLines={2}>
+                  {data.location}
                 </Text>
               </View>
-              {data.location ? (
-                <View className="flex-row items-center gap-2">
-                  <Icon name="map-pin" size={14} color={theme.inkSecondary} />
-                  <Text variant="caption" tone="inkSecondary" numberOfLines={2}>
-                    {data.location}
-                  </Text>
-                </View>
-              ) : null}
-              {data.childId
-                ? (() => {
-                    const child = (familyChildren.data ?? []).find((c) => c.id === data.childId);
-                    if (!child) return null;
-                    return (
-                      <View className="mt-1 flex-row items-center gap-2">
-                        <ChildAvatar name={child.name} color={child.color} size="sm" />
-                        <Text variant="caption" tone="inkSecondary">
-                          {child.name}
-                        </Text>
-                      </View>
-                    );
-                  })()
-                : null}
-            </View>
+            ) : null}
+            {data.childId
+              ? (() => {
+                  const child = (familyChildren.data ?? []).find((c) => c.id === data.childId);
+                  if (!child) return null;
+                  return (
+                    <View className="mt-1 flex-row items-center gap-2">
+                      <ChildAvatar name={child.name} color={child.color} size="sm" />
+                      <Text variant="caption" tone="inkSecondary">
+                        {child.name}
+                      </Text>
+                    </View>
+                  );
+                })()
+              : null}
+          </View>
 
-            <View className="mt-5">
-              <Text variant="eyebrow" tone="inkSecondary" className="mb-1">
-                {t("cal.detail.notes")}
-              </Text>
-              <Text variant="body" tone={data.description ? "ink" : "inkTertiary"}>
-                {data.description ?? "—"}
-              </Text>
-            </View>
+          <View className="mt-5">
+            <Text variant="eyebrow" tone="inkSecondary" className="mb-1">
+              {t("cal.detail.notes")}
+            </Text>
+            <Text variant="body" tone={data.description ? "ink" : "inkTertiary"}>
+              {data.description ?? "—"}
+            </Text>
+          </View>
 
-            <View className="mt-6">
-              <ReminderRow
-                label={t("cal.detail.reminder24h")}
-                value={reminder24}
-                onValueChange={setReminder24}
-              />
-              <ReminderRow
-                label={t("cal.detail.reminder1h")}
-                value={reminder1}
-                onValueChange={setReminder1}
-              />
-            </View>
-          </ScrollView>
+          <View className="mt-6">
+            <ReminderRow
+              label={t("cal.detail.reminder24h")}
+              value={reminder24}
+              onValueChange={setReminder24}
+            />
+            <ReminderRow
+              label={t("cal.detail.reminder1h")}
+              value={reminder1}
+              onValueChange={setReminder1}
+            />
+          </View>
 
-          <View className="flex-row gap-2.5 border-t border-line bg-card px-4 py-3">
+          <View className="mt-6">
             <Button
               label={deleteMutation.isPending ? t("cal.delete.deleting") : t("cal.detail.delete")}
               variant="soft"
               tone="danger"
-              className="flex-1"
+              block
               disabled={deleteMutation.isPending}
               onPress={onDeletePress}
             />
-            <Button
-              label={t("cal.detail.edit")}
-              tone="primary"
-              className="flex-1"
-              disabled={deleteMutation.isPending}
-              onPress={onEditPress}
-            />
           </View>
-        </>
+        </ScrollView>
       )}
     </SafeAreaView>
   );
