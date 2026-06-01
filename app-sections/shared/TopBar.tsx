@@ -12,6 +12,8 @@ interface TopBarProps extends ViewProps {
   leading?: React.ReactNode;
   onSettings?: () => void;
   hideSettings?: boolean;
+  onAdd?: () => void;
+  addLabel?: string;
 }
 
 export function TopBar({
@@ -20,6 +22,8 @@ export function TopBar({
   leading,
   onSettings,
   hideSettings,
+  onAdd,
+  addLabel,
   className,
   ...rest
 }: TopBarProps) {
@@ -44,16 +48,29 @@ export function TopBar({
           ) : null}
         </View>
       </View>
-      {hideSettings ? null : (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Settings"
-          onPress={handleSettings}
-          className="h-9 w-9 items-center justify-center rounded-xl border border-line bg-card active:opacity-70"
-        >
-          <Icon name="settings" size={16} color={theme.inkSecondary} />
-        </Pressable>
-      )}
+      <View className="flex-row items-center gap-2">
+        {onAdd ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={addLabel ?? "Add"}
+            onPress={onAdd}
+            className="h-9 w-9 items-center justify-center rounded-xl active:opacity-70"
+            style={{ backgroundColor: theme.primarySoft }}
+          >
+            <Icon name="plus" size={18} color={theme.primaryStrong} />
+          </Pressable>
+        ) : null}
+        {hideSettings ? null : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+            onPress={handleSettings}
+            className="h-9 w-9 items-center justify-center rounded-xl border border-line bg-card active:opacity-70"
+          >
+            <Icon name="settings" size={16} color={theme.inkSecondary} />
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }
