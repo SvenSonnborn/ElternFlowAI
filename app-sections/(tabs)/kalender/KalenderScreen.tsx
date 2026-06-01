@@ -4,14 +4,14 @@ import { useRouter } from "expo-router";
 import { type TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
 import { Calendar } from "react-native-calendars";
 
 import { ChildAvatar, Icon, SectionHeader, TopBar } from "@/app-sections/shared";
 import { palette } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
-import { useCurrentParent, useFamilyChildren } from "@/features/auth";
+import { useCurrentParent, useFamilyChildren, useSessionStore } from "@/features/auth";
 import {
   buildCalendarTheme,
   setCalendarLocale,
@@ -56,6 +56,15 @@ export function KalenderScreen() {
   const markedDates = useMarkedDates(occurrences, selectedDate, theme.primarySoft);
   const parent = useCurrentParent();
   const familyChildren = useFamilyChildren(parent.data?.family_id);
+  const session = useSessionStore((s) => s.session);
+
+  const openAdd = (date?: string) => {
+    if (!session) {
+      Alert.alert(t("cal.add.requiresAuth"));
+      return;
+    }
+    router.push({ pathname: "/event/new", params: date ? { date } : {} });
+  };
 
   const dayEvents = useMemo(
     () =>
@@ -74,7 +83,12 @@ export function KalenderScreen() {
 
   return (
     <Screen scroll>
-      <TopBar title={monthLabel} sub={t("cal.sub")} />
+      <TopBar
+        title={monthLabel}
+        sub={t("cal.sub")}
+        onAdd={() => openAdd()}
+        addLabel={t("cal.add.new")}
+      />
 
       <Card className="p-2">
         <Calendar
@@ -102,7 +116,11 @@ export function KalenderScreen() {
         </View>
       </Card>
 
-      <SectionHeader title={selectedDayLabel} />
+      <SectionHeader
+        title={selectedDayLabel}
+        onPressAdd={() => openAdd(selectedDate)}
+        addLabel={t("cal.add.new")}
+      />
       {dayEvents.length === 0 ? (
         <View className="items-center rounded-2xl border border-line bg-card px-4 py-6">
           <Text variant="caption" tone="inkSecondary">
