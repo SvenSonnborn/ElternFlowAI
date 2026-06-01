@@ -228,9 +228,6 @@
     "sub": "Familien-Kalender",
     "today": "Heute",
     "empty": "Keine Termine an diesem Tag",
-    "fallback": {
-      "banner": "Sample-Daten – noch nicht eingeloggt"
-    },
     "duration": {
       "hourShort": "Std.",
       "minuteShort": "Min."
@@ -255,8 +252,7 @@
       "edit": "Bearbeiten",
       "delete": "Löschen",
       "editSoon": "Bald verfügbar",
-      "close": "Schließen",
-      "requiresAuth": "Melde dich an, um Termine zu bearbeiten."
+      "close": "Schließen"
     },
     "edit": {
       "title": "Termin bearbeiten",

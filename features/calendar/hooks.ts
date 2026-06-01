@@ -15,21 +15,15 @@ import type { CalendarOccurrence, MarkedDates, MarkedDot } from "./types";
 
 import { expandEvents } from "./expand";
 import { calendarKeys, fetchEventById, fetchEventsInRange } from "./queries";
-import { getSampleOccurrences, findSampleOccurrence } from "./sample";
-import { useSessionStore } from "./sessionStore";
 
 interface UseFamilyEventsResult {
   data: CalendarOccurrence[];
   isLoading: boolean;
-  isFallback: boolean;
   error: unknown;
 }
 
 export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
   const { theme } = useTheme();
-  const session = useSessionStore((s) => s.session);
-  const initialized = useSessionStore((s) => s.initialized);
-  const hasSession = !!session;
 
   const { rangeStart, rangeEnd } = useMemo(() => {
     const s = addDays(startOfMonth(visibleMonth), -7);
@@ -40,21 +34,16 @@ export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
   const query = useQuery({
     queryKey: calendarKeys.range(rangeStart.toISOString(), rangeEnd.toISOString()),
     queryFn: () => fetchEventsInRange(rangeStart, rangeEnd),
-    enabled: hasSession && initialized,
   });
 
-  const sample = useMemo(() => getSampleOccurrences(visibleMonth), [visibleMonth]);
-
   const data = useMemo(() => {
-    if (!hasSession) return sample;
     if (!query.data) return [];
     return expandEvents(query.data, rangeStart, rangeEnd, theme);
-  }, [hasSession, query.data, rangeStart, rangeEnd, sample, theme]);
+  }, [query.data, rangeStart, rangeEnd, theme]);
 
   return {
     data,
-    isLoading: !initialized || (hasSession && query.isLoading),
-    isFallback: !hasSession,
+    isLoading: query.isLoading,
     error: query.error,
   };
 }
@@ -62,24 +51,19 @@ export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
 interface UseEventResult {
   data: CalendarOccurrence | null;
   isLoading: boolean;
-  isFallback: boolean;
   error: unknown;
 }
 
 export function useEvent(id: string, occurrenceDate?: string): UseEventResult {
   const { theme } = useTheme();
-  const session = useSessionStore((s) => s.session);
-  const initialized = useSessionStore((s) => s.initialized);
-  const hasSession = !!session;
 
   const query = useQuery({
     queryKey: calendarKeys.one(id),
     queryFn: () => fetchEventById(id),
-    enabled: hasSession && initialized && !!id,
+    enabled: !!id,
   });
 
   const occurrence = useMemo<CalendarOccurrence | null>(() => {
-    if (!hasSession) return findSampleOccurrence(id);
     const row = query.data;
     if (!row) return null;
     const start = new Date(row.start_at);
@@ -93,12 +77,11 @@ export function useEvent(id: string, occurrenceDate?: string): UseEventResult {
       return expanded.find((o) => o.occurrenceDate === occurrenceDate) ?? expanded[0] ?? null;
     }
     return expanded[0] ?? null;
-  }, [hasSession, query.data, id, occurrenceDate, theme]);
+  }, [query.data, occurrenceDate, theme]);
 
   return {
     data: occurrence,
-    isLoading: !initialized || (hasSession && query.isLoading),
-    isFallback: !hasSession,
+    isLoading: query.isLoading,
     error: query.error,
   };
 }

@@ -52,7 +52,7 @@ export function KalenderScreen() {
     setCalendarLocale(lang);
   }, [lang]);
 
-  const { data: occurrences, isFallback } = useFamilyEvents(visibleMonth);
+  const { data: occurrences } = useFamilyEvents(visibleMonth);
   const markedDates = useMarkedDates(occurrences, selectedDate, theme.primarySoft);
 
   const dayEvents = useMemo(
@@ -73,17 +73,6 @@ export function KalenderScreen() {
   return (
     <Screen scroll>
       <TopBar title={monthLabel} sub={t("cal.sub")} />
-
-      {isFallback ? (
-        <View
-          className="mb-3 rounded-xl border border-line bg-card-subtle px-3 py-2"
-          style={{ borderColor: theme.lineStrong }}
-        >
-          <Text variant="caption" tone="inkSecondary">
-            {t("cal.fallback.banner")}
-          </Text>
-        </View>
-      ) : null}
 
       <Card className="p-2">
         <Calendar

@@ -228,9 +228,6 @@
     "sub": "Family calendar",
     "today": "Today",
     "empty": "No events on this day",
-    "fallback": {
-      "banner": "Sample data – not signed in yet"
-    },
     "duration": {
       "hourShort": "hr",
       "minuteShort": "min"
@@ -255,8 +252,7 @@
       "edit": "Edit",
       "delete": "Delete",
       "editSoon": "Coming soon",
-      "close": "Close",
-      "requiresAuth": "Sign in to edit events."
+      "close": "Close"
     },
     "edit": {
       "title": "Edit event",

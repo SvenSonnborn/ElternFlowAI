@@ -13,8 +13,7 @@ Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope 
 
 ## Auth / Onboarding
 
-- **Auth-Flow + Login/Onboarding-Screens fehlen** (ADR-004 hat das explizit als Out-of-Scope markiert). Bis dahin greift im Calendar der Sample-Data-Fallback, und Edit/Delete-Buttons zeigen den `cal.detail.requiresAuth`-Alert.
-- Sobald Auth lebt: Konfig + Onboarding-Patterns aus `patterns/login.md` + `patterns/onboarding.md` implementieren, dann der EventEditScreen-Master-Row-Fix oben.
+- Sobald Auth lebt: EventEditScreen-Master-Row-Fix oben (siehe Calendar-Sektion).
 - **Onboarding-Resume nach Abbruch** (Approach C — Auth-Spec): User mit `current_family_id() !== null` aber abgebrochenem Onboarding (kein Partner eingeladen, kein Kind angelegt) landet aktuell direkt auf Dashboard, statt Step 3/4 wieder aufzunehmen. Aktuell durch Empty-State auf [patterns/dashboard-empty.md](../patterns/dashboard-empty.md) abgefangen — V2 sollte eine "Onboarding fortsetzen"-CTA auf dem Dashboard zeigen (sobald `children`-Count == 0 oder `family_invitations`-Count == 0), die per Deep-Link wieder in den passenden Step springt. Dezimiert die Re-Entry-Friction.
 
 ## Auth UX follow-ups
@@ -27,7 +26,7 @@ Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope 
 
 - **Realtime-Subscription** auf `events` / `event_exceptions` für Multi-User-Sync.
 - **Optimistic UI** in den Calendar-Mutations (aktuell invalidate-and-refetch).
-- **Toast-Component** statt `Alert.alert` für transiente Hinweise (`cal.detail.requiresAuth`, Edit-Save-Done, Delete-Done).
+- **Toast-Component** statt `Alert.alert` für transiente Hinweise (Edit-Save-Done, Delete-Done).
 - **Undo nach Delete** (Snackbar mit Re-Insert-Logic).
 - **Conflict-Detection** beim Anlegen/Editieren (Pattern erwähnt es, gekoppelt an Add-Flow).
 - **Sample-Daten-Strings via i18n** ([features/calendar/sample.ts](features/calendar/sample.ts) — `SAMPLE_SEEDS`). Title/Location sind aktuell DE-Literals. ~26 neue Catalog-Keys nötig (13 Events × 2 Sprachen); lohnt sich erst wenn Sample-Daten länger leben als die Auth-Iteration.
