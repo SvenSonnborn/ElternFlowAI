@@ -210,22 +210,25 @@ export function EventCreateScreen() {
           accessibilityState={{ checked: allDay }}
           accessibilityLabel={t("cal.create.fieldAllDay")}
           onPress={() => setAllDay(!allDay)}
-          className="flex-row items-center justify-center gap-3 rounded-xl border px-4 active:opacity-70"
+          className="flex-row items-center justify-between rounded-xl border px-3.5 active:opacity-70"
           style={{
             minHeight: 52,
             borderColor: allDay ? theme.primary : theme.line,
             backgroundColor: allDay ? theme.primarySoft : theme.card,
           }}
         >
-          <Icon name="clock" size={18} color={allDay ? theme.primaryStrong : theme.inkTertiary} />
-          <Text variant="body" tone={allDay ? "primaryStrong" : "ink"}>
-            {t("cal.create.fieldAllDay")}
-          </Text>
+          <View className="flex-row items-center gap-2.5">
+            <Icon name="clock" size={18} color={allDay ? theme.primaryStrong : theme.inkTertiary} />
+            <Text variant="body" tone={allDay ? "primaryStrong" : "ink"}>
+              {t("cal.create.fieldAllDay")}
+            </Text>
+          </View>
           <Switch
             value={allDay}
             onValueChange={setAllDay}
             trackColor={{ false: theme.line, true: theme.primary }}
             ios_backgroundColor={theme.line}
+            style={{ alignSelf: "center" }}
           />
         </Pressable>
 
