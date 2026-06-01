@@ -30,3 +30,19 @@ void mock.module("@react-native-async-storage/async-storage", () => ({
     removeItem: () => Promise.resolve(),
   },
 }));
+
+// `expo-router` and `expo-linking` reach into native bridges at import time;
+// stub them so modules that only need router.replace / Linking.addEventListener
+// can be loaded under `bun test` without crashing.
+void mock.module("expo-router", () => ({
+  router: {
+    replace: () => {},
+    push: () => {},
+    back: () => {},
+  },
+}));
+
+void mock.module("expo-linking", () => ({
+  getInitialURL: () => Promise.resolve(null),
+  addEventListener: () => ({ remove() {} }),
+}));
