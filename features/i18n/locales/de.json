@@ -292,10 +292,10 @@
     "create": {
       "title": "Termin hinzufügen",
       "fieldType": "Typ",
-      "fieldChild": "Kind",
+      "fieldMember": "Familienmitglied",
       "fieldAllDay": "Ganztägig",
       "fieldRecurrence": "Wiederholung",
-      "noChild": "Niemand",
+      "noMember": "Niemand",
       "save": "Hinzufügen",
       "saving": "Speichere…",
       "conflict_one": "Kollision mit {{title}} · {{from}}–{{to}}",

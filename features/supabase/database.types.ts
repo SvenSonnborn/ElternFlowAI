@@ -152,6 +152,7 @@ export type Database = {
           family_id: string;
           id: string;
           location: string | null;
+          parent_id: string | null;
           rrule_byweekday: number[] | null;
           rrule_count: number | null;
           rrule_freq: Database["public"]["Enums"]["rrule_freq_enum"] | null;
@@ -172,6 +173,7 @@ export type Database = {
           family_id: string;
           id?: string;
           location?: string | null;
+          parent_id?: string | null;
           rrule_byweekday?: number[] | null;
           rrule_count?: number | null;
           rrule_freq?: Database["public"]["Enums"]["rrule_freq_enum"] | null;
@@ -192,6 +194,7 @@ export type Database = {
           family_id?: string;
           id?: string;
           location?: string | null;
+          parent_id?: string | null;
           rrule_byweekday?: number[] | null;
           rrule_count?: number | null;
           rrule_freq?: Database["public"]["Enums"]["rrule_freq_enum"] | null;
@@ -222,6 +225,13 @@ export type Database = {
             columns: ["family_id"];
             isOneToOne: false;
             referencedRelation: "families";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "events_parent_id_fkey";
+            columns: ["parent_id"];
+            isOneToOne: false;
+            referencedRelation: "parents";
             referencedColumns: ["id"];
           },
           {

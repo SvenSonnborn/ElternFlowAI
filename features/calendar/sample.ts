@@ -163,6 +163,7 @@ function seedToOccurrence(seed: Seed, base: Date): CalendarOccurrence {
     location: seed.location ?? null,
     allDay: false,
     childId: seed.childId,
+    parentId: null,
     isException: false,
     isRecurring: false,
     type: {

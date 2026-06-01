@@ -38,6 +38,7 @@ export interface CreateEventVars {
   familyId: string;
   typeId: string;
   childId: string | null;
+  parentId: string | null;
   title: string;
   startAt: string;
   endAt: string;
@@ -49,11 +50,15 @@ export interface CreateEventVars {
 }
 
 export async function createEvent(vars: CreateEventVars): Promise<void> {
+  if (vars.childId !== null && vars.parentId !== null) {
+    throw new Error("Event can be assigned to either a child or a parent, not both.");
+  }
   const rrule = recurrenceToRrule(vars.recurrence, new Date(vars.startAt));
   const { error } = await supabase.from("events").insert({
     family_id: vars.familyId,
     type_id: vars.typeId,
     child_id: vars.childId,
+    parent_id: vars.parentId,
     title: vars.title,
     description: vars.description,
     location: vars.location,

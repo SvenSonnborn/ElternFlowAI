@@ -124,6 +124,7 @@ export function expandEvents(
         location: resolved.location,
         allDay: row.all_day,
         childId: row.child_id,
+        parentId: row.parent_id,
         isException: !!ex,
         isRecurring: !!row.rrule_freq,
         type: { slug, color, iconName, labelDe: labels.de, labelEn: labels.en },

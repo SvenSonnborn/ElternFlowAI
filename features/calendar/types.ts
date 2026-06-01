@@ -10,6 +10,7 @@ export interface CalendarOccurrence {
   location: string | null;
   allDay: boolean;
   childId: string | null;
+  parentId: string | null;
   isException: boolean;
   isRecurring: boolean;
   type: {
