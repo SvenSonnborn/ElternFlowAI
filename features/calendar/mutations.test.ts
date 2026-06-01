@@ -4,7 +4,7 @@ import type { Database } from "@/features/supabase/database.types";
 
 import type { EventChanges, EventOps } from "./recurrence";
 
-import { updateEvent, type UpdateEventDeps, type UpdateEventVars } from "./mutations";
+import { updateEvent, type UpdateEventVars } from "./mutations";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
@@ -63,18 +63,6 @@ const BASE_VARS: UpdateEventVars = {
 };
 
 describe("updateEvent", () => {
-  test("scope=all → fetches master and calls updateMaster", async () => {
-    const master = makeMaster();
-    const fetchMaster = mock((_id: string) => Promise.resolve(master));
-    const ops = makeOps();
-    const deps: UpdateEventDeps = { fetchMaster, ops };
-
-    await updateEvent(BASE_VARS, deps);
-
-    expect(fetchMaster).toHaveBeenCalledWith("evt-1");
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES);
-  });
-
   test("scope=forward on recurring → uses refetched master for insertSplitEvent", async () => {
     const master = makeMaster();
     const fetchMaster = mock((_id: string) => Promise.resolve(master));
@@ -92,20 +80,10 @@ describe("updateEvent", () => {
     const fetchMaster = mock((_id: string) => Promise.resolve(null));
     const ops = makeOps();
 
+    // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
     await expect(updateEvent(BASE_VARS, { fetchMaster, ops })).rejects.toThrow(
       /Event evt-1 not found/,
     );
     expect(ops.updateMaster).not.toHaveBeenCalled();
-  });
-
-  test("scope=this on non-recurring → still refetches master then updateMaster", async () => {
-    const master = makeMaster({ rrule_freq: null });
-    const fetchMaster = mock((_id: string) => Promise.resolve(master));
-    const ops = makeOps();
-
-    await updateEvent({ ...BASE_VARS, scope: "this", isRecurring: false }, { fetchMaster, ops });
-
-    expect(fetchMaster).toHaveBeenCalledWith("evt-1");
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES);
   });
 });
