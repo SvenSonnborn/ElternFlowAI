@@ -287,6 +287,23 @@ export function EventCreateScreen() {
             {createMutation.error instanceof Error ? createMutation.error.message : ""}
           </Text>
         ) : null}
+
+        <View
+          style={{
+            marginTop: 12,
+            paddingTop: 18,
+            borderTopWidth: 1,
+            borderTopColor: theme.line,
+          }}
+        >
+          <Button
+            block
+            label={createMutation.isPending ? t("cal.create.saving") : t("cal.create.save")}
+            tone="primary"
+            disabled={!canSave}
+            onPress={onSave}
+          />
+        </View>
       </ScrollView>
 
       {picker ? (
@@ -297,25 +314,6 @@ export function EventCreateScreen() {
           display={Platform.OS === "ios" ? "spinner" : "default"}
         />
       ) : null}
-
-      <View
-        style={{
-          paddingHorizontal: 20,
-          paddingTop: 12,
-          paddingBottom: 12,
-          backgroundColor: theme.card,
-          borderTopWidth: 1,
-          borderTopColor: theme.line,
-        }}
-      >
-        <Button
-          block
-          label={createMutation.isPending ? t("cal.create.saving") : t("cal.create.save")}
-          tone="primary"
-          disabled={!canSave}
-          onPress={onSave}
-        />
-      </View>
     </SafeAreaView>
   );
 }
