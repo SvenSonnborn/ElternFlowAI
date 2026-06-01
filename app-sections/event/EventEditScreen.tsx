@@ -1,7 +1,7 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { format, set } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, ScrollView, View } from "react-native";
@@ -127,7 +127,16 @@ export function EventEditScreen() {
   }
 
   return (
-    <SafeAreaView edges={["bottom"]} className="flex-1 bg-card">
+    <SafeAreaView
+      edges={["bottom"]}
+      style={{ flex: 1, backgroundColor: theme.card }}
+      className="flex-1 bg-card"
+    >
+      <Stack.Screen
+        options={{
+          contentStyle: { flex: 1, backgroundColor: theme.card },
+        }}
+      />
       <View className="items-center pb-1 pt-2.5">
         <View className="h-1 w-10 rounded-full" style={{ backgroundColor: theme.lineStrong }} />
       </View>
@@ -148,13 +157,14 @@ export function EventEditScreen() {
       ) : (
         <>
           <ScrollView
-            className="flex-1"
+            style={{ flex: 1 }}
             contentContainerStyle={{
               paddingHorizontal: 20,
               paddingTop: 14,
               paddingBottom: 24,
               gap: 14,
             }}
+            keyboardShouldPersistTaps="handled"
           >
             <Text variant="h2">{t("cal.edit.title")}</Text>
 

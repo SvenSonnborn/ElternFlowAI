@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, ScrollView, Switch, View } from "react-native";
@@ -114,7 +114,16 @@ export function EventDetailScreen() {
   };
 
   return (
-    <SafeAreaView edges={["bottom"]} className="flex-1 bg-card">
+    <SafeAreaView
+      edges={["bottom"]}
+      style={{ flex: 1, backgroundColor: theme.card }}
+      className="flex-1 bg-card"
+    >
+      <Stack.Screen
+        options={{
+          contentStyle: { flex: 1, backgroundColor: theme.card },
+        }}
+      />
       <View className="items-center pb-1 pt-2.5">
         <View className="h-1 w-10 rounded-full" style={{ backgroundColor: theme.lineStrong }} />
       </View>
@@ -138,8 +147,9 @@ export function EventDetailScreen() {
       ) : (
         <>
           <ScrollView
-            className="flex-1"
+            style={{ flex: 1 }}
             contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 24 }}
+            keyboardShouldPersistTaps="handled"
           >
             <View
               className="flex-row items-center gap-1.5 self-start rounded-pill px-2.5 py-1"
