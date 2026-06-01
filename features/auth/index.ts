@@ -1,4 +1,5 @@
 export { AuthGate } from "./AuthGate";
+export { AVATAR_COLORS, deriveShort } from "./avatarColor";
 export {
   decideRoute,
   type RouteDecisionInput,
