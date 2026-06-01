@@ -44,6 +44,41 @@ Conventions
 | `auth.error.help`  | Versuch es noch einmal oder setze dein Passwort zurück. | Try again or reset your password.     |
 | `auth.magicLink`   | Magic-Link per E-Mail senden                            | Send magic link by email              |
 | `auth.newHere`     | Neu hier?                                               | New here?                             |
+| `auth.signOut` | Abmelden | Sign out |
+| `auth.soon` | Bald verfügbar | Coming soon |
+| `auth.register.title` | Konto erstellen | Create your account |
+| `auth.register.sub` | Mit dieser E-Mail teilst du später Kalender und Listen mit deinem Partner. | You'll use this email to share calendar and lists with your partner. |
+| `auth.register.terms` | Ich stimme den AGB und der Datenschutzerklärung zu. | I agree to the terms and privacy policy. |
+| `auth.register.submit` | Konto erstellen | Create account |
+| `auth.checkEmail.title` | Schau in dein Postfach | Check your inbox |
+| `auth.checkEmail.sub` | Wir haben dir einen Link an {{email}} geschickt. Tippe ihn an, um deine E-Mail zu bestätigen. | We sent a link to {{email}}. Tap it to confirm your email. |
+| `auth.checkEmail.resend` | Mail erneut senden | Resend email |
+| `auth.checkEmail.wrongEmail` | Falsche E-Mail? Zurück | Wrong email? Go back |
+| `auth.reset.title` | Passwort zurücksetzen | Reset password |
+| `auth.reset.sub` | Wir senden dir einen Link an deine E-Mail. | We'll send a link to your email. |
+| `auth.reset.submit` | Link senden | Send link |
+| `auth.reset.success` | Falls die E-Mail registriert ist, findest du gleich einen Link in deinem Postfach. | If that email is registered, you'll find a link in your inbox shortly. |
+| `auth.reset.backToLogin` | Doch wieder eingefallen? Anmelden | Remembered it? Sign in |
+| `auth.newPassword.title` | Neues Passwort wählen | Pick a new password |
+| `auth.newPassword.sub` | Mind. 8 Zeichen. Buchstaben und Zahlen empfohlen. | At least 8 characters. Letters and numbers recommended. |
+| `auth.newPassword.newField` | Neues Passwort | New password |
+| `auth.newPassword.confirmField` | Bestätigen | Confirm |
+| `auth.newPassword.save` | Passwort speichern | Save password |
+| `auth.newPassword.pwMismatch` | Die Passwörter stimmen nicht überein. | Passwords do not match. |
+| `auth.newPassword.saved` | Passwort geändert. Bitte erneut anmelden. | Password updated. Please sign in again. |
+| `auth.passwordStrength.weak` | Schwach | Weak |
+| `auth.passwordStrength.fair` | Okay | OK |
+| `auth.passwordStrength.good` | Gut | Good |
+| `auth.passwordStrength.strong` | Stark | Strong |
+| `auth.error.invalidCredentials` | E-Mail oder Passwort falsch. | Email or password incorrect. |
+| `auth.error.emailTaken` | Diese E-Mail ist bereits registriert. | This email is already registered. |
+| `auth.error.emailNotConfirmed` | Bitte bestätige zuerst deine E-Mail. | Please confirm your email first. |
+| `auth.error.weakPassword` | Mindestens 8 Zeichen, bitte. | At least 8 characters, please. |
+| `auth.error.alreadyInFamily` | Du gehörst bereits zu einer Familie. | You're already part of a family. |
+| `auth.error.linkExpired` | Der Link ist abgelaufen oder wurde bereits verwendet. | This link has expired or was already used. |
+| `auth.error.notAuthenticated` | Bitte erneut anmelden. | Please sign in again. |
+| `auth.error.network` | Verbindung fehlgeschlagen. Bitte später erneut versuchen. | Connection failed. Please try again later. |
+| `auth.error.generic` | Etwas ist schiefgelaufen. Bitte später erneut versuchen. | Something went wrong. Please try again later. |
 
 ## Onboarding (5 steps)
 
@@ -66,8 +101,49 @@ Conventions
 | `onb.s4.sub`           | Du kannst weitere Kinder später anlegen — oder die KI mit deiner Stimme bitten.    | You can add more kids later — or use your voice.                     |
 | `onb.s4.voice`         | Lieber per Sprache erzählen                                                        | Or tell us by voice                                                  |
 | `onb.s5.title`         | Alles bereit!                                                                      | All set!                                                             |
-| `onb.s5.sub`           | Eltern Flow ist eingerichtet. {partner} wurde eingeladen und {child} ist angelegt. | Eltern Flow is ready. {partner} got an invite, {child} is set up.    |
+| `onb.s5.sub`           | Eltern Flow ist eingerichtet.                                                      | Eltern Flow is ready.                                                |
 | `onb.s5.cta`           | Zum Dashboard                                                                      | Open dashboard                                                       |
+| `onb.actions.next` | Weiter | Next |
+| `onb.actions.back` | Zurück | Back |
+| `onb.actions.skip` | Überspringen | Skip |
+| `onb.s2.familyField` | Familienname | Family name |
+| `onb.s2.familyPlaceholder` | Familie Becker | The Becker family |
+| `onb.s2.parentName.label` | Dein Name | Your name |
+| `onb.s2.parentName.placeholder` | Anna | Anna |
+| `onb.s2.color.label` | Deine Farbe | Your color |
+| `onb.s2.submit` | Weiter | Next |
+| `onb.s2.submitInvite` | Familie beitreten | Join family |
+| `onb.s3.partnerField` | E-Mail des Partners | Partner's email |
+| `onb.s3.shareSubject` | Komm in unsere Eltern-Flow-Familie | Join our Eltern Flow family |
+| `onb.s3.shareMessage` | Tritt unserer Familie auf Eltern Flow bei | Join our family on Eltern Flow |
+| `onb.s3.pendingPill` | Eingeladen | Invited |
+| `onb.s3.shared.calendar` | Gemeinsamer Kalender | Shared calendar |
+| `onb.s3.shared.tasks` | Aufgabenlisten | Task lists |
+| `onb.s3.shared.meals` | Essensplan | Meal plan |
+| `onb.s3.shared.children` | Kinderprofile | Child profiles |
+| `onb.s4.nameField` | Name | Name |
+| `onb.s4.birthdayField` | Geburtstag | Birthday |
+| `onb.s4.schoolField` | Schule / Kita | School / daycare |
+| `onb.s4.allergiesLabel` | Allergien & Unverträglichkeiten | Allergies & intolerances |
+| `onb.s4.avatarFallback` | ? | ? |
+| `onb.s4.allergies.peanuts` | Erdnüsse | Peanuts |
+| `onb.s4.allergies.milk` | Milch | Milk |
+| `onb.s4.allergies.eggs` | Eier | Eggs |
+| `onb.s4.allergies.gluten` | Gluten | Gluten |
+| `onb.s4.allergies.soy` | Soja | Soy |
+| `onb.s4.allergies.nuts` | Nüsse | Nuts |
+| `onb.s4.save` | Weiter | Next |
+| `onb.s4.skip` | Überspringen | Skip |
+| `onb.s5.secondary` | Weiteres Kind anlegen | Add another child |
+| `onb.s5.checkmark` | ✓ | ✓ |
+| `onb.s5.recap.you` | Du | You |
+| `onb.s5.recap.partner` | Partner | Partner |
+| `onb.s5.recap.partnerPending` | Eingeladen (noch nicht angenommen) | Invited (not yet accepted) |
+| `onb.s5.recap.partnerNone` | Niemand eingeladen | Nobody invited |
+| `onb.s5.recap.children` | Kinder | Children |
+| `onb.s5.recap.childrenNone` | Noch kein Kind angelegt | No child added yet |
+| `onb.s5.empty.title` | Fast geschafft | Almost done |
+| `onb.s5.empty.sub` | Du kannst Partner und Kinder jederzeit hinzufügen. | You can add a partner and children anytime. |
 
 ## Dashboard
 
