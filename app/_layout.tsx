@@ -31,6 +31,7 @@ function ThemedStack() {
             sheetAllowedDetents: [0.72],
             sheetCornerRadius: 26,
             sheetGrabberVisible: true,
+            sheetExpandsWhenScrolledToEdge: false,
             contentStyle: { flex: 1, backgroundColor: theme.bg },
           }}
         />
@@ -43,6 +44,7 @@ function ThemedStack() {
             sheetAllowedDetents: [0.85],
             sheetCornerRadius: 26,
             sheetGrabberVisible: true,
+            sheetExpandsWhenScrolledToEdge: false,
             contentStyle: { flex: 1, backgroundColor: theme.bg },
           }}
         />
@@ -55,6 +57,7 @@ function ThemedStack() {
             sheetAllowedDetents: [0.9],
             sheetCornerRadius: 26,
             sheetGrabberVisible: true,
+            sheetExpandsWhenScrolledToEdge: false,
             contentStyle: { flex: 1, backgroundColor: theme.bg },
           }}
         />
