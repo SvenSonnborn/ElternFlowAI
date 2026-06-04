@@ -187,6 +187,7 @@ This catches bugs, security issues, and CLAUDE.md/handoff violations **before** 
 
 - Review config lives in [.coderabbit.yaml](.coderabbit.yaml) — `path_instructions` are mapped to the non-negotiables above (handoff bundle off-limits, i18n enforced, touch targets, Du-Form, routing convention, RLS). Reviews are in German. Update this file when conventions change.
 - To re-trigger the bot's PR review after pushing fixes, comment `@coderabbitai review` on the PR.
+- A **pre-push hook** ([scripts/coderabbit-prepush.sh](scripts/coderabbit-prepush.sh), wired via `simple-git-hooks`) runs this review automatically before each `git push` of a feature branch — **warn-only**, never blocks. Skips on `main` and when there are no new commits vs `main`. Bypass a single push with `git push --no-verify`. A commented BLOCK variant is in the script if you ever want it to fail the push on findings.
 - Keep it lightweight — the free tier allows ~3–4 reviews/hour, so don't loop reviews needlessly.
 
 ## Commits
