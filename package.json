@@ -17,7 +17,8 @@
     "prepare": "simple-git-hooks"
   },
   "simple-git-hooks": {
-    "pre-commit": "bunx lint-staged"
+    "pre-commit": "bunx lint-staged",
+    "pre-push": "sh scripts/coderabbit-prepush.sh"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
