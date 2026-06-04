@@ -50,7 +50,7 @@ reviews:
         Designer-Sign-off") — es sei denn, die PR-Beschreibung nennt das
         explizit als gewollt. Engineering konsumiert die Tokens, erfindet sie
         nicht neu.
-    - path: "patterns/**/*.md"
+    - path: "patterns/*.md"
       instructions: >-
         HANDOFF-BUNDLE (designer-owned, off-limits). Pattern-Docs sind Source of
         Truth für Screens. Änderungen hier nur auf ausdrückliche Anforderung —
@@ -133,7 +133,7 @@ knowledge_base:
     enabled: true
     filePatterns:
       - "CLAUDE.md"
-      - "patterns/**/*.md"
+      - "patterns/*.md"
       - "docs/HANDOFF.md"
       - "docs/COPY.md"
 
