@@ -1,0 +1,141 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# Eltern Flow AI — CodeRabbit-Konfiguration
+# Gemappt auf die Non-Negotiables aus CLAUDE.md. Reviews auf Deutsch.
+# Doku: https://docs.coderabbit.ai/reference/configuration
+
+language: "de-DE"
+
+# Brand Voice: warm, ruhig, modern, vertrauenswürdig. Niemals kindlich-süß. Immer Du, nie Sie.
+tone_instructions: >-
+  Schreibe Reviews auf Deutsch, sachlich und direkt, im Du. Keine verspielten
+  oder kindlichen Formulierungen. Begründe Findings knapp und konkret.
+
+reviews:
+  # "chill" = weniger Rauschen, nur substanzielle Findings. Bei Bedarf auf "assertive" hochdrehen.
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  # Kein Gedicht — passt nicht zur Brand Voice.
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  changed_files_summary: true
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "main"
+
+  # Was NICHT reviewt wird (Build-Artefakte, Native-Deps, Generiertes).
+  # Das Handoff-Bundle wird bewusst NICHT ausgeschlossen — wir wollen,
+  # dass unautorisierte Änderungen daran auffallen.
+  path_filters:
+    - "!node_modules/**"
+    - "!ios/Pods/**"
+    - "!ios/build/**"
+    - "!**/*.lock"
+    - "!bun.lock"
+    - "!assets/**"
+    - "!features/supabase/database.types.ts" # generiert
+
+  path_instructions:
+    # --- HANDOFF-BUNDLE: designer-owned, off-limits ---
+    - path: "design-system/{colors,typography,spacing,themes,components,index}.ts"
+      instructions: >-
+        HANDOFF-BUNDLE (designer-owned, off-limits). Diese Datei darf laut
+        CLAUDE.md nur auf ausdrückliche Anforderung geändert werden. Flagge JEDE
+        inhaltliche Änderung an Tokens/Specs als zu bestätigen ("braucht
+        Designer-Sign-off") — es sei denn, die PR-Beschreibung nennt das
+        explizit als gewollt. Engineering konsumiert die Tokens, erfindet sie
+        nicht neu.
+    - path: "patterns/**/*.md"
+      instructions: >-
+        HANDOFF-BUNDLE (designer-owned, off-limits). Pattern-Docs sind Source of
+        Truth für Screens. Änderungen hier nur auf ausdrückliche Anforderung —
+        sonst flaggen.
+    - path: "docs/{HANDOFF,COPY,ICONS,README}.md"
+      instructions: >-
+        HANDOFF-BUNDLE (designer-owned, off-limits). Nur auf ausdrückliche
+        Anforderung ändern. docs/COPY.md ist die i18n-Copy-Quelle — Abweichungen
+        zwischen Code-Strings und COPY.md melden.
+
+    # --- ROUTING: app/ sind thin re-exports ---
+    - path: "app/**/*.{ts,tsx}"
+      instructions: >-
+        Dateien in app/ sind ausschließlich thin re-export-Wrapper (URL-Surface).
+        Sie sollen nur den Screen aus app-sections/ re-exportieren, z.B.
+        `export { XScreen as default } from "@/app-sections/...";`. Flagge echte
+        Implementierungslogik (JSX, Hooks, State) in app/ als Konvention-Verstoß
+        — die gehört nach app-sections/.
+
+    # --- SCREENS: i18n, Touch-Targets, Du-Form ---
+    - path: "app-sections/**/*.tsx"
+      instructions: >-
+        (1) Alle nutzersichtbaren Strings MÜSSEN über i18n laufen (t("...")) mit
+        Keys aus docs/COPY.md (nav.*, dash.*, voice.*, auth.*, onb.*, cal.*,
+        meals.*, hw.*, child.*, set.*). Flagge hartcodierte deutsche/englische
+        UI-Strings in JSX. (2) Touch-Targets ≥ 44×44 (Mic-FAB 60, Voice-Overlay-
+        Mic 84) — zu kleine interaktive Flächen melden. (3) Anrede immer Du, nie
+        Sie. (4) Voice-FAB muss auf Dashboard/Kalender/Essen/Aufgaben/Familie
+        erreichbar bleiben; nur in Settings-Sheet und Onboarding versteckt.
+
+    # --- i18n-Kataloge ---
+    - path: "features/i18n/locales/de.json"
+      instructions: >-
+        Kanonische Copy. Prüfe, ob neue Keys konsistent benannt sind (nav.*,
+        dash.*, …) und ob es ein englisches Gegenstück in en.json gibt. Anrede
+        immer Du, nie Sie.
+    - path: "features/i18n/locales/en.json"
+      instructions: >-
+        Englischer Mirror von de.json. Flagge fehlende Keys, die in de.json
+        existieren (und umgekehrt) — die Kataloge müssen synchron sein.
+
+    # --- Supabase / DB ---
+    - path: "supabase/migrations/**/*.sql"
+      instructions: >-
+        Jede Tabelle braucht RLS-Policies. Flagge neue Tabellen ohne RLS, zu
+        permissive Policies und fehlende Indizes auf Foreign Keys.
+
+    # --- Doku-Disziplin ---
+    - path: "docs/decision-log.md"
+      instructions: >-
+        ADRs sind append-only. Ältere ADRs werden nie umgeschrieben, nur per
+        neuem Eintrag superseded. Flagge Edits an bestehenden ADR-Einträgen.
+
+  tools:
+    eslint:
+      enabled: true
+    biome:
+      enabled: false
+    gitleaks:
+      enabled: true
+    semgrep:
+      enabled: true
+    markdownlint:
+      enabled: true
+    yamllint:
+      enabled: true
+
+# Knowledge Base: CLAUDE.md + Handoff-Docs als verbindliche Guidelines einlesen.
+# (code_guidelines/learnings entfalten ihren vollen Wert im Pro-Tier — die
+#  filePatterns schaden im Free-Tier aber nicht.)
+knowledge_base:
+  opt_out: false
+  learnings:
+    scope: "auto"
+  issues:
+    scope: "auto"
+  pull_requests:
+    scope: "auto"
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "CLAUDE.md"
+      - "patterns/**/*.md"
+      - "docs/HANDOFF.md"
+      - "docs/COPY.md"
+
+chat:
+  auto_reply: true

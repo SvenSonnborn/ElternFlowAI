@@ -175,6 +175,20 @@ When you change code that's documented, update the doc in the same commit:
 
 When in doubt, the **handoff bundle wins**. CLAUDE.md and decision-log.md adapt around it.
 
+## Code review (CodeRabbit)
+
+Before opening a PR / merge request, run a local CodeRabbit pass and address — or consciously dismiss with a reason — its findings:
+
+```bash
+coderabbit review --base main      # or: coderabbit --plain
+```
+
+This catches bugs, security issues, and CLAUDE.md/handoff violations **before** the PR exists, so the PR opens clean. The CodeRabbit GitHub bot then does the team-level review on the PR itself.
+
+- Review config lives in [.coderabbit.yaml](.coderabbit.yaml) — `path_instructions` are mapped to the non-negotiables above (handoff bundle off-limits, i18n enforced, touch targets, Du-Form, routing convention, RLS). Reviews are in German. Update this file when conventions change.
+- To re-trigger the bot's PR review after pushing fixes, comment `@coderabbitai review` on the PR.
+- Keep it lightweight — the free tier allows ~3–4 reviews/hour, so don't loop reviews needlessly.
+
 ## Commits
 
 - **Never add a `Co-Authored-By: Claude …` trailer** to commit messages. The repo policy is human-authored attribution only. This applies to every `git commit` regardless of context (regular work, fix-ups, amends, PR squashes).
