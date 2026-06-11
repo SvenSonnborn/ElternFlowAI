@@ -243,6 +243,7 @@ Conventions
 | `child.voiceAdd`           | Per Sprache ergänzen                                                        | Add by voice                                               |
 | `child.saved`              | Profil gespeichert                                                         | Profile saved                                             |
 | `child.notFound`           | Profil nicht gefunden.                                                     | Profile not found.                                       |
+| `child.colorOption`        | Farbe wählen                                                               | Choose colour                                            |
 | `child.delete`             | Kind löschen                                                               | Delete child                                              |
 | `child.deleteConfirmTitle` | Kind löschen?                                                              | Delete child?                                             |
 | `child.deleteConfirmMsg`   | Das Profil wird dauerhaft entfernt. Das lässt sich nicht rückgängig machen. | This profile will be permanently removed. This can't be undone. |
