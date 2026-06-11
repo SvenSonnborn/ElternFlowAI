@@ -4,6 +4,7 @@ import type { Database } from "@/features/supabase/database.types";
 
 import { supabase } from "@/features/supabase";
 
+import { pickReusableInvite } from "./inviteSelection";
 import { useSession } from "./session";
 import { currentParentKey } from "./useCurrentParent";
 
@@ -178,16 +179,62 @@ export function useDeleteChild() {
   });
 }
 
+async function fetchUnusedInvitations(familyId: string): Promise<InvitationRow[]> {
+  const { data, error } = await supabase
+    .from("family_invitations")
+    .select("*")
+    .eq("family_id", familyId)
+    .is("used_at", null)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Creates a partner invitation — or reuses the family's existing pending one.
+ *
+ * A family needs at most one live invite link at a time, so this is idempotent:
+ * if a non-expired unused invite already exists we re-share it instead of
+ * minting a new row. Without this, every tap of "Partner einladen" spawned a
+ * fresh invitation (see docs/TODO.md history). The DB also enforces the
+ * invariant via a partial unique index (one unused invite per family), so the
+ * insert below can lose a race — we recover by re-reading the winner's row.
+ */
 export function useCreateInvitation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ familyId }: CreateInvitationVars): Promise<InvitationRow> => {
+      const unused = await fetchUnusedInvitations(familyId);
+      const reusable = pickReusableInvite(unused, new Date().toISOString());
+      if (reusable) return reusable;
+
+      // Every remaining unused invite is expired — clear them so the partial
+      // unique index doesn't block the fresh insert.
+      const staleTokens = unused.map((i) => i.token);
+      if (staleTokens.length > 0) {
+        const { error: delError } = await supabase
+          .from("family_invitations")
+          .delete()
+          .in("token", staleTokens);
+        if (delError) throw delError;
+      }
+
       const { data, error } = await supabase
         .from("family_invitations")
         .insert({ family_id: familyId })
         .select()
         .single();
-      if (error) throw error;
+      if (error) {
+        // 23505 = a concurrent caller inserted first; reuse their invite.
+        if (error.code === "23505") {
+          const raced = pickReusableInvite(
+            await fetchUnusedInvitations(familyId),
+            new Date().toISOString(),
+          );
+          if (raced) return raced;
+        }
+        throw error;
+      }
       return data;
     },
     onSuccess: (_data, vars) => {

@@ -48,3 +48,4 @@ export {
   useCurrentParent,
   type ParentRow,
 } from "./useCurrentParent";
+export { useInvitePartner } from "./useInvitePartner";

@@ -366,6 +366,8 @@
     "childrenCount_other": "{{count}} children",
     "addChild": "Add child",
     "invitePartner": "Invite partner",
+    "invitePending": "Invitation pending",
+    "invitedPill": "Invited",
     "yearsOld_one": "{{count}} year",
     "yearsOld_other": "{{count}} years",
     "empty": "No child yet. Create the first profile.",
