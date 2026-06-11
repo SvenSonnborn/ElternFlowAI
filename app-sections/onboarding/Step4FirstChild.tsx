@@ -203,6 +203,8 @@ export function Step4FirstChild() {
                   key={a}
                   onPress={() => toggleAllergy(a)}
                   style={{
+                    minHeight: 44,
+                    minWidth: 44,
                     paddingHorizontal: 14,
                     paddingVertical: 8,
                     borderRadius: 999,
@@ -211,6 +213,7 @@ export function Step4FirstChild() {
                     borderColor: selected ? theme.primary : theme.line,
                     flexDirection: "row",
                     alignItems: "center",
+                    justifyContent: "center",
                     gap: 6,
                   }}
                   accessibilityRole="button"
