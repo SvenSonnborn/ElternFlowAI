@@ -207,18 +207,18 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: "events_child_id_fkey";
-            columns: ["child_id"];
+            foreignKeyName: "events_child_same_family_fk";
+            columns: ["family_id", "child_id"];
             isOneToOne: false;
             referencedRelation: "children";
-            referencedColumns: ["id"];
+            referencedColumns: ["family_id", "id"];
           },
           {
-            foreignKeyName: "events_created_by_fkey";
-            columns: ["created_by"];
+            foreignKeyName: "events_created_by_same_family_fk";
+            columns: ["family_id", "created_by"];
             isOneToOne: false;
             referencedRelation: "parents";
-            referencedColumns: ["id"];
+            referencedColumns: ["family_id", "id"];
           },
           {
             foreignKeyName: "events_family_id_fkey";
@@ -228,11 +228,11 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "events_parent_id_fkey";
-            columns: ["parent_id"];
+            foreignKeyName: "events_parent_same_family_fk";
+            columns: ["family_id", "parent_id"];
             isOneToOne: false;
             referencedRelation: "parents";
-            referencedColumns: ["id"];
+            referencedColumns: ["family_id", "id"];
           },
           {
             foreignKeyName: "events_type_id_fkey";
