@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { format, subYears } from "date-fns";
+import { addYears, format, subYears } from "date-fns";
 
 import { ageFromBirthday } from "./age";
 
@@ -18,5 +18,9 @@ describe("ageFromBirthday", () => {
 
   test("born today → 0", () => {
     expect(ageFromBirthday(iso(new Date()))).toBe(0);
+  });
+
+  test("a future birthday clamps to 0 (never negative)", () => {
+    expect(ageFromBirthday(iso(addYears(new Date(), 3)))).toBe(0);
   });
 });

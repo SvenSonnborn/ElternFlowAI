@@ -16,10 +16,10 @@ Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope 
 
 ## Familie / Child-Profile (Live-Daten V1)
 
-- **Voice-Add im Child-Profile** ([app-sections/child-profile/ChildProfileScreen.tsx](app-sections/child-profile/ChildProfileScreen.tsx) — `child.voiceAdd`-Button) bleibt disabled-Stub, an STT/LLM-Provider gekoppelt.
+- **Voice-Add im Child-Profile** ([app-sections/child-profile/ChildProfileScreen.tsx](../app-sections/child-profile/ChildProfileScreen.tsx) — `child.voiceAdd`-Button) bleibt disabled-Stub, an STT/LLM-Provider gekoppelt.
 - **„+ Andere“-Custom-Allergen** ist nicht umgesetzt — der Allergie-Picker zeigt nur die festen `ALLERGY_KEYS`. Freitext-Allergene erfordern eigene Eingabe + Keys-Strategie (sonst Locale-Coupling wie bei `SAMPLE_SEEDS`).
-- **Likes/Dislikes ohne AI-Vorschläge** ([ChildProfileScreen.tsx](app-sections/child-profile/ChildProfileScreen.tsx) — `TagEditor`). Aktuell reiner Freitext-Tag-Editor; das Pattern ([patterns/child-profile.md](../patterns/child-profile.md)) sieht „suggestions from AI corpus“ vor — kommt mit dem LLM-Layer.
-- **Parent-Subtitle/-Edit im Familie-Tab** ([app-sections/(tabs)/familie/FamilieScreen.tsx](<app-sections/(tabs)/familie/FamilieScreen.tsx>)): `parents`-Row hat keine `email`-Spalte (E-Mail liegt in `auth.users`), darum zeigt die Parent-Card nur den Namen. Parent-Profil bearbeiten + „Partner einladen“-Button sind noch nicht verdrahtet.
+- **Likes/Dislikes ohne AI-Vorschläge** ([ChildProfileScreen.tsx](../app-sections/child-profile/ChildProfileScreen.tsx) — `TagEditor`). Aktuell reiner Freitext-Tag-Editor; das Pattern ([patterns/child-profile.md](../patterns/child-profile.md)) sieht „suggestions from AI corpus“ vor — kommt mit dem LLM-Layer.
+- **Parent-Subtitle/-Edit im Familie-Tab** ([app-sections/(tabs)/familie/FamilieScreen.tsx](<../app-sections/(tabs)/familie/FamilieScreen.tsx>)): `parents`-Row hat keine `email`-Spalte (E-Mail liegt in `auth.users`), darum zeigt die Parent-Card nur den Namen. Parent-Profil bearbeiten + „Partner einladen“-Button sind noch nicht verdrahtet.
 
 ## Weitere Out-of-Scope-Items
 

@@ -20,7 +20,7 @@ export function FamilieScreen() {
   const children = childrenQ.data ?? [];
   const parents = parentsQ.data ?? [];
   const isLoading = parent.isLoading || childrenQ.isLoading || parentsQ.isLoading;
-  const isError = childrenQ.isError || parentsQ.isError;
+  const isError = parent.isError || childrenQ.isError || parentsQ.isError;
 
   const sub = `${t("familie.childrenCount", { count: children.length })} · ${t("familie.parentsCount", { n: parents.length })}`;
 
@@ -92,7 +92,13 @@ export function FamilieScreen() {
           block
           onPress={() => router.push("/child/new")}
         />
-        <Button label={t("familie.invitePartner")} variant="soft" tone="neutral" block />
+        <Button
+          label={`${t("familie.invitePartner")} · ${t("auth.soon")}`}
+          variant="soft"
+          tone="neutral"
+          block
+          disabled
+        />
       </View>
     </Screen>
   );

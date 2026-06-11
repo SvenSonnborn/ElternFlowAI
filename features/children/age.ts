@@ -8,5 +8,6 @@ import { differenceInYears, parseISO } from "date-fns";
  * date string (`YYYY-MM-DD`) Supabase returns for `date` columns.
  */
 export function ageFromBirthday(birthday: string): number {
-  return differenceInYears(new Date(), parseISO(birthday));
+  // Clamp to 0 so a (data-entry) birthday in the future never renders a negative age.
+  return Math.max(0, differenceInYears(new Date(), parseISO(birthday)));
 }
