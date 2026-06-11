@@ -14,11 +14,6 @@ Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope 
 
 - **Onboarding-Resume nach Abbruch** (Approach C — Auth-Spec): User mit `current_family_id() !== null` aber abgebrochenem Onboarding (kein Partner eingeladen, kein Kind angelegt) landet aktuell direkt auf Dashboard, statt Step 3/4 wieder aufzunehmen. Aktuell durch Empty-State auf [patterns/dashboard-empty.md](../patterns/dashboard-empty.md) abgefangen — V2 sollte eine "Onboarding fortsetzen"-CTA auf dem Dashboard zeigen (sobald `children`-Count == 0 oder `family_invitations`-Count == 0), die per Deep-Link wieder in den passenden Step springt. Dezimiert die Re-Entry-Friction.
 
-## Auth UX follow-ups
-
-- **Allergie-Storage-Locale-Coupling auflösen** ([app-sections/onboarding/Step4FirstChild.tsx](../app-sections/onboarding/Step4FirstChild.tsx) speichert per `t(...)` die _lokalisierten_ Allergie-Labels in `children.allergies[]`). Wenn User Sprache wechselt, bleiben gespeicherte Allergien in alter Sprache. Sauber: nur Keys (z.B. `"peanuts"`) speichern, in [ChildProfileScreen](../app-sections/child/ChildProfileScreen.tsx) + Sample-Data via `t()` rendern. Eigene kleine Iteration.
-- **`StrengthMeter` als shared Component extrahieren** ([app-sections/auth/RegisterScreen.tsx](../app-sections/auth/RegisterScreen.tsx) hat sie inline; [NewPasswordScreen.tsx](../app-sections/auth/NewPasswordScreen.tsx) hat _keinen_ visual meter obwohl [patterns/reset-password.md](../patterns/reset-password.md) ihn erwähnt). Extract nach `app-sections/auth/StrengthMeter.tsx`, dann in beiden Screens nutzen.
-
 ## Weitere Out-of-Scope-Items
 
 - **Realtime-Subscription** auf `events` / `event_exceptions` für Multi-User-Sync.
@@ -26,6 +21,6 @@ Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope 
 - **Toast-Component** statt `Alert.alert` für transiente Hinweise (Edit-Save-Done, Delete-Done).
 - **Undo nach Delete** (Snackbar mit Re-Insert-Logic).
 - **Conflict-Detection** beim Anlegen/Editieren (Pattern erwähnt es, gekoppelt an Add-Flow).
-- **Same-Family-FK auch für `events.child_id` (und ggf. `created_by`)** ([supabase/migrations/20260529091933_calendar.sql](../supabase/migrations/20260529091933_calendar.sql)). `parent_id` ist seit [20260602100000_events_parent_id.sql](../supabase/migrations/20260602100000_events_parent_id.sql) per Composite-FK `(family_id, parent_id) → parents(family_id, id)` familien-gebunden. `child_id` referenziert weiterhin nur `children(id)` — ein Kind aus einer fremden Familie ließe sich DB-seitig zuweisen (durch RLS unwahrscheinlich, aber kein DB-Guard). Analoger Composite-FK + `unique index children(family_id, id)` zieht das nach.
+- **Same-Family-FK auch für `events.created_by`** ([supabase/migrations/20260529091933_calendar.sql](../supabase/migrations/20260529091933_calendar.sql)). `child_id` ist seit [20260604120000_events_child_same_family.sql](../supabase/migrations/20260604120000_events_child_same_family.sql) und `parent_id` seit [20260602100000_events_parent_id.sql](../supabase/migrations/20260602100000_events_parent_id.sql) per Composite-FK familien-gebunden. `created_by` referenziert weiterhin nur `parents(id)`. Der nötige `unique index parents(family_id, id)` existiert bereits — analoger Composite-FK `(family_id, created_by) → parents(family_id, id)` zieht es billig nach.
 - **Sample-Daten-Strings via i18n** ([features/calendar/sample.ts](features/calendar/sample.ts) — `SAMPLE_SEEDS`). Title/Location sind aktuell DE-Literals. ~26 neue Catalog-Keys nötig (13 Events × 2 Sprachen); lohnt sich erst wenn Sample-Daten länger leben als die Auth-Iteration.
 - **gustar.io Worker + Stripe + Expo Notifications** — eigene Iterationen.
