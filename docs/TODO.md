@@ -13,13 +13,14 @@ Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope 
 ## Auth / Onboarding
 
 - **Onboarding-Resume nach Abbruch** (Approach C — Auth-Spec): User mit `current_family_id() !== null` aber abgebrochenem Onboarding (kein Partner eingeladen, kein Kind angelegt) landet aktuell direkt auf Dashboard, statt Step 3/4 wieder aufzunehmen. Aktuell durch Empty-State auf [patterns/dashboard-empty.md](../patterns/dashboard-empty.md) abgefangen — V2 sollte eine "Onboarding fortsetzen"-CTA auf dem Dashboard zeigen (sobald `children`-Count == 0 oder `family_invitations`-Count == 0), die per Deep-Link wieder in den passenden Step springt. Dezimiert die Re-Entry-Friction.
+- **Invite-Link von bereits-Mitglied geöffnet** ([features/auth/deepLinkHandler.ts](../features/auth/deepLinkHandler.ts) + Accept-Screen): Tippt ein User, der schon zu einer Familie gehört, auf einen `elternflow://invite/{token}`-Link, landet er im Namen-Eingabe-Formular und bekommt erst beim Absenden den RPC-Fehler `user already belongs to a family` (23505). Stattdessen sollte der Deep-Link-Handler früh kurzschließen und eine freundliche „Du bist bereits Teil einer Familie"-Meldung zeigen, statt das Accept-Formular anzubieten. (Aufgefallen beim Solo-Test des Invite-Flows.)
 
 ## Familie / Child-Profile (Live-Daten V1)
 
 - **Voice-Add im Child-Profile** ([app-sections/child-profile/ChildProfileScreen.tsx](../app-sections/child-profile/ChildProfileScreen.tsx) — `child.voiceAdd`-Button) bleibt disabled-Stub, an STT/LLM-Provider gekoppelt.
 - **„+ Andere“-Custom-Allergen** ist nicht umgesetzt — der Allergie-Picker zeigt nur die festen `ALLERGY_KEYS`. Freitext-Allergene erfordern eigene Eingabe + Keys-Strategie (sonst Locale-Coupling wie bei `SAMPLE_SEEDS`).
 - **Likes/Dislikes ohne AI-Vorschläge** ([ChildProfileScreen.tsx](../app-sections/child-profile/ChildProfileScreen.tsx) — `TagEditor`). Aktuell reiner Freitext-Tag-Editor; das Pattern ([patterns/child-profile.md](../patterns/child-profile.md)) sieht „suggestions from AI corpus“ vor — kommt mit dem LLM-Layer.
-- **Parent-Subtitle/-Edit im Familie-Tab** ([app-sections/(tabs)/familie/FamilieScreen.tsx](<../app-sections/(tabs)/familie/FamilieScreen.tsx>)): `parents`-Row hat keine `email`-Spalte (E-Mail liegt in `auth.users`), darum zeigt die Parent-Card nur den Namen. Parent-Profil bearbeiten + „Partner einladen“-Button sind noch nicht verdrahtet.
+- **Parent-Subtitle/-Edit im Familie-Tab** ([app-sections/(tabs)/familie/FamilieScreen.tsx](<../app-sections/(tabs)/familie/FamilieScreen.tsx>)): `parents`-Row hat keine `email`-Spalte (E-Mail liegt in `auth.users`), darum zeigt die Parent-Card nur den Namen. Parent-Profil bearbeiten ist noch nicht verdrahtet. (Der „Partner einladen“-Button ist seit der Invite-Iteration live — teilt sich den `useInvitePartner`-Flow mit Onboarding-Step 3.)
 
 ## Weitere Out-of-Scope-Items
 

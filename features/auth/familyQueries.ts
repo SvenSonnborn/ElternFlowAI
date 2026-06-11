@@ -77,11 +77,15 @@ export function useFamilyPendingInvitations(
   return useQuery({
     queryKey: ["family", familyId, "invitations"],
     queryFn: async () => {
+      // Mirror accept_invitation's predicate (unused AND not expired) so the
+      // "Einladung ausstehend" indicator only shows invites that can still be
+      // accepted.
       const { data, error } = await supabase
         .from("family_invitations")
         .select("*")
         .eq("family_id", familyId as string)
-        .is("used_at", null);
+        .is("used_at", null)
+        .gt("expires_at", new Date().toISOString());
       if (error) throw error;
       return data ?? [];
     },

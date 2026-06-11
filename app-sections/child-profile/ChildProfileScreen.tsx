@@ -1,5 +1,5 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { differenceInYears, format, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,7 +17,7 @@ import {
   useDeleteChild,
   useUpdateChild,
 } from "@/features/auth";
-import { ALLERGY_KEYS } from "@/features/children";
+import { ageFromBirthday, ALLERGY_KEYS } from "@/features/children";
 
 const LABEL_STYLE = {
   textTransform: "uppercase" as const,
@@ -95,7 +95,13 @@ function TagEditor({
           className="flex-1 text-base"
           style={{ fontFamily: "Inter", fontSize: 14, color: theme.ink }}
         />
-        <Pressable onPress={commit} hitSlop={13} className="active:opacity-70">
+        <Pressable
+          onPress={commit}
+          hitSlop={13}
+          accessibilityRole="button"
+          accessibilityLabel={placeholder}
+          className="active:opacity-70"
+        >
           <Icon name="plus" size={18} color={theme.primary} />
         </Pressable>
       </View>
@@ -142,7 +148,7 @@ export function ChildProfileScreen() {
     hydratedId.current = child.id;
   }, [childQ.data]);
 
-  const age = birthday ? differenceInYears(new Date(), birthday) : null;
+  const age = birthday ? ageFromBirthday(format(birthday, "yyyy-MM-dd")) : null;
   const titleText = isEdit ? t("child.editTitle", { name: name || "…" }) : t("child.newTitle");
   const subText = isEdit ? t("child.editSub", { age: age ?? 0 }) : t("child.newSub");
 
@@ -218,6 +224,8 @@ export function ChildProfileScreen() {
           <Pressable
             onPress={() => router.back()}
             hitSlop={4}
+            accessibilityRole="button"
+            accessibilityLabel={t("action.back")}
             className="h-9 w-9 items-center justify-center rounded-xl border border-line bg-card active:opacity-70"
           >
             <Icon name="chevron-left" size={16} color={theme.inkSecondary} />
@@ -253,6 +261,7 @@ export function ChildProfileScreen() {
                   onPress={() => setColor(c)}
                   hitSlop={8}
                   accessibilityRole="button"
+                  accessibilityLabel={t("child.colorOption")}
                   accessibilityState={{ selected: color === c }}
                   style={{
                     width: 28,
