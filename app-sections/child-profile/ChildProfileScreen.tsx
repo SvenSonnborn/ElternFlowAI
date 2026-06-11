@@ -7,20 +7,17 @@ import { ChildAvatar, Field, Icon, Pill, TopBar } from "@/app-sections/shared";
 import { palette } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Screen, Text } from "@/design-system/ui";
+import { ALLERGY_KEYS } from "@/features/children";
 import { children } from "@/features/sample-data";
 
-const ALLERGY_SUGGESTIONS_DE = ["Laktose", "Gluten", "Nüsse", "Soja", "Eier"];
-const ALLERGY_SUGGESTIONS_EN = ["Lactose", "Gluten", "Nuts", "Soy", "Eggs"];
-
 export function ChildProfileScreen() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { theme } = useTheme();
   const params = useLocalSearchParams<{ id?: string }>();
-  const lang = i18n.language.startsWith("de") ? "de" : "en";
 
   const child = useMemo(() => children.find((c) => c.id === params.id), [params.id]);
   const isEdit = Boolean(child);
-  const allergySuggestions = lang === "de" ? ALLERGY_SUGGESTIONS_DE : ALLERGY_SUGGESTIONS_EN;
+  const allergySuggestions = ALLERGY_KEYS.filter((key) => !child?.allergies.includes(key));
 
   const titleText =
     isEdit && child ? t("child.editTitle", { name: child.name }) : t("child.newTitle");
@@ -93,16 +90,14 @@ export function ChildProfileScreen() {
             {child?.allergies.map((a) => (
               <Pill
                 key={a}
-                label={a}
+                label={t(`onb.s4.allergies.${a}`)}
                 tone="warn"
                 leading={<Icon name="check" size={11} color={theme.accentStrong} />}
               />
             ))}
-            {allergySuggestions
-              .filter((s) => !child?.allergies.includes(s))
-              .map((s) => (
-                <Pill key={s} label={s} tone="ink" />
-              ))}
+            {allergySuggestions.map((key) => (
+              <Pill key={key} label={t(`onb.s4.allergies.${key}`)} tone="ink" />
+            ))}
             <Pill
               label={t("child.addOther")}
               tone="ink"
