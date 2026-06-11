@@ -8,6 +8,8 @@ import { Field } from "@/app-sections/shared";
 import { Button, Text } from "@/design-system/ui";
 import { mapAuthError, passwordStrength, useSignOut, useUpdatePassword } from "@/features/auth";
 
+import { StrengthMeter } from "./StrengthMeter";
+
 export function NewPasswordScreen() {
   const { t } = useTranslation();
   const update = useUpdatePassword();
@@ -65,18 +67,28 @@ export function NewPasswordScreen() {
         ) : null}
 
         <View style={{ gap: 16, marginTop: 24 }}>
-          <Field
-            label={t("auth.newPassword.newField")}
-            iconName="lock"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••"
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="new-password"
-            textContentType="newPassword"
-          />
+          <View>
+            <Field
+              label={t("auth.newPassword.newField")}
+              iconName="lock"
+              value={password}
+              onChangeText={setPassword}
+              placeholder="••••••••"
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="new-password"
+              textContentType="newPassword"
+            />
+            {password.length > 0 ? (
+              <View style={{ marginTop: 8 }}>
+                <StrengthMeter score={strength.score} />
+                <Text variant="caption" tone="inkSecondary" style={{ marginTop: 4 }}>
+                  {t(`auth.passwordStrength.${strength.label}`)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <Field
             label={t("auth.newPassword.confirmField")}
             iconName="lock"
