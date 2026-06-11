@@ -92,6 +92,7 @@ export function FamilieScreen() {
           block
           onPress={() => router.push("/child/new")}
         />
+        {/* Disabled stub — invite flow is not wired yet (see docs/TODO.md), so onPress is intentionally omitted. */}
         <Button
           label={`${t("familie.invitePartner")} · ${t("auth.soon")}`}
           variant="soft"
