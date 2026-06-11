@@ -141,10 +141,12 @@ export function useUpdateChild() {
         dislikes: vars.dislikes,
         updated_at: new Date().toISOString(),
       };
+      // family_id scope is belt-and-suspenders on top of the RLS update policy.
       const { data, error } = await supabase
         .from("children")
         .update(update)
         .eq("id", vars.id)
+        .eq("family_id", vars.familyId)
         .select()
         .single();
       if (error) throw error;
@@ -160,8 +162,13 @@ export function useUpdateChild() {
 export function useDeleteChild() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id }: DeleteChildVars) => {
-      const { error } = await supabase.from("children").delete().eq("id", id);
+    mutationFn: async ({ id, familyId }: DeleteChildVars) => {
+      // family_id scope is belt-and-suspenders on top of the RLS delete policy.
+      const { error } = await supabase
+        .from("children")
+        .delete()
+        .eq("id", id)
+        .eq("family_id", familyId);
       if (error) throw error;
     },
     onSuccess: (_data, vars) => {

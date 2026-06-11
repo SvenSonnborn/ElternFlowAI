@@ -7,7 +7,7 @@ import { ActivityIndicator, Alert, Platform, Pressable, TextInput, View } from "
 
 import { ChildAvatar, Field, Icon, Pill, TopBar } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
-import { Button, Screen, Text } from "@/design-system/ui";
+import { Button, Card, Screen, Text } from "@/design-system/ui";
 import {
   AVATAR_COLORS,
   mapAuthError,
@@ -95,7 +95,7 @@ function TagEditor({
           className="flex-1 text-base"
           style={{ fontFamily: "Inter", fontSize: 14, color: theme.ink }}
         />
-        <Pressable onPress={commit} hitSlop={8} className="active:opacity-70">
+        <Pressable onPress={commit} hitSlop={13} className="active:opacity-70">
           <Icon name="plus" size={18} color={theme.primary} />
         </Pressable>
       </View>
@@ -217,6 +217,7 @@ export function ChildProfileScreen() {
         leading={
           <Pressable
             onPress={() => router.back()}
+            hitSlop={4}
             className="h-9 w-9 items-center justify-center rounded-xl border border-line bg-card active:opacity-70"
           >
             <Icon name="chevron-left" size={16} color={theme.inkSecondary} />
@@ -229,6 +230,18 @@ export function ChildProfileScreen() {
         <View className="items-center py-10">
           <ActivityIndicator color={theme.primary} />
         </View>
+      ) : isEdit && childQ.isError ? (
+        <Card className="items-center py-6">
+          <Text variant="body" tone="inkSecondary">
+            {t("familie.loadError")}
+          </Text>
+        </Card>
+      ) : isEdit && childQ.data === null ? (
+        <Card className="items-center py-6">
+          <Text variant="body" tone="inkSecondary">
+            {t("child.notFound")}
+          </Text>
+        </Card>
       ) : (
         <>
           <View className="mb-5 items-center">

@@ -394,6 +394,7 @@
     "avatarHint": "Tippe auf Stift zum Ändern",
     "addOther": "Andere",
     "saved": "Profil gespeichert",
+    "notFound": "Profil nicht gefunden.",
     "delete": "Kind löschen",
     "deleteConfirmTitle": "Kind löschen?",
     "deleteConfirmMsg": "Das Profil wird dauerhaft entfernt. Das lässt sich nicht rückgängig machen."

@@ -394,6 +394,7 @@
     "avatarHint": "Tap pencil to change",
     "addOther": "Other",
     "saved": "Profile saved",
+    "notFound": "Profile not found.",
     "delete": "Delete child",
     "deleteConfirmTitle": "Delete child?",
     "deleteConfirmMsg": "This profile will be permanently removed. This can't be undone."
