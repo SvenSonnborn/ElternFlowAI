@@ -14,7 +14,11 @@ tone_instructions: >-
 reviews:
   # "chill" = weniger Rauschen, nur substanzielle Findings. Bei Bedarf auf "assertive" hochdrehen.
   profile: "chill"
-  request_changes_workflow: false
+  # true = aktiviert den Resolve/Approve-Workflow: `@coderabbitai resolve` und
+  # `@coderabbitai approve` funktionieren, und CodeRabbit approved automatisch,
+  # sobald alle seine Kommentare adressiert sind. Nebenwirkung: offene Findings
+  # erscheinen als "Changes requested", bis sie aufgelöst sind.
+  request_changes_workflow: true
   high_level_summary: true
   # Kein Gedicht — passt nicht zur Brand Voice.
   poem: false
@@ -24,6 +28,11 @@ reviews:
 
   auto_review:
     enabled: true
+    # Re-reviewt neue Commits nach jedem Push automatisch (Default true, hier
+    # explizit). Adressierte Kommentare werden dabei aufgelöst. Kommt nach einem
+    # Push kein neuer Kommentar, gab es entweder keine Findings oder das
+    # Free-Tier-Rate-Limit (~3–4 Reviews/h) hat den Lauf verzögert.
+    auto_incremental_review: true
     drafts: false
     base_branches:
       - "main"
