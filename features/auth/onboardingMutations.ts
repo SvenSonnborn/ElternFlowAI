@@ -8,6 +8,7 @@ import { useSession } from "./session";
 import { currentParentKey } from "./useCurrentParent";
 
 type ChildInsert = Database["public"]["Tables"]["children"]["Insert"];
+type ChildUpdate = Database["public"]["Tables"]["children"]["Update"];
 type InvitationRow = Database["public"]["Tables"]["family_invitations"]["Row"];
 
 interface CreateFamilyVars {
@@ -31,6 +32,29 @@ interface CreateChildVars {
   color: string;
   school: string | null;
   allergies: string[];
+  // Optional taste/grade profile. Onboarding (Step 4) omits these and lets the
+  // DB defaults ('{}' / NULL) apply; the standalone child profile screen sends them.
+  grade?: string | null;
+  likes?: string[];
+  dislikes?: string[];
+}
+
+interface UpdateChildVars {
+  id: string;
+  familyId: string;
+  name: string;
+  birthday: string; // ISO date YYYY-MM-DD
+  color: string;
+  school: string | null;
+  grade: string | null;
+  allergies: string[];
+  likes: string[];
+  dislikes: string[];
+}
+
+interface DeleteChildVars {
+  id: string;
+  familyId: string;
 }
 
 interface CreateInvitationVars {
@@ -88,6 +112,9 @@ export function useCreateChild() {
         color: vars.color,
         school: vars.school,
         allergies: vars.allergies,
+        ...(vars.grade !== undefined ? { grade: vars.grade } : {}),
+        ...(vars.likes !== undefined ? { likes: vars.likes } : {}),
+        ...(vars.dislikes !== undefined ? { dislikes: vars.dislikes } : {}),
       };
       const { data, error } = await supabase.from("children").insert(insert).select().single();
       if (error) throw error;
@@ -95,6 +122,51 @@ export function useCreateChild() {
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: ["family", vars.familyId, "children"] });
+    },
+  });
+}
+
+export function useUpdateChild() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: UpdateChildVars) => {
+      const update: ChildUpdate = {
+        name: vars.name,
+        birthday: vars.birthday,
+        color: vars.color,
+        school: vars.school,
+        grade: vars.grade,
+        allergies: vars.allergies,
+        likes: vars.likes,
+        dislikes: vars.dislikes,
+        updated_at: new Date().toISOString(),
+      };
+      const { data, error } = await supabase
+        .from("children")
+        .update(update)
+        .eq("id", vars.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: ["family", vars.familyId, "children"] });
+      void qc.invalidateQueries({ queryKey: ["child", vars.id] });
+    },
+  });
+}
+
+export function useDeleteChild() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id }: DeleteChildVars) => {
+      const { error } = await supabase.from("children").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: ["family", vars.familyId, "children"] });
+      void qc.invalidateQueries({ queryKey: ["child", vars.id] });
     },
   });
 }

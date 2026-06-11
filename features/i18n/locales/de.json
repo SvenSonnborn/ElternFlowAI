@@ -367,23 +367,36 @@
     "addChild": "Kind hinzufügen",
     "invitePartner": "Partner einladen",
     "yearsOld_one": "{{count}} Jahr",
-    "yearsOld_other": "{{count}} Jahre"
+    "yearsOld_other": "{{count}} Jahre",
+    "empty": "Noch kein Kind angelegt. Leg das erste Profil an.",
+    "loadError": "Familie konnte nicht geladen werden."
   },
   "child": {
     "name": "Name",
+    "namePlaceholder": "Vorname",
     "age": "Alter",
     "birthday": "Geburtstag",
+    "birthdayPlaceholder": "TT.MM.JJJJ",
     "school": "Schule / Kita",
+    "schoolPlaceholder": "z. B. Grundschule am Park",
+    "grade": "Klasse",
+    "gradePlaceholder": "z. B. 2. Klasse",
     "allergies": "Allergien & Unverträglichkeiten",
     "likes": "Lieblingsessen",
+    "likesAdd": "Lieblingsessen hinzufügen",
     "dislikes": "Mag nicht",
+    "dislikesAdd": "Mag-nicht hinzufügen",
     "voiceAdd": "Per Sprache ergänzen",
     "editTitle": "{{name}} bearbeiten",
     "editSub": "Kind-Profil · {{age}} Jahre",
     "newTitle": "Neues Kind",
     "newSub": "Profil anlegen",
     "avatarHint": "Tippe auf Stift zum Ändern",
-    "addOther": "Andere"
+    "addOther": "Andere",
+    "saved": "Profil gespeichert",
+    "delete": "Kind löschen",
+    "deleteConfirmTitle": "Kind löschen?",
+    "deleteConfirmMsg": "Das Profil wird dauerhaft entfernt. Das lässt sich nicht rückgängig machen."
   },
   "recipe": {
     "title": "Kürbis-Risotto mit Salbei",
