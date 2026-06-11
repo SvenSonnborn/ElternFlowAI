@@ -1,6 +1,7 @@
 export { AuthGate } from "./AuthGate";
 export { AVATAR_COLORS, deriveShort } from "./avatarColor";
 export {
+  useChild,
   useFamily,
   useFamilyChildren,
   useFamilyParents,
@@ -29,6 +30,8 @@ export {
   useCreateFamily,
   useAcceptInvitation,
   useCreateChild,
+  useUpdateChild,
+  useDeleteChild,
   useCreateInvitation,
 } from "./onboardingMutations";
 export {

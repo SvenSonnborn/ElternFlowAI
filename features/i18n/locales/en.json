@@ -367,23 +367,36 @@
     "addChild": "Add child",
     "invitePartner": "Invite partner",
     "yearsOld_one": "{{count}} year",
-    "yearsOld_other": "{{count}} years"
+    "yearsOld_other": "{{count}} years",
+    "empty": "No child yet. Create the first profile.",
+    "loadError": "Couldn't load the family."
   },
   "child": {
     "name": "Name",
+    "namePlaceholder": "First name",
     "age": "Age",
     "birthday": "Birthday",
+    "birthdayPlaceholder": "DD.MM.YYYY",
     "school": "School",
+    "schoolPlaceholder": "e.g. Park Primary School",
+    "grade": "Grade",
+    "gradePlaceholder": "e.g. Year 2",
     "allergies": "Allergies & intolerances",
     "likes": "Favourite foods",
+    "likesAdd": "Add a favourite food",
     "dislikes": "Dislikes",
+    "dislikesAdd": "Add a dislike",
     "voiceAdd": "Add by voice",
     "editTitle": "Edit {{name}}",
     "editSub": "Child profile · age {{age}}",
     "newTitle": "New child",
     "newSub": "Create profile",
     "avatarHint": "Tap pencil to change",
-    "addOther": "Other"
+    "addOther": "Other",
+    "saved": "Profile saved",
+    "delete": "Delete child",
+    "deleteConfirmTitle": "Delete child?",
+    "deleteConfirmMsg": "This profile will be permanently removed. This can't be undone."
   },
   "recipe": {
     "title": "Pumpkin risotto with sage",

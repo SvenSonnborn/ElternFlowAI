@@ -226,14 +226,27 @@ Conventions
 
 | Key               | DE                              | EN                       |
 | ----------------- | ------------------------------- | ------------------------ |
-| `child.name`      | Name                            | Name                     |
-| `child.age`       | Alter                           | Age                      |
-| `child.birthday`  | Geburtstag                      | Birthday                 |
-| `child.school`    | Schule / Kita                   | School                   |
-| `child.allergies` | Allergien & Unverträglichkeiten | Allergies & intolerances |
-| `child.likes`     | Lieblingsessen                  | Favourite foods          |
-| `child.dislikes`  | Mag nicht                       | Dislikes                 |
-| `child.voiceAdd`  | Per Sprache ergänzen            | Add by voice             |
+| `child.name`               | Name                                                                       | Name                                                       |
+| `child.namePlaceholder`    | Vorname                                                                     | First name                                                 |
+| `child.age`                | Alter                                                                       | Age                                                        |
+| `child.birthday`           | Geburtstag                                                                  | Birthday                                                   |
+| `child.birthdayPlaceholder`| TT.MM.JJJJ                                                                  | DD.MM.YYYY                                                 |
+| `child.school`             | Schule / Kita                                                              | School                                                     |
+| `child.schoolPlaceholder`  | z. B. Grundschule am Park                                                   | e.g. Park Primary School                                   |
+| `child.grade`              | Klasse                                                                      | Grade                                                      |
+| `child.gradePlaceholder`   | z. B. 2. Klasse                                                             | e.g. Year 2                                                |
+| `child.allergies`          | Allergien & Unverträglichkeiten                                            | Allergies & intolerances                                  |
+| `child.likes`              | Lieblingsessen                                                              | Favourite foods                                           |
+| `child.likesAdd`           | Lieblingsessen hinzufügen                                                   | Add a favourite food                                      |
+| `child.dislikes`           | Mag nicht                                                                   | Dislikes                                                   |
+| `child.dislikesAdd`        | Mag-nicht hinzufügen                                                        | Add a dislike                                             |
+| `child.voiceAdd`           | Per Sprache ergänzen                                                        | Add by voice                                               |
+| `child.saved`              | Profil gespeichert                                                         | Profile saved                                             |
+| `child.delete`             | Kind löschen                                                               | Delete child                                              |
+| `child.deleteConfirmTitle` | Kind löschen?                                                              | Delete child?                                             |
+| `child.deleteConfirmMsg`   | Das Profil wird dauerhaft entfernt. Das lässt sich nicht rückgängig machen. | This profile will be permanently removed. This can't be undone. |
+| `familie.empty`            | Noch kein Kind angelegt. Leg das erste Profil an.                          | No child yet. Create the first profile.                  |
+| `familie.loadError`        | Familie konnte nicht geladen werden.                                       | Couldn't load the family.                                 |
 
 ## Settings
 

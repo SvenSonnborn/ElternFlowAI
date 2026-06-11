@@ -40,6 +40,22 @@ export function useFamilyParents(familyId: string | undefined): UseQueryResult<P
   });
 }
 
+export function useChild(childId: string | undefined): UseQueryResult<ChildRow | null, Error> {
+  return useQuery({
+    queryKey: ["child", childId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("children")
+        .select("*")
+        .eq("id", childId as string)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: Boolean(childId),
+  });
+}
+
 export function useFamilyChildren(familyId: string | undefined): UseQueryResult<ChildRow[], Error> {
   return useQuery({
     queryKey: ["family", familyId, "children"],
