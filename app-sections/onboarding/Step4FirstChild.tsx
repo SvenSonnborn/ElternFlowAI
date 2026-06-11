@@ -9,19 +9,9 @@ import { Field, Icon } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { AVATAR_COLORS, mapAuthError, useCreateChild, useCurrentParent } from "@/features/auth";
+import { ALLERGY_KEYS, type AllergyKey } from "@/features/children";
 
 import { OnboardingShell } from "./OnboardingShell";
-
-type AllergyKey = "peanuts" | "milk" | "eggs" | "gluten" | "soy" | "nuts";
-
-const COMMON_ALLERGIES: readonly AllergyKey[] = [
-  "peanuts",
-  "milk",
-  "eggs",
-  "gluten",
-  "soy",
-  "nuts",
-] as const;
 
 export function Step4FirstChild() {
   const { t } = useTranslation();
@@ -59,9 +49,9 @@ export function Step4FirstChild() {
         birthday: format(birthday, "yyyy-MM-dd"),
         color,
         school: school.trim() || null,
-        // Persist the user's currently-rendered label so downstream consumers
-        // (e.g. ChildProfileScreen, sample data) can keep rendering raw strings.
-        allergies: Array.from(allergies).map((a) => t(`onb.s4.allergies.${a}`)),
+        // Persist stable allergy KEYS, not localized labels — switching language
+        // must not strand stored allergies in the old locale. Rendered via t().
+        allergies: Array.from(allergies),
       });
       router.push("/(onboarding)/5");
     } catch {
@@ -206,7 +196,7 @@ export function Step4FirstChild() {
             {t("onb.s4.allergiesLabel")}
           </Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-            {COMMON_ALLERGIES.map((a) => {
+            {ALLERGY_KEYS.map((a) => {
               const selected = allergies.has(a);
               return (
                 <Pressable
