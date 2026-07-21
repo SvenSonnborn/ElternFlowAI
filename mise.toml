@@ -12,3 +12,14 @@
 java = "temurin-17"
 node = "24"
 bun = "1.3.10"
+
+[env]
+# Expo SDK 55 enables "prebuilt React Native core" (the React-Core-prebuilt pod /
+# React.xcframework) for iOS by default. On this project, CocoaPods resolved a
+# STALE, mismatched prebuilt binary — React-Core-prebuilt 0.81.5 against
+# React-Core 0.83.6 source — whose headers predate RCTDevMenuConfiguration, so the
+# iOS build fails with "expected a type" in Expo's EXReactRootViewFactory.h.
+# Forcing RN to build from source (the SDK-54 behaviour) sidesteps the prebuilt
+# binary entirely. The project Podfile reads this var: `ENV['RCT_USE_PREBUILT_RNCORE'] ||= '1'`.
+# Trade-off: slower iOS builds. Revisit once a later SDK's prebuilt RN is stable.
+RCT_USE_PREBUILT_RNCORE = "0"
