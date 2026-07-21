@@ -53,7 +53,7 @@ bunx expo export --platform web --output-dir /tmp/eltern-web
 
 Node, Java, and Bun are pinned per-project in [mise.toml](mise.toml) (managed by [mise](https://mise.jdx.dev)). With mise activated in your shell (`eval "$(mise activate zsh)"`), `cd`-ing into the repo auto-selects **node 24 (LTS)**, **bun 1.3.10** (same version as CI), and **JDK 17**, and sets `JAVA_HOME`. Run `mise install` once after cloning.
 
-The **JDK 17 pin is what makes the Android build work**: the Gradle wrapper (8.14.3) runs only on JDK ≤ 24, so a newer default JDK (e.g. 26) fails Gradle with `Unsupported class file major version 70`. 17 is React Native's canonical JDK — bump the `java` pin to 21 if a future SDK's Android build requires it. CI is unaffected (it uses `oven-sh/setup-bun` / `actions/setup-node`, not mise).
+The **JDK 17 pin is what makes the Android build work**: the Gradle wrapper (8.14.3) runs only on JDK ≤ 24, so a newer default JDK (e.g. 26) fails Gradle with `Unsupported class file major version 70`. 17 is React Native's canonical JDK — bump the `java` pin to 21 if a future SDK's Android build requires it. CI is unaffected (it pins Bun via `oven-sh/setup-bun`, not mise).
 
 `mise.toml` also sets **`RCT_USE_PREBUILT_RNCORE=0`** under `[env]`. Since SDK 55, Expo enables prebuilt React Native core (the `React-Core-prebuilt` pod / `React.xcframework`) for iOS by default, but CocoaPods can resolve a stale, version-mismatched prebuilt binary whose headers fail the iOS build (`RCTDevMenuConfiguration` "expected a type" in `EXReactRootViewFactory.h`). This var forces RN to build from source (as SDK 54 did) — the Podfile reads it (`ENV['RCT_USE_PREBUILT_RNCORE'] ||= '1'`). Trade-off: slower iOS builds; revisit when a later SDK's prebuilt RN is stable.
 
