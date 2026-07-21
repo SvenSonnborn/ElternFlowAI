@@ -818,17 +818,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export function createSupabaseEventOps(client: SupabaseClient<Database>): EventOps {
   return {
     cancelOccurrence: async (eventId, occurrenceDate) => {
-      const { error } = await client
-        .from("event_exceptions")
-        .upsert(
-          {
-            event_id: eventId,
-            occurrence_date: occurrenceDate,
-            action: "cancelled",
-            override: null,
-          },
-          { onConflict: "event_id,occurrence_date" },
-        );
+      const { error } = await client.from("event_exceptions").upsert(
+        {
+          event_id: eventId,
+          occurrence_date: occurrenceDate,
+          action: "cancelled",
+          override: null,
+        },
+        { onConflict: "event_id,occurrence_date" },
+      );
       if (error) throw error;
     },
 

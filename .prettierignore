@@ -8,6 +8,11 @@ package-lock.json
 bun.lock
 bun.lockb
 
+# Local / scratch (git-ignored) — keep `bun run format:check` in sync with CI,
+# which never sees these (fresh checkout only has tracked files).
+.superpowers/
+.claude/settings.local.json
+
 # HANDOFF bundle — designer-owned, off-limits for auto-formatting (see CLAUDE.md)
 design-system/colors.ts
 design-system/typography.ts
