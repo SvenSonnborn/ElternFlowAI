@@ -8,6 +8,13 @@
     "jsx": "react-jsx",
     "types": ["bun-types", "jest"]
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"],
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "expo-globals.d.ts",
+    "nativewind-env.d.ts"
+  ],
   "exclude": ["node_modules", "babel.config.js", "metro.config.js"]
 }
