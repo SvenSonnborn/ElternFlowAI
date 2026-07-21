@@ -29,7 +29,8 @@ aufzustauen.
    Config-Plugins in `app.json` (`expo-router`, `expo-localization`,
    `@react-native-community/datetimepicker`). Kein nativer Code wird von Hand
    gediffed; `expo prebuild --clean` regeneriert beide Plattformen.
-2. **New Architecture ist bereits aktiv** (`newArchEnabled: true` in `app.json`).
+2. **New Architecture ist bereits aktiv** (beim Start via `newArchEnabled: true`; ab
+   SDK 55 unbedingt — das Feld wurde aus dem `app.json`-Schema entfernt).
    Die größte künftige Bruchstelle ist damit schon genommen.
 3. **CI** (`.github/workflows/ci.yml`) gated per PR: `format:check` → `lint` →
    `typecheck` → `test` (`bun test`) → `bunx expo export --platform web`. Kein
@@ -68,7 +69,7 @@ Identisch für jede der drei Major-Stufen:
    Android-Emulator-Build starten.
 9. **Flow-Smoke:** Auth-Login, Kalender öffnen + Termin, Essen-Tab, Voice-FAB
    sichtbar auf allen 5 Tabs (Dashboard · Kalender · Essen · Aufgaben · Familie).
-10. **Docs + Commit:** betroffene Doku im selben Commit (siehe Abschnitt „Doku"),
+10. **Docs + Commit:** betroffene Doku im selben Commit (siehe Abschnitt „Doku“),
     Conventional-Commit `chore(deps): Expo SDK N+1 …`, **ohne**
     `Co-Authored-By`-Trailer (Repo-Policy), Pre-Commit-Hooks nie mit
     `--no-verify` umgehen. `bun.lock` wird mitcommittet.
