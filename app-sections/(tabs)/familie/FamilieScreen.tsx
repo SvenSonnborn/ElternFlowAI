@@ -28,8 +28,9 @@ export function FamilieScreen() {
   const children = childrenQ.data ?? [];
   const parents = parentsQ.data ?? [];
   const pendingInvites = pendingQ.data ?? [];
-  const isLoading = parent.isLoading || childrenQ.isLoading || parentsQ.isLoading;
-  const isError = parent.isError || childrenQ.isError || parentsQ.isError;
+  const isLoading =
+    parent.isLoading || childrenQ.isLoading || parentsQ.isLoading || pendingQ.isLoading;
+  const isError = parent.isError || childrenQ.isError || parentsQ.isError || pendingQ.isError;
 
   const sub = `${t("familie.childrenCount", { count: children.length })} · ${t("familie.parentsCount", { n: parents.length })}`;
 
