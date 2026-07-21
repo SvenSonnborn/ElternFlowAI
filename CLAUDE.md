@@ -49,6 +49,12 @@ Web-bundle smoke check end-to-end:
 bunx expo export --platform web --output-dir /tmp/eltern-web
 ```
 
+## Local toolchain (mise)
+
+Node, Java, and Bun are pinned per-project in [mise.toml](mise.toml) (managed by [mise](https://mise.jdx.dev)). With mise activated in your shell (`eval "$(mise activate zsh)"`), `cd`-ing into the repo auto-selects **node 24 (LTS)**, **bun 1.3.10** (same version as CI), and **JDK 17**, and sets `JAVA_HOME`. Run `mise install` once after cloning.
+
+The **JDK 17 pin is what makes the Android build work**: the Gradle wrapper (8.14.3) runs only on JDK ≤ 24, so a newer default JDK (e.g. 26) fails Gradle with `Unsupported class file major version 70`. 17 is React Native's canonical JDK — bump the `java` pin to 21 if a future SDK's Android build requires it. CI is unaffected (it uses `oven-sh/setup-bun` / `actions/setup-node`, not mise).
+
 ## Tech stack (locked)
 
 - **Expo SDK 54 + Expo Router 6** (file-based, `(tabs)` group, typed routes enabled)
