@@ -1,0 +1,14 @@
+# Toolchain pins for Eltern Flow AI — managed by mise (https://mise.jdx.dev).
+# mise auto-sets JAVA_HOME + PATH when you cd into this project (mise is
+# activated in the shell via `eval "$(mise activate zsh)"`).
+#
+# java 17 — required by the Android Gradle build: the project's Gradle wrapper
+#           (8.14.3) runs only on JDK <= 24, but the machine default is JDK 26
+#           ("Unsupported class file major version 70"). 17 is React Native's
+#           canonical JDK. Bump to 21 if a future SDK's Android build needs it.
+# node 24 — current LTS; the Expo/Metro-supported track.
+# bun 1.3.10 — matches the pinned Bun in CI (.github/workflows/ci.yml) so local == CI.
+[tools]
+java = "temurin-17"
+node = "24"
+bun = "1.3.10"
