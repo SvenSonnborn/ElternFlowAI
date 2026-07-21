@@ -57,8 +57,8 @@ The **JDK 17 pin is what makes the Android build work**: the Gradle wrapper (8.1
 
 ## Tech stack (locked)
 
-- **Expo SDK 54 + Expo Router 6** (file-based, `(tabs)` group, typed routes enabled)
-- React 19.1 + React Native 0.81, **TypeScript strict**
+- **Expo SDK 55 + Expo Router 55** (file-based, `(tabs)` group, typed routes enabled)
+- React 19.2 + React Native 0.83, **TypeScript strict**
 - **NativeWind v4 + Tailwind 3.4** — utility classes consume CSS variables that flip per theme
 - **Zustand** (local/UI) + **@tanstack/react-query** (server)
 - **react-i18next + expo-localization** — DE default, EN switch
