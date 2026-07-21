@@ -174,6 +174,8 @@ Supabase Auth, das 5-Step-Onboarding, der Reset-Password-Flow und der Partner-In
 
 ## ADR-006 — CI/CD via GitHub Actions (2026-07-21)
 
+### Status
+
 Accepted. Erste CI/CD-Absicherung; ergänzt die bestehende CodeRabbit-Review-Schicht um mechanische Gates.
 
 ### Context
@@ -183,11 +185,11 @@ Bis dato gab es kein `.github/`-Verzeichnis und keine automatisierten Checks auf
 ### Decisions
 
 1. **Drei Workflows, alle `pull_request`-getriggert.** `ci.yml` (Quality + Web-Smoke-Build), `pr-labeler.yml` (Auto-Labels), `dependency-review.yml` (CVE-Gate). Kein `push`-Trigger auf `main` — main verlässt sich auf die PR-Gates davor.
-2. **`ci.yml` als zwei parallele Jobs.** `quality` führt `format:check` · `lint` · `typecheck` · `test` als getrennte Steps mit `if: ${{ !cancelled() }}` aus (alle Checks laufen, volle Signalmenge). `build` macht `bunx expo export --platform web` als Smoke-Test. Begründung: getrennte Verantwortlichkeiten, paralleles Feedback.
+2. **`ci.yml` als zwei parallele Jobs.** `quality` führt `format:check` · `lint` · `typecheck` · `test` als getrennte Steps aus; die nachgelagerten Steps (`lint`/`typecheck`/`test`) tragen `if: ${{ !cancelled() }}`, sodass ein früher Fehler die späteren nicht verdeckt (volle Signalmenge). `build` macht `bunx expo export --platform web` als Smoke-Test. Begründung: getrennte Verantwortlichkeiten, paralleles Feedback.
 3. **Bun als CI-Runtime, gepinnt auf 1.3.10** + `bun install --frozen-lockfile`. Deckungsgleich mit lokaler Entwicklung, deterministisch.
 4. **Labels aus Branch-Namen** via `actions/labeler@v5` mit `head-branch`-Regex (nicht dateipfad-basiert). Volles Conventional-Set (feat/fix/chore/docs/refactor/test). Label-Palette wird einmalig über `scripts/setup-labels.sh` angelegt.
 5. **CVE-Schwelle `moderate`** in `dependency-review-action`, kein Lizenz-Gate. Balancepunkt zwischen Sicherheit und Rauschen. Public Repo → Dependency-Graph ohne GitHub Advanced Security verfügbar.
-6. **Least-Privilege-Permissions, Concurrency-Cancel, Job-Timeouts, Dependency-Cache** als Querschnitt über alle Workflows.
+6. **Least-Privilege-Permissions und Job-Timeouts** in allen drei Workflows; **Concurrency-Cancel und Dependency-Cache** nur in `ci.yml` (Labeler und Dependency-Review sind kurzlebige Single-Step-Jobs ohne Dependency-Install).
 
 ### Consequences
 
