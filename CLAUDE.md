@@ -175,6 +175,16 @@ When you change code that's documented, update the doc in the same commit:
 
 When in doubt, the **handoff bundle wins**. CLAUDE.md and decision-log.md adapt around it.
 
+## CI/CD (GitHub Actions)
+
+Drei PR-getriggerte Workflows in [.github/workflows/](.github/workflows/) sichern jeden Pull Request ab (kein `push`-Trigger auf `main` — die PR-Gates davor genügen):
+
+- **`ci.yml`** — zwei parallele Jobs. `quality` läuft `format:check` · `lint` · `typecheck` · `test` (getrennte Steps, alle via `if: ${{ !cancelled() }}`, damit ein früher Fehler die späteren nicht verdeckt); `build` macht `bunx expo export --platform web --output-dir dist` als Smoke-Test. Runtime: Bun `1.3.10` (gepinnt), `bun install --frozen-lockfile`.
+- **`pr-labeler.yml`** + [.github/labeler.yml](.github/labeler.yml) — setzt Labels automatisch aus dem Branch-Namen (`actions/labeler@v5`, `head-branch`-Regex). Mapping: `feat/`→feature, `fix/`→bug, `chore/`·`ci/`·`build/`→chore, `docs/`→documentation, `refactor/`·`perf/`→refactor, `test/`→test. Die Label-Palette wird einmalig via `bash scripts/setup-labels.sh` (braucht `gh`-Auth) angelegt.
+- **`dependency-review.yml`** — CVE-Gate für neue Dependencies (`actions/dependency-review-action@v4`, `fail-on-severity: moderate`).
+
+Verhältnis zu CodeRabbit: CI macht die **mechanischen** Gates, der CodeRabbit-Bot das **inhaltliche** Review. Der lokale CodeRabbit-pre-push-Hook bleibt deaktiviert.
+
 ## Code review (CodeRabbit)
 
 Before opening a PR / merge request, run a local CodeRabbit pass and address — or consciously dismiss with a reason — its findings:
