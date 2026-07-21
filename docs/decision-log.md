@@ -189,7 +189,7 @@ Bis dato gab es kein `.github/`-Verzeichnis und keine automatisierten Checks auf
 3. **Bun als CI-Runtime, gepinnt auf 1.3.10** + `bun install --frozen-lockfile`. Deckungsgleich mit lokaler Entwicklung, deterministisch.
 4. **Labels aus Branch-Namen** via `actions/labeler@v5` mit `head-branch`-Regex (nicht dateipfad-basiert). Volles Conventional-Set (feat/fix/chore/docs/refactor/test). Label-Palette wird einmalig über `scripts/setup-labels.sh` angelegt.
 5. **CVE-Schwelle `moderate`** in `dependency-review-action`, kein Lizenz-Gate. Balancepunkt zwischen Sicherheit und Rauschen. Public Repo → Dependency-Graph ohne GitHub Advanced Security verfügbar.
-6. **Least-Privilege-Permissions und Job-Timeouts** in allen drei Workflows; **Concurrency-Cancel und Dependency-Cache** nur in `ci.yml` (Labeler und Dependency-Review sind kurzlebige Single-Step-Jobs ohne Dependency-Install).
+6. **Least-Privilege-Permissions und Job-Timeouts** in allen drei Workflows; **Concurrency-Cancel und Dependency-Cache** nur in `ci.yml` (Labeler und Dependency-Review sind kurzlebige Jobs ohne Dependency-Install).
 
 ### Consequences
 
