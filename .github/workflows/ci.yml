@@ -43,24 +43,27 @@ jobs:
             bun-${{ runner.os }}-
 
       - name: Install dependencies
+        id: install
         run: bun install --frozen-lockfile
 
-      # Cheap static checks first; each carries if: !cancelled() so an early
-      # failure never hides a later one (all checks run, full signal per run).
+      # Cheap static checks first. Guard: `!cancelled() && install succeeded` —
+      # an early *check* failure never hides a later one (all checks run, full
+      # signal per run), but a failed frozen-lockfile install skips them all
+      # instead of cascading errors against a dependency-less repo.
       - name: Format check
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bun run format:check
 
       - name: Lint
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bun run lint
 
       - name: Typecheck
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bun run typecheck
 
       - name: Test
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         # Bun's test runner (see bunfig.toml preload) — NOT `bun run test`/jest,
         # which is broken under jest-expo 55. Mirrors the local `bun test` command.
         run: bun test
@@ -68,5 +71,5 @@ jobs:
       # Web smoke build last — the most expensive step. Verifies the web bundle
       # compiles. Uses the Supabase placeholder env above.
       - name: Web smoke build
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bunx expo export --platform web --output-dir dist
