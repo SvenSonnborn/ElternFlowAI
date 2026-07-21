@@ -196,3 +196,29 @@ Bis dato gab es kein `.github/`-Verzeichnis und keine automatisierten Checks auf
 - Neue Dateien: `.github/workflows/{ci,pr-labeler,dependency-review}.yml`, `.github/labeler.yml`, `scripts/setup-labels.sh`.
 - CodeRabbit-Verhältnis: CI macht die mechanischen Gates (lint/format/typecheck/test/build/CVE), CodeRabbit das inhaltliche Review. Der lokale CodeRabbit-pre-push-Hook bleibt deaktiviert.
 - Follow-ups in [docs/TODO.md](./TODO.md): Actions auf Commit-SHA pinnen, Dependabot für Actions/Deps, Branch-Protection-Rule „Status-Checks required" auf `main` (Repo-Settings).
+
+## ADR-007 — Dependency-Update Expo SDK 54 → 57 (+ Non-Expo-Deps) (2026-07-21)
+
+### Status
+
+Accepted. Hebt die Codebasis von einem 3-Major-SDK-Rückstand auf den aktuellen Stand. Spec: [docs/superpowers/specs/2026-07-21-expo-sdk-57-dependency-update-design.md](./superpowers/specs/2026-07-21-expo-sdk-57-dependency-update-design.md) · Plan: [docs/superpowers/plans/2026-07-21-expo-sdk-57-dependency-update.md](./superpowers/plans/2026-07-21-expo-sdk-57-dependency-update.md).
+
+### Context
+
+Das Projekt lag auf Expo SDK 54 (RN 0.81), während SDK 57 (RN 0.86) das aktuelle Stable war — drei Major-Versionen Rückstand. Zwei Rahmenbedingungen erleichterten den Sprung: der **CNG-Workflow** (`/ios` + `/android` gitignored, via `expo prebuild` regeneriert → kein nativer Code von Hand zu diffen) und dass die **New Architecture bereits aktiv** war. Der Web-Smoke-Build der CI deckt keinen nativen Code ab, daher wurde jede Stufe zusätzlich nativ (iOS + Android) verifiziert.
+
+### Decisions
+
+1. **Stufenweise 54→55→56→57, nie überspringen** (Expo-Empfehlung). Ein Branch (`chore/dependency-updates`), pro SDK-Stufe ein für sich grüner Commit als Rollback-Anker. Versions-Alignment ausschließlich über `bunx expo install --fix` — RN/React/reanimated/worklets/expo-\* nie von Hand pinnen.
+2. **Volle Verifikation pro Stufe:** `format:check`/`lint`/`typecheck`/`bun test` + `expo export --platform web` + `expo-doctor` + nativer iOS- **und** Android-Build + manueller Flow-Smoke (Auth, 5 Tabs, Voice-FAB, Kalender, Theme, Plurale).
+3. **Toolchain via mise** ([mise.toml](../mise.toml)): node 24 / bun 1.3.10 / **JDK 17**. Der System-Default JDK 26 ist zu neu für die Gradle-8.14.3-Wrapper (`Unsupported class file major version 70`); JDK 17 (RN-kanonisch) macht den Android-Build wieder grün. Zusätzlich **`RCT_USE_PREBUILT_RNCORE=0`** (`[env]`): SDK 55 aktiviert vorkompiliertes RN-Core, aber CocoaPods zog ein stale, versions-mismatchtes Binary (`React-Core-prebuilt 0.81.5` vs `0.83.6` Source → `RCTDevMenuConfiguration` „expected a type"). RN aus Source zu bauen umgeht das (Trade-off: langsamere iOS-Builds).
+4. **SDK-bedingte Config-Migrationen:** `newArchEnabled` + `android.edgeToEdgeEnabled` seit SDK 55 aus dem app.json-Schema entfernt (New Arch unbedingt an); `splash` → `expo-splash-screen`-Plugin (SDK 56); TypeScript 6.0 (SDK 56) — `tsconfig.json` auf `paths` ohne `baseUrl` (TS5101) + explizites `types: ["bun-types","jest"]` (TS-6-Default ist `[]`); `expo install --fix` hängt inerte Plugin-Einträge (`expo-status-bar`/`expo-font`) an — bewusst behalten.
+5. **Non-Expo-Deps am Ende, gruppenweise** (eigene Commits): supabase-js 2.110.7, tanstack-query 5.101.4, zustand 5.0.14, date-fns 4.4.0, nativewind 4.2.6, prettier-plugin-tailwindcss 0.8.1; Majors **i18next 26 + react-i18next 17** und **react-native-url-polyfill 4** gebumpt (keine Breaking-Change-Treffer: nur `useTranslation`/`t()`, kein `<Trans>`, `compatibilityJSON: "v4"` bleibt gültig; `/auto`-Import unverändert). **Bewusst nicht angefasst:** `tailwindcss` bleibt v3 (v4 ist ein eigenes Projekt), `@react-native-async-storage/async-storage` ist Expo-managed (exakt 2.2.0).
+6. **`test`-Script auf `bun test`** umgebogen (der echte Runner via `bunfig.toml`-Preload) — entkoppelt lokale/CI-Läufe von der jest-expo-Fragilität über die SDK-Bumps; `react-test-renderer` wird pro Stufe exakt an `react` gehalten (nicht Expo-managed).
+
+### Consequences
+
+- **Endstand:** Expo 57.0.7 · React Native 0.86.0 · React 19.2.3 · expo-router 57.0.7 · TypeScript 6.0.3 · NativeWind 4.2.6 · reanimated 4.5.0 / worklets 0.10.0. Alle Stufen nativ (iOS + Android) grün verifiziert.
+- **Neue Datei:** [mise.toml](../mise.toml). CLAUDE.md um „Local toolchain (mise)" ergänzt + Tech-Stack auf SDK 57 gezogen.
+- **Trade-off:** iOS baut RN aus Source (langsamer) — bewusst gegen den prebuilt-RN-Mismatch eingetauscht.
+- **Follow-ups in [docs/TODO.md](./TODO.md):** `@expo/vector-icons` → scoped `@react-native-vector-icons/*` (SDK-56-Deprecation); Tailwind v3 → v4 (eigenes Projekt); `RCT_USE_PREBUILT_RNCORE=0` reaktivieren, sobald ein späteres SDK das prebuilt-RN-Core stabil ausliefert (schnellere iOS-Builds).
