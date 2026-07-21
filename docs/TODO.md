@@ -32,3 +32,6 @@ Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope 
 - **Conflict-Detection** beim Anlegen/Editieren (Pattern erwähnt es, gekoppelt an Add-Flow).
 - **Sample-Daten-Strings via i18n** ([features/calendar/sample.ts](features/calendar/sample.ts) — `SAMPLE_SEEDS`). Title/Location sind aktuell DE-Literals. ~26 neue Catalog-Keys nötig (13 Events × 2 Sprachen); lohnt sich erst wenn Sample-Daten länger leben als die Auth-Iteration.
 - **gustar.io Worker + Stripe + Expo Notifications** — eigene Iterationen.
+- **CI: Actions auf Commit-SHA pinnen** ([.github/workflows/](../.github/workflows/)) — aktuell auf Major-Version-Tags (`@v4`/`@v5`); SHA-Pinning härtet gegen Supply-Chain-Angriffe (kompromittierte Tag-Re-Points). Sinnvoll zusammen mit dem nächsten Punkt.
+- **`.github/dependabot.yml`** — automatische Updates für GitHub-Actions-Versionen und Bun/npm-Dependencies. Hält gepinnte Actions/Deps aktuell, ohne manuelles Nachziehen.
+- **Branch-Protection-Rule „Status-Checks required" auf `main`** — die CI-Jobs (`quality`, `build`, `dependency-review`) und den Labeler-Job als Pflicht-Checks vor Merge setzen. Nicht als Datei versionierbar (GitHub-Repo-Settings), daher manuell in den Repo-Einstellungen.
