@@ -29,7 +29,7 @@ export function RegisterScreen() {
     try {
       await signUp.mutateAsync({ email: email.trim(), password });
       router.replace({
-        pathname: "/(auth)/check-email" as never,
+        pathname: "/(auth)/check-email",
         params: { email: email.trim() },
       });
     } catch {
