@@ -9,6 +9,16 @@
 #         (2) Findings sind beratend, du entscheidest.
 # Blockieren gewünscht? Siehe BLOCK-Variante am Ende dieser Datei.
 
+# ── DEAKTIVIERT ────────────────────────────────────────────────────────────
+# Lokaler Pre-Push-Review ausgeschaltet: wir nutzen die Reviews des CodeRabbit-
+# GitHub-Bots direkt am PR. Der Hook bleibt via simple-git-hooks verdrahtet,
+# tut aber nichts. Zum Reaktivieren einfach die nächsten zwei Zeilen (echo +
+# exit) löschen. (package.json ist JSON und kann keine Kommentare tragen, darum
+# wird hier im Script deaktiviert statt am Hook-Eintrag.)
+echo "ℹ️  Lokaler CodeRabbit Pre-Push-Review deaktiviert — Review läuft am PR (GitHub-Bot)."
+exit 0
+# ───────────────────────────────────────────────────────────────────────────
+
 export PATH="$HOME/.local/bin:$PATH"
 
 BASE="main"
@@ -27,14 +37,14 @@ if [ "$BRANCH" = "$BASE" ]; then
   exit 0
 fi
 
-# Keine neuen Commits ggü. base? Kein Review verschwenden (Free-Tier ~3/h).
+# Keine neuen Commits ggü. base? Kein Review verschwenden.
 AHEAD="$(git rev-list --count "$BASE..HEAD" 2>/dev/null || echo 0)"
 if [ "$AHEAD" = "0" ]; then
   echo "ℹ️  Keine neuen Commits ggü. $BASE — überspringe pre-push Review."
   exit 0
 fi
 
-echo "🐰 CodeRabbit Review: $BRANCH ($AHEAD Commit(s)) vs $BASE … (Free-Tier ~3/h)"
+echo "🐰 CodeRabbit Review: $BRANCH ($AHEAD Commit(s)) vs $BASE …"
 echo "   Überspringen geht jederzeit mit:  git push --no-verify"
 echo ""
 
