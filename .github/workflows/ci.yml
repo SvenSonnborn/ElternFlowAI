@@ -49,7 +49,9 @@ jobs:
 
       - name: Test
         if: ${{ !cancelled() }}
-        run: bun run test
+        # Bun's test runner (see bunfig.toml preload) — NOT `bun run test`/jest,
+        # which is broken under jest-expo 55. Mirrors the local `bun test` command.
+        run: bun test
 
   build:
     name: Web smoke build
