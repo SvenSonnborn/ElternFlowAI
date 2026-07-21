@@ -25,6 +25,7 @@ Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope 
 
 ## Weitere Out-of-Scope-Items
 
+- **`@expo/vector-icons` → scoped `@react-native-vector-icons/*`** ([app-sections/shared/Icon.tsx](../app-sections/shared/Icon.tsx) — nutzt `@expo/vector-icons/Feather` + `/MaterialCommunityIcons`). SDK 56 deprecatet das Bundle-Paket zugunsten von `@react-native-vector-icons/*` (ein Paket pro Icon-Set) + Codemod `npx @react-native-vector-icons/codemod`. `@expo/vector-icons` ist seit SDK 56 kein Sub-Dependency von `expo` mehr und wurde für diesen Bump explizit als Dependency ergänzt (`package.json`) — funktioniert unverändert, Migration auf die scoped Pakete ist ein separater Schritt (Icon-Namen/Imports ändern sich), kein Breaking Change dieses Bumps.
 - **Realtime-Subscription** auf `events` / `event_exceptions` für Multi-User-Sync.
 - **Optimistic UI** in den Calendar-Mutations (aktuell invalidate-and-refetch).
 - **Toast-Component** statt `Alert.alert` für transiente Hinweise (Edit-Save-Done, Delete-Done).
