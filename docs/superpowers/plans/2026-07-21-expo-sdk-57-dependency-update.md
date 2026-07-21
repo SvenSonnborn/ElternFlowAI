@@ -17,7 +17,7 @@ Diese Regeln gelten für **jeden** Task implizit — exakt aus Spec + CLAUDE.md:
 - **Handoff-Bundle ist off-limits** (nicht editieren ohne expliziten Auftrag): `design-system/{colors,typography,spacing,themes,components,index}.ts`, `docs/{HANDOFF,COPY,ICONS,README}.md`, `patterns/*.md`. Bei Konflikt (z. B. NativeWind zwingt Token-Änderung): in Konversation eskalieren, **nicht** still divergieren.
 - **Versionen niemals von Hand pinnen** für RN, reanimated, worklets, expo-\* — immer `bunx expo install --fix` entscheiden lassen.
 - **Babel:** `react-native-worklets/plugin` muss das **letzte** Plugin in `babel.config.js` bleiben.
-- **New Architecture bleibt an** (`newArchEnabled: true` in `app.json`).
+- **New Architecture bleibt an.** SDK 55+ setzt sie unbedingt voraus — das `newArchEnabled`-Feld wurde aus dem `app.json`-Schema entfernt und darf nicht wieder hinzugefügt werden.
 - **Definition of Done pro Stufe (alle grün):** `bun run format:check` · `bun lint` · `bun run typecheck` · `bun test` · `bunx expo export --platform web` · `bunx expo-doctor` · iOS-Build (`bun run ios`) · Android-Build (`bun run android`) · Flow-Smoke (§ Flow-Smoke-Checkliste).
 - **Doku-Disziplin:** dokumentierte Änderungen im selben Commit nachziehen (CLAUDE.md-Tech-Stack pro SDK-Stufe; ADR + TODO am Ende).
 - **`docs/TODO.md` vor Start lesen** und am Ende erledigte Punkte entfernen / neue anhängen.
@@ -197,7 +197,7 @@ Erwartet: PASS — läuft jetzt Buns Runner statt jest.
 
 In [CLAUDE.md](CLAUDE.md), im Commands-Abschnitt, die Zeile
 
-```
+```bash
 bun test                     # Tests (uses Bun's jest-compatible runner)
 ```
 
@@ -205,7 +205,7 @@ bleibt korrekt. Zusätzlich den Erklärabsatz darunter anpassen: den Satz, der b
 
 - [ ] **Step 5: TODO-Item entfernen**
 
-In [docs/TODO.md](docs/TODO.md) den kompletten Bullet entfernen, der mit „**`jest`-Binary reparieren oder `test`-Script umbiegen**" beginnt (die Zeile ganz löschen, nicht abhaken — CLAUDE.md-Workflow).
+In [docs/TODO.md](docs/TODO.md) den kompletten Bullet entfernen, der mit „**`jest`-Binary reparieren oder `test`-Script umbiegen**“ beginnt (die Zeile ganz löschen, nicht abhaken — CLAUDE.md-Workflow).
 
 - [ ] **Step 6: GATES (statischer Teil reicht hier — keine Dep-/Native-Änderung)**
 
@@ -310,7 +310,7 @@ git commit -m "chore(deps): Expo SDK 56 (RN <x.y>, React <a.b>)"
 - Consumes: grüner SDK-56-Zustand (Task 3).
 - Produces: grüner SDK-57-Zustand (Ziel des SDK-Teils) — RN 0.86, React 19.2, expo-router 57.x.
 
-**Ziel-Version:** `expo@^57` (dist-tag `latest`/`sdk-57`, aktuell 57.0.7). Endzustand: RN 0.86, React 19.2.7.
+**Ziel-Version:** `expo@^57` (dist-tag `latest`/`sdk-57`, aktuell 57.0.7). Endzustand: RN 0.86, React 19.2.3 (von Expo gepinnt; 19.2.7 war die separate neueste Upstream-Version).
 
 **Guide-URLs (R1):** `https://expo.dev/changelog/sdk-57` + Walkthrough.
 
