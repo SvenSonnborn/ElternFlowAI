@@ -1,0 +1,14 @@
+# Branch-Namen → Label-Mapping für actions/labeler@v5.
+# Gematcht wird der Head-Branch-Name des PR gegen diese Regexes.
+feature:
+  - head-branch: ["^feat/", "^feature/"]
+bug:
+  - head-branch: ["^fix/", "^hotfix/", "^bugfix/"]
+chore:
+  - head-branch: ["^chore/", "^ci/", "^build/"]
+documentation:
+  - head-branch: ["^docs/"]
+refactor:
+  - head-branch: ["^refactor/", "^perf/"]
+test:
+  - head-branch: ["^test/"]
