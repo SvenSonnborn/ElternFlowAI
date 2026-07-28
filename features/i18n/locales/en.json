@@ -243,6 +243,10 @@
       "through": "ongoing",
       "dayOf": "Day {{index}}/{{total}}"
     },
+    "a11y": {
+      "event": "{{title}}, {{time}}",
+      "eventSpan": "{{title}}, {{day}}, {{time}}"
+    },
     "add": {
       "voice": "Add by voice",
       "new": "Add event",
