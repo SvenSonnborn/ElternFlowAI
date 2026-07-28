@@ -76,20 +76,18 @@ export function EventCreateScreen() {
 
   const occurrences = useFamilyEvents(startAt).data;
   const conflicts = useMemo(() => {
-    const dateStr = format(startAt, "yyyy-MM-dd");
     const checked = allDay ? toAllDayRange({ startAt, endAt }) : { startAt, endAt };
     const samePerson = (o: { childId: string | null; parentId: string | null }) => {
-      if (member === null) return true; // family-wide event conflicts with everything that day
+      if (member === null) return true; // family-wide event conflicts with everything
       if (o.childId === null && o.parentId === null) return true; // existing family-wide conflicts with anyone
       if (member.kind === "child" && o.childId === member.id) return true;
       if (member.kind === "parent" && o.parentId === member.id) return true;
       return false;
     };
+    // `rangesOverlap` already compares absolute instants — the old
+    // `occurrenceDate === startDate` guard was what hid multi-day collisions.
     return occurrences.filter(
-      (o) =>
-        o.occurrenceDate === dateStr &&
-        samePerson(o) &&
-        rangesOverlap(o.startAt, o.endAt, checked.startAt, checked.endAt),
+      (o) => samePerson(o) && rangesOverlap(o.startAt, o.endAt, checked.startAt, checked.endAt),
     );
   }, [occurrences, startAt, endAt, member, allDay]);
 
