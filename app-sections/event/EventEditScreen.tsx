@@ -1,40 +1,32 @@
-import DateTimePicker from "@react-native-community/datetimepicker";
-import { format, set } from "date-fns";
+import { format } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Modal, Platform, Pressable, ScrollView, View } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Pressable, ScrollView, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Field } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
-import { useEvent, useUpdateEvent, type EditScope } from "@/features/calendar";
+import {
+  applyRangePick,
+  isDateRangeInvalid,
+  isTimeRangeInvalid,
+  useEvent,
+  useUpdateEvent,
+  type DateRange,
+  type EditScope,
+  type RangeField,
+} from "@/features/calendar";
 
+import { DateTimePickerSheet } from "./DateTimePickerSheet";
 import { pickScope } from "./scopeDialog";
-
-function isMultiDay(start: Date, end: Date): boolean {
-  return (
-    end.getTime() - start.getTime() > 24 * 3600_000 ||
-    format(start, "yyyy-MM-dd") !== format(end, "yyyy-MM-dd")
-  );
-}
-
-function mergeDateAndTime(date: Date, time: Date): Date {
-  return set(date, {
-    hours: time.getHours(),
-    minutes: time.getMinutes(),
-    seconds: 0,
-    milliseconds: 0,
-  });
-}
 
 export function EventEditScreen() {
   const { id, occ } = useLocalSearchParams<{ id?: string; occ?: string }>();
   const { t, i18n } = useTranslation();
   const { theme, nativeVars } = useTheme();
-  const insets = useSafeAreaInsets();
   const lang = i18n.language.startsWith("de") ? "de" : "en";
   const dateLocale = lang === "de" ? deLocale : enLocale;
 
@@ -53,46 +45,26 @@ export function EventEditScreen() {
   }, [occurrence]);
 
   const [title, setTitle] = useState("");
-  const [startAt, setStartAt] = useState<Date>(new Date());
-  const [endAt, setEndAt] = useState<Date>(new Date());
+  const [range, setRange] = useState<DateRange>(() => ({ startAt: new Date(), endAt: new Date() }));
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
-  const [picker, setPicker] = useState<"date" | "startTime" | "endTime" | null>(null);
+  const [picker, setPicker] = useState<RangeField | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const { startAt, endAt } = range;
 
   if (initial && !hydrated) {
     setTitle(initial.title);
-    setStartAt(initial.startAt);
-    setEndAt(initial.endAt);
+    setRange({ startAt: initial.startAt, endAt: initial.endAt });
     setLocation(initial.location);
     setNotes(initial.notes);
     setHydrated(true);
   }
 
-  const multiDay = useMemo(() => isMultiDay(startAt, endAt), [startAt, endAt]);
   const titleError = !title.trim() ? t("cal.edit.error.titleRequired") : "";
+  const dateError = isDateRangeInvalid(range) ? t("cal.edit.error.invalidDateRange") : "";
   const timeError =
-    endAt.getTime() <= startAt.getTime() ? t("cal.edit.error.invalidTimeRange") : "";
-  const multiDayError = multiDay ? t("cal.edit.error.multiDay") : "";
-  const canSave =
-    hydrated && !titleError && !timeError && !multiDayError && !updateMutation.isPending;
-
-  const onPickerChange = (event: { type: string }, selected?: Date) => {
-    if (Platform.OS === "android") setPicker(null);
-    if (event.type === "dismissed" || !selected) {
-      if (Platform.OS === "ios") setPicker(null);
-      return;
-    }
-    if (picker === "date") {
-      setStartAt(mergeDateAndTime(selected, startAt));
-      setEndAt(mergeDateAndTime(selected, endAt));
-      if (Platform.OS === "ios") setPicker(null);
-    } else if (picker === "startTime") {
-      setStartAt(mergeDateAndTime(startAt, selected));
-    } else if (picker === "endTime") {
-      setEndAt(mergeDateAndTime(endAt, selected));
-    }
-  };
+    !dateError && isTimeRangeInvalid(range, false) ? t("cal.edit.error.invalidTimeRange") : "";
+  const canSave = hydrated && !titleError && !dateError && !timeError && !updateMutation.isPending;
 
   async function onSave() {
     if (!occurrence || !canSave) return;
@@ -182,14 +154,6 @@ export function EventEditScreen() {
               </Pressable>
             </View>
 
-            {multiDayError ? (
-              <View className="rounded-xl bg-warning-soft px-3 py-2">
-                <Text variant="caption" tone="accentStrong">
-                  {multiDayError}
-                </Text>
-              </View>
-            ) : null}
-
             <Field
               label={t("cal.edit.fieldTitle")}
               value={title}
@@ -197,12 +161,25 @@ export function EventEditScreen() {
               error={titleError}
             />
 
-            <Field
-              label={t("cal.edit.fieldDate")}
-              iconName="calendar"
-              value={format(startAt, "EEEE, d. MMMM yyyy", { locale: dateLocale })}
-              onPress={() => setPicker("date")}
-            />
+            <View className="flex-row gap-3">
+              <View className="flex-1">
+                <Field
+                  label={t("cal.edit.fieldStartDate")}
+                  iconName="calendar"
+                  value={format(startAt, "E, d. MMM yyyy", { locale: dateLocale })}
+                  onPress={() => setPicker("startDate")}
+                />
+              </View>
+              <View className="flex-1">
+                <Field
+                  label={t("cal.edit.fieldEndDate")}
+                  iconName="calendar"
+                  value={format(endAt, "E, d. MMM yyyy", { locale: dateLocale })}
+                  onPress={() => setPicker("endDate")}
+                  error={dateError}
+                />
+              </View>
+            </View>
 
             <View className="flex-row gap-3">
               <View className="flex-1">
@@ -266,66 +243,12 @@ export function EventEditScreen() {
             </View>
           </ScrollView>
 
-          {Platform.OS === "ios" ? (
-            <Modal
-              visible={picker !== null}
-              transparent
-              animationType="slide"
-              onRequestClose={() => setPicker(null)}
-            >
-              <Pressable
-                style={{ flex: 1, backgroundColor: theme.overlay, justifyContent: "flex-end" }}
-                onPress={() => setPicker(null)}
-              >
-                <Pressable
-                  onPress={(e) => e.stopPropagation()}
-                  style={{
-                    backgroundColor: theme.card,
-                    borderTopLeftRadius: 20,
-                    borderTopRightRadius: 20,
-                    paddingHorizontal: 16,
-                    paddingTop: 12,
-                    paddingBottom: 16 + insets.bottom,
-                  }}
-                >
-                  <View style={{ alignItems: "center", marginBottom: 8 }}>
-                    <View
-                      style={{
-                        width: 40,
-                        height: 4,
-                        borderRadius: 2,
-                        backgroundColor: theme.lineStrong,
-                      }}
-                    />
-                  </View>
-                  {picker ? (
-                    <DateTimePicker
-                      value={picker === "date" ? startAt : picker === "startTime" ? startAt : endAt}
-                      mode={picker === "date" ? "date" : "time"}
-                      display={picker === "date" ? "inline" : "spinner"}
-                      onChange={onPickerChange}
-                      themeVariant={theme.card === "#FFFFFF" ? "light" : "dark"}
-                    />
-                  ) : null}
-                  <View style={{ marginTop: 8 }}>
-                    <Button
-                      block
-                      label={t("action.done")}
-                      tone="primary"
-                      onPress={() => setPicker(null)}
-                    />
-                  </View>
-                </Pressable>
-              </Pressable>
-            </Modal>
-          ) : picker ? (
-            <DateTimePicker
-              value={picker === "date" ? startAt : picker === "startTime" ? startAt : endAt}
-              mode={picker === "date" ? "date" : "time"}
-              display="default"
-              onChange={onPickerChange}
-            />
-          ) : null}
+          <DateTimePickerSheet
+            field={picker}
+            range={range}
+            onPick={(field, selected) => setRange((prev) => applyRangePick(prev, field, selected))}
+            onClose={() => setPicker(null)}
+          />
         </>
       )}
     </SafeAreaView>

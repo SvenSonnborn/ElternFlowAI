@@ -10,6 +10,7 @@ import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
 import {
+  isMultiDay,
   REMINDER_OFFSET_1H,
   REMINDER_OFFSET_24H,
   useDeleteEvent,
@@ -229,7 +230,9 @@ export function EventDetailScreen() {
             <View className="flex-row items-center gap-2">
               <Icon name="clock" size={14} color={theme.inkSecondary} />
               <Text variant="caption" tone="inkSecondary">
-                {format(data.startAt, "EEEE, d. MMMM", { locale: dateLocale })}
+                {isMultiDay(data)
+                  ? `${format(data.startAt, "E, d. MMM", { locale: dateLocale })} – ${format(data.endAt, "E, d. MMM", { locale: dateLocale })}`
+                  : format(data.startAt, "EEEE, d. MMMM", { locale: dateLocale })}
                 {" · "}
                 {data.allDay
                   ? "—"

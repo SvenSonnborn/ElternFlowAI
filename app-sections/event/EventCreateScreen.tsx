@@ -1,50 +1,47 @@
-import DateTimePicker from "@react-native-community/datetimepicker";
-import { addMinutes, format, parseISO, set, startOfDay } from "date-fns";
+import { addMinutes, format, parseISO, set } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Modal, Platform, Pressable, ScrollView, Switch, View } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Pressable, ScrollView, Switch, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Field, Icon } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
 import {
+  applyRangePick,
+  isDateRangeInvalid,
+  isTimeRangeInvalid,
+  toAllDayRange,
   useCreateEvent,
   useEventTypes,
   useFamilyEvents,
+  type DateRange,
+  type RangeField,
   type RecurrenceOption,
 } from "@/features/calendar";
 
+import { DateTimePickerSheet } from "./DateTimePickerSheet";
 import { MemberPicker, type MemberOption, type SelectedMember } from "./MemberPicker";
 import { RecurrenceRadio } from "./RecurrenceRadio";
 import { TypePicker } from "./TypePicker";
-
-function mergeDateAndTime(date: Date, time: Date): Date {
-  return set(date, {
-    hours: time.getHours(),
-    minutes: time.getMinutes(),
-    seconds: 0,
-    milliseconds: 0,
-  });
-}
 
 function rangesOverlap(a1: Date, a2: Date, b1: Date, b2: Date): boolean {
   return a1.getTime() < b2.getTime() && b1.getTime() < a2.getTime();
 }
 
-function initialStart(paramDate: string | undefined): Date {
+function initialRange(paramDate: string | undefined): DateRange {
   const day = paramDate ? parseISO(paramDate) : new Date();
-  return set(day, { hours: 9, minutes: 0, seconds: 0, milliseconds: 0 });
+  const startAt = set(day, { hours: 9, minutes: 0, seconds: 0, milliseconds: 0 });
+  return { startAt, endAt: addMinutes(startAt, 60) };
 }
 
 export function EventCreateScreen() {
   const { date: paramDate } = useLocalSearchParams<{ date?: string }>();
   const { t, i18n } = useTranslation();
   const { theme, nativeVars } = useTheme();
-  const insets = useSafeAreaInsets();
   const lang = i18n.language.startsWith("de") ? "de" : "en";
   const dateLocale = lang === "de" ? deLocale : enLocale;
 
@@ -56,16 +53,16 @@ export function EventCreateScreen() {
   const createMutation = useCreateEvent();
 
   const [title, setTitle] = useState("");
-  const [startAt, setStartAt] = useState<Date>(() => initialStart(paramDate));
-  const [endAt, setEndAt] = useState<Date>(() => addMinutes(initialStart(paramDate), 60));
+  const [range, setRange] = useState<DateRange>(() => initialRange(paramDate));
   const [allDay, setAllDay] = useState(false);
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
   const [typeId, setTypeId] = useState<string | null>(null);
   const [member, setMember] = useState<SelectedMember | null>(null);
   const [recurrence, setRecurrence] = useState<RecurrenceOption>("none");
-  const [picker, setPicker] = useState<"date" | "startTime" | "endTime" | null>(null);
+  const [picker, setPicker] = useState<RangeField | null>(null);
   const [typeHydrated, setTypeHydrated] = useState(false);
+  const { startAt, endAt } = range;
 
   if (eventTypes.data && !typeHydrated) {
     const defaultType =
@@ -77,8 +74,7 @@ export function EventCreateScreen() {
   const occurrences = useFamilyEvents(startAt).data;
   const conflicts = useMemo(() => {
     const dateStr = format(startAt, "yyyy-MM-dd");
-    const checkStart = allDay ? startOfDay(startAt) : startAt;
-    const checkEnd = allDay ? set(startAt, { hours: 23, minutes: 59 }) : endAt;
+    const checked = allDay ? toAllDayRange({ startAt, endAt }) : { startAt, endAt };
     const samePerson = (o: { childId: string | null; parentId: string | null }) => {
       if (member === null) return true; // family-wide event conflicts with everything that day
       if (o.childId === null && o.parentId === null) return true; // existing family-wide conflicts with anyone
@@ -90,40 +86,26 @@ export function EventCreateScreen() {
       (o) =>
         o.occurrenceDate === dateStr &&
         samePerson(o) &&
-        rangesOverlap(o.startAt, o.endAt, checkStart, checkEnd),
+        rangesOverlap(o.startAt, o.endAt, checked.startAt, checked.endAt),
     );
   }, [occurrences, startAt, endAt, member, allDay]);
 
   const titleError = !title.trim() ? t("cal.edit.error.titleRequired") : "";
+  const dateError = isDateRangeInvalid(range) ? t("cal.edit.error.invalidDateRange") : "";
   const timeError =
-    !allDay && endAt.getTime() <= startAt.getTime() ? t("cal.edit.error.invalidTimeRange") : "";
+    !dateError && isTimeRangeInvalid(range, allDay) ? t("cal.edit.error.invalidTimeRange") : "";
   const typeError = !typeId ? t("cal.create.error.typeRequired") : "";
   const canSave =
-    !titleError && !timeError && !typeError && !!familyId && !createMutation.isPending;
-
-  const onPickerChange = (event: { type: string }, selected?: Date) => {
-    if (Platform.OS === "android") setPicker(null);
-    if (event.type === "dismissed" || !selected) {
-      if (Platform.OS === "ios") setPicker(null);
-      return;
-    }
-    if (picker === "date") {
-      setStartAt(mergeDateAndTime(selected, startAt));
-      setEndAt(mergeDateAndTime(selected, endAt));
-      if (Platform.OS === "ios") setPicker(null);
-    } else if (picker === "startTime") {
-      setStartAt(mergeDateAndTime(startAt, selected));
-    } else if (picker === "endTime") {
-      setEndAt(mergeDateAndTime(endAt, selected));
-    }
-  };
+    !titleError &&
+    !dateError &&
+    !timeError &&
+    !typeError &&
+    !!familyId &&
+    !createMutation.isPending;
 
   function onSave() {
     if (!canSave || !familyId || !typeId) return;
-    const finalStart = allDay
-      ? set(startAt, { hours: 0, minutes: 0, seconds: 0, milliseconds: 0 })
-      : startAt;
-    const finalEnd = allDay ? set(startAt, { hours: 23, minutes: 59, seconds: 0 }) : endAt;
+    const final = allDay ? toAllDayRange(range) : range;
     const childId = member?.kind === "child" ? member.id : null;
     const parentId = member?.kind === "parent" ? member.id : null;
     createMutation.mutate(
@@ -133,8 +115,8 @@ export function EventCreateScreen() {
         childId,
         parentId,
         title: title.trim(),
-        startAt: finalStart.toISOString(),
-        endAt: finalEnd.toISOString(),
+        startAt: final.startAt.toISOString(),
+        endAt: final.endAt.toISOString(),
         allDay,
         location: location.trim() || null,
         description: notes.trim() || null,
@@ -221,12 +203,25 @@ export function EventCreateScreen() {
           error={titleError}
         />
 
-        <Field
-          label={t("cal.edit.fieldDate")}
-          iconName="calendar"
-          value={format(startAt, "EEEE, d. MMMM yyyy", { locale: dateLocale })}
-          onPress={() => setPicker("date")}
-        />
+        <View className="flex-row gap-3">
+          <View className="flex-1">
+            <Field
+              label={t("cal.edit.fieldStartDate")}
+              iconName="calendar"
+              value={format(startAt, "E, d. MMM yyyy", { locale: dateLocale })}
+              onPress={() => setPicker("startDate")}
+            />
+          </View>
+          <View className="flex-1">
+            <Field
+              label={t("cal.edit.fieldEndDate")}
+              iconName="calendar"
+              value={format(endAt, "E, d. MMM yyyy", { locale: dateLocale })}
+              onPress={() => setPicker("endDate")}
+              error={dateError}
+            />
+          </View>
+        </View>
 
         <Pressable
           accessibilityRole="switch"
@@ -346,66 +341,12 @@ export function EventCreateScreen() {
         </View>
       </ScrollView>
 
-      {Platform.OS === "ios" ? (
-        <Modal
-          visible={picker !== null}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setPicker(null)}
-        >
-          <Pressable
-            style={{ flex: 1, backgroundColor: theme.overlay, justifyContent: "flex-end" }}
-            onPress={() => setPicker(null)}
-          >
-            <Pressable
-              onPress={(e) => e.stopPropagation()}
-              style={{
-                backgroundColor: theme.card,
-                borderTopLeftRadius: 20,
-                borderTopRightRadius: 20,
-                paddingHorizontal: 16,
-                paddingTop: 12,
-                paddingBottom: 16 + insets.bottom,
-              }}
-            >
-              <View style={{ alignItems: "center", marginBottom: 8 }}>
-                <View
-                  style={{
-                    width: 40,
-                    height: 4,
-                    borderRadius: 2,
-                    backgroundColor: theme.lineStrong,
-                  }}
-                />
-              </View>
-              {picker ? (
-                <DateTimePicker
-                  value={picker === "date" ? startAt : picker === "startTime" ? startAt : endAt}
-                  mode={picker === "date" ? "date" : "time"}
-                  display={picker === "date" ? "inline" : "spinner"}
-                  onChange={onPickerChange}
-                  themeVariant={theme.card === "#FFFFFF" ? "light" : "dark"}
-                />
-              ) : null}
-              <View style={{ marginTop: 8 }}>
-                <Button
-                  block
-                  label={t("action.done")}
-                  tone="primary"
-                  onPress={() => setPicker(null)}
-                />
-              </View>
-            </Pressable>
-          </Pressable>
-        </Modal>
-      ) : picker ? (
-        <DateTimePicker
-          value={picker === "date" ? startAt : picker === "startTime" ? startAt : endAt}
-          mode={picker === "date" ? "date" : "time"}
-          display="default"
-          onChange={onPickerChange}
-        />
-      ) : null}
+      <DateTimePickerSheet
+        field={picker}
+        range={range}
+        onPick={(field, selected) => setRange((prev) => applyRangePick(prev, field, selected))}
+        onClose={() => setPicker(null)}
+      />
     </SafeAreaView>
   );
 }

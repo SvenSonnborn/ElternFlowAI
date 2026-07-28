@@ -263,7 +263,8 @@
     "edit": {
       "title": "Termin bearbeiten",
       "fieldTitle": "Titel",
-      "fieldDate": "Datum",
+      "fieldStartDate": "Von (Datum)",
+      "fieldEndDate": "Bis (Datum)",
       "fieldStart": "Von",
       "fieldEnd": "Bis",
       "fieldLocation": "Ort",
@@ -273,7 +274,7 @@
       "error": {
         "titleRequired": "Titel darf nicht leer sein",
         "invalidTimeRange": "Endzeit muss nach Startzeit liegen",
-        "multiDay": "Mehrtägige Termine sind in dieser Version nicht editierbar",
+        "invalidDateRange": "Enddatum darf nicht vor dem Startdatum liegen",
         "network": "Speichern fehlgeschlagen"
       }
     },
