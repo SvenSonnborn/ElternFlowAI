@@ -165,13 +165,16 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
   const { ops, scope, eventId, occurrenceDate, isRecurring, master, changes, recurrence } = args;
 
   if (recurrence) {
-    await ops.updateMaster(eventId, changes, recurrence);
-    // Exceptions are keyed by the occurrence dates the *old* rule produced. Once
-    // the rule moves, the surviving rows would cancel or rewrite occurrences the
-    // user never touched, so a real rule change clears them.
+    // Exceptions are keyed by the occurrence dates the *old* rule produced, so a
+    // real rule change clears them — before the rule moves, not after. These are
+    // separate, non-transactional calls: failing here leaves the old rule and its
+    // own exceptions intact, whereas the other order would leave a new rule with
+    // stale exceptions cancelling occurrences the user never touched. Same
+    // damage-minimising reasoning as the forward-split path below.
     if (ruleDiffers(master, recurrence)) {
       await ops.deleteAllExceptions(eventId);
     }
+    await ops.updateMaster(eventId, changes, recurrence);
     return;
   }
 

@@ -402,6 +402,23 @@ describe("applyEditScope", () => {
     rrule_until: null,
   };
 
+  test("exceptions are cleared before the rule moves, not after", async () => {
+    // Non-transactional calls: failing here must leave the old rule with its own
+    // exceptions, never a new rule with stale ones.
+    const { ops, calls } = makeRecordingOps();
+    await applyEditScope({
+      ops,
+      scope: "all",
+      eventId: "evt-1",
+      occurrenceDate: "2026-06-15",
+      isRecurring: true,
+      master: makeMaster(),
+      changes: CHANGES,
+      recurrence: NEW_RULE,
+    });
+    expect(calls).toEqual(["deleteAllExceptions", "updateMaster"]);
+  });
+
   test("recurrence change → updateMaster carries the rule and exceptions are cleared", async () => {
     const ops = makeOps();
     await applyEditScope({

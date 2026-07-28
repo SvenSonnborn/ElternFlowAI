@@ -75,8 +75,11 @@ export function EventDetailScreen() {
   const familyId = parent.data?.family_id ?? null;
   const reminderOffsets = reminders.data ?? [];
   // Until the row list has loaded there is nothing truthful to render, so the
-  // switches stay off and locked rather than guessing a default.
-  const remindersLocked = !familyId || !id || reminders.isPending || toggleReminder.isPending;
+  // switches stay off and locked rather than guessing a default. A failed read
+  // is locked too: `isPending` is already false by then and the empty fallback
+  // would otherwise claim every reminder is off.
+  const remindersLocked =
+    !familyId || !id || reminders.isPending || reminders.isError || toggleReminder.isPending;
 
   const onReminderToggle = (offsetMinutes: number) => (enabled: boolean) => {
     if (!familyId || !id) return;
@@ -287,6 +290,22 @@ export function EventDetailScreen() {
               disabled={remindersLocked}
               onValueChange={onReminderToggle(REMINDER_OFFSET_1H)}
             />
+            {reminders.isError ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("action.retry")}
+                onPress={() => void reminders.refetch()}
+                className="flex-row items-center justify-between py-3 active:opacity-70"
+                hitSlop={8}
+              >
+                <Text variant="caption" tone="danger" className="flex-1">
+                  {t("cal.detail.reminderError")}
+                </Text>
+                <Text variant="bodyEmph" tone="primaryStrong">
+                  {t("action.retry")}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
 
           <View className="mt-6">

@@ -14,6 +14,7 @@ import {
   isDateRangeInvalid,
   isTimeRangeInvalid,
   parseRecurrenceCount,
+  toAllDayRange,
   recurrenceToRrule,
   rruleToRecurrence,
   useEvent,
@@ -93,10 +94,15 @@ export function EventEditScreen() {
     (recurrence !== initial.recurrence ||
       (recurrence !== "none" && countText.trim() !== initial.countText));
 
+  // All-day is not editable here (the create form owns that switch), but it must
+  // still be respected: an all-day event carries synthetic 00:00/23:59 times, so
+  // editing them freely would desync `start_at`/`end_at` from `all_day`.
+  const allDay = occurrence?.allDay ?? false;
+
   const titleError = !title.trim() ? t("cal.edit.error.titleRequired") : "";
   const dateError = isDateRangeInvalid(range) ? t("cal.edit.error.invalidDateRange") : "";
   const timeError =
-    !dateError && isTimeRangeInvalid(range, false) ? t("cal.edit.error.invalidTimeRange") : "";
+    !dateError && isTimeRangeInvalid(range, allDay) ? t("cal.edit.error.invalidTimeRange") : "";
   const parsedCount = recurrence === "none" ? null : parseRecurrenceCount(countText);
   const countError = parsedCount === "invalid" ? t("cal.create.error.invalidCount") : "";
   const canSave =
@@ -147,6 +153,9 @@ export function EventEditScreen() {
       if (!chosen) return;
       scope = chosen;
     }
+    // Re-snap rather than trust the state: the date pickers can move an all-day
+    // event across days, and its times must stay 00:00 → 23:59.
+    const final = allDay ? toAllDayRange(range) : range;
     updateMutation.mutate(
       {
         scope,
@@ -155,8 +164,8 @@ export function EventEditScreen() {
         isRecurring,
         changes: {
           title: title.trim(),
-          start_at: startAt.toISOString(),
-          end_at: endAt.toISOString(),
+          start_at: final.startAt.toISOString(),
+          end_at: final.endAt.toISOString(),
           location: location.trim() || null,
           description: notes.trim() || null,
         },
@@ -247,22 +256,26 @@ export function EventEditScreen() {
               </View>
             </View>
 
-            <View className="flex-row gap-3">
+            <View
+              className="flex-row gap-3"
+              pointerEvents={allDay ? "none" : "auto"}
+              style={{ opacity: allDay ? 0.4 : 1 }}
+            >
               <View className="flex-1">
                 <Field
                   label={t("cal.edit.fieldStart")}
                   iconName="clock"
-                  value={format(startAt, "HH:mm")}
-                  onPress={() => setPicker("startTime")}
+                  value={allDay ? "—" : format(startAt, "HH:mm")}
+                  onPress={allDay ? undefined : () => setPicker("startTime")}
                 />
               </View>
               <View className="flex-1">
                 <Field
                   label={t("cal.edit.fieldEnd")}
                   iconName="clock"
-                  value={format(endAt, "HH:mm")}
-                  onPress={() => setPicker("endTime")}
-                  error={timeError}
+                  value={allDay ? "—" : format(endAt, "HH:mm")}
+                  onPress={allDay ? undefined : () => setPicker("endTime")}
+                  error={allDay ? undefined : timeError}
                 />
               </View>
             </View>

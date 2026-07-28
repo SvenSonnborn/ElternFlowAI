@@ -43,29 +43,34 @@ export interface ToggleReminderVars {
 }
 
 /**
- * There is no unique index on (event_id, offset_minutes), so enabling deletes
- * before it inserts — that keeps a double-tap from stacking duplicate rows the
- * cron worker would later send twice.
+ * Enabling is a single upsert against the `reminders_event_offset_uniq` index
+ * (migration `20260728120000_reminders_unique_offset.sql`) — one statement, so
+ * a double-tap cannot stack duplicate rows and a failure cannot leave the
+ * reminder half-removed the way delete-then-insert could.
  *
  * `family_id` is required by the generated Insert type; the
  * `reminders_set_family_id` trigger overwrites it from the event anyway, and
  * RLS validates event ownership independently.
  */
 export async function toggleReminder(vars: ToggleReminderVars): Promise<void> {
-  const { error: deleteError } = await supabase
-    .from("reminders")
-    .delete()
-    .eq("event_id", vars.eventId)
-    .eq("offset_minutes", vars.offsetMinutes);
-  if (deleteError) throw deleteError;
+  if (!vars.enabled) {
+    const { error } = await supabase
+      .from("reminders")
+      .delete()
+      .eq("event_id", vars.eventId)
+      .eq("offset_minutes", vars.offsetMinutes);
+    if (error) throw error;
+    return;
+  }
 
-  if (!vars.enabled) return;
-
-  const { error } = await supabase.from("reminders").insert({
-    event_id: vars.eventId,
-    family_id: vars.familyId,
-    offset_minutes: vars.offsetMinutes,
-  });
+  const { error } = await supabase.from("reminders").upsert(
+    {
+      event_id: vars.eventId,
+      family_id: vars.familyId,
+      offset_minutes: vars.offsetMinutes,
+    },
+    { onConflict: "event_id,offset_minutes" },
+  );
   if (error) throw error;
 }
 

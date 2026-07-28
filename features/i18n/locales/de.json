@@ -19,7 +19,8 @@
     "cancel": "Abbrechen",
     "on": "An",
     "off": "Aus",
-    "manage": "Verwalten"
+    "manage": "Verwalten",
+    "retry": "Erneut versuchen"
   },
   "auth": {
     "signIn": "Anmelden",

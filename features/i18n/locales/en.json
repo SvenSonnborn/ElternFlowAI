@@ -19,7 +19,8 @@
     "cancel": "Cancel",
     "on": "On",
     "off": "Off",
-    "manage": "Manage"
+    "manage": "Manage",
+    "retry": "Try again"
   },
   "auth": {
     "signIn": "Sign in",
