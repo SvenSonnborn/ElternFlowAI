@@ -236,6 +236,13 @@
       "hourShort": "hr",
       "minuteShort": "min"
     },
+    "span": {
+      "allDay": "All day",
+      "from": "from {{time}}",
+      "until": "until {{time}}",
+      "through": "ongoing",
+      "dayOf": "Day {{index}}/{{total}}"
+    },
     "add": {
       "voice": "Add by voice",
       "new": "Add event",
