@@ -1123,7 +1123,19 @@ Am `Pressable` der Zeile ergänzen (Touch-Target bleibt unverändert weit über 
 ```tsx
 accessibilityRole="button"
 accessibilityLabel={
-  isSpan ? `${occ.title}, ${subLabel}, ${timeLabel}` : `${occ.title}, ${timeLabel}`
+  isSpan
+    ? t("cal.a11y.eventSpan", { title: occ.title, day: subLabel, time: timeLabel })
+    : t("cal.a11y.event", { title: occ.title, time: timeLabel })
+}
+```
+
+Das Label ist Screenreader-sichtbarer Text und fällt damit unter Non-Negotiable Nr. 3 — auch die
+Kommasetzung gehört in den Katalog, nicht ins Template-Literal. Dazu in beide Catalogs unter `cal`:
+
+```json
+"a11y": {
+  "event": "{{title}}, {{time}}",
+  "eventSpan": "{{title}}, {{day}}, {{time}}"
 }
 ```
 
