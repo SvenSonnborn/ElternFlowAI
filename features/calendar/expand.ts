@@ -1,5 +1,4 @@
 import { format } from "date-fns";
-import { Frequency, RRule } from "rrule";
 
 import type { Theme } from "@/design-system/themes";
 import type { Database, Json } from "@/features/supabase/database.types";
@@ -7,6 +6,7 @@ import type { Database, Json } from "@/features/supabase/database.types";
 import type { CalendarOccurrence } from "./types";
 
 import { eventColorFor, eventIconFor, typeLabelsForSlug } from "./palette";
+import { buildRule } from "./rrule";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
@@ -15,13 +15,6 @@ type EventExceptionRow = Database["public"]["Tables"]["event_exceptions"]["Row"]
 export type EventWithRelations = EventRow & {
   event_types: EventTypeRow | null;
   event_exceptions: EventExceptionRow[] | null;
-};
-
-const FREQ_MAP: Record<NonNullable<EventRow["rrule_freq"]>, Frequency> = {
-  daily: RRule.DAILY,
-  weekly: RRule.WEEKLY,
-  monthly: RRule.MONTHLY,
-  yearly: RRule.YEARLY,
 };
 
 function isJsonObject(j: Json | null | undefined): j is { [k: string]: Json | undefined } {
@@ -40,18 +33,11 @@ function readLabel(slug: string, label: Json | null | undefined): { de: string; 
 }
 
 function expandRecurrence(row: EventRow, rangeStart: Date, rangeEnd: Date): Date[] {
-  const start = new Date(row.start_at);
-  if (!row.rrule_freq) {
+  const rule = buildRule(row);
+  if (!rule) {
+    const start = new Date(row.start_at);
     return start >= rangeStart && start <= rangeEnd ? [start] : [];
   }
-  const rule = new RRule({
-    freq: FREQ_MAP[row.rrule_freq],
-    interval: row.rrule_interval || 1,
-    dtstart: start,
-    until: row.rrule_until ? new Date(row.rrule_until) : null,
-    count: row.rrule_count ?? null,
-    byweekday: row.rrule_byweekday?.length ? row.rrule_byweekday.map((n) => n - 1) : null,
-  });
   return rule.between(rangeStart, rangeEnd, true);
 }
 
