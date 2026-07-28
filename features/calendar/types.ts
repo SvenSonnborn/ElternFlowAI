@@ -42,10 +42,23 @@ export interface MarkedDot {
   color: string;
 }
 
+/**
+ * A multi-day event's slice on one day of the month grid. `isStart`/`isEnd`
+ * round the matching edge; a bar that is neither reaches both cell edges flush
+ * and therefore reads as "continues".
+ */
+export interface SpanBar {
+  key: string;
+  color: string;
+  isStart: boolean;
+  isEnd: boolean;
+}
+
 export type MarkedDates = Record<
   string,
   {
     dots?: MarkedDot[];
+    bars?: SpanBar[];
     marked?: boolean;
     selected?: boolean;
     selectedColor?: string;
