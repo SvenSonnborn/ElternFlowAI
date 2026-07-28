@@ -58,7 +58,8 @@ export type MarkedDates = Record<
   string,
   {
     dots?: MarkedDot[];
-    bars?: SpanBar[];
+    /** Index is the lane: a `null` hole keeps the lanes below it aligned. */
+    bars?: (SpanBar | null)[];
     marked?: boolean;
     selected?: boolean;
     selectedColor?: string;

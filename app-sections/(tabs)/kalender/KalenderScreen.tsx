@@ -213,9 +213,13 @@ export function KalenderScreen() {
                     borderBottomRightRadius: seg.isEnd ? 2 : 0,
                   }}
                 />
-                <View className="w-14">
+                <View className="w-[72px]">
                   <Text
-                    variant="bodyEmph"
+                    // A bare time is the scannable datum and stays prominent;
+                    // "ab 09:00" / "durchgehend" are descriptive phrases that
+                    // would truncate at body size — DE "durchgehend" and EN
+                    // "until 14:00" are both 11 characters.
+                    variant={isSpan && !occ.allDay ? "caption" : "bodyEmph"}
                     style={{ fontVariant: ["tabular-nums"] }}
                     numberOfLines={1}
                   >

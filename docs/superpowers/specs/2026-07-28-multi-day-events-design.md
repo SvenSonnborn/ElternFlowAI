@@ -252,9 +252,34 @@ Today-Zelle und auf der Selected-Zelle, in Light und Dark.
 Vor dem PR zusätzlich: `bun run typecheck`, `bun lint`, `bun format:check` sowie
 `coderabbit review --base main` gemäß CLAUDE.md.
 
+## Nachtrag aus der Verifikation (2026-07-28)
+
+Drei Punkte, die erst die Sichtprüfung am laufenden Kalender gezeigt hat. Sie ergänzen D5/D6,
+widersprechen ihnen nicht:
+
+- **N1 — Spannen bekommen eine feste Spur.** D5 sagte nur „max. 2 Balken pro Tag". Ohne feste
+  Spurzuweisung liegt ein Balken an Tagen, die er allein belegt, in Zeile 0 und an Tagen mit einer
+  früheren Spanne in Zeile 1 — die Linie springt mitten in der Spanne die Zeile und zerstört genau
+  die Kontinuität, für die es die Balken gibt. `toDayMarkings` weist jeder Spanne jetzt die
+  niedrigste über ihre gesamte Länge freie Spur zu und hält sie dort; freie Spuren darüber bleiben
+  als `null`-Loch erhalten, damit die Zeilenposition stabil bleibt. `MarkedDates.bars` ist deshalb
+  `(SpanBar | null)[]`.
+- **N2 — Balken laufen über die Monatsgrenze weiter.** Dots werden auf Nachbarmonats-Tagen
+  (`state === "disabled"`) unterdrückt; für Balken wäre das falsch, weil ein Balken mit bündiger
+  „geht weiter"-Kante, hinter der nichts folgt, schlechter liest als ein gedimmter. Balken rendern
+  dort mit `opacity: 0.4`.
+- **N3 — Die Zeitspalte trägt 72px und kleinere Span-Labels.** Bei 56px und `bodyEmph` wurde
+  „from 09:00" zu „from 0…" abgeschnitten; DE „durchgehend" hätte es genauso getroffen (beide
+  11 Zeichen). Reine Uhrzeiten und „Ganztägig" bleiben `bodyEmph`, die beschreibenden Phrasen
+  (`ab …`/`bis …`/`durchgehend`) laufen auf `caption`. **Das ist eine typografische Entscheidung
+  im Designer-Territorium** — wenn der Designer die Spalte lieber breiter oder die Copy kürzer
+  hätte, ist das die Stelle zum Nachziehen.
+
 ## Risiken
 
-- **Zellbreite im Raster** (D5) — einziges offenes Darstellungsrisiko, Fallback dokumentiert.
+- **Zellbreite im Raster** (D5) — Sichtprüfung ergab: benachbarte Balken lassen ~1px Luft, die
+  Linie liest sich bei realer Größe trotzdem durchgehend. Der in D5 dokumentierte Fallback greift,
+  die Variante bleibt. Auf iOS noch nicht gegengeprüft.
 - **`useEvent` bleibt bewusst auf Occurrence-Ebene.** Detail- und Edit-Screen sehen nie Segmente.
   Das ist Absicht (D1) und muss beim Review als solches gelesen werden, nicht als Lücke.
 - **Über-Fetching in `fetchEventsInRange`** (keine untere `start_at`-Schranke) bleibt bestehen. Es

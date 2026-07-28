@@ -80,10 +80,67 @@ export function toDaySegments(
   return out;
 }
 
-/** Bars per day before a span falls back into the dot row. */
+/** Lanes available per day before a span falls back into the dot row. */
 const MAX_BARS = 2;
 /** Dots per day, matching what `CalendarDay` renders. */
 const MAX_DOTS = 3;
+
+/** All segments of one occurrence, grouped so the span can claim a lane. */
+interface SpanGroup {
+  key: string;
+  segments: DaySegment[];
+  firstDate: string;
+}
+
+function groupSpans(segments: DaySegment[]): SpanGroup[] {
+  const byKey = new Map<string, SpanGroup>();
+  for (const segment of segments) {
+    // Two occurrences of the same series can share a day once a span is longer
+    // than its recurrence interval — the anchor date keeps keys unique.
+    const key = `${segment.occurrence.eventId}-${segment.occurrence.occurrenceDate}`;
+    const group = byKey.get(key);
+    if (group) {
+      group.segments.push(segment);
+      if (segment.date < group.firstDate) group.firstDate = segment.date;
+    } else {
+      byKey.set(key, { key, segments: [segment], firstDate: segment.date });
+    }
+  }
+  // Earliest span first, key as tie-breaker, so lanes stay stable between
+  // renders instead of shuffling with map insertion order.
+  return Array.from(byKey.values()).sort(
+    (a, b) => a.firstDate.localeCompare(b.firstDate) || a.key.localeCompare(b.key),
+  );
+}
+
+/**
+ * Assigns every span the lowest lane free on all of its days, and keeps it
+ * there for the whole span.
+ *
+ * Without this a bar would sit in row 0 on days where it is alone and row 1
+ * where an earlier span shares the day — the line would jump rows mid-span,
+ * destroying exactly the continuity the bars exist to show. Spans that find no
+ * free lane return `null` and fall back to a dot.
+ */
+function assignLanes(groups: SpanGroup[]): Map<string, number | null> {
+  const lanes: Set<string>[] = [];
+  const out = new Map<string, number | null>();
+
+  for (const group of groups) {
+    const dates = group.segments.map((s) => s.date);
+    let placed: number | null = null;
+    for (let lane = 0; lane < MAX_BARS; lane++) {
+      const taken = lanes[lane] ?? new Set<string>();
+      if (dates.some((d) => taken.has(d))) continue;
+      dates.forEach((d) => taken.add(d));
+      lanes[lane] = taken;
+      placed = lane;
+      break;
+    }
+    out.set(group.key, placed);
+  }
+  return out;
+}
 
 /**
  * Turns day segments into the marking objects the month grid consumes.
@@ -98,7 +155,7 @@ export function toDayMarkings(
   selectedDate: string,
   selectedColor: string,
 ): MarkedDates {
-  const barsByDate = new Map<string, SpanBar[]>();
+  const barsByDate = new Map<string, (SpanBar | null)[]>();
   const dotsByDate = new Map<string, Map<string, MarkedDot>>();
 
   const addDot = (date: string, occurrence: CalendarOccurrence) => {
@@ -112,25 +169,34 @@ export function toDayMarkings(
     dotsByDate.set(date, forDay);
   };
 
+  const spans = groupSpans(segments.filter((s) => s.total > 1));
+  const laneOf = assignLanes(spans);
+
   for (const segment of segments) {
     if (segment.total === 1) {
       addDot(segment.date, segment.occurrence);
+    }
+  }
+
+  for (const group of spans) {
+    const lane = laneOf.get(group.key) ?? null;
+    if (lane === null) {
+      // Out of lanes — better a dot than a silently dropped event.
+      group.segments.forEach((s) => addDot(s.date, s.occurrence));
       continue;
     }
-    const forDay = barsByDate.get(segment.date) ?? [];
-    if (forDay.length >= MAX_BARS) {
-      addDot(segment.date, segment.occurrence);
-      continue;
+    for (const segment of group.segments) {
+      const forDay = barsByDate.get(segment.date) ?? [];
+      // Pad with holes so every bar keeps its lane index as its row.
+      while (forDay.length < lane) forDay.push(null);
+      forDay[lane] = {
+        key: group.key,
+        color: segment.occurrence.type.color,
+        isStart: segment.isStart,
+        isEnd: segment.isEnd,
+      };
+      barsByDate.set(segment.date, forDay);
     }
-    forDay.push({
-      // Two occurrences of the same series can share a day once a span is
-      // longer than its recurrence interval — the anchor date keeps keys unique.
-      key: `${segment.occurrence.eventId}-${segment.occurrence.occurrenceDate}`,
-      color: segment.occurrence.type.color,
-      isStart: segment.isStart,
-      isEnd: segment.isEnd,
-    });
-    barsByDate.set(segment.date, forDay);
   }
 
   const out: MarkedDates = {};

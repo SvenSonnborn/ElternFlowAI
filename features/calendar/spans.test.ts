@@ -175,6 +175,49 @@ describe("toDayMarkings", () => {
     expect(marks["2026-06-11"].dots ?? []).toEqual([]);
   });
 
+  test("a span keeps one lane for its whole length", () => {
+    // Mint runs 10.–12., blue starts on the 12. and runs on. Blue must stay in
+    // lane 1 on the 13. too — a bar that jumps rows mid-span breaks the very
+    // continuity the bars exist to show.
+    const marks = toDayMarkings(
+      segmentsFor([
+        makeOccurrence("2026-06-10T09:00:00", "2026-06-12T14:00:00", { eventId: "mint" }),
+        makeOccurrence("2026-06-12T09:00:00", "2026-06-14T14:00:00", {
+          eventId: "blue",
+          type: {
+            slug: "family",
+            color: "#7DD3FC",
+            iconName: "book-open",
+            labelDe: "Familie",
+            labelEn: "Social",
+          },
+        }),
+      ]),
+      "2026-06-01",
+      "#E8F7F5",
+    );
+    const laneOfBlue = (date: string) =>
+      (marks[date].bars ?? []).findIndex((b) => b?.key.startsWith("blue"));
+    expect(laneOfBlue("2026-06-12")).toBe(1);
+    expect(laneOfBlue("2026-06-13")).toBe(1);
+    expect(laneOfBlue("2026-06-14")).toBe(1);
+    // The freed lane 0 stays as an explicit hole, not a collapsed row.
+    expect(marks["2026-06-13"].bars?.[0]).toBeNull();
+  });
+
+  test("a span reuses a lane once the earlier span has ended", () => {
+    const marks = toDayMarkings(
+      segmentsFor([
+        makeOccurrence("2026-06-10T09:00:00", "2026-06-11T14:00:00", { eventId: "first" }),
+        makeOccurrence("2026-06-13T09:00:00", "2026-06-14T14:00:00", { eventId: "second" }),
+      ]),
+      "2026-06-01",
+      "#E8F7F5",
+    );
+    expect(marks["2026-06-10"].bars?.[0]?.key).toContain("first");
+    expect(marks["2026-06-13"].bars?.[0]?.key).toContain("second");
+  });
+
   test("beyond two bars a span falls back into the dot row instead of vanishing", () => {
     const spans = [1, 2, 3].map((n) =>
       makeOccurrence("2026-06-10T09:00:00", "2026-06-12T14:00:00", {
