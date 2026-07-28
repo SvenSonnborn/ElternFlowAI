@@ -1,7 +1,6 @@
 import { format } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Pressable, ScrollView, Switch, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,17 +9,27 @@ import { ChildAvatar, Icon } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
-import { useDeleteEvent, useEvent, type EditScope } from "@/features/calendar";
+import {
+  REMINDER_OFFSET_1H,
+  REMINDER_OFFSET_24H,
+  useDeleteEvent,
+  useEvent,
+  useEventReminders,
+  useToggleReminder,
+  type EditScope,
+} from "@/features/calendar";
 
 import { pickScope } from "./scopeDialog";
 
 function ReminderRow({
   label,
   value,
+  disabled,
   onValueChange,
 }: {
   label: string;
   value: boolean;
+  disabled: boolean;
   onValueChange: (b: boolean) => void;
 }) {
   const { theme } = useTheme();
@@ -37,6 +46,7 @@ function ReminderRow({
       </View>
       <Switch
         value={value}
+        disabled={disabled}
         onValueChange={onValueChange}
         trackColor={{ false: theme.line, true: theme.primary }}
         thumbColor={theme.card}
@@ -52,8 +62,6 @@ export function EventDetailScreen() {
   const insets = useSafeAreaInsets();
   const lang = i18n.language.startsWith("de") ? "de" : "en";
   const dateLocale = lang === "de" ? deLocale : enLocale;
-  const [reminder24, setReminder24] = useState(true);
-  const [reminder1, setReminder1] = useState(false);
 
   const { data, isLoading, error } = useEvent(id ?? "", occ);
   const parent = useCurrentParent();
@@ -61,6 +69,28 @@ export function EventDetailScreen() {
   const familyParents = useFamilyParents(parent.data?.family_id);
 
   const deleteMutation = useDeleteEvent();
+  const reminders = useEventReminders(id ?? "");
+  const toggleReminder = useToggleReminder();
+  const familyId = parent.data?.family_id ?? null;
+  const reminderOffsets = reminders.data ?? [];
+  // Until the row list has loaded there is nothing truthful to render, so the
+  // switches stay off and locked rather than guessing a default.
+  const remindersLocked = !familyId || !id || reminders.isPending || toggleReminder.isPending;
+
+  const onReminderToggle = (offsetMinutes: number) => (enabled: boolean) => {
+    if (!familyId || !id) return;
+    toggleReminder.mutate(
+      { eventId: id, familyId, offsetMinutes, enabled },
+      {
+        onError: (err) => {
+          Alert.alert(
+            t("cal.detail.reminderError"),
+            err instanceof Error ? err.message : undefined,
+          );
+        },
+      },
+    );
+  };
 
   const onEditPress = () => {
     if (!data) return;
@@ -244,13 +274,15 @@ export function EventDetailScreen() {
           <View className="mt-6">
             <ReminderRow
               label={t("cal.detail.reminder24h")}
-              value={reminder24}
-              onValueChange={setReminder24}
+              value={reminderOffsets.includes(REMINDER_OFFSET_24H)}
+              disabled={remindersLocked}
+              onValueChange={onReminderToggle(REMINDER_OFFSET_24H)}
             />
             <ReminderRow
               label={t("cal.detail.reminder1h")}
-              value={reminder1}
-              onValueChange={setReminder1}
+              value={reminderOffsets.includes(REMINDER_OFFSET_1H)}
+              disabled={remindersLocked}
+              onValueChange={onReminderToggle(REMINDER_OFFSET_1H)}
             />
           </View>
 

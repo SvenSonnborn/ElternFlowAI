@@ -253,6 +253,7 @@
       "location": "Ort",
       "reminder24h": "Erinnerung 24 Std. vorher",
       "reminder1h": "Erinnerung 1 Std. vorher",
+      "reminderError": "Erinnerung konnte nicht gespeichert werden",
       "notes": "Notizen",
       "edit": "Bearbeiten",
       "delete": "Löschen",

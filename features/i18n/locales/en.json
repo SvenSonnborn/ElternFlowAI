@@ -253,6 +253,7 @@
       "location": "Location",
       "reminder24h": "Remind 24 hr before",
       "reminder1h": "Remind 1 hr before",
+      "reminderError": "Could not save the reminder",
       "notes": "Notes",
       "edit": "Edit",
       "delete": "Delete",

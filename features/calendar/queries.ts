@@ -13,6 +13,7 @@ export const calendarKeys = {
   range: (start: string, end: string) => ["calendar", "events", start, end] as const,
   one: (id: string) => ["calendar", "event", id] as const,
   types: ["calendar", "types"] as const,
+  reminders: (eventId: string) => ["calendar", "reminders", eventId] as const,
 };
 
 export async function fetchEventsInRange(
