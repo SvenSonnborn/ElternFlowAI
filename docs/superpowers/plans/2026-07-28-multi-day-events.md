@@ -1242,13 +1242,13 @@ Im selben Abschnitt anhängen:
 
 Den bestehenden Bullet „**Neue Kalender-Keys fehlen in `docs/COPY.md`**" um die neuen Keys erweitern — im Satz mit der Key-Aufzählung ergänzen:
 
-```
+```markdown
 … sowie `cal.span.allDay`/`from`/`until`/`through`/`dayOf` (Beschriftung mehrtägiger Termine in der Tagesliste).
 ```
 
 Zusätzlich am Ende desselben Bullets anfügen:
 
-```
+```markdown
 Ebenso kennt [patterns/calendar.md](../patterns/calendar.md) die Spannen-Darstellung noch nicht — die V1-Beschreibung nennt nur „bis zu 3 Farbdots" pro Tag, nicht den Spannen-Balken.
 ```
 
@@ -1294,7 +1294,7 @@ PR-Body: Ziel, die vier Aufgabenpunkte mit Status (zwei davon bereits durch `6f6
 
 ## Reihenfolge und Abhängigkeiten
 
-```
+```text
 Task 1 (Span-Mathematik)
   └─ Task 2 (Marker)  ──┐
 Task 3 (Expansions-Fenster, unabhängig) ──┐

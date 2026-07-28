@@ -243,6 +243,10 @@
       "through": "durchgehend",
       "dayOf": "Tag {{index}}/{{total}}"
     },
+    "a11y": {
+      "event": "{{title}}, {{time}}",
+      "eventSpan": "{{title}}, {{day}}, {{time}}"
+    },
     "add": {
       "voice": "Termin per Sprache",
       "new": "Termin hinzufügen",

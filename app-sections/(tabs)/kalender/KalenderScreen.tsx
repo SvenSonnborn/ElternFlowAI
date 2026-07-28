@@ -167,9 +167,9 @@ export function KalenderScreen() {
                   : seg.isEnd
                     ? t("cal.span.until", { time: format(occ.endAt, "HH:mm") })
                     : t("cal.span.through");
-            // Empty string rather than null: the label is interpolated into the
-            // row's accessibility label below, and a `string | null` there trips
-            // the type-aware lint rule for template expressions.
+            // Empty string rather than null: the label doubles as an
+            // interpolation value for the row's accessibility label below, where
+            // a null would be read out verbatim.
             const subLabel = isSpan
               ? t("cal.span.dayOf", { index: seg.index + 1, total: seg.total })
               : occ.allDay
@@ -189,7 +189,13 @@ export function KalenderScreen() {
                 }
                 accessibilityRole="button"
                 accessibilityLabel={
-                  isSpan ? `${occ.title}, ${subLabel}, ${timeLabel}` : `${occ.title}, ${timeLabel}`
+                  isSpan
+                    ? t("cal.a11y.eventSpan", {
+                        title: occ.title,
+                        day: subLabel,
+                        time: timeLabel,
+                      })
+                    : t("cal.a11y.event", { title: occ.title, time: timeLabel })
                 }
                 className="flex-row items-center gap-3 overflow-hidden rounded-2xl border border-line bg-card p-3 pl-4 active:opacity-70"
               >
