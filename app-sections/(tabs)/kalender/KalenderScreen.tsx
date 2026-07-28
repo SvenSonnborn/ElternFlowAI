@@ -22,6 +22,7 @@ import {
   setCalendarLocale,
   useFamilyEvents,
   useMarkedDates,
+  type DaySegment,
 } from "@/features/calendar";
 
 import { CalendarDay } from "./CalendarDay";
@@ -57,8 +58,8 @@ export function KalenderScreen() {
     setCalendarLocale(lang);
   }, [lang]);
 
-  const { data: occurrences } = useFamilyEvents(visibleMonth);
-  const markedDates = useMarkedDates(occurrences, selectedDate, theme.primarySoft);
+  const { segments } = useFamilyEvents(visibleMonth);
+  const markedDates = useMarkedDates(segments, selectedDate, theme.primarySoft);
   const parent = useCurrentParent();
   const familyChildren = useFamilyChildren(parent.data?.family_id);
   const familyParents = useFamilyParents(parent.data?.family_id);
@@ -74,10 +75,17 @@ export function KalenderScreen() {
 
   const dayEvents = useMemo(
     () =>
-      occurrences
-        .filter((o) => o.occurrenceDate === selectedDate)
-        .sort((a, b) => a.startAt.getTime() - b.startAt.getTime()),
-    [occurrences, selectedDate],
+      segments
+        .filter((s) => s.date === selectedDate)
+        .sort((a, b) => {
+          // Something running all day belongs above the day's appointments, not
+          // at the position of a start time that may be days in the past.
+          const rank = (s: DaySegment) => (s.occurrence.allDay || !s.isStart ? 0 : 1);
+          return (
+            rank(a) - rank(b) || a.occurrence.startAt.getTime() - b.occurrence.startAt.getTime()
+          );
+        }),
+    [segments, selectedDate],
   );
 
   const monthName = format(visibleMonth, "LLLL", { locale: dateLocale });
@@ -135,7 +143,8 @@ export function KalenderScreen() {
         </View>
       ) : (
         <View className="gap-2">
-          {dayEvents.map((occ) => {
+          {dayEvents.map((seg) => {
+            const occ = seg.occurrence;
             const person = occ.childId
               ? (familyChildren.data ?? []).find((c) => c.id === occ.childId)
               : occ.parentId
@@ -149,7 +158,7 @@ export function KalenderScreen() {
             const typeLabel = lang === "de" ? occ.type.labelDe : occ.type.labelEn;
             return (
               <Pressable
-                key={`${occ.eventId}-${occ.occurrenceDate}`}
+                key={`${occ.eventId}-${occ.occurrenceDate}-${seg.date}`}
                 onPress={() =>
                   router.push({
                     pathname: "/event/[id]",
