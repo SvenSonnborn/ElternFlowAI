@@ -13,15 +13,19 @@ import type { Database } from "@/features/supabase/database.types";
 
 import { useTheme } from "@/design-system/ThemeProvider";
 
-import type { CalendarOccurrence, MarkedDates, MarkedDot } from "./types";
+import type { DaySegment } from "./spans";
+import type { CalendarOccurrence, MarkedDates } from "./types";
 
 import { expandEvents } from "./expand";
 import { calendarKeys, fetchEventById, fetchEventsInRange, fetchEventTypes } from "./queries";
+import { toDayMarkings, toDaySegments } from "./spans";
 
 type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
 
 interface UseFamilyEventsResult {
   data: CalendarOccurrence[];
+  /** One entry per covered calendar day, clipped to the same window as `data`. */
+  segments: DaySegment[];
   isLoading: boolean;
   error: unknown;
 }
@@ -45,8 +49,14 @@ export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
     return expandEvents(query.data, rangeStart, rangeEnd, theme);
   }, [query.data, rangeStart, rangeEnd, theme]);
 
+  const segments = useMemo(
+    () => toDaySegments(data, rangeStart, rangeEnd),
+    [data, rangeStart, rangeEnd],
+  );
+
   return {
     data,
+    segments,
     isLoading: query.isLoading,
     error: query.error,
   };
@@ -99,28 +109,12 @@ export function useEventTypes(): UseQueryResult<EventTypeRow[], Error> {
 }
 
 export function useMarkedDates(
-  occurrences: CalendarOccurrence[],
+  segments: DaySegment[],
   selectedDate: string,
   selectedColor: string,
 ): MarkedDates {
-  return useMemo(() => {
-    const byDate = new Map<string, Map<string, MarkedDot>>();
-    for (const occ of occurrences) {
-      const dots = byDate.get(occ.occurrenceDate) ?? new Map<string, MarkedDot>();
-      if (!dots.has(occ.type.slug)) {
-        dots.set(occ.type.slug, { key: occ.type.slug, color: occ.type.color });
-      }
-      byDate.set(occ.occurrenceDate, dots);
-    }
-    const out: MarkedDates = {};
-    byDate.forEach((dotMap, date) => {
-      out[date] = { marked: true, dots: Array.from(dotMap.values()).slice(0, 3) };
-    });
-    out[selectedDate] = {
-      ...(out[selectedDate] ?? {}),
-      selected: true,
-      selectedColor,
-    };
-    return out;
-  }, [occurrences, selectedDate, selectedColor]);
+  return useMemo(
+    () => toDayMarkings(segments, selectedDate, selectedColor),
+    [segments, selectedDate, selectedColor],
+  );
 }
