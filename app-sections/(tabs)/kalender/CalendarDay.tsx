@@ -17,7 +17,7 @@ interface CalendarDayProps {
    * `react-native-calendars` types `marking` narrowly but hands our own object
    * through untouched — `bars` is ours, added in `toDayMarkings`.
    */
-  marking?: MarkingProps & { bars?: SpanBar[] };
+  marking?: MarkingProps & { bars?: (SpanBar | null)[] };
   onPress?: (date?: DateData) => void;
 }
 
@@ -37,7 +37,10 @@ export function CalendarDay({ date, state, marking, onPress }: CalendarDayProps)
 
   const pillBg = isToday ? theme.primary : isSelected ? theme.primarySoft : "transparent";
   const dots = isDisabled ? [] : (marking?.dots ?? []).slice(0, 3);
-  const bars = isDisabled ? [] : (marking?.bars ?? []);
+  // Spans keep their bar on neighbouring-month days, unlike dots: a bar that
+  // stops at the month edge with a flush "continues" edge and nothing after it
+  // is worse than a dimmed one. The day number stays greyed either way.
+  const bars = marking?.bars ?? [];
 
   return (
     <Pressable
@@ -65,21 +68,23 @@ export function CalendarDay({ date, state, marking, onPress }: CalendarDayProps)
       </View>
       {bars.length > 0 ? (
         <View className="mt-1 w-full gap-0.5">
-          {bars.map((bar) => (
+          {bars.map((bar, lane) => (
             <View
-              key={bar.key}
+              // A hole renders as an empty row of the same height so the lanes
+              // below it keep their vertical position across the whole span.
+              key={bar?.key ?? `lane-${lane}`}
               style={{
                 height: 3,
-                backgroundColor: bar.color,
+                backgroundColor: bar ? bar.color : "transparent",
                 // Flush edges are the signal: a bar that is neither start nor end
                 // touches both cell borders and reads as one line across the week.
-                marginLeft: bar.isStart ? 4 : 0,
-                marginRight: bar.isEnd ? 4 : 0,
-                borderTopLeftRadius: bar.isStart ? 2 : 0,
-                borderBottomLeftRadius: bar.isStart ? 2 : 0,
-                borderTopRightRadius: bar.isEnd ? 2 : 0,
-                borderBottomRightRadius: bar.isEnd ? 2 : 0,
-                opacity: isToday ? 0.9 : 1,
+                marginLeft: bar?.isStart ? 4 : 0,
+                marginRight: bar?.isEnd ? 4 : 0,
+                borderTopLeftRadius: bar?.isStart ? 2 : 0,
+                borderBottomLeftRadius: bar?.isStart ? 2 : 0,
+                borderTopRightRadius: bar?.isEnd ? 2 : 0,
+                borderBottomRightRadius: bar?.isEnd ? 2 : 0,
+                opacity: isDisabled ? 0.4 : isToday ? 0.9 : 1,
               }}
             />
           ))}
