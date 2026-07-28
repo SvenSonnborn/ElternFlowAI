@@ -9,7 +9,6 @@ import {
   applyDeleteScope,
   applyEditScope,
   createSupabaseEventOps,
-  type ApplyDeleteScopeArgs,
   type EditScope,
   type EventChanges,
   type EventOps,
@@ -25,13 +24,14 @@ export {
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
-type DeleteVars = Omit<ApplyDeleteScopeArgs, "ops">;
-
-export interface UpdateEventVars {
+export interface DeleteEventVars {
   scope: EditScope;
   eventId: string;
   occurrenceDate: string;
   isRecurring: boolean;
+}
+
+export interface UpdateEventVars extends DeleteEventVars {
   changes: EventChanges;
 }
 
@@ -56,12 +56,27 @@ export async function updateEvent(vars: UpdateEventVars, deps: UpdateEventDeps):
   });
 }
 
+export async function deleteEvent(vars: DeleteEventVars, deps: UpdateEventDeps): Promise<void> {
+  const master = await deps.fetchMaster(vars.eventId);
+  if (!master) {
+    throw new Error(`Event ${vars.eventId} not found`);
+  }
+  await applyDeleteScope({
+    scope: vars.scope,
+    eventId: vars.eventId,
+    occurrenceDate: vars.occurrenceDate,
+    isRecurring: vars.isRecurring,
+    master,
+    ops: deps.ops,
+  });
+}
+
 export function useDeleteEvent() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (vars: DeleteVars) => {
+    mutationFn: async (vars: DeleteEventVars) => {
       const ops = createSupabaseEventOps(supabase);
-      await applyDeleteScope({ ...vars, ops });
+      await deleteEvent(vars, { fetchMaster: fetchEventById, ops });
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.all });

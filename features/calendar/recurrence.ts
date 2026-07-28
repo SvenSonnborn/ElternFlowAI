@@ -4,6 +4,8 @@ import { addDays, format, parseISO } from "date-fns";
 
 import type { Database } from "@/features/supabase/database.types";
 
+import { buildRule } from "./rrule";
+
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
 export type EditScope = "this" | "forward" | "all";
@@ -26,8 +28,13 @@ export interface EventOps {
   deleteMaster: (eventId: string) => Promise<void>;
   updateMaster: (eventId: string, changes: EventChanges) => Promise<void>;
   setRruleUntil: (eventId: string, until: string) => Promise<void>;
+  setRruleCount: (eventId: string, count: number) => Promise<void>;
   deleteExceptionsFromDate: (eventId: string, fromDateInclusive: string) => Promise<void>;
-  insertSplitEvent: (master: EventRow, changes: EventChanges) => Promise<void>;
+  insertSplitEvent: (
+    master: EventRow,
+    changes: EventChanges,
+    rruleCount: number | null,
+  ) => Promise<void>;
 }
 
 export interface ApplyDeleteScopeArgs {
@@ -36,7 +43,7 @@ export interface ApplyDeleteScopeArgs {
   eventId: string;
   occurrenceDate: string;
   isRecurring: boolean;
-  masterStartAt: Date;
+  master: EventRow;
 }
 
 export interface ApplyEditScopeArgs {
@@ -57,8 +64,26 @@ function dateOnly(d: Date): string {
   return format(d, "yyyy-MM-dd");
 }
 
+/**
+ * How many occurrences of a series fall strictly before `occurrenceDate`.
+ *
+ * iCal COUNT is relative to dtstart, so a bounded series cannot be truncated by
+ * writing an UNTIL (the DB even forbids it — `events_rrule_count_xor_until`).
+ * Splitting one means re-deriving both halves: the head keeps what it has
+ * already consumed, the tail gets `count - consumed`.
+ *
+ * Occurrences are compared as local `yyyy-MM-dd` keys because that is exactly
+ * how `expand.ts` derives the `occurrenceDate` the caller hands us.
+ */
+function consumedBefore(master: EventRow, occurrenceDate: string): number {
+  const rule = buildRule(master);
+  if (!rule) return 0;
+  // `all()` is safe here: only ever called for count-bounded series.
+  return rule.all().filter((d) => dateOnly(d) < occurrenceDate).length;
+}
+
 export async function applyDeleteScope(args: ApplyDeleteScopeArgs): Promise<void> {
-  const { ops, scope, eventId, occurrenceDate, isRecurring, masterStartAt } = args;
+  const { ops, scope, eventId, occurrenceDate, isRecurring, master } = args;
 
   if (scope === "this") {
     if (isRecurring) {
@@ -70,8 +95,18 @@ export async function applyDeleteScope(args: ApplyDeleteScopeArgs): Promise<void
   }
 
   if (scope === "forward" && isRecurring) {
+    if (master.rrule_count != null) {
+      const consumed = consumedBefore(master, occurrenceDate);
+      if (consumed === 0) {
+        await ops.deleteMaster(eventId);
+        return;
+      }
+      await ops.setRruleCount(eventId, consumed);
+      await ops.deleteExceptionsFromDate(eventId, occurrenceDate);
+      return;
+    }
     const cutoff = dayBefore(occurrenceDate);
-    if (cutoff < dateOnly(masterStartAt)) {
+    if (cutoff < dateOnly(new Date(master.start_at))) {
       await ops.deleteMaster(eventId);
       return;
     }
@@ -97,13 +132,29 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
   }
 
   if (scope === "forward" && isRecurring) {
+    if (master.rrule_count != null) {
+      const consumed = consumedBefore(master, occurrenceDate);
+      if (consumed === 0) {
+        await ops.updateMaster(eventId, changes);
+        return;
+      }
+      const remaining = master.rrule_count - consumed;
+      await ops.setRruleCount(eventId, consumed);
+      // remaining === 0 → the cutoff sits past the end of the series, so there
+      // is nothing left to carry over into a split event.
+      if (remaining > 0) {
+        await ops.insertSplitEvent(master, changes, remaining);
+      }
+      await ops.deleteExceptionsFromDate(eventId, occurrenceDate);
+      return;
+    }
     const cutoff = dayBefore(occurrenceDate);
     if (cutoff < dateOnly(new Date(master.start_at))) {
       await ops.updateMaster(eventId, changes);
       return;
     }
     await ops.setRruleUntil(eventId, cutoff);
-    await ops.insertSplitEvent(master, changes);
+    await ops.insertSplitEvent(master, changes, null);
     await ops.deleteExceptionsFromDate(eventId, occurrenceDate);
     return;
   }
@@ -158,6 +209,14 @@ export function createSupabaseEventOps(client: SupabaseClient<Database>): EventO
       if (error) throw error;
     },
 
+    setRruleCount: async (eventId, count) => {
+      const { error } = await client
+        .from("events")
+        .update({ rrule_count: count })
+        .eq("id", eventId);
+      if (error) throw error;
+    },
+
     deleteExceptionsFromDate: async (eventId, fromDateInclusive) => {
       const { error } = await client
         .from("event_exceptions")
@@ -167,7 +226,7 @@ export function createSupabaseEventOps(client: SupabaseClient<Database>): EventO
       if (error) throw error;
     },
 
-    insertSplitEvent: async (master, changes) => {
+    insertSplitEvent: async (master, changes, rruleCount) => {
       const { error } = await client.from("events").insert({
         family_id: master.family_id,
         type_id: master.type_id,
@@ -181,13 +240,12 @@ export function createSupabaseEventOps(client: SupabaseClient<Database>): EventO
         rrule_freq: master.rrule_freq,
         rrule_interval: master.rrule_interval,
         rrule_byweekday: master.rrule_byweekday,
-        // Preserve absolute end date — still applies after split.
-        rrule_until: master.rrule_until,
-        // rrule_count intentionally null after split: count is relative to
-        // dtstart, so a bounded series can't be split correctly without
-        // tracking how many occurrences were consumed before the cutoff.
-        // See docs/TODO.md for the follow-up.
-        rrule_count: null,
+        // A series is bounded by UNTIL or COUNT, never both
+        // (`events_rrule_count_xor_until`). An absolute UNTIL still applies to
+        // the tail unchanged; a COUNT was re-derived for the split by the
+        // caller, since count is relative to dtstart and the tail starts later.
+        rrule_until: rruleCount == null ? master.rrule_until : null,
+        rrule_count: rruleCount,
         created_by: master.created_by,
       });
       if (error) throw error;
