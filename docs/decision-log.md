@@ -249,3 +249,28 @@ Nach der Edit/Delete-Iteration blieben vier Lücken offen: Reminder-Switches ohn
 - `EventOps` wächst um `deleteAllExceptions`; `updateMaster` nimmt ein optionales drittes Argument.
 - Neue Catalog-Keys (`cal.edit.fieldStartDate`/`fieldEndDate`/`error.invalidDateRange`/`recurrenceAppliesToAll`, `cal.create.fieldRecurrenceCount`/`recurrenceCountUnlimited`/`error.invalidCount`, `cal.detail.reminderError`); `cal.edit.fieldDate` und `cal.edit.error.multiDay` sind entfallen. Nachtrag in der designer-eigenen [docs/COPY.md](./COPY.md) steht aus → [docs/TODO.md](./TODO.md).
 - **Follow-ups in [docs/TODO.md](./TODO.md):** Spanning-Rendering mehrtägiger Termine im Monatsraster, Conflict-Detection über Tagesgrenzen, Reminder-Zustellung (pg_cron + Edge Function), Voice-Add-Flow (weiter an der STT/LLM-Entscheidung).
+
+---
+
+## ADR-009 — Supabase-MCP authentifiziert per Personal Access Token statt OAuth (2026-07-28)
+
+### Status
+
+Accepted. Ersetzt den OAuth-Teil der MCP-Konfiguration aus ADR-004 (Supabase-Anbindung); die Server-URL und der Project-Scope bleiben unverändert.
+
+### Context
+
+Der Supabase-MCP-Server war dauerhaft „not connected". Die Diagnose zeigte: Der Endpoint ist erreichbar (`https://mcp.supabase.com/mcp` → `401`, erwartet) und `.mcp.json` war korrekt. Kaputt war der gespeicherte Credential: Im macOS-Keychain-Eintrag `Claude Code-credentials` lagen zwei `mcpOAuth`-Records für Supabase mit `clientId` + `clientSecret` (die Dynamic Client Registration lief also durch), aber **leerem `accessToken`**, ohne `refreshToken` und ohne `expiresAt` — der Token-Exchange am Localhost-Callback ist nie angekommen. Ein Probe-Request mit dem gespeicherten Token quittiert entsprechend mit `Format is Authorization: Bearer [token]`. Betroffen sind **alle** MCP-OAuth-Einträge der Maschine (Supabase ×2, Stripe, Expo), das Problem ist also der Flow, nicht der Anbieter. Ein Reconnect hilft nicht, weil der halbfertige Record wie ein gültiger aussieht.
+
+### Decisions
+
+1. **PAT-Header statt OAuth.** `.mcp.json` schickt `Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}`; die hosted MCP-Server unterstützen das offiziell als Weg für Clients ohne (funktionierende) Dynamic Client Registration. Deterministisch, headless- und CI-tauglich, kein Browser-Roundtrip.
+2. **Der Token bleibt aus dem Repo.** `.mcp.json` enthält nur den Platzhalter und wird weiter committet; der Wert liegt im bereits gitignorierten `.env.local` (`.gitignore: .env*.local`) und ist in `.env.example` dokumentiert.
+3. **mise exportiert die Variable** ([mise.toml](../mise.toml) → `[env] _.file = ".env.local"`), weil Claude Code `${…}` aus der Prozess-Umgebung expandiert. mise überspringt eine fehlende Datei still, ein frischer Clone ohne `.env.local` bricht also nicht — nachgemessen, nicht angenommen. Nebeneffekt: Die `EXPO_PUBLIC_*`-Variablen landen ebenfalls in der Shell (unkritisch, sind ohnehin public).
+4. **Die kaputten Keychain-Records bleiben vorerst liegen.** Ein konfigurierter Header hat Vorrang, und ein Rewrite des Credential-Blobs würde auch die claude.ai-Session mit anfassen — Aufräumen erst, wenn der PAT-Weg nachweislich damit kollidiert.
+
+### Consequences
+
+- Der PAT hat **Account-Reichweite** (nicht projekt-beschränkt) — schwergewichtiger als ein OAuth-Grant. Wer den Blast-Radius kleiner will, hängt `&read_only=true` an die MCP-URL; das kostet `execute_sql`-Schreibzugriff und `apply_migration`, was bei migrations-getriebenem Schema verkraftbar wäre. Bewusst nicht default gesetzt, um die bestehenden Fähigkeiten nicht stillschweigend zu beschneiden.
+- Jeder Entwickler braucht einen eigenen Token aus <https://supabase.com/dashboard/account/tokens>; ohne ihn expandiert der Header leer und der Server bleibt unverbunden (gleiches Symptom wie vorher — deshalb steht der Hinweis in `.env.example`).
+- Der OAuth-Flow selbst ist damit **nicht** repariert. Stripe- und Expo-MCP hängen weiter am selben Defekt.

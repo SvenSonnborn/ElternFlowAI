@@ -14,6 +14,11 @@ node = "24"
 bun = "1.3.10"
 
 [env]
+# Load the gitignored .env.local into the shell. Needed so `.mcp.json` can expand
+# ${SUPABASE_ACCESS_TOKEN} for the Supabase MCP server (see .env.example). mise
+# silently skips the file when it doesn't exist, so a fresh clone still works.
+_.file = ".env.local"
+
 # Expo SDK 55 enables "prebuilt React Native core" (the React-Core-prebuilt pod /
 # React.xcframework) for iOS by default. On this project, CocoaPods resolved a
 # STALE, mismatched prebuilt binary — React-Core-prebuilt 0.81.5 against
