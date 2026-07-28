@@ -7,6 +7,8 @@ export {
   useUpdateEvent,
   useDeleteEvent,
   recurrenceToRrule,
+  rruleToRecurrence,
+  parseRecurrenceCount,
   type CreateEventVars,
   type RecurrenceOption,
   type RruleFields,
@@ -34,5 +36,6 @@ export {
   type EditScope,
   type EventChanges,
   type EventOps,
+  type RecurrenceChanges,
 } from "./recurrence";
-export type { CalendarOccurrence, MarkedDates, MarkedDot } from "./types";
+export type { CalendarOccurrence, MarkedDates, MarkedDot, OccurrenceRrule } from "./types";

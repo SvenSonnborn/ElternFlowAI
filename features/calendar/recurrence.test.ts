@@ -2,7 +2,13 @@ import { describe, expect, mock, test } from "bun:test";
 
 import type { Database } from "@/features/supabase/database.types";
 
-import { applyDeleteScope, applyEditScope, type EventChanges, type EventOps } from "./recurrence";
+import {
+  applyDeleteScope,
+  applyEditScope,
+  type EventChanges,
+  type EventOps,
+  type RecurrenceChanges,
+} from "./recurrence";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
@@ -15,6 +21,7 @@ function makeOps(): EventOps {
     setRruleUntil: mock(() => Promise.resolve()),
     setRruleCount: mock(() => Promise.resolve()),
     deleteExceptionsFromDate: mock(() => Promise.resolve()),
+    deleteAllExceptions: mock(() => Promise.resolve()),
     insertSplitEvent: mock(() => Promise.resolve()),
   };
 }
@@ -380,6 +387,121 @@ describe("applyEditScope", () => {
       changes: CHANGES,
     });
     expect(calls).toEqual(["insertSplitEvent", "setRruleUntil", "deleteExceptionsFromDate"]);
+  });
+
+  // ── series rule edits ─────────────────────────────────────────────────────
+  // A rule change redefines the whole series, so it goes to the master no
+  // matter which scope the caller passes, and takes the now-orphaned
+  // per-occurrence exceptions with it.
+
+  const NEW_RULE: RecurrenceChanges = {
+    rrule_freq: "daily",
+    rrule_interval: 1,
+    rrule_byweekday: null,
+    rrule_count: null,
+    rrule_until: null,
+  };
+
+  test("recurrence change → updateMaster carries the rule and exceptions are cleared", async () => {
+    const ops = makeOps();
+    await applyEditScope({
+      ops,
+      scope: "all",
+      eventId: "evt-1",
+      occurrenceDate: "2026-06-15",
+      isRecurring: true,
+      master: makeMaster(),
+      changes: CHANGES,
+      recurrence: NEW_RULE,
+    });
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, NEW_RULE);
+    expect(ops.deleteAllExceptions).toHaveBeenCalledWith("evt-1");
+    expect(ops.insertSplitEvent).not.toHaveBeenCalled();
+  });
+
+  test("recurrence change wins over scope=forward — no split is attempted", async () => {
+    const ops = makeOps();
+    await applyEditScope({
+      ops,
+      scope: "forward",
+      eventId: "evt-1",
+      occurrenceDate: "2026-06-15",
+      isRecurring: true,
+      master: makeMaster(),
+      changes: CHANGES,
+      recurrence: NEW_RULE,
+    });
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, NEW_RULE);
+    expect(ops.insertSplitEvent).not.toHaveBeenCalled();
+    expect(ops.setRruleUntil).not.toHaveBeenCalled();
+  });
+
+  test("recurrence identical to the master → exceptions survive", async () => {
+    const ops = makeOps();
+    const unchanged: RecurrenceChanges = {
+      rrule_freq: "weekly",
+      rrule_interval: 1,
+      rrule_byweekday: [1],
+      rrule_count: null,
+      rrule_until: null,
+    };
+    await applyEditScope({
+      ops,
+      scope: "all",
+      eventId: "evt-1",
+      occurrenceDate: "2026-06-15",
+      isRecurring: true,
+      master: makeMaster(),
+      changes: CHANGES,
+      recurrence: unchanged,
+    });
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, unchanged);
+    expect(ops.deleteAllExceptions).not.toHaveBeenCalled();
+  });
+
+  test("a changed count alone counts as a rule change", async () => {
+    const ops = makeOps();
+    const bounded: RecurrenceChanges = {
+      rrule_freq: "weekly",
+      rrule_interval: 1,
+      rrule_byweekday: [1],
+      rrule_count: 8,
+      rrule_until: null,
+    };
+    await applyEditScope({
+      ops,
+      scope: "all",
+      eventId: "evt-1",
+      occurrenceDate: "2026-06-15",
+      isRecurring: true,
+      master: makeMaster(),
+      changes: CHANGES,
+      recurrence: bounded,
+    });
+    expect(ops.deleteAllExceptions).toHaveBeenCalledWith("evt-1");
+  });
+
+  test("turning a series into a single event nulls every rrule column", async () => {
+    const ops = makeOps();
+    const none: RecurrenceChanges = {
+      rrule_freq: null,
+      rrule_interval: 1,
+      rrule_byweekday: null,
+      rrule_count: null,
+      rrule_until: null,
+    };
+    await applyEditScope({
+      ops,
+      scope: "all",
+      eventId: "evt-1",
+      occurrenceDate: "2026-06-15",
+      isRecurring: true,
+      master: makeMaster(),
+      changes: CHANGES,
+      recurrence: none,
+    });
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, none);
+    expect(ops.deleteAllExceptions).toHaveBeenCalledWith("evt-1");
   });
 
   test("scope=forward past the end of a count-series → truncate head, no tail", async () => {

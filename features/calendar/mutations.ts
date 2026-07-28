@@ -12,11 +12,14 @@ import {
   type EditScope,
   type EventChanges,
   type EventOps,
+  type RecurrenceChanges,
 } from "./recurrence";
 
 export {
   useCreateEvent,
   recurrenceToRrule,
+  rruleToRecurrence,
+  parseRecurrenceCount,
   type CreateEventVars,
   type RecurrenceOption,
   type RruleFields,
@@ -33,6 +36,7 @@ export interface DeleteEventVars {
 
 export interface UpdateEventVars extends DeleteEventVars {
   changes: EventChanges;
+  recurrence?: RecurrenceChanges | null;
 }
 
 export interface UpdateEventDeps {
@@ -52,6 +56,7 @@ export async function updateEvent(vars: UpdateEventVars, deps: UpdateEventDeps):
     isRecurring: vars.isRecurring,
     master,
     changes: vars.changes,
+    recurrence: vars.recurrence,
     ops: deps.ops,
   });
 }

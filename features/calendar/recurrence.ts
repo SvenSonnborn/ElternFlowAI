@@ -18,6 +18,23 @@ export interface EventChanges {
   description: string | null;
 }
 
+/**
+ * A series-level rule change. Separate from `EventChanges` because the latter
+ * doubles as the per-occurrence override JSON, where rrule columns have no
+ * meaning — a single occurrence cannot carry a recurrence rule.
+ *
+ * All five columns travel together so the write is total: partial updates could
+ * leave a count and an until set at once, which the DB rejects
+ * (`events_rrule_count_xor_until`).
+ */
+export interface RecurrenceChanges {
+  rrule_freq: EventRow["rrule_freq"];
+  rrule_interval: number;
+  rrule_byweekday: number[] | null;
+  rrule_count: number | null;
+  rrule_until: string | null;
+}
+
 export interface EventOps {
   cancelOccurrence: (eventId: string, occurrenceDate: string) => Promise<void>;
   modifyOccurrence: (
@@ -26,7 +43,12 @@ export interface EventOps {
     override: Partial<EventChanges>,
   ) => Promise<void>;
   deleteMaster: (eventId: string) => Promise<void>;
-  updateMaster: (eventId: string, changes: EventChanges) => Promise<void>;
+  updateMaster: (
+    eventId: string,
+    changes: EventChanges,
+    recurrence?: RecurrenceChanges,
+  ) => Promise<void>;
+  deleteAllExceptions: (eventId: string) => Promise<void>;
   setRruleUntil: (eventId: string, until: string) => Promise<void>;
   setRruleCount: (eventId: string, count: number) => Promise<void>;
   deleteExceptionsFromDate: (eventId: string, fromDateInclusive: string) => Promise<void>;
@@ -54,6 +76,12 @@ export interface ApplyEditScopeArgs {
   isRecurring: boolean;
   master: EventRow;
   changes: EventChanges;
+  /**
+   * Set only when the user edited the series rule. A rule change redefines the
+   * whole series, so it is applied on the "all" path — the edit form forces
+   * that scope whenever this is present.
+   */
+  recurrence?: RecurrenceChanges | null;
 }
 
 function dayBefore(isoDate: string): string {
@@ -119,8 +147,33 @@ export async function applyDeleteScope(args: ApplyDeleteScopeArgs): Promise<void
   await ops.deleteMaster(eventId);
 }
 
+/** Whether a rule change actually moves any occurrence, ignoring no-op edits. */
+function ruleDiffers(master: EventRow, next: RecurrenceChanges): boolean {
+  const sameDays =
+    (master.rrule_byweekday ?? []).length === (next.rrule_byweekday ?? []).length &&
+    (master.rrule_byweekday ?? []).every((d) => next.rrule_byweekday?.includes(d));
+  return !(
+    master.rrule_freq === next.rrule_freq &&
+    master.rrule_interval === next.rrule_interval &&
+    sameDays &&
+    master.rrule_count === next.rrule_count &&
+    master.rrule_until === next.rrule_until
+  );
+}
+
 export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
-  const { ops, scope, eventId, occurrenceDate, isRecurring, master, changes } = args;
+  const { ops, scope, eventId, occurrenceDate, isRecurring, master, changes, recurrence } = args;
+
+  if (recurrence) {
+    await ops.updateMaster(eventId, changes, recurrence);
+    // Exceptions are keyed by the occurrence dates the *old* rule produced. Once
+    // the rule moves, the surviving rows would cancel or rewrite occurrences the
+    // user never touched, so a real rule change clears them.
+    if (ruleDiffers(master, recurrence)) {
+      await ops.deleteAllExceptions(eventId);
+    }
+    return;
+  }
 
   if (scope === "this") {
     if (isRecurring) {
@@ -201,8 +254,16 @@ export function createSupabaseEventOps(client: SupabaseClient<Database>): EventO
       if (error) throw error;
     },
 
-    updateMaster: async (eventId, changes) => {
-      const { error } = await client.from("events").update(changes).eq("id", eventId);
+    updateMaster: async (eventId, changes, recurrence) => {
+      const { error } = await client
+        .from("events")
+        .update(recurrence ? { ...changes, ...recurrence } : changes)
+        .eq("id", eventId);
+      if (error) throw error;
+    },
+
+    deleteAllExceptions: async (eventId) => {
+      const { error } = await client.from("event_exceptions").delete().eq("event_id", eventId);
       if (error) throw error;
     },
 

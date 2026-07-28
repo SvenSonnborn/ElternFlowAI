@@ -222,3 +222,30 @@ Das Projekt lag auf Expo SDK 54 (RN 0.81), während SDK 57 (RN 0.86) das aktuell
 - **Neue Datei:** [mise.toml](../mise.toml). CLAUDE.md um „Local toolchain (mise)" ergänzt + Tech-Stack auf SDK 57 gezogen.
 - **Trade-off:** iOS baut RN aus Source (langsamer) — bewusst gegen den prebuilt-RN-Mismatch eingetauscht.
 - **Follow-ups in [docs/TODO.md](./TODO.md):** `@expo/vector-icons` → scoped `@react-native-vector-icons/*` (SDK-56-Deprecation); Tailwind v3 → v4 (eigenes Projekt); `RCT_USE_PREBUILT_RNCORE=0` reaktivieren, sobald ein späteres SDK das prebuilt-RN-Core stabil ausliefert (schnellere iOS-Builds).
+
+---
+
+## ADR-008 — Kalender-V1 abgeschlossen: Reminder, Recurrence-Editor, Multi-Day (2026-07-28)
+
+### Status
+
+Accepted. Schließt die in [docs/TODO.md](./TODO.md) gesammelten Kalender-Lücken aus der Edit/Delete-Iteration (ADR-Vorlauf: [specs/2026-05-29-event-edit-delete-design.md](./superpowers/specs/2026-05-29-event-edit-delete-design.md)).
+
+### Context
+
+Nach der Edit/Delete-Iteration blieben vier Lücken offen: Reminder-Switches ohne Persistenz, keine Recurrence-Bearbeitung im Edit-Form, mehrtägige Termine in beiden Formularen gesperrt, und `rrule_count` über die UI gar nicht setzbar — womit der count-aware Forward-Split in [recurrence.ts](../features/calendar/recurrence.ts) nur theoretisch erreichbar war.
+
+### Decisions
+
+1. **Reminder an die bestehende `reminders`-Tabelle** ([features/calendar/reminders.ts](../features/calendar/reminders.ts)): Die zwei Switches (24 h / 1 h) schreiben `offset_minutes` 1440 bzw. 60. Die Tabelle hängt an `event_id` ohne `occurrence_date`, ein Switch gilt daher **für die ganze Serie** — bewusst kein Schema-Ausbau auf Verdacht. Enable löscht vor dem Insert (kein Unique-Index auf `(event_id, offset_minutes)`), damit Doppel-Taps keine doppelten Push-Zeilen stapeln. Kein Optimistic-Update — konsistent mit den übrigen Calendar-Mutations (invalidate-and-refetch).
+2. **Recurrence-Änderungen laufen immer über die ganze Serie.** Ein neues `RecurrenceChanges` reist getrennt von `EventChanges` durch `applyEditScope`, weil letzteres zugleich das Per-Occurrence-Override-JSON ist, in dem rrule-Spalten keine Bedeutung haben. Liegt eine Rule-Änderung an, entfällt der Scope-Dialog: „nur diesen Termin" ist auf ein neues Wiederholungsmuster nicht sinnvoll beantwortbar. Ein echter Rule-Wechsel löscht zusätzlich **alle** `event_exceptions` des Events — sie sind auf die Occurrence-Daten der alten Regel geschlüsselt und würden sonst fremde Termine canceln.
+3. **Der Editor bleibt verborgen, wenn die gespeicherte Regel außerhalb der fünf V1-Optionen liegt** (`yearly`, `interval > 1`, beliebige Weekday-Sets). `rruleToRecurrence` gibt dafür `null` zurück, statt die Regel auf die nächstgelegene Option zu runden — Rendern des Radios würde sie beim nächsten Speichern still umschreiben. Damit bleibt [patterns/calendar.md](../patterns/calendar.md) („kein iCal-RRULE-Editor") gewahrt und importierte Regeln unbeschädigt.
+4. **`rrule_count` als „Endet nach … Terminen"-Feld** in Create _und_ Edit — das macht den bereits implementierten count-aware Forward-Split erstmals über die UI erreichbar. Leeres Feld = unbegrenzt; alles außer einer Ganzzahl ≥ 1 wird als Fehler geflaggt statt still als „unbegrenzt" gespeichert. Ein gesetzter Count nullt `rrule_until` (`events_rrule_count_xor_until`).
+5. **Multi-Day über getrennte Start-/End-Datumsfelder** statt eines eigenen Editors. Die Picker-Logik liegt pur und getestet in [features/calendar/dateRange.ts](../features/calendar/dateRange.ts) (Verschieben des Startdatums zieht das Enddatum um dieselbe Tages-Differenz mit), das Picker-Sheet als geteilte Komponente [DateTimePickerSheet](../app-sections/event/DateTimePickerSheet.tsx) — vorher war der Modal-Block in beiden Screens dupliziert.
+
+### Consequences
+
+- `CalendarOccurrence` trägt jetzt ein `rrule`-Objekt (Master-Regel), damit das Edit-Form ohne Zweit-Fetch hydrieren kann.
+- `EventOps` wächst um `deleteAllExceptions`; `updateMaster` nimmt ein optionales drittes Argument.
+- Neue Catalog-Keys (`cal.edit.fieldStartDate`/`fieldEndDate`/`error.invalidDateRange`/`recurrenceAppliesToAll`, `cal.create.fieldRecurrenceCount`/`recurrenceCountUnlimited`/`error.invalidCount`, `cal.detail.reminderError`); `cal.edit.fieldDate` und `cal.edit.error.multiDay` sind entfallen. Nachtrag in der designer-eigenen [docs/COPY.md](./COPY.md) steht aus → [docs/TODO.md](./TODO.md).
+- **Follow-ups in [docs/TODO.md](./TODO.md):** Spanning-Rendering mehrtägiger Termine im Monatsraster, Conflict-Detection über Tagesgrenzen, Reminder-Zustellung (pg_cron + Edge Function), Voice-Add-Flow (weiter an der STT/LLM-Entscheidung).

@@ -1,4 +1,18 @@
 import type { IconName } from "@/app-sections/shared";
+import type { Database } from "@/features/supabase/database.types";
+
+/**
+ * The master event's recurrence rule, carried on every occurrence so the edit
+ * form can hydrate its editor without a second fetch. Identical for all
+ * occurrences of a series — it describes the series, not the occurrence.
+ */
+export interface OccurrenceRrule {
+  freq: Database["public"]["Enums"]["rrule_freq_enum"] | null;
+  interval: number;
+  byweekday: number[] | null;
+  count: number | null;
+  until: string | null;
+}
 
 export interface CalendarOccurrence {
   eventId: string;
@@ -13,6 +27,7 @@ export interface CalendarOccurrence {
   parentId: string | null;
   isException: boolean;
   isRecurring: boolean;
+  rrule: OccurrenceRrule;
   type: {
     slug: string;
     color: string;

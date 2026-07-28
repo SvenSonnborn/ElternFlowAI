@@ -271,6 +271,7 @@
       "fieldNotes": "Notes",
       "save": "Save",
       "saving": "Saving…",
+      "recurrenceAppliesToAll": "Changes to the repeat apply to every event in the series.",
       "error": {
         "titleRequired": "Title cannot be empty",
         "invalidTimeRange": "End time must be after start time",
@@ -297,6 +298,8 @@
       "fieldMember": "Family member",
       "fieldAllDay": "All day",
       "fieldRecurrence": "Repeat",
+      "fieldRecurrenceCount": "Ends after … events",
+      "recurrenceCountUnlimited": "Unlimited",
       "noMember": "Nobody",
       "save": "Add",
       "saving": "Saving…",
@@ -304,6 +307,7 @@
       "conflict_other": "{{count}} conflicts — {{title}} · {{from}}–{{to}} and more",
       "error": {
         "typeRequired": "Pick a type",
+        "invalidCount": "Enter a number of 1 or more, or leave it empty",
         "noFamily": "Family not set up yet"
       }
     },

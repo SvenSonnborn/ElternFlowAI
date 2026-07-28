@@ -271,6 +271,7 @@
       "fieldNotes": "Notizen",
       "save": "Speichern",
       "saving": "Speichere…",
+      "recurrenceAppliesToAll": "Änderungen an der Wiederholung gelten für alle Termine der Serie.",
       "error": {
         "titleRequired": "Titel darf nicht leer sein",
         "invalidTimeRange": "Endzeit muss nach Startzeit liegen",
@@ -297,6 +298,8 @@
       "fieldMember": "Familienmitglied",
       "fieldAllDay": "Ganztägig",
       "fieldRecurrence": "Wiederholung",
+      "fieldRecurrenceCount": "Endet nach … Terminen",
+      "recurrenceCountUnlimited": "Unbegrenzt",
       "noMember": "Niemand",
       "save": "Hinzufügen",
       "saving": "Speichere…",
@@ -304,6 +307,7 @@
       "conflict_other": "{{count}} Kollisionen — {{title}} · {{from}}–{{to}} u.a.",
       "error": {
         "typeRequired": "Bitte einen Typ wählen",
+        "invalidCount": "Bitte eine Zahl ab 1 eingeben oder leer lassen",
         "noFamily": "Familie noch nicht eingerichtet"
       }
     },

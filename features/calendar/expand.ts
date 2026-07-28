@@ -80,6 +80,13 @@ export function expandEvents(
     const iconName = eventIconFor(slug, typeRow?.icon ?? "");
 
     const exceptions = new Map((row.event_exceptions ?? []).map((ex) => [ex.occurrence_date, ex]));
+    const rrule = {
+      freq: row.rrule_freq,
+      interval: row.rrule_interval,
+      byweekday: row.rrule_byweekday,
+      count: row.rrule_count,
+      until: row.rrule_until,
+    };
 
     for (const occurrenceStart of occurrences) {
       const lookupDate = format(occurrenceStart, "yyyy-MM-dd");
@@ -113,6 +120,7 @@ export function expandEvents(
         parentId: row.parent_id,
         isException: !!ex,
         isRecurring: !!row.rrule_freq,
+        rrule,
         type: { slug, color, iconName, labelDe: labels.de, labelEn: labels.en },
       });
     }

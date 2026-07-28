@@ -14,6 +14,7 @@ import {
   applyRangePick,
   isDateRangeInvalid,
   isTimeRangeInvalid,
+  parseRecurrenceCount,
   toAllDayRange,
   useCreateEvent,
   useEventTypes,
@@ -25,6 +26,7 @@ import {
 
 import { DateTimePickerSheet } from "./DateTimePickerSheet";
 import { MemberPicker, type MemberOption, type SelectedMember } from "./MemberPicker";
+import { RecurrenceCountField } from "./RecurrenceCountField";
 import { RecurrenceRadio } from "./RecurrenceRadio";
 import { TypePicker } from "./TypePicker";
 
@@ -60,6 +62,7 @@ export function EventCreateScreen() {
   const [typeId, setTypeId] = useState<string | null>(null);
   const [member, setMember] = useState<SelectedMember | null>(null);
   const [recurrence, setRecurrence] = useState<RecurrenceOption>("none");
+  const [countText, setCountText] = useState("");
   const [picker, setPicker] = useState<RangeField | null>(null);
   const [typeHydrated, setTypeHydrated] = useState(false);
   const { startAt, endAt } = range;
@@ -95,16 +98,19 @@ export function EventCreateScreen() {
   const timeError =
     !dateError && isTimeRangeInvalid(range, allDay) ? t("cal.edit.error.invalidTimeRange") : "";
   const typeError = !typeId ? t("cal.create.error.typeRequired") : "";
+  const parsedCount = recurrence === "none" ? null : parseRecurrenceCount(countText);
+  const countError = parsedCount === "invalid" ? t("cal.create.error.invalidCount") : "";
   const canSave =
     !titleError &&
     !dateError &&
     !timeError &&
     !typeError &&
+    !countError &&
     !!familyId &&
     !createMutation.isPending;
 
   function onSave() {
-    if (!canSave || !familyId || !typeId) return;
+    if (!canSave || !familyId || !typeId || parsedCount === "invalid") return;
     const final = allDay ? toAllDayRange(range) : range;
     const childId = member?.kind === "child" ? member.id : null;
     const parentId = member?.kind === "parent" ? member.id : null;
@@ -121,6 +127,7 @@ export function EventCreateScreen() {
         location: location.trim() || null,
         description: notes.trim() || null,
         recurrence,
+        recurrenceCount: parsedCount,
         createdBy: parent.data?.id ?? null,
       },
       {
@@ -308,6 +315,10 @@ export function EventCreateScreen() {
           value={recurrence}
           onChange={setRecurrence}
         />
+
+        {recurrence !== "none" ? (
+          <RecurrenceCountField value={countText} onChangeText={setCountText} error={countError} />
+        ) : null}
 
         {!familyId ? (
           <Text variant="caption" tone="danger">

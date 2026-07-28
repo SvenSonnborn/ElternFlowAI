@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { recurrenceToRrule } from "./createMutation";
+import { parseRecurrenceCount, recurrenceToRrule, rruleToRecurrence } from "./createMutation";
 
 describe("recurrenceToRrule", () => {
   test("none → all-null rrule", () => {
@@ -39,5 +39,83 @@ describe("recurrenceToRrule", () => {
     const r = recurrenceToRrule("monthly", new Date("2026-06-03T16:00:00Z"));
     expect(r.rrule_freq).toBe("monthly");
     expect(r.rrule_byweekday).toBeNull();
+  });
+});
+
+// 2026-06-03 is a Wednesday, so a "weekly" rule off this start is byweekday=[3].
+const WEDNESDAY = new Date("2026-06-03T16:00:00");
+
+describe("rruleToRecurrence", () => {
+  test("round-trips every option the create form can produce", () => {
+    for (const opt of ["none", "daily", "weekdays", "weekly", "monthly"] as const) {
+      expect(rruleToRecurrence(recurrenceToRrule(opt, WEDNESDAY), WEDNESDAY)).toBe(opt);
+    }
+  });
+
+  test("a weekly rule without byweekday is the plain weekly option", () => {
+    // rrule falls back to dtstart's weekday, which is what "weekly" means here.
+    const opt = rruleToRecurrence(
+      { rrule_freq: "weekly", rrule_interval: 1, rrule_byweekday: null },
+      WEDNESDAY,
+    );
+    expect(opt).toBe("weekly");
+  });
+
+  // Rules the radio has no name for must stay hidden rather than be rewritten
+  // into the nearest option on the next save.
+
+  test("interval > 1 is not representable", () => {
+    expect(
+      rruleToRecurrence(
+        { rrule_freq: "weekly", rrule_interval: 2, rrule_byweekday: [3] },
+        WEDNESDAY,
+      ),
+    ).toBeNull();
+  });
+
+  test("yearly is not representable", () => {
+    expect(
+      rruleToRecurrence(
+        { rrule_freq: "yearly", rrule_interval: 1, rrule_byweekday: null },
+        WEDNESDAY,
+      ),
+    ).toBeNull();
+  });
+
+  test("an arbitrary weekday set is not representable", () => {
+    expect(
+      rruleToRecurrence(
+        { rrule_freq: "weekly", rrule_interval: 1, rrule_byweekday: [2, 4] },
+        WEDNESDAY,
+      ),
+    ).toBeNull();
+  });
+
+  test("a weekly rule on a day other than dtstart's is not representable", () => {
+    expect(
+      rruleToRecurrence(
+        { rrule_freq: "weekly", rrule_interval: 1, rrule_byweekday: [1] },
+        WEDNESDAY,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("parseRecurrenceCount", () => {
+  test("empty means unbounded", () => {
+    expect(parseRecurrenceCount("")).toBeNull();
+    expect(parseRecurrenceCount("   ")).toBeNull();
+  });
+
+  test("positive integers pass through", () => {
+    expect(parseRecurrenceCount("10")).toBe(10);
+    expect(parseRecurrenceCount(" 1 ")).toBe(1);
+  });
+
+  test("zero, negatives and fractions are rejected rather than treated as unbounded", () => {
+    expect(parseRecurrenceCount("0")).toBe("invalid");
+    expect(parseRecurrenceCount("-3")).toBe("invalid");
+    expect(parseRecurrenceCount("2.5")).toBe("invalid");
+    expect(parseRecurrenceCount("abc")).toBe("invalid");
   });
 });

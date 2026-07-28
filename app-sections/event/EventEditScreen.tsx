@@ -13,14 +13,21 @@ import {
   applyRangePick,
   isDateRangeInvalid,
   isTimeRangeInvalid,
+  parseRecurrenceCount,
+  recurrenceToRrule,
+  rruleToRecurrence,
   useEvent,
   useUpdateEvent,
   type DateRange,
   type EditScope,
   type RangeField,
+  type RecurrenceChanges,
+  type RecurrenceOption,
 } from "@/features/calendar";
 
 import { DateTimePickerSheet } from "./DateTimePickerSheet";
+import { RecurrenceCountField } from "./RecurrenceCountField";
+import { RecurrenceRadio } from "./RecurrenceRadio";
 import { pickScope } from "./scopeDialog";
 
 export function EventEditScreen() {
@@ -35,12 +42,25 @@ export function EventEditScreen() {
 
   const initial = useMemo(() => {
     if (!occurrence) return null;
+    // The weekday check in `rruleToRecurrence` runs against this occurrence's
+    // start rather than the master's dtstart — equivalent here, because a
+    // byweekday rule only ever yields occurrences on the days it names.
+    const rrule = occurrence.rrule;
     return {
       title: occurrence.title,
       startAt: occurrence.startAt,
       endAt: occurrence.endAt,
       location: occurrence.location ?? "",
       notes: occurrence.description ?? "",
+      recurrence: rruleToRecurrence(
+        {
+          rrule_freq: rrule.freq,
+          rrule_interval: rrule.interval,
+          rrule_byweekday: rrule.byweekday,
+        },
+        occurrence.startAt,
+      ),
+      countText: rrule.count == null ? "" : String(rrule.count),
     };
   }, [occurrence]);
 
@@ -48,6 +68,8 @@ export function EventEditScreen() {
   const [range, setRange] = useState<DateRange>(() => ({ startAt: new Date(), endAt: new Date() }));
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
+  const [recurrence, setRecurrence] = useState<RecurrenceOption>("none");
+  const [countText, setCountText] = useState("");
   const [picker, setPicker] = useState<RangeField | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const { startAt, endAt } = range;
@@ -57,20 +79,63 @@ export function EventEditScreen() {
     setRange({ startAt: initial.startAt, endAt: initial.endAt });
     setLocation(initial.location);
     setNotes(initial.notes);
+    setRecurrence(initial.recurrence ?? "none");
+    setCountText(initial.countText);
     setHydrated(true);
   }
+
+  // `null` means the stored rule is outside the five V1 options (yearly, every
+  // n-th week, an arbitrary weekday set). Showing the radio would rewrite it on
+  // save, so the editor stays hidden and the rule is left alone.
+  const recurrenceEditable = initial?.recurrence != null;
+  const recurrenceDirty =
+    recurrenceEditable &&
+    (recurrence !== initial.recurrence ||
+      (recurrence !== "none" && countText.trim() !== initial.countText));
 
   const titleError = !title.trim() ? t("cal.edit.error.titleRequired") : "";
   const dateError = isDateRangeInvalid(range) ? t("cal.edit.error.invalidDateRange") : "";
   const timeError =
     !dateError && isTimeRangeInvalid(range, false) ? t("cal.edit.error.invalidTimeRange") : "";
-  const canSave = hydrated && !titleError && !dateError && !timeError && !updateMutation.isPending;
+  const parsedCount = recurrence === "none" ? null : parseRecurrenceCount(countText);
+  const countError = parsedCount === "invalid" ? t("cal.create.error.invalidCount") : "";
+  const canSave =
+    hydrated && !titleError && !dateError && !timeError && !countError && !updateMutation.isPending;
+
+  /**
+   * The series rule, rebuilt from the radio. `null` when the user left the
+   * recurrence untouched — the update then keeps the stored rule verbatim.
+   */
+  function buildRecurrenceChanges(): RecurrenceChanges | null {
+    if (!recurrenceDirty || parsedCount === "invalid") return null;
+    if (recurrence === "none") {
+      return {
+        rrule_freq: null,
+        rrule_interval: 1,
+        rrule_byweekday: null,
+        rrule_count: null,
+        rrule_until: null,
+      };
+    }
+    const rule = recurrenceToRrule(recurrence, startAt);
+    return {
+      ...rule,
+      rrule_count: parsedCount,
+      // COUNT and UNTIL are mutually exclusive (`events_rrule_count_xor_until`).
+      // A stored UNTIL — e.g. from an earlier forward-delete — survives only as
+      // long as no count replaces it.
+      rrule_until: parsedCount == null ? (occurrence?.rrule.until ?? null) : null,
+    };
+  }
 
   async function onSave() {
     if (!occurrence || !canSave) return;
     const isRecurring = occurrence.isRecurring;
+    const recurrenceChanges = buildRecurrenceChanges();
     let scope: EditScope = "all";
-    if (isRecurring) {
+    // A rule change redefines the series, so there is nothing to scope: asking
+    // "just this one?" about a new repeat pattern has no coherent answer.
+    if (isRecurring && !recurrenceChanges) {
       const labels = {
         title: t("cal.scope.title"),
         this: t("cal.scope.this"),
@@ -95,6 +160,7 @@ export function EventEditScreen() {
           location: location.trim() || null,
           description: notes.trim() || null,
         },
+        recurrence: recurrenceChanges,
       },
       {
         onSuccess: () => router.back(),
@@ -216,6 +282,32 @@ export function EventEditScreen() {
               type="multiline"
               placeholder="—"
             />
+
+            {recurrenceEditable ? (
+              <>
+                <RecurrenceRadio
+                  label={t("cal.create.fieldRecurrence")}
+                  value={recurrence}
+                  onChange={setRecurrence}
+                />
+
+                {recurrence !== "none" ? (
+                  <RecurrenceCountField
+                    value={countText}
+                    onChangeText={setCountText}
+                    error={countError}
+                  />
+                ) : null}
+
+                {recurrenceDirty ? (
+                  <View className="rounded-xl bg-warning-soft px-3 py-2">
+                    <Text variant="caption" tone="accentStrong">
+                      {t("cal.edit.recurrenceAppliesToAll")}
+                    </Text>
+                  </View>
+                ) : null}
+              </>
+            ) : null}
 
             {updateMutation.error ? (
               <Text variant="caption" tone="danger">

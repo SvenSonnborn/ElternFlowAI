@@ -166,6 +166,7 @@ function seedToOccurrence(seed: Seed, base: Date): CalendarOccurrence {
     parentId: null,
     isException: false,
     isRecurring: false,
+    rrule: { freq: null, interval: 1, byweekday: null, count: null, until: null },
     type: {
       slug: seed.slug,
       color: eventColorFor(seed.slug, "primary", lightTheme),

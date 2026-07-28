@@ -19,6 +19,7 @@ function makeOps(): EventOps {
     setRruleUntil: mock(() => Promise.resolve()),
     setRruleCount: mock(() => Promise.resolve()),
     deleteExceptionsFromDate: mock(() => Promise.resolve()),
+    deleteAllExceptions: mock(() => Promise.resolve()),
     insertSplitEvent: mock(() => Promise.resolve()),
   };
 }
