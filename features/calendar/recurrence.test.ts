@@ -19,6 +19,20 @@ function makeOps(): EventOps {
   };
 }
 
+/** Ops that record the order calls were made in, for the split-durability tests. */
+function makeRecordingOps(): { ops: EventOps; calls: string[] } {
+  const calls: string[] = [];
+  const base = makeOps();
+  const ops = {} as Record<string, unknown>;
+  for (const key of Object.keys(base) as (keyof EventOps)[]) {
+    ops[key] = (...args: unknown[]) => {
+      calls.push(key);
+      return (base[key] as (...a: unknown[]) => Promise<void>)(...args);
+    };
+  }
+  return { ops: ops as unknown as EventOps, calls };
+}
+
 // 2026-05-04 is a Monday. A weekly/byweekday=[Mo] series from here runs
 // 05-04, 05-11, 05-18, 05-25, 06-01, 06-08, 06-15, 06-22, 06-29, 07-06.
 const MASTER_START = new Date("2026-05-04T16:30:00.000Z");
@@ -334,6 +348,38 @@ describe("applyEditScope", () => {
     // 05-04, 05-05, 05-06 consumed → 05-07 and 05-08 remain.
     expect(ops.setRruleCount).toHaveBeenCalledWith("evt-1", 3);
     expect(ops.insertSplitEvent).toHaveBeenCalledWith(master, CHANGES, 2);
+  });
+
+  // The split is several non-transactional calls. Creating the tail before
+  // shortening the head means a mid-way failure leaves a visible duplicate
+  // rather than silently dropping every occurrence after the cutoff.
+
+  test("scope=forward creates the split event before shortening the count", async () => {
+    const { ops, calls } = makeRecordingOps();
+    await applyEditScope({
+      ops,
+      scope: "forward",
+      eventId: "evt-1",
+      occurrenceDate: "2026-06-15",
+      isRecurring: true,
+      master: makeMaster({ rrule_count: 10 }),
+      changes: CHANGES,
+    });
+    expect(calls).toEqual(["insertSplitEvent", "setRruleCount", "deleteExceptionsFromDate"]);
+  });
+
+  test("scope=forward creates the split event before setting until", async () => {
+    const { ops, calls } = makeRecordingOps();
+    await applyEditScope({
+      ops,
+      scope: "forward",
+      eventId: "evt-1",
+      occurrenceDate: "2026-06-15",
+      isRecurring: true,
+      master: makeMaster(),
+      changes: CHANGES,
+    });
+    expect(calls).toEqual(["insertSplitEvent", "setRruleUntil", "deleteExceptionsFromDate"]);
   });
 
   test("scope=forward past the end of a count-series → truncate head, no tail", async () => {
