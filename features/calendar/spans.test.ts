@@ -89,8 +89,11 @@ describe("toDaySegments", () => {
   });
 
   test("an end at or before the start still yields one segment", () => {
-    const occ = makeOccurrence("2026-06-10T09:00:00", "2026-06-10T09:00:00");
-    expect(toDaySegments([occ], WINDOW_START, WINDOW_END)).toHaveLength(1);
+    const zeroLength = makeOccurrence("2026-06-10T09:00:00", "2026-06-10T09:00:00");
+    expect(toDaySegments([zeroLength], WINDOW_START, WINDOW_END)).toHaveLength(1);
+    // Inverted range — the form rejects it, but bad data must not vanish.
+    const inverted = makeOccurrence("2026-06-10T09:00:00", "2026-06-10T08:00:00");
+    expect(toDaySegments([inverted], WINDOW_START, WINDOW_END)).toHaveLength(1);
   });
 });
 
@@ -130,9 +133,12 @@ describe("toDaySegments window clipping", () => {
   });
 });
 
-describe("toDaySegments across a DST transition", () => {
-  test("counts calendar days, not 24-hour blocks", () => {
-    // Europe/Berlin springs forward on 2026-03-29 — that day has 23 hours.
+describe("toDaySegments counts calendar days", () => {
+  test("a 48-hour span over the European DST weekend is still three days", () => {
+    // 2026-03-29 is the European spring-forward date, so in a DST-observing
+    // zone this window contains a 23-hour day. The assertion holds in every
+    // timezone — it is `differenceInCalendarDays` that makes it hold, and a
+    // millisecond-division implementation would fail it under Europe/Berlin.
     const occ = makeOccurrence("2026-03-28T09:00:00", "2026-03-30T09:00:00");
     const segments = toDaySegments(
       [occ],
