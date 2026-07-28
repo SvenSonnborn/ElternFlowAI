@@ -139,12 +139,16 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
         return;
       }
       const remaining = master.rrule_count - consumed;
-      await ops.setRruleCount(eventId, consumed);
+      // Create the tail before shortening the head. These are separate,
+      // non-transactional calls: if the insert fails after the head was already
+      // truncated, the occurrences from the cutoff on are gone for good. The
+      // other order merely risks a visible duplicate the user can delete.
       // remaining === 0 → the cutoff sits past the end of the series, so there
       // is nothing left to carry over into a split event.
       if (remaining > 0) {
         await ops.insertSplitEvent(master, changes, remaining);
       }
+      await ops.setRruleCount(eventId, consumed);
       await ops.deleteExceptionsFromDate(eventId, occurrenceDate);
       return;
     }
@@ -153,8 +157,9 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
       await ops.updateMaster(eventId, changes);
       return;
     }
-    await ops.setRruleUntil(eventId, cutoff);
+    // Tail first — same durability reasoning as the count path above.
     await ops.insertSplitEvent(master, changes, null);
+    await ops.setRruleUntil(eventId, cutoff);
     await ops.deleteExceptionsFromDate(eventId, occurrenceDate);
     return;
   }
