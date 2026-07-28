@@ -99,7 +99,6 @@ export function EventDetailScreen() {
                 eventId: data.eventId,
                 occurrenceDate: data.occurrenceDate,
                 isRecurring,
-                masterStartAt: data.startAt,
               },
               {
                 onSuccess: () => router.back(),
