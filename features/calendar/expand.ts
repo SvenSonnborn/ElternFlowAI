@@ -32,13 +32,25 @@ function readLabel(slug: string, label: Json | null | undefined): { de: string; 
   };
 }
 
-function expandRecurrence(row: EventRow, rangeStart: Date, rangeEnd: Date): Date[] {
+/**
+ * Occurrence starts inside the window — widened backwards by the event's own
+ * duration, because a span that began before `rangeStart` still paints days
+ * inside it. Nothing is guessed: shifting by exactly the duration is the
+ * smallest window that cannot miss an intersecting occurrence.
+ */
+function expandRecurrence(
+  row: EventRow,
+  rangeStart: Date,
+  rangeEnd: Date,
+  durationMs: number,
+): Date[] {
+  const searchStart = new Date(rangeStart.getTime() - Math.max(0, durationMs));
   const rule = buildRule(row);
   if (!rule) {
     const start = new Date(row.start_at);
-    return start >= rangeStart && start <= rangeEnd ? [start] : [];
+    return start >= searchStart && start <= rangeEnd ? [start] : [];
   }
-  return rule.between(rangeStart, rangeEnd, true);
+  return rule.between(searchStart, rangeEnd, true);
 }
 
 interface Resolved {
@@ -67,11 +79,12 @@ export function expandEvents(
 ): CalendarOccurrence[] {
   const out: CalendarOccurrence[] = [];
   for (const row of rows) {
-    const occurrences = expandRecurrence(row, rangeStart, rangeEnd);
-    if (!occurrences.length) continue;
     const masterStart = new Date(row.start_at);
     const masterEnd = new Date(row.end_at);
     const durationMs = masterEnd.getTime() - masterStart.getTime();
+
+    const occurrences = expandRecurrence(row, rangeStart, rangeEnd, durationMs);
+    if (!occurrences.length) continue;
 
     const typeRow = row.event_types;
     const slug = typeRow?.slug ?? "family";
@@ -102,6 +115,11 @@ export function expandEvents(
       if (ex?.action === "modified") {
         resolved = applyOverride(resolved, ex.override ?? null);
       }
+
+      // The widened search window (and a modified exception's shifted times)
+      // can produce occurrences that miss the range entirely — drop them here
+      // rather than letting the grid deal with off-window days.
+      if (resolved.endAt < rangeStart || resolved.startAt > rangeEnd) continue;
 
       // Date may shift if a modified exception overrode start_at to a different day —
       // recompute from the resolved value so the returned record reflects the actual date.
