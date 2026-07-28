@@ -269,7 +269,7 @@ export function SettingsScreen() {
 
         <View className="mt-8 items-center">
           <Text variant="meta" tone="inkTertiary">
-            {`Eltern Flow · v${appVersion} · Made in Berlin`}
+            {t("set.footer", { version: appVersion })}
           </Text>
         </View>
       </ScrollView>

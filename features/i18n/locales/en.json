@@ -427,6 +427,7 @@
     "connectedApps": "Connected apps",
     "subscription": "Eltern Flow Plus",
     "help": "Help & support",
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "footer": "Eltern Flow · v{{version}} · Made in Berlin"
   }
 }
