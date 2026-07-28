@@ -150,11 +150,33 @@ export function KalenderScreen() {
               : occ.parentId
                 ? (familyParents.data ?? []).find((p) => p.id === occ.parentId)
                 : null;
+            const isSpan = seg.total > 1;
             const durationMin = Math.max(
               0,
               Math.round((occ.endAt.getTime() - occ.startAt.getTime()) / 60_000),
             );
-            const timeLabel = occ.allDay ? "—" : format(occ.startAt, "HH:mm");
+            // The left column answers "what happens on THIS day", not "when did
+            // the series start" — a continuation day showing 09:00 would simply
+            // be wrong.
+            const timeLabel = occ.allDay
+              ? t("cal.span.allDay")
+              : seg.isStart && seg.isEnd
+                ? format(occ.startAt, "HH:mm")
+                : seg.isStart
+                  ? t("cal.span.from", { time: format(occ.startAt, "HH:mm") })
+                  : seg.isEnd
+                    ? t("cal.span.until", { time: format(occ.endAt, "HH:mm") })
+                    : t("cal.span.through");
+            // Empty string rather than null: the label is interpolated into the
+            // row's accessibility label below, and a `string | null` there trips
+            // the type-aware lint rule for template expressions.
+            const subLabel = isSpan
+              ? t("cal.span.dayOf", { index: seg.index + 1, total: seg.total })
+              : occ.allDay
+                ? // A 00:00–23:59 all-day range would report "24 Std." — a number
+                  // nobody entered. Better to show nothing.
+                  ""
+                : formatDurationLabel(durationMin, t);
             const typeLabel = lang === "de" ? occ.type.labelDe : occ.type.labelEn;
             return (
               <Pressable
@@ -165,19 +187,39 @@ export function KalenderScreen() {
                     params: { id: occ.eventId, occ: occ.occurrenceDate },
                   })
                 }
+                accessibilityRole="button"
+                accessibilityLabel={
+                  isSpan ? `${occ.title}, ${subLabel}, ${timeLabel}` : `${occ.title}, ${timeLabel}`
+                }
                 className="flex-row items-center gap-3 overflow-hidden rounded-2xl border border-line bg-card p-3 pl-4 active:opacity-70"
               >
                 <View
-                  className="absolute bottom-2 left-1.5 top-2 w-1 rounded-full"
-                  style={{ backgroundColor: occ.type.color }}
+                  className="absolute left-1.5 w-1"
+                  style={{
+                    backgroundColor: occ.type.color,
+                    // Flush to the card edge where the span continues — same
+                    // language as the bars in the month grid.
+                    top: seg.isStart ? 8 : 0,
+                    bottom: seg.isEnd ? 8 : 0,
+                    borderTopLeftRadius: seg.isStart ? 2 : 0,
+                    borderTopRightRadius: seg.isStart ? 2 : 0,
+                    borderBottomLeftRadius: seg.isEnd ? 2 : 0,
+                    borderBottomRightRadius: seg.isEnd ? 2 : 0,
+                  }}
                 />
-                <View className="w-12">
-                  <Text variant="bodyEmph" style={{ fontVariant: ["tabular-nums"] }}>
+                <View className="w-14">
+                  <Text
+                    variant="bodyEmph"
+                    style={{ fontVariant: ["tabular-nums"] }}
+                    numberOfLines={1}
+                  >
                     {timeLabel}
                   </Text>
-                  <Text variant="caption" tone="inkSecondary">
-                    {formatDurationLabel(durationMin, t)}
-                  </Text>
+                  {subLabel ? (
+                    <Text variant="caption" tone="inkSecondary" numberOfLines={1}>
+                      {subLabel}
+                    </Text>
+                  ) : null}
                 </View>
                 <View className="flex-1">
                   <Text variant="listTitle" numberOfLines={1}>

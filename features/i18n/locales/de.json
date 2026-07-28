@@ -236,6 +236,13 @@
       "hourShort": "Std.",
       "minuteShort": "Min."
     },
+    "span": {
+      "allDay": "Ganztägig",
+      "from": "ab {{time}}",
+      "until": "bis {{time}}",
+      "through": "durchgehend",
+      "dayOf": "Tag {{index}}/{{total}}"
+    },
     "add": {
       "voice": "Termin per Sprache",
       "new": "Termin hinzufügen",
