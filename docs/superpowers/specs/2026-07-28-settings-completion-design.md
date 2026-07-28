@@ -108,8 +108,9 @@ Keine neuen Tests. Der Screen hat keine, und die Repo-Tests decken ausschließli
 ab (`features/**/*.test.ts` + ein `__tests__/smoke.test.tsx`); hier entsteht keine testbare Logik
 außer `parents.length + children.length`.
 
-Verifikation stattdessen: `bun run format:check`, `bun lint`, `npx tsc --noEmit`, `bun test`
-und der Web-Smoke-Export (`bunx expo export --platform web`).
+Verifikation stattdessen: `bun run format:check`, `bun lint`, `bun run typecheck`, `bun test`
+und der Web-Smoke-Export (`bunx expo export --platform web`) — die in CLAUDE.md dokumentierten
+Skripte.
 
 ## Nicht in Scope
 
