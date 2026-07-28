@@ -38,5 +38,5 @@ export {
   type EventOps,
   type RecurrenceChanges,
 } from "./recurrence";
-export { toDaySegments, type DaySegment } from "./spans";
-export type { CalendarOccurrence, MarkedDates, MarkedDot, OccurrenceRrule } from "./types";
+export { toDaySegments, toDayMarkings, type DaySegment } from "./spans";
+export type { CalendarOccurrence, MarkedDates, MarkedDot, OccurrenceRrule, SpanBar } from "./types";

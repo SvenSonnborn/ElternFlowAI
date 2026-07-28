@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { CalendarOccurrence } from "./types";
 
-import { toDaySegments } from "./spans";
+import { toDayMarkings, toDaySegments } from "./spans";
 
 /**
  * Minimal occurrence — only the fields the span math reads matter. Local times
@@ -141,5 +141,88 @@ describe("toDaySegments across a DST transition", () => {
     );
     expect(segments.map((s) => s.date)).toEqual(["2026-03-28", "2026-03-29", "2026-03-30"]);
     expect(segments[0].total).toBe(3);
+  });
+});
+
+describe("toDayMarkings", () => {
+  const segmentsFor = (occs: CalendarOccurrence[]) => toDaySegments(occs, WINDOW_START, WINDOW_END);
+
+  test("single-day events become dots, one per type slug", () => {
+    const marks = toDayMarkings(
+      segmentsFor([
+        makeOccurrence("2026-06-10T09:00:00", "2026-06-10T10:00:00", { eventId: "a" }),
+        makeOccurrence("2026-06-10T11:00:00", "2026-06-10T12:00:00", { eventId: "b" }),
+      ]),
+      "2026-06-01",
+      "#E8F7F5",
+    );
+    expect(marks["2026-06-10"].dots).toEqual([{ key: "schule", color: "#4ECDC4" }]);
+    expect(marks["2026-06-10"].bars ?? []).toEqual([]);
+    expect(marks["2026-06-10"].marked).toBe(true);
+  });
+
+  test("a multi-day event becomes a bar on every covered day, rounded at its ends", () => {
+    const marks = toDayMarkings(
+      segmentsFor([makeOccurrence("2026-06-10T09:00:00", "2026-06-12T14:00:00")]),
+      "2026-06-01",
+      "#E8F7F5",
+    );
+    expect(marks["2026-06-10"].bars).toEqual([
+      { key: "evt-1-2026-06-10", color: "#4ECDC4", isStart: true, isEnd: false },
+    ]);
+    expect(marks["2026-06-11"].bars?.[0]).toMatchObject({ isStart: false, isEnd: false });
+    expect(marks["2026-06-12"].bars?.[0]).toMatchObject({ isStart: false, isEnd: true });
+    expect(marks["2026-06-11"].dots ?? []).toEqual([]);
+  });
+
+  test("beyond two bars a span falls back into the dot row instead of vanishing", () => {
+    const spans = [1, 2, 3].map((n) =>
+      makeOccurrence("2026-06-10T09:00:00", "2026-06-12T14:00:00", {
+        eventId: `evt-${n}`,
+        type: {
+          slug: `slug-${n}`,
+          color: `#00000${n}`,
+          iconName: "book-open",
+          labelDe: "x",
+          labelEn: "x",
+        },
+      }),
+    );
+    const marks = toDayMarkings(segmentsFor(spans), "2026-06-01", "#E8F7F5");
+    expect(marks["2026-06-10"].bars).toHaveLength(2);
+    expect(marks["2026-06-10"].dots).toEqual([{ key: "slug-3", color: "#000003" }]);
+  });
+
+  test("dots stay capped at three", () => {
+    const many = [1, 2, 3, 4].map((n) =>
+      makeOccurrence("2026-06-10T09:00:00", "2026-06-10T10:00:00", {
+        eventId: `evt-${n}`,
+        type: {
+          slug: `slug-${n}`,
+          color: `#00000${n}`,
+          iconName: "book-open",
+          labelDe: "x",
+          labelEn: "x",
+        },
+      }),
+    );
+    expect(
+      toDayMarkings(segmentsFor(many), "2026-06-01", "#E8F7F5")["2026-06-10"].dots,
+    ).toHaveLength(3);
+  });
+
+  test("the selected day is marked even when it holds no events", () => {
+    const marks = toDayMarkings([], "2026-06-15", "#E8F7F5");
+    expect(marks["2026-06-15"]).toEqual({ selected: true, selectedColor: "#E8F7F5" });
+  });
+
+  test("selection is merged onto a day that already has markings", () => {
+    const marks = toDayMarkings(
+      segmentsFor([makeOccurrence("2026-06-10T09:00:00", "2026-06-10T10:00:00")]),
+      "2026-06-10",
+      "#E8F7F5",
+    );
+    expect(marks["2026-06-10"].selected).toBe(true);
+    expect(marks["2026-06-10"].dots).toHaveLength(1);
   });
 });

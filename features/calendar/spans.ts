@@ -1,6 +1,6 @@
 import { addDays, differenceInCalendarDays, format, startOfDay } from "date-fns";
 
-import type { CalendarOccurrence } from "./types";
+import type { CalendarOccurrence, MarkedDates, MarkedDot, SpanBar } from "./types";
 
 /**
  * One calendar day covered by an occurrence. A single-day event yields exactly
@@ -77,5 +77,74 @@ export function toDaySegments(
       });
     }
   }
+  return out;
+}
+
+/** Bars per day before a span falls back into the dot row. */
+const MAX_BARS = 2;
+/** Dots per day, matching what `CalendarDay` renders. */
+const MAX_DOTS = 3;
+
+/**
+ * Turns day segments into the marking objects the month grid consumes.
+ *
+ * Single-day events stay dots (deduplicated by type slug, as before), spans
+ * become bars. The bar budget is deliberately small — beyond it a span drops
+ * into the dot row rather than disappearing, so a busy day never silently
+ * swallows an event.
+ */
+export function toDayMarkings(
+  segments: DaySegment[],
+  selectedDate: string,
+  selectedColor: string,
+): MarkedDates {
+  const barsByDate = new Map<string, SpanBar[]>();
+  const dotsByDate = new Map<string, Map<string, MarkedDot>>();
+
+  const addDot = (date: string, occurrence: CalendarOccurrence) => {
+    const forDay = dotsByDate.get(date) ?? new Map<string, MarkedDot>();
+    if (!forDay.has(occurrence.type.slug)) {
+      forDay.set(occurrence.type.slug, {
+        key: occurrence.type.slug,
+        color: occurrence.type.color,
+      });
+    }
+    dotsByDate.set(date, forDay);
+  };
+
+  for (const segment of segments) {
+    if (segment.total === 1) {
+      addDot(segment.date, segment.occurrence);
+      continue;
+    }
+    const forDay = barsByDate.get(segment.date) ?? [];
+    if (forDay.length >= MAX_BARS) {
+      addDot(segment.date, segment.occurrence);
+      continue;
+    }
+    forDay.push({
+      // Two occurrences of the same series can share a day once a span is
+      // longer than its recurrence interval — the anchor date keeps keys unique.
+      key: `${segment.occurrence.eventId}-${segment.occurrence.occurrenceDate}`,
+      color: segment.occurrence.type.color,
+      isStart: segment.isStart,
+      isEnd: segment.isEnd,
+    });
+    barsByDate.set(segment.date, forDay);
+  }
+
+  const out: MarkedDates = {};
+  const dates = new Set<string>();
+  barsByDate.forEach((_, date) => dates.add(date));
+  dotsByDate.forEach((_, date) => dates.add(date));
+  dates.forEach((date) => {
+    out[date] = {
+      marked: true,
+      bars: barsByDate.get(date),
+      dots: Array.from(dotsByDate.get(date)?.values() ?? []).slice(0, MAX_DOTS),
+    };
+  });
+
+  out[selectedDate] = { ...(out[selectedDate] ?? {}), selected: true, selectedColor };
   return out;
 }
