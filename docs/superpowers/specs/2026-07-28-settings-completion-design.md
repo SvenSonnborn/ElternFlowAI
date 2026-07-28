@@ -47,12 +47,20 @@ Damit verschwindet die letzte `sample-data`-Abhängigkeit des Screens. Formal et
 Issue-Punkte hinaus, aber ein fremder Sample-Name direkt neben einem echten Member-Count wäre
 schlicht falsche Information.
 
-### D2 — Keine neuen i18n-Keys
+### D2 — Nur ein neuer i18n-Key (die Footer-Zeile)
 
-`docs/COPY.md` ist designer-eigen und laut CLAUDE.md off-limits. Alle Texte kommen aus
-existierenden Keys: `auth.soon`, `set.logout`, `action.cancel`, `auth.error.*` via `mapAuthError`.
-Der Logout-Confirm nutzt `t("set.logout")` als Alert-Titel ohne Body-Text — ein Body bräuchte
-einen neuen Key.
+`docs/COPY.md` ist designer-eigen und laut CLAUDE.md off-limits, deshalb kommen die Row-Labels
+und Dialog-Texte aus existierenden Keys: `auth.soon`, `set.logout`, `action.cancel`,
+`auth.error.*` via `mapAuthError`. Der Logout-Confirm nutzt `t("set.logout")` als Alert-Titel
+ohne Body-Text — ein Body bräuchte einen weiteren Key.
+
+**Ausnahme Footer:** Non-negotiable Nr. 3 („All UI strings live in i18n catalogs") wiegt
+schwerer als das Vermeiden neuer Keys — eine hartcodierte Template-Literal-Zeile im JSX bleibt
+ein Verstoß, auch wenn sie aus dem Altbestand stammt. Deshalb kommt
+`set.footer = "Eltern Flow · v{{version}} · Made in Berlin"` in beide Catalogs
+(`features/i18n/locales/{de,en}.json`, identischer Text in DE und EN), die Version wird als
+Interpolations-Parameter übergeben. Der Key muss noch in `docs/COPY.md` nachgetragen werden —
+das macht der Designer, siehe `docs/TODO.md`.
 
 ### D3 — Logout ohne manuelle Navigation
 
