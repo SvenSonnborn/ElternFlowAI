@@ -112,6 +112,11 @@ reviews:
       instructions: >-
         ADRs sind append-only. Ältere ADRs werden nie umgeschrieben, nur per
         neuem Eintrag superseded. Flagge Edits an bestehenden ADR-Einträgen.
+        Ausgenommen sind rein redaktionelle Korrekturen, die die Aussage
+        unberührt lassen: tote Links, falsche Datei-/Pfadangaben, Tippfehler.
+        Ein eigener superseding ADR wäre dafür unverhältnismäßig und würde den
+        kaputten Verweis im Original stehen lassen. Flagge solche Edits nur,
+        wenn sie Entscheidung, Begründung oder Konsequenzen verändern.
 
   tools:
     eslint:
