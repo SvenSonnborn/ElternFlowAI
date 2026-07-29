@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { TaskWithType } from "./types";
 
-import { groupTasksByChild } from "./stats";
+import { computeTaskStats, groupTasksByChild } from "./stats";
 
 /**
  * Only the columns the derivations read carry meaning; the rest is filler so
@@ -97,5 +97,108 @@ describe("groupTasksByChild", () => {
     ];
     groupTasksByChild(tasks);
     expect(tasks.map((t) => t.id)).toEqual(["a", "b"]);
+  });
+});
+
+/** Wednesday, 2026-07-29. ISO week: Mon 2026-07-27 … Sun 2026-08-02. */
+const NOW = new Date(2026, 6, 29, 10, 0, 0);
+
+function makeDone(id: string, completedAt: string): TaskWithType {
+  return makeTask({ id, is_done: true, completed_at: completedAt, due_date: "2026-07-27" });
+}
+
+describe("computeTaskStats", () => {
+  test("returns zeroes for no tasks", () => {
+    expect(computeTaskStats([], NOW)).toEqual({
+      dueToday: 0,
+      thisWeek: 0,
+      donePct: 0,
+      open: 0,
+      doneToday: 0,
+    });
+  });
+
+  test("dueToday counts overdue tasks too, tomorrow does not count", () => {
+    const stats = computeTaskStats(
+      [
+        makeTask({ id: "overdue", due_date: "2026-07-27" }),
+        makeTask({ id: "today", due_date: "2026-07-29" }),
+        makeTask({ id: "tomorrow", due_date: "2026-07-30" }),
+      ],
+      NOW,
+    );
+
+    expect(stats.dueToday).toBe(2);
+    expect(stats.open).toBe(3);
+  });
+
+  test("thisWeek includes today and ends on Sunday", () => {
+    const stats = computeTaskStats(
+      [
+        makeTask({ id: "today", due_date: "2026-07-29" }),
+        makeTask({ id: "sunday", due_date: "2026-08-02" }),
+        makeTask({ id: "next-monday", due_date: "2026-08-03" }),
+      ],
+      NOW,
+    );
+
+    expect(stats.thisWeek).toBe(2);
+  });
+
+  test("doneToday counts only tasks completed on the reference day", () => {
+    const stats = computeTaskStats(
+      [
+        makeDone("today", "2026-07-29T12:00:00.000Z"),
+        makeDone("yesterday", "2026-07-28T12:00:00.000Z"),
+      ],
+      NOW,
+    );
+
+    expect(stats.doneToday).toBe(1);
+    expect(stats.open).toBe(0);
+  });
+
+  test("donePct is done over done-plus-open within the running week", () => {
+    const stats = computeTaskStats(
+      [
+        makeDone("d1", "2026-07-28T12:00:00.000Z"),
+        makeDone("d2", "2026-07-29T12:00:00.000Z"),
+        makeDone("d3", "2026-07-29T13:00:00.000Z"),
+        makeTask({ id: "open-this-week", due_date: "2026-07-30" }),
+      ],
+      NOW,
+    );
+
+    expect(stats.donePct).toBe(75);
+  });
+
+  test("tasks completed before the running week do not raise donePct", () => {
+    const stats = computeTaskStats(
+      [
+        makeDone("last-week", "2026-07-24T12:00:00.000Z"),
+        makeTask({ id: "open-this-week", due_date: "2026-07-30" }),
+      ],
+      NOW,
+    );
+
+    expect(stats.donePct).toBe(0);
+  });
+
+  test("donePct is 0 rather than NaN when nothing is due or done this week", () => {
+    const stats = computeTaskStats([makeTask({ id: "far-off", due_date: "2026-09-01" })], NOW);
+
+    expect(stats.donePct).toBe(0);
+  });
+
+  test("only the calendar day of `now` matters, not the time of day", () => {
+    const tasks = [
+      makeTask({ id: "today", due_date: "2026-07-29" }),
+      makeTask({ id: "sunday", due_date: "2026-08-02" }),
+      makeDone("done", "2026-07-29T12:00:00.000Z"),
+    ];
+
+    expect(computeTaskStats(tasks, new Date(2026, 6, 29, 0, 0, 0))).toEqual(
+      computeTaskStats(tasks, new Date(2026, 6, 29, 23, 59, 59)),
+    );
   });
 });
