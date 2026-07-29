@@ -342,7 +342,7 @@ git commit -m "feat(calendar): Occurrences in Tages-Segmente auffaechern"
 - Consumes: `DaySegment` und `toDaySegments` aus Task 1.
 - Produces:
   - `interface SpanBar { key: string; color: string; isStart: boolean; isEnd: boolean }` (in `types.ts`)
-  - `MarkedDates[date].bars?: SpanBar[]`
+  - `MarkedDates[date].bars?: (SpanBar | null)[]` — Index ist die Spur, ein `null`-Loch hält die Spuren darunter auf Position
   - `function toDayMarkings(segments: DaySegment[], selectedDate: string, selectedColor: string): MarkedDates`
 
 - [ ] **Step 1: `types.ts` erweitern**
@@ -370,7 +370,8 @@ export type MarkedDates = Record<
   string,
   {
     dots?: MarkedDot[];
-    bars?: SpanBar[];
+    /** Index ist die Spur: ein `null`-Loch hält die Spuren darunter ausgerichtet. */
+    bars?: (SpanBar | null)[];
     marked?: boolean;
     selected?: boolean;
     selectedColor?: string;
@@ -501,7 +502,7 @@ export function toDayMarkings(
   selectedDate: string,
   selectedColor: string,
 ): MarkedDates {
-  const barsByDate = new Map<string, SpanBar[]>();
+  const barsByDate = new Map<string, (SpanBar | null)[]>();
   const dotsByDate = new Map<string, Map<string, MarkedDot>>();
 
   const addDot = (date: string, occurrence: CalendarOccurrence) => {
@@ -928,7 +929,7 @@ interface CalendarDayProps {
    * `react-native-calendars` types `marking` narrowly but hands our own object
    * through untouched — `bars` is ours, added in `toDayMarkings`.
    */
-  marking?: MarkingProps & { bars?: SpanBar[] };
+  marking?: MarkingProps & { bars?: (SpanBar | null)[] };
   onPress?: (date?: DateData) => void;
 }
 ```
@@ -938,7 +939,10 @@ interface CalendarDayProps {
 Neben `dots` ergänzen:
 
 ```tsx
-const bars = isDisabled ? [] : (marking?.bars ?? []);
+// Spans keep their bar on neighbouring-month days, unlike dots: a bar that
+// stops at the month edge with a flush "continues" edge and nothing after it
+// is worse than a dimmed one. The day number stays greyed either way.
+const bars = marking?.bars ?? [];
 ```
 
 Die Zellhöhe von 44 auf 52 anheben, damit Balken **und** Dot-Reihe unter die 36px-Pille passen:
@@ -953,21 +957,23 @@ Direkt nach dem Pill-`View` und **vor** dem Dots-Block einfügen:
 {
   bars.length > 0 ? (
     <View className="mt-1 w-full gap-0.5">
-      {bars.map((bar) => (
+      {bars.map((bar, lane) => (
         <View
-          key={bar.key}
+          // A hole renders as an empty row of the same height so the lanes
+          // below it keep their vertical position across the whole span.
+          key={bar?.key ?? `lane-${lane}`}
           style={{
             height: 3,
-            backgroundColor: bar.color,
+            backgroundColor: bar ? bar.color : "transparent",
             // Flush edges are the signal: a bar that is neither start nor end
             // touches both cell borders and reads as one line across the week.
-            marginLeft: bar.isStart ? 4 : 0,
-            marginRight: bar.isEnd ? 4 : 0,
-            borderTopLeftRadius: bar.isStart ? 2 : 0,
-            borderBottomLeftRadius: bar.isStart ? 2 : 0,
-            borderTopRightRadius: bar.isEnd ? 2 : 0,
-            borderBottomRightRadius: bar.isEnd ? 2 : 0,
-            opacity: isToday ? 0.9 : 1,
+            marginLeft: bar?.isStart ? 4 : 0,
+            marginRight: bar?.isEnd ? 4 : 0,
+            borderTopLeftRadius: bar?.isStart ? 2 : 0,
+            borderBottomLeftRadius: bar?.isStart ? 2 : 0,
+            borderTopRightRadius: bar?.isEnd ? 2 : 0,
+            borderBottomRightRadius: bar?.isEnd ? 2 : 0,
+            opacity: isDisabled ? 0.4 : isToday ? 0.9 : 1,
           }}
         />
       ))}
