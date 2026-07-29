@@ -197,8 +197,10 @@ applyUpdate(tasks: TaskWithType[], taskId: string, changes: TaskChanges): TaskWi
 applyDelete(tasks: TaskWithType[], taskId: string): TaskWithType[]
 ```
 
-Alle drei geben ein neues Array zurück und mutieren weder Eingabe noch
-Elemente. `completedAt`/`completedBy` sind Parameter statt intern erzeugt —
+Trifft die `taskId`, geben alle drei ein **neues** Array zurück und mutieren
+weder Eingabe noch Elemente; trifft sie nicht, kommt die Eingabe unverändert
+und identisch zurück (siehe nächster Absatz). `completedAt`/`completedBy` sind
+Parameter statt intern erzeugt —
 derselbe Grund wie bei `computeTaskStats(tasks, now)`: die Tests bleiben
 deterministisch.
 

@@ -47,7 +47,9 @@ export function mapTaskError(input: unknown): TaskErrorKey {
   if (err.code === "23503") return "hw.error.staleReference";
 
   const message = err.message ?? "";
-  if (err.name === "AbortError" || /network|fetch failed|aborted/i.test(message)) {
+  // Both word orders on purpose: undici (native, Node) says "fetch failed",
+  // browsers and react-native-web say "Failed to fetch".
+  if (err.name === "AbortError" || /network|fetch failed|failed to fetch|aborted/i.test(message)) {
     return "hw.error.network";
   }
 
