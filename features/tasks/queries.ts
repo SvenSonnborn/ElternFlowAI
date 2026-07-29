@@ -1,11 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { addDays, startOfDay, subDays } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
 
 import { supabase } from "@/features/supabase";
 
-import type { TaskGroup, TaskStats, TaskWithType } from "./types";
+import type { TaskGroup, TaskStats, TaskTypeRow, TaskWithType } from "./types";
 
 import { computeTaskStats, groupTasksByChild } from "./stats";
 
@@ -21,6 +21,7 @@ const DONE_WINDOW_DAYS = 7;
 export const taskKeys = {
   all: ["tasks"] as const,
   family: (doneSince: string) => ["tasks", "family", doneSince] as const,
+  types: ["tasks", "types"] as const,
 };
 
 /**
@@ -112,4 +113,23 @@ export function useTasksStats(): TaskStats {
   // computeTaskStats only reads the calendar day off `now`, so local midnight
   // is as good as the wall clock — and it keeps the memo from re-running.
   return useMemo(() => computeTaskStats(data, today), [data, today]);
+}
+
+/**
+ * The lookup behind a task's `type_id`. `task_types` holds global rows
+ * (`family_id IS NULL`) next to family-owned ones and the RLS policy releases
+ * both, so no filter is needed here either.
+ */
+export async function fetchTaskTypes(): Promise<TaskTypeRow[]> {
+  const { data, error } = await supabase.from("task_types").select("*").order("slug");
+  if (error) throw error;
+  return data ?? [];
+}
+
+export function useTaskTypes(): UseQueryResult<TaskTypeRow[], Error> {
+  return useQuery({
+    queryKey: taskKeys.types,
+    queryFn: fetchTaskTypes,
+    staleTime: 5 * 60_000,
+  });
 }
