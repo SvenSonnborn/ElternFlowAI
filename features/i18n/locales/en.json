@@ -374,7 +374,13 @@
     "openCount_one": "{{count}} open",
     "openCount_other": "{{count}} open",
     "due": "Due: {{when}}",
-    "addVoice": "Add by voice"
+    "addVoice": "Add by voice",
+    "error": {
+      "notAuthenticated": "Please sign in again.",
+      "staleReference": "That child or task type no longer exists.",
+      "network": "Connection failed. Please try again later.",
+      "generic": "Something went wrong. Please try again later."
+    }
   },
   "familie": {
     "parents": "Parents",

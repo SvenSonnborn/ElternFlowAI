@@ -374,7 +374,13 @@
     "openCount_one": "{{count}} offen",
     "openCount_other": "{{count}} offen",
     "due": "Fällig: {{when}}",
-    "addVoice": "Aufgabe per Sprache"
+    "addVoice": "Aufgabe per Sprache",
+    "error": {
+      "notAuthenticated": "Bitte erneut anmelden.",
+      "staleReference": "Kind oder Aufgabentyp existiert nicht mehr.",
+      "network": "Verbindung fehlgeschlagen. Bitte später erneut versuchen.",
+      "generic": "Etwas ist schiefgelaufen. Bitte später erneut versuchen."
+    }
   },
   "familie": {
     "parents": "Eltern",
