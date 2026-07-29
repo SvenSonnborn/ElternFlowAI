@@ -103,8 +103,23 @@ describe("groupTasksByChild", () => {
 /** Wednesday, 2026-07-29. ISO week: Mon 2026-07-27 … Sun 2026-08-02. */
 const NOW = new Date(2026, 6, 29, 10, 0, 0);
 
-function makeDone(id: string, completedAt: string): TaskWithType {
-  return makeTask({ id, is_done: true, completed_at: completedAt, due_date: "2026-07-27" });
+/**
+ * Local noon on a July 2026 day. A hardcoded UTC instant would land on a
+ * different calendar day in far-eastern zones — at UTC+14, `…-07-29T12:00Z`
+ * is already the 30th locally, which silently swaps the "today" and
+ * "yesterday" fixtures below.
+ */
+function localNoon(day: number): Date {
+  return new Date(2026, 6, day, 12, 0, 0);
+}
+
+function makeDone(id: string, completedAt: Date): TaskWithType {
+  return makeTask({
+    id,
+    is_done: true,
+    completed_at: completedAt.toISOString(),
+    due_date: "2026-07-27",
+  });
 }
 
 describe("computeTaskStats", () => {
@@ -146,24 +161,27 @@ describe("computeTaskStats", () => {
   });
 
   test("doneToday counts only tasks completed on the reference day", () => {
+    // Two on the reference day, one the day before: a fixture that slipped a
+    // calendar day would change the count, not just relabel it.
     const stats = computeTaskStats(
       [
-        makeDone("today", "2026-07-29T12:00:00.000Z"),
-        makeDone("yesterday", "2026-07-28T12:00:00.000Z"),
+        makeDone("today-morning", new Date(2026, 6, 29, 8, 0, 0)),
+        makeDone("today-evening", new Date(2026, 6, 29, 20, 0, 0)),
+        makeDone("yesterday", localNoon(28)),
       ],
       NOW,
     );
 
-    expect(stats.doneToday).toBe(1);
+    expect(stats.doneToday).toBe(2);
     expect(stats.open).toBe(0);
   });
 
   test("donePct is done over done-plus-open within the running week", () => {
     const stats = computeTaskStats(
       [
-        makeDone("d1", "2026-07-28T12:00:00.000Z"),
-        makeDone("d2", "2026-07-29T12:00:00.000Z"),
-        makeDone("d3", "2026-07-29T13:00:00.000Z"),
+        makeDone("d1", localNoon(28)),
+        makeDone("d2", localNoon(29)),
+        makeDone("d3", new Date(2026, 6, 29, 13, 0, 0)),
         makeTask({ id: "open-this-week", due_date: "2026-07-30" }),
       ],
       NOW,
@@ -175,7 +193,7 @@ describe("computeTaskStats", () => {
   test("tasks completed before the running week do not raise donePct", () => {
     const stats = computeTaskStats(
       [
-        makeDone("last-week", "2026-07-24T12:00:00.000Z"),
+        makeDone("last-week", localNoon(24)),
         makeTask({ id: "open-this-week", due_date: "2026-07-30" }),
       ],
       NOW,
@@ -194,7 +212,7 @@ describe("computeTaskStats", () => {
     const tasks = [
       makeTask({ id: "today", due_date: "2026-07-29" }),
       makeTask({ id: "sunday", due_date: "2026-08-02" }),
-      makeDone("done", "2026-07-29T12:00:00.000Z"),
+      makeDone("done", localNoon(29)),
     ];
 
     expect(computeTaskStats(tasks, new Date(2026, 6, 29, 0, 0, 0))).toEqual(
