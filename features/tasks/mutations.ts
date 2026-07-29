@@ -47,9 +47,9 @@ async function patchTaskCaches(
   qc: QueryClient,
   updater: (tasks: TaskWithType[]) => TaskWithType[],
 ): Promise<TasksSnapshot> {
-  await qc.cancelQueries({ queryKey: taskKeys.all });
-  const snapshot = qc.getQueriesData<TaskWithType[]>({ queryKey: taskKeys.all });
-  qc.setQueriesData<TaskWithType[]>({ queryKey: taskKeys.all }, (tasks) =>
+  await qc.cancelQueries({ queryKey: taskKeys.familyRoot });
+  const snapshot = qc.getQueriesData<TaskWithType[]>({ queryKey: taskKeys.familyRoot });
+  qc.setQueriesData<TaskWithType[]>({ queryKey: taskKeys.familyRoot }, (tasks) =>
     tasks ? updater(tasks) : tasks,
   );
   return snapshot;
@@ -69,7 +69,7 @@ function restoreTaskCaches(qc: QueryClient, snapshot: TasksSnapshot | undefined)
  * a moment later when the server data lands.
  */
 function invalidateTasks(qc: QueryClient): Promise<void> {
-  return qc.invalidateQueries({ queryKey: taskKeys.all });
+  return qc.invalidateQueries({ queryKey: taskKeys.familyRoot });
 }
 
 /**
