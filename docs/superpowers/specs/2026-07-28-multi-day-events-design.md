@@ -132,7 +132,7 @@ bereits geladen — nur der Expander hat sie weggeworfen.
 **Der endgültige Vertrag ist `bars?: (SpanBar | null)[]`** — die `null`-Lücken kamen mit N1 dazu
 (siehe Nachtrag), damit eine Spanne ihre Spur behält. Typ, Hook, Renderer und Tests führen
 durchgängig diese Variante.
-Der einzige Cast steht an der Bibliotheksgrenze in `CalendarDay` (`marking?: MarkingProps & { bars?: SpanBar[] }`),
+Der einzige Cast steht an der Bibliotheksgrenze in `CalendarDay` (`marking?: MarkingProps & { bars?: (SpanBar | null)[] }`),
 weil `react-native-calendars` `MarkingProps` fest typisiert, das Objekt aber unverändert
 durchreicht.
 
