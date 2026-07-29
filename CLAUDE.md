@@ -178,7 +178,7 @@ Lives in [app-sections/shared/VoiceAssistantFAB.tsx](app-sections/shared/VoiceAs
 When you change code that's documented, update the doc in the same commit:
 
 - Architectural changes → [docs/architecture.md](docs/architecture.md)
-- Decisions worth a paper trail → append a new ADR to [docs/decision-log.md](docs/decision-log.md) (never edit older ADRs — supersede them)
+- Decisions worth a paper trail → append a new ADR to [docs/decision-log.md](docs/decision-log.md) (never edit older ADRs — supersede them). The rule protects the _content_ of a decision: its rationale and consequences. Purely editorial repairs that leave the statement intact — dead links, wrong file/path references, typos — are fixed in place; a superseding ADR for a filename typo would be noise and would leave the broken reference in the original.
 - Anything visible to engineers (folder moves, new conventions, renamed routes) → this file
 
 When in doubt, the **handoff bundle wins**. CLAUDE.md and decision-log.md adapt around it.
@@ -198,8 +198,13 @@ Verhältnis zu CodeRabbit: CI macht die **mechanischen** Gates, der CodeRabbit-B
 Before opening a PR / merge request, run a local CodeRabbit pass and address — or consciously dismiss with a reason — its findings:
 
 ```bash
-coderabbit review --base main      # or: coderabbit --plain
+coderabbit review --base main      # plain text is the default output
+coderabbit review --base main --agent   # structured findings, for agent workflows
 ```
+
+`--plain` no longer exists as a flag (plain text became the default); `--agent`
+is the structured counterpart. `coderabbit review findings` reprints the last
+local review without spending a new one.
 
 This catches bugs, security issues, and CLAUDE.md/handoff violations **before** the PR exists, so the PR opens clean. The CodeRabbit GitHub bot then does the team-level review on the PR itself.
 
