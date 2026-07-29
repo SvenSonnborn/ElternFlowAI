@@ -62,8 +62,14 @@ function restoreTaskCaches(qc: QueryClient, snapshot: TasksSnapshot | undefined)
   }
 }
 
-function invalidateTasks(qc: QueryClient): void {
-  void qc.invalidateQueries({ queryKey: taskKeys.all });
+/**
+ * Returned, not fired-and-forgotten: React Query keeps the mutation pending
+ * until the promise settles, so `isPending` only drops once the refetched rows
+ * are in. Otherwise a screen would flip out of its saving state and then jump
+ * a moment later when the server data lands.
+ */
+function invalidateTasks(qc: QueryClient): Promise<void> {
+  return qc.invalidateQueries({ queryKey: taskKeys.all });
 }
 
 /**
@@ -158,16 +164,23 @@ export function useToggleTaskDone() {
         .eq("id", vars.taskId);
       if (error) throw error;
     },
-    onMutate: (vars) =>
-      patchTaskCaches(qc, (tasks) =>
+    onMutate: (vars) => {
+      // Without a parent the mutationFn throws MissingParentError, so there is
+      // nothing worth patching. Skipping also keeps an impossible row out of
+      // the cache: `is_done: true` with a null `completed_by` is exactly what
+      // the tasks_completed_consistency CHECK forbids.
+      if (!parent) return undefined;
+
+      return patchTaskCaches(qc, (tasks) =>
         applyToggle(
           tasks,
           vars.taskId,
           vars.done,
           vars.done ? new Date().toISOString() : null,
-          vars.done ? (parent?.id ?? null) : null,
+          vars.done ? parent.id : null,
         ),
-      ),
+      );
+    },
     onError: (_err, _vars, snapshot) => restoreTaskCaches(qc, snapshot),
     onSettled: () => invalidateTasks(qc),
   });

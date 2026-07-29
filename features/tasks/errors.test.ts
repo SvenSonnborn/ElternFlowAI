@@ -23,8 +23,12 @@ describe("mapTaskError", () => {
     expect(mapTaskError({ name: "AbortError", message: "aborted" })).toBe("hw.error.network");
   });
 
-  test("fetch failure message → hw.error.network", () => {
+  test("undici fetch failure message → hw.error.network", () => {
     expect(mapTaskError({ message: "TypeError: fetch failed" })).toBe("hw.error.network");
+  });
+
+  test("browser fetch failure message → hw.error.network", () => {
+    expect(mapTaskError({ message: "TypeError: Failed to fetch" })).toBe("hw.error.network");
   });
 
   test("Postgres 23514 (CHECK) falls through to generic", () => {
