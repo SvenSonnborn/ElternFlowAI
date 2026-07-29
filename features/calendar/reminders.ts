@@ -44,7 +44,7 @@ export interface ToggleReminderVars {
 
 /**
  * Enabling is a single upsert against the `reminders_event_offset_uniq` index
- * (migration `20260728120000_reminders_unique_offset.sql`) — one statement, so
+ * (migration `20260728112100_reminders_unique_offset.sql`) — one statement, so
  * a double-tap cannot stack duplicate rows and a failure cannot leave the
  * reminder half-removed the way delete-then-insert could.
  *
