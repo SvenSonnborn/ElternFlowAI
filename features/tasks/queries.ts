@@ -41,9 +41,15 @@ export async function fetchFamilyTasks(doneSince: string): Promise<TaskWithType[
 }
 
 /**
- * Local midnight today. Recomputed each render but stable within a calendar
- * day, so the query key holds still — and rolls over if the app stays open
- * past midnight.
+ * Local midnight today. Read during render, so it stays stable within a
+ * calendar day and the query key holds still.
+ *
+ * It picks up the new day on the first render *after* midnight, not at
+ * midnight — nothing here schedules a wake-up. An app parked on a tab across
+ * midnight keeps yesterday's window until something else re-renders. A timer
+ * alone would not close that gap: JS timers are suspended while the app is
+ * backgrounded, so the real fix needs AppState and belongs with the screen
+ * that consumes this. Tracked in docs/TODO.md.
  */
 function useToday(): Date {
   const dayKey = format(new Date(), "yyyy-MM-dd");
