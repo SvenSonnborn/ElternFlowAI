@@ -69,11 +69,13 @@ describe("applyToggle", () => {
     expect(result[1]).toBe(other);
   });
 
-  test("an unknown id leaves the array unchanged", () => {
+  test("an unknown id returns the very same array instance", () => {
     const tasks = [makeTask({ id: "a" })];
     const result = applyToggle(tasks, "nope", true, DONE_AT, "parent-1");
 
-    expect(result).toEqual(tasks);
+    // toBe, not toEqual: React Query skips a re-render only when the reference
+    // is unchanged, so identity is the contract here — not deep equality.
+    expect(result).toBe(tasks);
   });
 
   test("does not mutate the input array or its elements", () => {
@@ -111,10 +113,10 @@ describe("applyUpdate", () => {
     expect(result[1]).toBe(other);
   });
 
-  test("an unknown id leaves the array unchanged", () => {
+  test("an unknown id returns the very same array instance", () => {
     const tasks = [makeTask({ id: "a" })];
 
-    expect(applyUpdate(tasks, "nope", { title: "Neu" })).toEqual(tasks);
+    expect(applyUpdate(tasks, "nope", { title: "Neu" })).toBe(tasks);
   });
 
   test("does not mutate the input array or its elements", () => {
@@ -132,10 +134,10 @@ describe("applyDelete", () => {
     expect(result.map((t) => t.id)).toEqual(["b"]);
   });
 
-  test("an unknown id leaves the array unchanged", () => {
+  test("an unknown id returns the very same array instance", () => {
     const tasks = [makeTask({ id: "a" })];
 
-    expect(applyDelete(tasks, "nope")).toEqual(tasks);
+    expect(applyDelete(tasks, "nope")).toBe(tasks);
   });
 
   test("does not mutate the input array", () => {

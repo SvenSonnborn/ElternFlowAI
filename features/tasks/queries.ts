@@ -19,7 +19,16 @@ const SELECT = "*, task_types(*)";
 const DONE_WINDOW_DAYS = 7;
 
 export const taskKeys = {
+  /** Everything tasks-related. Matches the lists *and* `types` by prefix. */
   all: ["tasks"] as const,
+  /**
+   * The task lists alone — every `family(doneSince)` entry, and deliberately
+   * not `types`. Mutations scope their cancel/snapshot/patch/invalidate to
+   * this: under `all` they would drop the type lookup's five-minute
+   * `staleTime` on every write, and hand `TaskTypeRow[]` to updaters typed for
+   * `TaskWithType[]`.
+   */
+  familyRoot: ["tasks", "family"] as const,
   family: (doneSince: string) => ["tasks", "family", doneSince] as const,
   types: ["tasks", "types"] as const,
 };

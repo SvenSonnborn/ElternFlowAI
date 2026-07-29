@@ -451,7 +451,7 @@ export function mapTaskError(input: unknown): TaskErrorKey {
 
 Run: `bun test features/tasks/errors.test.ts`
 
-Expected: PASS — 11 Tests grün (die `test.each`-Zeile zählt als vier).
+Expected: PASS — 12 Tests grün (die `test.each`-Zeile zählt als vier).
 
 - [ ] **Step 5: i18n-Keys ergänzen**
 
@@ -847,7 +847,7 @@ git commit -m "feat(tasks): Mutations mit optimistischem Cache-Update"
 
 Run: `bun format:check && bun lint && bun run typecheck && bun test`
 
-Expected: alle vier PASS. `bun test` muss 25 neue Tests aus `features/tasks/optimistic.test.ts` (14) und `features/tasks/errors.test.ts` (11) enthalten.
+Expected: alle vier PASS. `bun test` muss 26 neue Tests aus `features/tasks/optimistic.test.ts` (14) und `features/tasks/errors.test.ts` (12) enthalten.
 
 - [ ] **Step 2: Web-Smoke-Build**
 
