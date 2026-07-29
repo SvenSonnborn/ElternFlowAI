@@ -49,7 +49,7 @@ echo "   Überspringen geht jederzeit mit:  git push --no-verify"
 echo ""
 
 # Warn-only: Output zeigen, aber Exit-Code des Reviews NICHT durchreichen.
-coderabbit review --plain --type committed --base "$BASE" || true
+coderabbit review --committed --base "$BASE" || true
 
 echo ""
 echo "🐰 Review gelesen — Push läuft weiter (Hinweise sind beratend)."
@@ -59,7 +59,7 @@ exit 0
 # BLOCK-Variante (optional): Push abbrechen, wenn CodeRabbit Findings meldet.
 # Ersetze den `coderabbit review ... || true`-Block oben durch:
 #
-#   if ! coderabbit review --plain --type committed --base "$BASE"; then
+#   if ! coderabbit review --committed --base "$BASE"; then
 #     echo "❌ CodeRabbit hat Findings gemeldet — Push abgebrochen."
 #     echo "   Beheben, oder bewusst überspringen mit: git push --no-verify"
 #     exit 1
