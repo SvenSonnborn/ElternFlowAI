@@ -6,16 +6,27 @@ import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, Switch, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { DateTimePickerSheet, Field, Icon } from "@/app-sections/shared";
+import {
+  DateTimePickerSheet,
+  Field,
+  Icon,
+  MemberPicker,
+  TypePicker,
+  type MemberOption,
+  type SelectedMember,
+  type TypePickerItem,
+} from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
 import {
   applyRangePick,
+  eventColorFor,
   isDateRangeInvalid,
   isTimeRangeInvalid,
   parseRecurrenceCount,
   toAllDayRange,
+  typeLabelsForSlug,
   useCreateEvent,
   useEventTypes,
   useFamilyEvents,
@@ -24,10 +35,8 @@ import {
   type RecurrenceOption,
 } from "@/features/calendar";
 
-import { MemberPicker, type MemberOption, type SelectedMember } from "./MemberPicker";
 import { RecurrenceCountField } from "./RecurrenceCountField";
 import { RecurrenceRadio } from "./RecurrenceRadio";
-import { TypePicker } from "./TypePicker";
 
 function rangesOverlap(a1: Date, a2: Date, b1: Date, b2: Date): boolean {
   return a1.getTime() < b2.getTime() && b1.getTime() < a2.getTime();
@@ -148,6 +157,19 @@ export function EventCreateScreen() {
     })),
   ];
 
+  const typeItems: TypePickerItem[] = useMemo(
+    () =>
+      (eventTypes.data ?? []).map((type) => {
+        const labels = typeLabelsForSlug(type.slug);
+        return {
+          id: type.id,
+          label: lang === "de" ? labels.de : labels.en,
+          color: eventColorFor(type.slug, type.color, theme),
+        };
+      }),
+    [eventTypes.data, lang, theme],
+  );
+
   // The sheet is range-agnostic now: which end of the range is being edited is
   // calendar knowledge and stays here.
   const pickerMode = picker === null ? null : picker.endsWith("Date") ? "date" : "time";
@@ -191,8 +213,8 @@ export function EventCreateScreen() {
 
         <TypePicker
           label={t("cal.create.fieldType")}
-          types={eventTypes.data ?? []}
-          selectedTypeId={typeId}
+          items={typeItems}
+          selectedId={typeId}
           onSelect={setTypeId}
           error={typeError}
         />

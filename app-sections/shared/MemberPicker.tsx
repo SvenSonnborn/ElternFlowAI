@@ -1,8 +1,9 @@
 import { Pressable, View } from "react-native";
 
-import { ChildAvatar } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Text } from "@/design-system/ui";
+
+import { ChildAvatar } from "./ChildAvatar";
 
 export type MemberKind = "parent" | "child";
 
@@ -82,6 +83,7 @@ export function MemberPicker({
           accessibilityLabel={noMemberLabel}
           accessibilityState={{ selected: selected === null }}
           onPress={() => onSelect(null)}
+          hitSlop={{ top: 4, bottom: 4 }}
           className="h-9 flex-row items-center rounded-pill border px-3 active:opacity-70"
           style={{
             backgroundColor: selected === null ? theme.primarySoft : theme.cardSubtle,
