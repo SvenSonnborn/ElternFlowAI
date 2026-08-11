@@ -2,21 +2,13 @@ import { format } from "date-fns";
 import { de, enUS } from "date-fns/locale";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Alert, RefreshControl, View } from "react-native";
-
-import type { TaskWithType } from "@/features/tasks";
+import { ActivityIndicator, RefreshControl, View } from "react-native";
 
 import { TopBar } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren } from "@/features/auth";
-import {
-  mapTaskError,
-  useFamilyTasks,
-  useTasksSections,
-  useTasksStats,
-  useToggleTaskDone,
-} from "@/features/tasks";
+import { mapTaskError, useFamilyTasks, useTasksSections, useTasksStats } from "@/features/tasks";
 
 import { TaskRow } from "./TaskRow";
 
@@ -27,7 +19,6 @@ export function AufgabenScreen() {
   const { isLoading, isRefetching, error, refetch } = useFamilyTasks();
   const sections = useTasksSections();
   const stats = useTasksStats();
-  const toggle = useToggleTaskDone();
 
   const { data: parent } = useCurrentParent();
   const { data: children } = useFamilyChildren(parent?.family_id);
@@ -65,15 +56,6 @@ export function AufgabenScreen() {
     { key: "upcoming", label: t("hw.upcoming"), items: sections.upcoming, urgent: false },
     { key: "doneToday", label: t("hw.doneToday"), items: sections.doneToday, urgent: false },
   ].filter((group) => group.items.length > 0);
-
-  function handleToggle(task: TaskWithType) {
-    toggle.mutate(
-      { taskId: task.id, done: !task.is_done },
-      // The layer classifies, the screen presents — that is what mapTaskError
-      // is for.
-      { onError: (err) => Alert.alert(t(mapTaskError(err))) },
-    );
-  }
 
   return (
     <Screen
@@ -144,7 +126,6 @@ export function AufgabenScreen() {
                       task={task}
                       child={task.child_id ? childById.get(task.child_id) : undefined}
                       urgent={group.urgent}
-                      onToggle={() => handleToggle(task)}
                     />
                   ))}
                 </View>
