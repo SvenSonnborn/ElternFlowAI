@@ -10,6 +10,7 @@ export {
   type UpdateTaskVars,
 } from "./mutations";
 export { applyDelete, applyToggle, applyUpdate, type TaskChanges } from "./optimistic";
+export { taskTypeColorFor } from "./palette";
 export {
   fetchFamilyTasks,
   fetchTaskTypes,
@@ -17,13 +18,15 @@ export {
   useFamilyTasks,
   useTaskTypes,
   useTasksByChild,
+  useTasksSections,
   useTasksStats,
 } from "./queries";
-export { computeTaskStats, groupTasksByChild } from "./stats";
+export { computeTaskStats, groupTasksByChild, groupTasksByDue } from "./stats";
 export type {
   TaskGroup,
   TaskInsert,
   TaskRow,
+  TaskSections,
   TaskStats,
   TaskTypeRow,
   TaskUpdate,
