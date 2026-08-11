@@ -50,10 +50,31 @@ export function DateTimePickerSheet({ mode, value, onPick, onClose }: DateTimePi
               type={isDateMode ? "date" : "time"}
               value={isValid(value) ? format(value, pattern) : ""}
               onChange={(event) => {
-                // Parsing against `value` keeps the part the input does not
-                // edit: the date picker leaves the clock alone and vice versa.
-                const next = parse(event.target.value, pattern, value);
-                if (isValid(next)) onPick(next);
+                // date-fns parse() only back-fills unspecified units from the
+                // reference date if the pattern omits those units. In date mode
+                // (pattern "yyyy-MM-dd"), the clock is missing—parse always resets
+                // it to 00:00:00, losing the original time. We must carry it over
+                // explicitly. In time mode (pattern "HH:mm"), the date is missing—
+                // parse correctly back-fills it from the reference, so no carry
+                // needed. Guard: if value is invalid, use epoch as the fallback.
+                const baseValue = isValid(value) ? value : new Date(0);
+                const parsed = parse(event.target.value, pattern, baseValue);
+                if (!isValid(parsed)) return;
+
+                if (isDateMode) {
+                  // Explicitly carry over the clock from the reference date
+                  const next = new Date(parsed);
+                  next.setHours(
+                    baseValue.getHours(),
+                    baseValue.getMinutes(),
+                    baseValue.getSeconds(),
+                    baseValue.getMilliseconds(),
+                  );
+                  onPick(next);
+                } else {
+                  // Time mode: date is already preserved from baseValue
+                  onPick(parsed);
+                }
               }}
               style={{
                 fontFamily: "Inter",
