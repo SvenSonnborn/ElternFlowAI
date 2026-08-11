@@ -10,7 +10,18 @@ export {
   type UpdateTaskVars,
 } from "./mutations";
 export { applyDelete, applyToggle, applyUpdate, type TaskChanges } from "./optimistic";
-export { taskTypeColorFor } from "./palette";
+export {
+  emptyTaskForm,
+  hasTaskFormErrors,
+  taskToForm,
+  toCreateVars,
+  toTaskChanges,
+  validateTaskForm,
+  type TaskFormErrorKey,
+  type TaskFormErrors,
+  type TaskFormState,
+} from "./form";
+export { taskTypeColorFor, taskTypeLabelKey } from "./palette";
 export {
   fetchFamilyTasks,
   fetchTaskTypes,
