@@ -380,11 +380,49 @@
     "openCount_other": "{{count}} open",
     "due": "Due: {{when}}",
     "addVoice": "Add by voice",
+    "add": "New task",
+    "notFound": "Task not found",
+    "create": {
+      "title": "Add task",
+      "save": "Add",
+      "saving": "Saving…"
+    },
+    "edit": {
+      "title": "Edit task",
+      "save": "Save",
+      "saving": "Saving…"
+    },
+    "form": {
+      "fieldType": "Type",
+      "fieldChild": "Child",
+      "noChild": "No child",
+      "fieldTitle": "Title",
+      "fieldSubject": "Subject",
+      "fieldDue": "Due date",
+      "fieldDueTime": "Time",
+      "clearTime": "Remove time",
+      "fieldNotes": "Notes"
+    },
+    "delete": {
+      "confirmTitle": "Delete task?",
+      "confirmBody": "This cannot be undone.",
+      "confirmOk": "Delete",
+      "deleting": "Deleting…",
+      "error": "Delete failed"
+    },
+    "type": {
+      "hausaufgaben": "Homework",
+      "besorgung": "Errand",
+      "elternAufgabe": "Parent task"
+    },
     "error": {
       "notAuthenticated": "Please sign in again.",
       "staleReference": "That child or task type no longer exists.",
       "network": "Connection failed. Please try again later.",
-      "generic": "Something went wrong. Please try again later."
+      "generic": "Something went wrong. Please try again later.",
+      "titleRequired": "Please enter a title",
+      "typeRequired": "Please pick a type",
+      "dateRequired": "Please pick a due date"
     }
   },
   "familie": {

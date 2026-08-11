@@ -380,11 +380,49 @@
     "openCount_other": "{{count}} offen",
     "due": "Fällig: {{when}}",
     "addVoice": "Aufgabe per Sprache",
+    "add": "Neue Aufgabe",
+    "notFound": "Aufgabe nicht gefunden",
+    "create": {
+      "title": "Aufgabe hinzufügen",
+      "save": "Hinzufügen",
+      "saving": "Speichere…"
+    },
+    "edit": {
+      "title": "Aufgabe bearbeiten",
+      "save": "Speichern",
+      "saving": "Speichere…"
+    },
+    "form": {
+      "fieldType": "Typ",
+      "fieldChild": "Kind",
+      "noChild": "Ohne Kind",
+      "fieldTitle": "Titel",
+      "fieldSubject": "Fach",
+      "fieldDue": "Fällig am",
+      "fieldDueTime": "Uhrzeit",
+      "clearTime": "Uhrzeit entfernen",
+      "fieldNotes": "Notizen"
+    },
+    "delete": {
+      "confirmTitle": "Aufgabe löschen?",
+      "confirmBody": "Diese Aktion kann nicht rückgängig gemacht werden.",
+      "confirmOk": "Löschen",
+      "deleting": "Lösche…",
+      "error": "Löschen fehlgeschlagen"
+    },
+    "type": {
+      "hausaufgaben": "Hausaufgaben",
+      "besorgung": "Besorgung",
+      "elternAufgabe": "Eltern-Aufgabe"
+    },
     "error": {
       "notAuthenticated": "Bitte erneut anmelden.",
       "staleReference": "Kind oder Aufgabentyp existiert nicht mehr.",
       "network": "Verbindung fehlgeschlagen. Bitte später erneut versuchen.",
-      "generic": "Etwas ist schiefgelaufen. Bitte später erneut versuchen."
+      "generic": "Etwas ist schiefgelaufen. Bitte später erneut versuchen.",
+      "titleRequired": "Bitte einen Titel eingeben",
+      "typeRequired": "Bitte einen Typ wählen",
+      "dateRequired": "Bitte ein Fälligkeitsdatum wählen"
     }
   },
   "familie": {
