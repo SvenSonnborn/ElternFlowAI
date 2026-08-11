@@ -3,52 +3,44 @@ import { useTranslation } from "react-i18next";
 import { Modal, Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import type { DateRange, RangeField } from "@/features/calendar";
-
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button } from "@/design-system/ui";
 
-interface DateTimePickerSheetProps {
-  /** Which of the four range pickers is open; `null` renders nothing. */
-  field: RangeField | null;
-  range: DateRange;
-  onPick: (field: RangeField, selected: Date) => void;
-  onClose: () => void;
-}
+import type { DateTimePickerSheetProps } from "./DateTimePickerSheet.types";
 
 /**
- * Platform-native date/time picker for a start–end range: a bottom sheet on
- * iOS, the system dialog on Android. Shared by the create and edit forms so the
- * two can never drift apart on picker behaviour.
+ * Platform-native date/time picker: a bottom sheet on iOS, the system dialog
+ * on Android, a `<input type="date">` on web (see the .web.tsx sibling).
+ *
+ * It knows nothing about what the value means — a range's start, a task's due
+ * date. The caller maps its own state onto `mode` + `value`.
  */
-export function DateTimePickerSheet({ field, range, onPick, onClose }: DateTimePickerSheetProps) {
+export function DateTimePickerSheet({ mode, value, onPick, onClose }: DateTimePickerSheetProps) {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
 
-  const isDateField = field === "startDate" || field === "endDate";
-  const isEndField = field === "endDate" || field === "endTime";
-  const value = isEndField ? range.endAt : range.startAt;
+  const isDateMode = mode === "date";
 
   const onChange = (event: { type: string }, selected?: Date) => {
-    if (!field) return;
+    if (!mode) return;
     if (Platform.OS === "android") onClose();
     if (event.type === "dismissed" || !selected) {
       if (Platform.OS === "ios") onClose();
       return;
     }
-    onPick(field, selected);
+    onPick(selected);
     // The inline iOS calendar has no confirm affordance of its own, so picking
     // a date closes the sheet. The time spinners stay open until "Fertig".
-    if (Platform.OS === "ios" && isDateField) onClose();
+    if (Platform.OS === "ios" && isDateMode) onClose();
   };
 
   if (Platform.OS !== "ios") {
-    if (!field) return null;
+    if (!mode) return null;
     return (
       <DateTimePicker
         value={value}
-        mode={isDateField ? "date" : "time"}
+        mode={isDateMode ? "date" : "time"}
         display="default"
         onChange={onChange}
       />
@@ -56,7 +48,7 @@ export function DateTimePickerSheet({ field, range, onPick, onClose }: DateTimeP
   }
 
   return (
-    <Modal visible={field !== null} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={mode !== null} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable
         style={{ flex: 1, backgroundColor: theme.overlay, justifyContent: "flex-end" }}
         onPress={onClose}
@@ -77,11 +69,11 @@ export function DateTimePickerSheet({ field, range, onPick, onClose }: DateTimeP
               style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.lineStrong }}
             />
           </View>
-          {field ? (
+          {mode ? (
             <DateTimePicker
               value={value}
-              mode={isDateField ? "date" : "time"}
-              display={isDateField ? "inline" : "spinner"}
+              mode={mode}
+              display={isDateMode ? "inline" : "spinner"}
               onChange={onChange}
               themeVariant={theme.card === "#FFFFFF" ? "light" : "dark"}
             />
