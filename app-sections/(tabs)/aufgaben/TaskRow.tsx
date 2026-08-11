@@ -24,10 +24,13 @@ export function TaskRow({ task, child, urgent, onToggle }: TaskRowProps) {
   const { t, i18n } = useTranslation();
   const { theme } = useTheme();
 
-  const locale = i18n.language.startsWith("de") ? de : enUS;
+  const isGerman = i18n.language.startsWith("de");
+  const locale = isGerman ? de : enUS;
   // parseISO, never new Date(): `due_date` is a Postgres `date`, and
   // new Date("2026-08-11") would read UTC midnight and shift the day.
-  const due = format(parseISO(task.due_date), "d. MMM", { locale });
+  // The pattern differs per language, not just the month name: the dot after
+  // the day is a German convention, English wants "Aug 11".
+  const due = format(parseISO(task.due_date), isGerman ? "d. MMM" : "MMM d", { locale });
   const badgeColor = taskTypeColorFor(task.task_types?.color, theme);
 
   return (
