@@ -16,3 +16,16 @@ export function taskTypeColorFor(colorRole: string | null | undefined, theme: Th
   const value = (theme as unknown as Record<string, unknown>)[colorRole];
   return typeof value === "string" ? value : theme.primary;
 }
+
+/**
+ * The catalog key for a task type's label. `task_types.label` is jsonb seeded
+ * with German only (`20260529091455_type_lookups.sql`), so a label read from
+ * there would show up in German inside the English UI — the catalogs own this
+ * copy, exactly as `typeLabelsForSlug` does for the calendar.
+ *
+ * Hyphenated slugs become camelCase so the key path stays a plain identifier.
+ */
+export function taskTypeLabelKey(slug: string): string {
+  const camel = slug.replace(/-([a-z])/g, (_match, letter: string) => letter.toUpperCase());
+  return `hw.type.${camel}`;
+}

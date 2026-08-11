@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { lightTheme } from "@/design-system";
 
-import { taskTypeColorFor } from "./palette";
+import { taskTypeColorFor, taskTypeLabelKey } from "./palette";
 
 describe("taskTypeColorFor", () => {
   test("resolves a semantic theme role to its colour", () => {
@@ -26,5 +26,16 @@ describe("taskTypeColorFor", () => {
     // Guards against a role name that collides with an inherited member.
     expect(typeof taskTypeColorFor("toString", lightTheme)).toBe("string");
     expect(taskTypeColorFor("toString", lightTheme)).toBe(lightTheme.primary);
+  });
+});
+
+describe("taskTypeLabelKey", () => {
+  test("builds a catalog key from a slug", () => {
+    expect(taskTypeLabelKey("hausaufgaben")).toBe("hw.type.hausaufgaben");
+    expect(taskTypeLabelKey("besorgung")).toBe("hw.type.besorgung");
+  });
+
+  test("camel-cases a hyphenated slug", () => {
+    expect(taskTypeLabelKey("eltern-aufgabe")).toBe("hw.type.elternAufgabe");
   });
 });
