@@ -24,6 +24,13 @@ export interface TaskGroup {
   openCount: number;
 }
 
+/** The three sections of patterns/homework.md V2, as `groupTasksByDue` returns them. */
+export interface TaskSections {
+  today: TaskWithType[];
+  upcoming: TaskWithType[];
+  doneToday: TaskWithType[];
+}
+
 export interface TaskStats {
   /** Open, `due_date <= end of today` — overdue tasks fold in here. */
   dueToday: number;
