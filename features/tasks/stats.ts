@@ -1,6 +1,6 @@
 import { endOfDay, endOfWeek, isSameDay, parseISO, startOfWeek } from "date-fns";
 
-import type { TaskGroup, TaskStats, TaskWithType } from "./types";
+import type { TaskGroup, TaskSections, TaskStats, TaskWithType } from "./types";
 
 /** `due_date` is a plain `YYYY-MM-DD` string — lexical order is date order. */
 function byDueDateAsc(a: TaskWithType, b: TaskWithType): number {
@@ -73,4 +73,38 @@ export function computeTaskStats(tasks: TaskWithType[], now: Date): TaskStats {
   const donePct = weekTotal === 0 ? 0 : Math.round((doneThisWeek / weekTotal) * 100);
 
   return { dueToday, thisWeek, donePct, open, doneToday };
+}
+
+/**
+ * The three sections of patterns/homework.md V2.
+ *
+ * `upcoming` deliberately takes *everything* open after today, not just the
+ * running week: a "this week" section would drop long-term tasks out of every
+ * list and make them invisible. The week's count lives in the stat strip
+ * instead. Together with `today` that means every open task sits in exactly
+ * one section.
+ */
+export function groupTasksByDue(tasks: TaskWithType[], now: Date): TaskSections {
+  const todayEnd = endOfDay(now);
+
+  const today: TaskWithType[] = [];
+  const upcoming: TaskWithType[] = [];
+  const doneToday: TaskWithType[] = [];
+
+  for (const task of tasks) {
+    if (task.is_done) {
+      if (task.completed_at && isSameDay(new Date(task.completed_at), now)) doneToday.push(task);
+      continue;
+    }
+    // Overdue folds into "today" — patterns/homework.md derives urgency as
+    // `today` if `due <= end of today`, same rule as computeTaskStats.
+    if (parseISO(task.due_date) <= todayEnd) today.push(task);
+    else upcoming.push(task);
+  }
+
+  return {
+    today: today.sort(byDueDateAsc),
+    upcoming: upcoming.sort(byDueDateAsc),
+    doneToday: doneToday.sort(byCompletedAtDesc),
+  };
 }
