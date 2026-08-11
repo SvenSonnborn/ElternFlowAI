@@ -312,7 +312,7 @@ export function taskTypeColorFor(colorRole: string | null | undefined, theme: Th
 
 Run: `bun test features/tasks/palette.test.ts`
 
-Expected: PASS — 6 Tests grün.
+Expected: PASS — 5 Tests grün.
 
 - [ ] **Step 5: Committen**
 
@@ -839,7 +839,7 @@ git commit -m "feat(tasks): AufgabenScreen auf Live-Daten umstellen"
 
 Run: `bun format:check && bun lint && bun run typecheck && bun test`
 
-Expected: alle vier PASS. `bun test` muss die 14 neuen Tests aus Task 1 (8) und Task 2 (6) enthalten.
+Expected: alle vier PASS. `bun test` muss die 13 neuen Tests aus Task 1 (8) und Task 2 (5) enthalten.
 
 - [ ] **Step 2: Web-Smoke-Build**
 
