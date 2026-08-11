@@ -5,9 +5,9 @@ import { AppState } from "react-native";
 
 import { supabase } from "@/features/supabase";
 
-import type { TaskGroup, TaskStats, TaskTypeRow, TaskWithType } from "./types";
+import type { TaskGroup, TaskSections, TaskStats, TaskTypeRow, TaskWithType } from "./types";
 
-import { computeTaskStats, groupTasksByChild } from "./stats";
+import { computeTaskStats, groupTasksByChild, groupTasksByDue } from "./stats";
 
 const SELECT = "*, task_types(*)";
 
@@ -92,7 +92,11 @@ function useToday(): Date {
 interface UseFamilyTasksResult {
   data: TaskWithType[];
   isLoading: boolean;
+  /** True while a pull-to-refresh (or any background refetch) is in flight. */
+  isRefetching: boolean;
   error: unknown;
+  /** Narrowed to `() => void`: callers hand this straight to `onRefresh`. */
+  refetch: () => void;
 }
 
 export function useFamilyTasks(): UseFamilyTasksResult {
@@ -107,13 +111,23 @@ export function useFamilyTasks(): UseFamilyTasksResult {
   return {
     data: query.data ?? [],
     isLoading: query.isLoading,
+    isRefetching: query.isRefetching,
     error: query.error,
+    refetch: () => void query.refetch(),
   };
 }
 
 export function useTasksByChild(): TaskGroup[] {
   const { data } = useFamilyTasks();
   return useMemo(() => groupTasksByChild(data), [data]);
+}
+
+export function useTasksSections(): TaskSections {
+  const { data } = useFamilyTasks();
+  const today = useToday();
+  // groupTasksByDue only reads the calendar day off `now`, so local midnight is
+  // as good as the wall clock — and it keeps the memo from re-running.
+  return useMemo(() => groupTasksByDue(data, today), [data, today]);
 }
 
 export function useTasksStats(): TaskStats {

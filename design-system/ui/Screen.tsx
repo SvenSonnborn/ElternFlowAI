@@ -1,14 +1,17 @@
-import { ScrollView, View, type ViewProps } from "react-native";
+import { ScrollView, View, type ScrollViewProps, type ViewProps } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface ScreenProps extends ViewProps {
   scroll?: boolean;
+  /** Only honoured together with `scroll` — a non-scrolling screen has nothing to pull. */
+  refreshControl?: ScrollViewProps["refreshControl"];
   className?: string;
   contentClassName?: string;
 }
 
 export function Screen({
   scroll = false,
+  refreshControl,
   className,
   contentClassName,
   children,
@@ -27,6 +30,7 @@ export function Screen({
           className="flex-1"
           contentContainerClassName={`pb-32 ${contentClassName ?? ""}`.trim()}
           keyboardShouldPersistTaps="handled"
+          refreshControl={refreshControl}
         >
           {inner}
         </ScrollView>
