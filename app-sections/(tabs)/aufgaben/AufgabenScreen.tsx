@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import { de, enUS } from "date-fns/locale";
+import { router } from "expo-router";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, RefreshControl, View } from "react-native";
@@ -135,7 +136,16 @@ export function AufgabenScreen() {
         </>
       )}
 
-      <Button label={t("hw.addVoice")} variant="soft" tone="accent" block className="mt-5" />
+      {/* Outside the loading/error branch on purpose: adding a task must work
+          even when the list itself is unavailable. */}
+      <Button
+        label={t("hw.add")}
+        tone="primary"
+        block
+        className="mt-5"
+        onPress={() => router.push("/task/new")}
+      />
+      <Button label={t("hw.addVoice")} variant="soft" tone="accent" block className="mt-2" />
     </Screen>
   );
 }
