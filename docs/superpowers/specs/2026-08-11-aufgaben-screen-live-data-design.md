@@ -169,12 +169,12 @@ Der Voice-Button bleibt unverändert stehen.
 
 ### Zustände
 
-| Zustand                    | Darstellung                                                             |
-| -------------------------- | ----------------------------------------------------------------------- |
-| Erste Ladung (`isLoading`) | `ActivityIndicator`, keine Stat-Leiste                                  |
-| Fehler (`error`)           | Card mit `t(mapTaskError(error))` + Button `action.retry` → `refetch`   |
-| Alles leer                 | Card mit `hw.empty.title` / `hw.empty.sub`, Stat-Leiste bleibt sichtbar |
-| Refetch (`isRefetching`)   | Spinner im `RefreshControl`, Inhalt bleibt stehen                       |
+| Zustand                    | Darstellung                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Erste Ladung (`isLoading`) | `ActivityIndicator`, keine Stat-Leiste                                                                              |
+| Fehler (`error`)           | Card mit `hw.loadError` als Titel, `t(mapTaskError(error))` als Ursache darunter, Button `action.retry` → `refetch` |
+| Alles leer                 | Card mit `hw.empty.title` / `hw.empty.sub`, Stat-Leiste bleibt sichtbar                                             |
+| Refetch (`isRefetching`)   | Spinner im `RefreshControl`, Inhalt bleibt stehen                                                                   |
 
 Ein Fehler beim Abhaken zeigt `Alert.alert(t(mapTaskError(err)))` im `onError`
 — genau die Arbeitsteilung, für die `mapTaskError` gebaut wurde: der Layer
