@@ -364,7 +364,12 @@
   },
   "hw": {
     "title": "Homework",
-    "sub": "Wed · {{open}} open · {{done}} done",
+    "sub": "{{weekday}} · {{open}} open · {{done}} done",
+    "loadError": "Tasks could not be loaded.",
+    "empty": {
+      "title": "Nothing to do",
+      "sub": "Tasks will show up here once there are any."
+    },
     "dueToday": "Due today",
     "thisWeek": "This week",
     "longTerm": "Long term",

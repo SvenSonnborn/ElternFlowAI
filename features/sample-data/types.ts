@@ -68,24 +68,6 @@ export interface CalendarDayCell {
   dots: string[];
 }
 
-export interface HomeworkItem {
-  id: string;
-  subject: string;
-  subjectEn: string;
-  title: string;
-  titleEn: string;
-  due: string;
-  dueEn: string;
-  tone: string;
-  isUrgent?: boolean;
-  isDone?: boolean;
-}
-
-export interface HomeworkByChild {
-  childId: string;
-  items: HomeworkItem[];
-}
-
 export interface Ingredient {
   amount: string;
   name: string;

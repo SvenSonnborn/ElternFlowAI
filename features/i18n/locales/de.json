@@ -364,7 +364,12 @@
   },
   "hw": {
     "title": "Hausaufgaben",
-    "sub": "Mittwoch · {{open}} offen · {{done}} erledigt",
+    "sub": "{{weekday}} · {{open}} offen · {{done}} erledigt",
+    "loadError": "Aufgaben konnten nicht geladen werden.",
+    "empty": {
+      "title": "Nichts zu tun",
+      "sub": "Sobald Aufgaben anstehen, findest du sie hier."
+    },
     "dueToday": "Heute fällig",
     "thisWeek": "Diese Woche",
     "longTerm": "Langfristig",
