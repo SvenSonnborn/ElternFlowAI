@@ -105,7 +105,9 @@ export function AufgabenScreen() {
           <Text variant="caption" tone="inkSecondary">
             {t(mapTaskError(error))}
           </Text>
-          <Button label={t("action.retry")} variant="soft" size="sm" onPress={refetch} />
+          {/* Default size (md, h-11) on purpose — `sm` is h-9 and would fall
+              below the 44×44 touch target. */}
+          <Button label={t("action.retry")} variant="soft" onPress={refetch} />
         </Card>
       ) : (
         <>
