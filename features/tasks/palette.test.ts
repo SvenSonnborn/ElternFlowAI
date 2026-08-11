@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { lightTheme } from "@/design-system/themes";
+import { lightTheme } from "@/design-system";
 
 import { taskTypeColorFor } from "./palette";
 
