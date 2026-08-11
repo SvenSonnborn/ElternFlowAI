@@ -849,9 +849,11 @@ Expected: Bundle wird ohne Fehler geschrieben. Hier besonders relevant, weil `da
 
 - [ ] **Step 3: Schichtgrenze prüfen**
 
-Run: `grep -n "react-native" features/tasks/mutations.ts features/tasks/optimistic.ts features/tasks/errors.ts features/tasks/palette.ts features/tasks/stats.ts`
+Run: `grep -nE '^\s*import .*"react-native"' features/tasks/mutations.ts features/tasks/optimistic.ts features/tasks/errors.ts features/tasks/palette.ts features/tasks/stats.ts`
 
 Expected: **keine Treffer.** Der Daten-Layer bleibt frei von UI-Abhängigkeiten; `queries.ts` ist ausgenommen (es nutzt `AppState` für den Mitternachts-Refresh).
+
+Der Ausdruck prüft auf **Import-Zeilen**, nicht auf das blanke Wort — `errors.ts` erwähnt „react-native-web" in einem Kommentar zur Netzwerkfehler-Erkennung, und ein loser `grep "react-native"` schlägt darauf fälschlich an.
 
 - [ ] **Step 4: CodeRabbit-Review**
 
