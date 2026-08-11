@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Field } from "@/app-sections/shared";
+import { DateTimePickerSheet, Field } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import {
@@ -26,7 +26,6 @@ import {
   type RecurrenceOption,
 } from "@/features/calendar";
 
-import { DateTimePickerSheet } from "./DateTimePickerSheet";
 import { RecurrenceCountField } from "./RecurrenceCountField";
 import { RecurrenceRadio } from "./RecurrenceRadio";
 import { pickScope } from "./scopeDialog";
@@ -176,6 +175,11 @@ export function EventEditScreen() {
       },
     );
   }
+
+  // The sheet is range-agnostic now: which end of the range is being edited is
+  // calendar knowledge and stays here.
+  const pickerMode = picker === null ? null : picker.endsWith("Date") ? "date" : "time";
+  const pickerValue = picker === "endDate" || picker === "endTime" ? endAt : startAt;
 
   return (
     <SafeAreaView
@@ -349,9 +353,11 @@ export function EventEditScreen() {
           </ScrollView>
 
           <DateTimePickerSheet
-            field={picker}
-            range={range}
-            onPick={(field, selected) => setRange((prev) => applyRangePick(prev, field, selected))}
+            mode={pickerMode}
+            value={pickerValue}
+            onPick={(selected) => {
+              if (picker) setRange((prev) => applyRangePick(prev, picker, selected));
+            }}
             onClose={() => setPicker(null)}
           />
         </>
