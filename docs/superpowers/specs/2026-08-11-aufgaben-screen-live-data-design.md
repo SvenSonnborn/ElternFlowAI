@@ -153,8 +153,15 @@ Handoff-Bundles bleiben unberührt.
 - kleiner `ChildAvatar` (`size="sm"`, 24 px) mit Name und Farbe des Kindes aus
   `useFamilyChildren`; Tasks ohne `child_id` (Eltern-Aufgaben, Besorgungen)
   bekommen keinen.
-- Pill mit `task.subject`; ist die Spalte `null`, das Label aus `task_types`
-  in der aktiven Sprache. Farbe aus `task_types.color`.
+- Pill mit `task.subject`, **nur wenn die Spalte gesetzt ist**. Kein Rückfall
+  auf ein Typ-Label: `task_types.label` ist jsonb mit ausschließlich
+  `{"de": …}` (siehe Seed in `20260529091455_type_lookups.sql`), ein Label
+  daraus stünde im englischen UI auf Deutsch. `patterns/homework.md` sieht in
+  der V2-Zeile ohnehin nur ein Subject-Pill vor. Der Typ steuert allein die
+  **Farbe** — und auch die nicht direkt: `task_types.color` enthält Namen
+  semantischer Theme-Rollen (`accent`, `primary`, `primarySoft`), keine
+  Hex-Werte. Auflösung über `taskTypeColorFor`, analog `eventColorFor` in
+  `features/calendar/palette.ts`.
 - Urgent-Pill (`hw.dueToday`, tone `warn`), wenn offen und `due_date ≤ heute`.
 - Titel, bei `is_done` durchgestrichen und `inkTertiary`.
 - Caption `hw.due` mit dem formatierten Fälligkeitsdatum.
