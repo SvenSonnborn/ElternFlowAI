@@ -8,8 +8,9 @@ import type { TaskGroup, TaskSections, TaskStats, TaskWithType } from "./types";
  * geparst.
  *
  * Eine Aufgabe ohne Uhrzeit ist der vageste Termin ihres Tages und sortiert
- * hinter die terminierten; der Titel bricht den Rest der Gleichstände, damit
- * die Reihenfolge stabil ist statt „was Postgres gerade lieferte".
+ * hinter die terminierten; Titel und zuletzt `id` brechen den Rest der
+ * Gleichstände, damit die Reihenfolge stabil ist statt „was Postgres gerade
+ * lieferte".
  */
 function byDueAsc(a: TaskWithType, b: TaskWithType): number {
   const byDate = a.due_date.localeCompare(b.due_date);
@@ -21,7 +22,14 @@ function byDueAsc(a: TaskWithType, b: TaskWithType): number {
     return a.due_time.localeCompare(b.due_time);
   }
 
-  return a.title.localeCompare(b.title);
+  const byTitle = a.title.localeCompare(b.title);
+  if (byTitle !== 0) return byTitle;
+
+  // Ohne diesen letzten Vergleich gäbe der Comparator bei gleichem Termin und
+  // gleichem Titel 0 zurück. `Array.sort` ist stabil, übernähme also die
+  // Reihenfolge der Query — und die ist bei Gleichstand nicht festgelegt, zwei
+  // gleichnamige Aufgaben könnten zwischen zwei Refetches die Plätze tauschen.
+  return a.id.localeCompare(b.id);
 }
 
 function byCompletedAtDesc(a: TaskWithType, b: TaskWithType): number {

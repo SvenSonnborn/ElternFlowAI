@@ -220,9 +220,15 @@ interface TaskSections {
 }
 ```
 
-`doneRecent` wird **nur bei Status = `done` gerendert**. Unter `all` bleibt der
-Screen beim Tagesrhythmus, statt die Default-Ansicht um eine Woche Historie zu
-verlängern.
+`doneRecent` wird **gerendert, sobald irgendein Filter aktiv ist**. Im
+ungefilterten Default-Zustand bleibt die Sektion weg, damit die Standardansicht
+beim Tagesrhythmus bleibt und nicht um eine Woche Historie wächst.
+
+> Ursprünglich war die Bedingung enger gefasst — nur bei Status = `done`. Das
+> ließ Zeilen verschwinden, die der Filter durchgelassen hatte: Status `Alle` +
+> Fälligkeit `Überfällig` auf eine gestern erledigte überfällige Aufgabe landet
+> in `doneRecent`, und der Screen meldete „Keine Treffer", obwohl es einen gab.
+> Im finalen Review korrigiert, siehe ADR-011 Decision 3.
 
 ### Neue Datei: `features/tasks/filterStore.ts`
 
@@ -412,8 +418,8 @@ braucht „Heute", die Überschrift „Heute fällig".
    zurück; ein App-Neustart setzt ihn auf `Alle`.
 5. „Diese Woche" liefert genau so viele offene Aufgaben, wie die gleichnamige
    Stat-Kachel zählt.
-6. Bei Status = `Erledigt` erscheinen „Erledigt heute" und „Zuletzt erledigt";
-   unter `Alle` nur „Erledigt heute".
+6. Sobald ein Filter aktiv ist, erscheinen „Erledigt heute" und „Zuletzt
+   erledigt"; im ungefilterten Default-Zustand nur „Erledigt heute".
 7. Überfällige Aufgaben stehen unter „Überfällig", auch ohne aktiven Filter,
    und tragen die Pille „Überfällig" statt „Heute fällig".
 8. Bei gleichem `due_date` sortiert die frühere `due_time` nach oben, Zeilen

@@ -365,7 +365,7 @@ git commit -m "feat(tasks): Ueberfaellig- und DoneRecent-Sektion plus stabile So
 
 Task 1 hat den `overdue`-Eimer erzeugt, aber niemand rendert ihn — überfällige Aufgaben sind gerade komplett unsichtbar. Diese Task schließt die Lücke sofort und stellt dabei `TaskRow` von `urgent: boolean` auf ein dreiwertiges `urgency` um, weil eine überfällige Zeile sonst die Pille „Heute fällig" trüge.
 
-`doneRecent` bleibt hier bewusst ungerendert — es erscheint erst mit dem Status-Filter in Task 6.
+`doneRecent` bleibt hier bewusst ungerendert — es erscheint erst mit der Filterleiste in Task 6.
 
 **Files:**
 
@@ -1377,9 +1377,11 @@ const groups = [
     items: sections.doneToday,
     urgency: "none" as const,
   },
-  // Nur unter dem Erledigt-Filter: unter „Alle" würde die Default-Ansicht
-  // sonst um eine Woche Historie wachsen.
-  ...(filter.status === "done"
+  // Sobald ein Filter aktiv ist: sonst kann eine vom Filter durchgelassene
+  // Zeile in doneRecent landen und dort verschwinden, während der Screen
+  // „Keine Treffer" meldet. Im ungefilterten Default-Zustand bleibt die
+  // Sektion weg, damit die Ansicht nicht um eine Woche Historie wächst.
+  ...(filterActive
     ? [
         {
           key: "doneRecent",
@@ -1559,7 +1561,7 @@ ungenutzt: ein Kind-_Filter_ ersetzt keine Kind-_Gruppierung_.
 In `docs/TODO.md` ans Ende des Abschnitts `## Aufgaben / Tasks (Daten-Layer V1)` anhängen:
 
 ```markdown
-- **`patterns/homework.md` kennt keine Filterleiste und nennt drei Sektionen statt fünf** ([patterns/homework.md](../patterns/homework.md)): Der V2-Abschnitt beschreibt „Heute fällig / Demnächst / Erledigt heute". Seit ADR-011 rendert der Screen zusätzlich „Überfällig" (immer, sobald überfällige Aufgaben existieren) und „Zuletzt erledigt" (nur unter dem Erledigt-Filter), und darüber sitzen drei Chip-Reihen, die der Pattern-Doc überhaupt nicht führt. Mit dem Designer abstimmen, damit der Doc die Anatomie mitträgt — inklusive der Frage, ob die Stat-Kachel „Heute fällig" weiterhin Überfälliges mitzählen soll, während die Liste beides trennt.
+- **`patterns/homework.md` kennt keine Filterleiste und nennt drei Sektionen statt fünf** ([patterns/homework.md](../patterns/homework.md)): Der V2-Abschnitt beschreibt „Heute fällig / Demnächst / Erledigt heute". Seit ADR-011 rendert der Screen zusätzlich „Überfällig" (immer, sobald überfällige Aufgaben existieren) und „Zuletzt erledigt" (sobald ein Filter aktiv ist), und darüber sitzen drei Chip-Reihen, die der Pattern-Doc überhaupt nicht führt. Mit dem Designer abstimmen, damit der Doc die Anatomie mitträgt — inklusive der Frage, ob die Stat-Kachel „Heute fällig" weiterhin Überfälliges mitzählen soll, während die Liste beides trennt.
 - **Neue Filter-Keys fehlen in `docs/COPY.md`** ([features/i18n/locales/de.json](../features/i18n/locales/de.json) + [en.json](../features/i18n/locales/en.json)): `hw.overdue`, `hw.doneRecent` sowie `hw.filter.all`/`open`/`done`/`today`/`reset`, `hw.filter.empty.title`/`sub` und `hw.filter.a11y.status`/`due`/`child`. Vom Designer in der Copy-Deck-Tabelle nachtragen (gleiche Baustelle wie `set.footer` und die Kalender-Keys).
 ```
 
@@ -1610,7 +1612,7 @@ Jeden Fund entweder beheben oder mit Begründung bewusst verwerfen. Rate-Limit b
 | Chip-Tap ohne Request                                                 | Task 4 Step 5 (Filter im `useMemo`, kein Query-Key)                               |
 | Filter überlebt Tab-Wechsel, nicht den Neustart                       | Task 4 Step 3 (Store ohne `persist`) · Sichtprüfung Punkt 8                       |
 | „Diese Woche" == Stat-Kachel                                          | Task 3 Step 1 (`'week' reicht bis einschließlich Sonntag`) · Sichtprüfung Punkt 4 |
-| `doneRecent` nur unter Status `Erledigt`                              | Task 6 Step 6 · Sichtprüfung Punkt 2                                              |
+| `doneRecent` nur bei aktivem Filter                                   | Task 6 Step 6 · Sichtprüfung Punkt 2                                              |
 | Überfällig immer sichtbar, mit eigener Pille                          | Task 1 Step 2 · Task 2 Step 2 · Sichtprüfung Punkt 3                              |
 | `due_time`-Tiebreaker, ohne Uhrzeit alphabetisch ans Ende             | Task 1 Step 2 (zwei Sortier-Tests)                                                |
 | Gefilterter Leerzustand statt „Nichts zu tun"                         | Task 6 Step 8 · Sichtprüfung Punkt 7                                              |
