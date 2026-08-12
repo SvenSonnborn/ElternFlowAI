@@ -12,15 +12,17 @@ import { useTheme } from "@/design-system/ThemeProvider";
 import { Card, Text } from "@/design-system/ui";
 import { mapTaskError, taskTypeColorFor, useToggleTaskDone } from "@/features/tasks";
 
+/** Steuert Card-Tönung und Dringlichkeits-Pille der Zeile. */
+export type TaskUrgency = "none" | "today" | "overdue";
+
 interface TaskRowProps {
   task: TaskWithType;
-  /** Absent for parent errands and chores, which hang on no child. */
+  /** Fehlt bei Eltern-Besorgungen, die an keinem Kind hängen. */
   child?: ChildRow;
-  /** Set for the "today" section: tints the card and shows the urgent pill. */
-  urgent: boolean;
+  urgency: TaskUrgency;
 }
 
-export function TaskRow({ task, child, urgent }: TaskRowProps) {
+export function TaskRow({ task, child, urgency }: TaskRowProps) {
   const { t, i18n } = useTranslation();
   const { theme } = useTheme();
 
@@ -47,10 +49,11 @@ export function TaskRow({ task, child, urgent }: TaskRowProps) {
   // the day is a German convention, English wants "Aug 11".
   const due = format(parseISO(task.due_date), isGerman ? "d. MMM" : "MMM d", { locale });
   const badgeColor = taskTypeColorFor(task.task_types?.color, theme);
+  const isUrgent = urgency !== "none";
 
   return (
     <Card
-      variant={urgent ? "tinted" : "base"}
+      variant={isUrgent ? "tinted" : "base"}
       tint="warning"
       className="flex-row items-center gap-2.5"
     >
@@ -87,7 +90,7 @@ export function TaskRow({ task, child, urgent }: TaskRowProps) {
         // shifting normal-length rows, whose content already exceeds it.
         className="min-h-11 flex-1 justify-center active:opacity-70"
       >
-        {task.subject || urgent ? (
+        {task.subject || isUrgent ? (
           <View className="mb-1 flex-row items-center gap-1.5">
             {task.subject ? (
               <View
@@ -99,7 +102,11 @@ export function TaskRow({ task, child, urgent }: TaskRowProps) {
                 </Text>
               </View>
             ) : null}
-            {urgent ? <Pill label={t("hw.dueToday")} tone="warn" /> : null}
+            {/* Beide dringenden Zustände tönen die Card `warning` — `Card`s
+                TintTone kennt kein `danger`, und design-system/ui folgt darin
+                dem Handoff-Bundle. Die Unterscheidung trägt die Pille. */}
+            {urgency === "overdue" ? <Pill label={t("hw.overdue")} tone="danger" /> : null}
+            {urgency === "today" ? <Pill label={t("hw.dueToday")} tone="warn" /> : null}
           </View>
         ) : null}
 
