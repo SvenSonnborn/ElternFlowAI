@@ -1,10 +1,27 @@
-import { endOfDay, endOfWeek, isSameDay, parseISO, startOfWeek } from "date-fns";
+import { endOfDay, endOfWeek, isSameDay, parseISO, startOfDay, startOfWeek } from "date-fns";
 
 import type { TaskGroup, TaskSections, TaskStats, TaskWithType } from "./types";
 
-/** `due_date` is a plain `YYYY-MM-DD` string — lexical order is date order. */
-function byDueDateAsc(a: TaskWithType, b: TaskWithType): number {
-  return a.due_date.localeCompare(b.due_date);
+/**
+ * `due_date` ist ein `YYYY-MM-DD`-String und `due_time` ein `HH:MM:SS` — für
+ * beide ist die lexikalische Ordnung die chronologische, es wird also nichts
+ * geparst.
+ *
+ * Eine Aufgabe ohne Uhrzeit ist der vageste Termin ihres Tages und sortiert
+ * hinter die terminierten; der Titel bricht den Rest der Gleichstände, damit
+ * die Reihenfolge stabil ist statt „was Postgres gerade lieferte".
+ */
+function byDueAsc(a: TaskWithType, b: TaskWithType): number {
+  const byDate = a.due_date.localeCompare(b.due_date);
+  if (byDate !== 0) return byDate;
+
+  if (a.due_time !== b.due_time) {
+    if (a.due_time === null) return 1;
+    if (b.due_time === null) return -1;
+    return a.due_time.localeCompare(b.due_time);
+  }
+
+  return a.title.localeCompare(b.title);
 }
 
 function byCompletedAtDesc(a: TaskWithType, b: TaskWithType): number {
@@ -15,7 +32,7 @@ export function groupTasksByChild(tasks: TaskWithType[]): TaskGroup[] {
   // Sorting first makes the Map's insertion order the "earliest due date
   // first" order the caller sees.
   const buckets = new Map<string | null, TaskWithType[]>();
-  for (const task of [...tasks].sort(byDueDateAsc)) {
+  for (const task of [...tasks].sort(byDueAsc)) {
     const bucket = buckets.get(task.child_id);
     if (bucket) bucket.push(task);
     else buckets.set(task.child_id, [task]);
@@ -23,7 +40,7 @@ export function groupTasksByChild(tasks: TaskWithType[]): TaskGroup[] {
 
   const groups: TaskGroup[] = [];
   for (const [childId, bucket] of buckets) {
-    const open = bucket.filter((t) => !t.is_done).sort(byDueDateAsc);
+    const open = bucket.filter((t) => !t.is_done).sort(byDueAsc);
     const done = bucket.filter((t) => t.is_done).sort(byCompletedAtDesc);
     groups.push({ childId, tasks: [...open, ...done], openCount: open.length });
   }
@@ -76,35 +93,50 @@ export function computeTaskStats(tasks: TaskWithType[], now: Date): TaskStats {
 }
 
 /**
- * The three sections of patterns/homework.md V2.
+ * Die Sektionen des Aufgaben-Screens.
  *
- * `upcoming` deliberately takes *everything* open after today, not just the
- * running week: a "this week" section would drop long-term tasks out of every
- * list and make them invisible. The week's count lives in the stat strip
- * instead. Together with `today` that means every open task sits in exactly
- * one section.
+ * `upcoming` nimmt bewusst *alles* Offene nach heute auf, nicht nur die
+ * laufende Woche: eine „diese Woche"-Sektion ließe langfristige Aufgaben aus
+ * jeder Liste fallen. Die Wochenzahl steht stattdessen in der Stat-Leiste.
+ * Zusammen mit `overdue` und `today` sitzt damit jede offene Aufgabe in genau
+ * einer Sektion.
+ *
+ * Überfälliges bekommt seit der Filter-Iteration eine eigene Sektion, statt in
+ * `today` zu verschwinden — eine drei Tage überfällige Aufgabe sah sonst aus
+ * wie eine, die heute Abend fällig ist. Die Kachel „Heute fällig" zählt
+ * weiterhin beides zusammen (siehe `computeTaskStats`).
  */
 export function groupTasksByDue(tasks: TaskWithType[], now: Date): TaskSections {
+  const dayStart = startOfDay(now);
   const todayEnd = endOfDay(now);
 
+  const overdue: TaskWithType[] = [];
   const today: TaskWithType[] = [];
   const upcoming: TaskWithType[] = [];
   const doneToday: TaskWithType[] = [];
+  const doneRecent: TaskWithType[] = [];
 
   for (const task of tasks) {
     if (task.is_done) {
-      if (task.completed_at && isSameDay(new Date(task.completed_at), now)) doneToday.push(task);
+      // Der tasks_completed_consistency-CHECK garantiert completed_at, sobald
+      // is_done — die Prüfung fängt Zeilen aus einem veralteten Cache ab.
+      if (!task.completed_at) continue;
+      if (isSameDay(new Date(task.completed_at), now)) doneToday.push(task);
+      else doneRecent.push(task);
       continue;
     }
-    // Overdue folds into "today" — patterns/homework.md derives urgency as
-    // `today` if `due <= end of today`, same rule as computeTaskStats.
-    if (parseISO(task.due_date) <= todayEnd) today.push(task);
+
+    const dueAt = parseISO(task.due_date);
+    if (dueAt < dayStart) overdue.push(task);
+    else if (dueAt <= todayEnd) today.push(task);
     else upcoming.push(task);
   }
 
   return {
-    today: today.sort(byDueDateAsc),
-    upcoming: upcoming.sort(byDueDateAsc),
+    overdue: overdue.sort(byDueAsc),
+    today: today.sort(byDueAsc),
+    upcoming: upcoming.sort(byDueAsc),
     doneToday: doneToday.sort(byCompletedAtDesc),
+    doneRecent: doneRecent.sort(byCompletedAtDesc),
   };
 }
