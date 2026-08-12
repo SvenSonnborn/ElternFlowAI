@@ -57,6 +57,7 @@ export function FilterChipRow<T extends string>({
             hitSlop={{ top: 4, bottom: 4 }}
             className="h-9 flex-row items-center gap-1.5 rounded-pill border px-3 active:opacity-70"
             style={{
+              minWidth: 44,
               backgroundColor: active ? theme.primarySoft : theme.cardSubtle,
               borderColor: active ? theme.primary : theme.line,
             }}
