@@ -1,23 +1,20 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import type { MemberOption, TypePickerItem } from "@/app-sections/shared";
 import type { TaskFormState } from "@/features/tasks";
 
 import { confirmDestructive, showAlert } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
-import { Button, Text } from "@/design-system/ui";
+import { Button, Card, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren } from "@/features/auth";
 import {
   emptyTaskForm,
   hasTaskFormErrors,
   mapTaskError,
   taskToForm,
-  taskTypeColorFor,
-  taskTypeLabelKey,
   toTaskChanges,
   useDeleteTask,
   useTask,
@@ -27,6 +24,7 @@ import {
 } from "@/features/tasks";
 
 import { TaskForm } from "./TaskForm";
+import { useTaskFormOptions } from "./useTaskFormOptions";
 
 export function TaskEditScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -34,7 +32,7 @@ export function TaskEditScreen() {
   const { t } = useTranslation();
   const { theme, nativeVars } = useTheme();
 
-  const { data: task, isLoading } = useTask(taskId);
+  const { data: task, isLoading, error: loadError, refetch } = useTask(taskId);
   const types = useTaskTypes();
   const { data: parent } = useCurrentParent();
   const { data: children } = useFamilyChildren(parent?.family_id);
@@ -60,26 +58,7 @@ export function TaskEditScreen() {
     });
   }
 
-  const typeItems: TypePickerItem[] = useMemo(
-    () =>
-      (types.data ?? []).map((type) => ({
-        id: type.id,
-        label: t(taskTypeLabelKey(type.slug), { defaultValue: type.slug }),
-        color: taskTypeColorFor(type.color, theme),
-      })),
-    [types.data, t, theme],
-  );
-
-  const childOptions: MemberOption[] = useMemo(
-    () =>
-      (children ?? []).map((child) => ({
-        id: child.id,
-        name: child.name,
-        color: child.color,
-        kind: "child" as const,
-      })),
-    [children],
-  );
+  const { typeItems, childOptions } = useTaskFormOptions(types.data, children);
 
   const errors = validateTaskForm(state);
   const canSave =
@@ -123,6 +102,22 @@ export function TaskEditScreen() {
       {isLoading ? (
         <View className="flex-1 items-center justify-center px-6">
           <View className="h-24 w-full rounded-2xl" style={{ backgroundColor: theme.cardSubtle }} />
+        </View>
+      ) : loadError && !task && !hydrated ? (
+        // A failed `useFamilyTasks` load and a genuinely-missing task both
+        // resolve `task` to `undefined` here — without this branch a cold-start
+        // deep link while offline would render "task not found" instead of
+        // "couldn't load", with no way back in but a retry.
+        <View className="flex-1 items-center justify-center px-6">
+          <Card className="w-full items-start gap-2">
+            <Text variant="bodyEmph">{t("hw.loadError")}</Text>
+            <Text variant="caption" tone="inkSecondary">
+              {t(mapTaskError(loadError))}
+            </Text>
+            {/* Default size (md, h-11) on purpose — `sm` is h-9 and would fall
+                below the 44×44 touch target. */}
+            <Button label={t("action.retry")} variant="soft" onPress={refetch} />
+          </Card>
         </View>
       ) : !task && !hydrated ? (
         // `!task` alone would also fire mid-delete: the mutation's onMutate
