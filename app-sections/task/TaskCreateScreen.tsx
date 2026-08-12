@@ -56,12 +56,7 @@ export function TaskCreateScreen() {
 
   const { typeItems, childOptions } = useTaskFormOptions(types.data, children);
 
-  // Suppressed while the type lookup is still in flight: `typeId` is null at
-  // that point too, but the user hasn't had a chance to pick anything yet —
-  // showing "please pick a type" here would accuse them before the picker
-  // even has options.
   const errors = validateTaskForm(state);
-  const showTypeError = !types.isLoading;
   const canSave = !hasTaskFormErrors(errors) && !createMutation.isPending;
 
   // No history to fall back to on a cold-start deep link straight to
@@ -87,6 +82,11 @@ export function TaskCreateScreen() {
       <Stack.Screen options={{ contentStyle: { flex: 1, backgroundColor: theme.card } }} />
 
       {types.isLoading ? (
+        // Renders in place of the form rather than alongside it: with
+        // `typeItems` still empty, `typeId` reads as null the same as
+        // "loaded, nothing picked" — showing the form here would let
+        // `TaskForm` flag "please pick a type" before the picker has any
+        // options to pick from.
         <View className="flex-1 items-center justify-center px-6">
           <View className="h-24 w-full rounded-2xl" style={{ backgroundColor: theme.cardSubtle }} />
         </View>
@@ -138,7 +138,7 @@ export function TaskCreateScreen() {
             childOptions={childOptions}
             errors={{
               title: errors.title ? t(errors.title) : undefined,
-              typeId: showTypeError && errors.typeId ? t(errors.typeId) : undefined,
+              typeId: errors.typeId ? t(errors.typeId) : undefined,
               dueDate: errors.dueDate ? t(errors.dueDate) : undefined,
             }}
           />
