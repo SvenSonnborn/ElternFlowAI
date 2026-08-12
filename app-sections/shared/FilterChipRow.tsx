@@ -36,7 +36,9 @@ export function FilterChipRow<T extends string>({
   return (
     // Container-Rolle statt `accessible`: ein accessible-Container würde die
     // Chips für den Screenreader verschlucken, die Rolle benennt die Gruppe,
-    // ohne sie unerreichbar zu machen.
+    // ohne sie unerreichbar zu machen. Die Chips selbst sind `radio`, nicht
+    // `button` — die Reihe ist Einfachauswahl mit einem verpflichtenden
+    // Default, genau das, was eine Radiogroup semantisch beschreibt.
     <View
       accessibilityRole="radiogroup"
       accessibilityLabel={accessibilityLabel}
@@ -47,15 +49,15 @@ export function FilterChipRow<T extends string>({
         return (
           <Pressable
             key={option.id}
-            accessibilityRole="button"
+            accessibilityRole="radio"
             accessibilityLabel={option.label}
-            accessibilityState={{ selected: active }}
+            accessibilityState={{ checked: active }}
             onPress={() => onSelect(option.id)}
             // Der Chip ist per Design 36px hoch; hitSlop bringt das
             // Touch-Target auf 44, ohne die Optik anzufassen — wie in
             // TypePicker.
             hitSlop={{ top: 4, bottom: 4 }}
-            className="h-9 flex-row items-center gap-1.5 rounded-pill border px-3 active:opacity-70"
+            className="h-9 flex-row items-center justify-center gap-1.5 rounded-pill border px-3 active:opacity-70"
             style={{
               minWidth: 44,
               backgroundColor: active ? theme.primarySoft : theme.cardSubtle,
