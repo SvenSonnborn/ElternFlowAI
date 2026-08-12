@@ -21,9 +21,33 @@ import {
   useTasksStats,
   type DueFilter,
   type StatusFilter,
+  type TaskWithType,
 } from "@/features/tasks";
 
-import { TaskRow } from "./TaskRow";
+import { TaskRow, type TaskUrgency } from "./TaskRow";
+
+/** Eine Sektion des Screens: die Fälligkeits-/Erledigt-Häufchen aus `TaskSections`, benannt und mit ihrer Dringlichkeits-Pille. */
+interface TaskGroupEntry {
+  key: string;
+  label: string;
+  items: TaskWithType[];
+  urgency: TaskUrgency;
+}
+
+/**
+ * Kontextuelle Typisierung über den Funktionsparameter statt einer
+ * Objekt-Literal-Annotation: `urgency` bleibt so an jeder Aufrufstelle gegen
+ * `TaskUrgency` geprüft, ohne dass ein `as const` nötig wäre oder das
+ * Widening der bedingt gespreadeten `doneRecent`-Zeile umgangen werden müsste.
+ */
+function taskGroup(
+  key: string,
+  label: string,
+  items: TaskWithType[],
+  urgency: TaskUrgency,
+): TaskGroupEntry {
+  return { key, label, items, urgency };
+}
 
 export function AufgabenScreen() {
   const { t, i18n } = useTranslation();
@@ -97,39 +121,23 @@ export function AufgabenScreen() {
     },
   ];
 
-  const groups = [
-    {
-      key: "overdue",
-      label: t("hw.overdue"),
-      items: sections.overdue,
-      urgency: "overdue" as const,
-    },
-    { key: "today", label: t("hw.dueToday"), items: sections.today, urgency: "today" as const },
-    {
-      key: "upcoming",
-      label: t("hw.upcoming"),
-      items: sections.upcoming,
-      urgency: "none" as const,
-    },
-    {
-      key: "doneToday",
-      label: t("hw.doneToday"),
-      items: sections.doneToday,
-      urgency: "none" as const,
-    },
-    // Nur unter dem Erledigt-Filter: unter „Alle" würde die Default-Ansicht
-    // sonst um eine Woche Historie wachsen.
-    ...(filter.status === "done"
-      ? [
-          {
-            key: "doneRecent",
-            label: t("hw.doneRecent"),
-            items: sections.doneRecent,
-            urgency: "none" as const,
-          },
-        ]
+  const allGroups: TaskGroupEntry[] = [
+    taskGroup("overdue", t("hw.overdue"), sections.overdue, "overdue"),
+    taskGroup("today", t("hw.dueToday"), sections.today, "today"),
+    taskGroup("upcoming", t("hw.upcoming"), sections.upcoming, "none"),
+    taskGroup("doneToday", t("hw.doneToday"), sections.doneToday, "none"),
+    // Sobald irgendein Filter aktiv ist, nicht nur unter „Erledigt": sonst
+    // kann eine Zeile, die der Filter durchlässt (z. B. „Alle" + „Überfällig"
+    // auf eine gestern erledigte überfällige Aufgabe), in `doneRecent` landen
+    // und dort stillschweigend verschwinden — der Screen zeigt dann "Keine
+    // Treffer", obwohl eine passende Zeile existiert. Im ungefilterten
+    // Default-Zustand bleibt die Sektion weiterhin weg, sonst wüchse die
+    // Standardansicht um eine Woche Historie.
+    ...(filterActive
+      ? [taskGroup("doneRecent", t("hw.doneRecent"), sections.doneRecent, "none")]
       : []),
-  ].filter((group) => group.items.length > 0);
+  ];
+  const groups = allGroups.filter((group) => group.items.length > 0);
 
   return (
     <Screen
