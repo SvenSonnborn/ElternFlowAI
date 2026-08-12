@@ -338,8 +338,8 @@ describe("groupTasksByDue", () => {
   test("same due date sorts by due_time, tasks without a time last", () => {
     const sections = groupTasksByDue(
       [
-        makeTask({ id: "no-time", due_date: "2026-07-29", due_time: null, title: "Aaa" }),
         makeTask({ id: "late", due_date: "2026-07-29", due_time: "16:00:00", title: "Bbb" }),
+        makeTask({ id: "no-time", due_date: "2026-07-29", due_time: null, title: "Aaa" }),
         makeTask({ id: "early", due_date: "2026-07-29", due_time: "07:30:00", title: "Ccc" }),
       ],
       NOW,
