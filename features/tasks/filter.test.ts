@@ -4,6 +4,7 @@ import type { DueFilter, TaskFilter } from "./filter";
 import type { TaskWithType } from "./types";
 
 import { CHILD_ALL, CHILD_NONE, DEFAULT_TASK_FILTER, filterTasks, isFiltered } from "./filter";
+import { computeTaskStats } from "./stats";
 
 /**
  * Eigene Fixture statt eines geteilten Helpers — stats.test.ts und form.test.ts
@@ -172,6 +173,30 @@ describe("filterTasks · Fälligkeit", () => {
     const late = filterTasks(SPREAD, withDue("today"), new Date(2026, 6, 29, 23, 59, 59));
 
     expect(ids(early)).toEqual(ids(late));
+  });
+});
+
+describe("filterTasks · Drilldown-Treue zu computeTaskStats", () => {
+  /**
+   * `matchesDue` (hier) und `computeTaskStats` (stats.ts) schreiben ihre
+   * `today`/`week`-Grenzen unabhängig voneinander hin — beide bauen
+   * `startOfDay`/`endOfDay`/`endOfWeek(now, { weekStartsOn: 1 })` selbst auf.
+   * Nichts zwingt sie, in Zukunft übereinzustimmen: würde z. B. `weekStartsOn`
+   * nur in einer der beiden Dateien geändert oder `computeTaskStats` hörte auf,
+   * Überfälliges in `dueToday` zu falten, bliebe jeder bestehende Test hier
+   * grün — dieser Test würde als einziger rot, weil er die Chip-Zählung direkt
+   * gegen die Kachel-Zählung prüft. Das ist das Versprechen des Designs: „Diese
+   * Woche" antippen zeigt exakt die Zeilen, die die gleichnamige Kachel zählt.
+   */
+  test("'today'- und 'week'-Chip liefern exakt so viele Zeilen wie die gleichnamigen Stat-Kacheln", () => {
+    const stats = computeTaskStats(SPREAD, NOW);
+
+    expect(
+      filterTasks(SPREAD, { ...DEFAULT_TASK_FILTER, status: "open", due: "week" }, NOW),
+    ).toHaveLength(stats.thisWeek);
+    expect(
+      filterTasks(SPREAD, { ...DEFAULT_TASK_FILTER, status: "open", due: "today" }, NOW),
+    ).toHaveLength(stats.dueToday);
   });
 });
 
