@@ -67,10 +67,18 @@ export function TaskEditScreen() {
     !updateMutation.isPending &&
     !deleteMutation.isPending;
 
+  // No history to fall back to on a cold-start deep link straight to
+  // `/task/edit/[id]` — `router.back()` alone would strand the sheet with no
+  // way out.
+  function goBackOrToTasks() {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)/aufgaben");
+  }
+
   function onSave() {
     const changes = toTaskChanges(state);
     if (!changes || !taskId || updateMutation.isPending || deleteMutation.isPending) return;
-    updateMutation.mutate({ taskId, changes }, { onSuccess: () => router.back() });
+    updateMutation.mutate({ taskId, changes }, { onSuccess: goBackOrToTasks });
   }
 
   async function onDelete() {
@@ -85,7 +93,7 @@ export function TaskEditScreen() {
     deleteMutation.mutate(
       { taskId },
       {
-        onSuccess: () => router.back(),
+        onSuccess: goBackOrToTasks,
         onError: (err) => showAlert({ title: t("hw.delete.error"), body: t(mapTaskError(err)) }),
       },
     );
@@ -149,7 +157,7 @@ export function TaskEditScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("action.cancel")}
-              onPress={() => router.back()}
+              onPress={goBackOrToTasks}
               className="px-2 py-1 active:opacity-70"
               hitSlop={12}
             >
