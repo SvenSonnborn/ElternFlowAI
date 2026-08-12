@@ -9,6 +9,7 @@ export { DateTimePickerSheet } from "./DateTimePickerSheet";
 export type { DateTimePickerMode, DateTimePickerSheetProps } from "./DateTimePickerSheet.types";
 export { EventRow, type EventRowProps } from "./EventRow";
 export { Field, type FieldProps, type FieldType } from "./Field";
+export { FilterChipRow, type FilterChipOption } from "./FilterChipRow";
 export { Icon, type IconName } from "./Icon";
 export {
   MemberPicker,
