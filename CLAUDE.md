@@ -81,6 +81,8 @@ app/                     Expo Router routes — THIN re-export files only
 ├─ (tabs)/essen.tsx
 ├─ (tabs)/aufgaben.tsx
 ├─ (tabs)/familie.tsx
+├─ task/new.tsx           → TaskCreateScreen
+├─ task/edit/[id].tsx     → TaskEditScreen
 └─ +not-found.tsx
 
 app-sections/            Real screen implementations
@@ -88,7 +90,9 @@ app-sections/            Real screen implementations
 ├─ auth/                 (login & friends — to come)
 ├─ onboarding/           (5-step flow — to come)
 ├─ modals/
-└─ shared/VoiceAssistantFAB.tsx
+├─ task/                 Anlegen/Bearbeiten von Aufgaben (Create · Edit · TaskForm)
+└─ shared/               Geteilte Bausteine inkl. Formular-Primitives
+   (DateTimePickerSheet · TypePicker · MemberPicker · Field · confirmDialog)
 
 design-system/           Handoff bundle + theming runtime
 ├─ colors.ts             Palette + brand aliases (HANDOFF — do not edit)

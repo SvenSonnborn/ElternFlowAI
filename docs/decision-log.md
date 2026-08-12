@@ -274,3 +274,34 @@ Der Supabase-MCP-Server war dauerhaft „not connected". Die Diagnose zeigte: De
 - Der PAT hat **Account-Reichweite** (nicht projekt-beschränkt) — schwergewichtiger als ein OAuth-Grant. Wer den Blast-Radius kleiner will, hängt `&read_only=true` an die MCP-URL; das kostet `execute_sql`-Schreibzugriff und `apply_migration`, was bei migrations-getriebenem Schema verkraftbar wäre. Bewusst nicht default gesetzt, um die bestehenden Fähigkeiten nicht stillschweigend zu beschneiden.
 - Jeder Entwickler braucht einen eigenen Token aus <https://supabase.com/dashboard/account/tokens>; ohne ihn expandiert der Header leer und der Server bleibt unverbunden (gleiches Symptom wie vorher — deshalb steht der Hinweis in `.env.example`).
 - Der OAuth-Flow selbst ist damit **nicht** repariert. Stripe- und Expo-MCP hängen weiter am selben Defekt.
+
+---
+
+## ADR-010 — Formular-Bausteine nach `app-sections/shared/`, Web-Zweig per Plattform-Datei (2026-08-11)
+
+### Status
+
+Accepted. Ergänzt die Kalender-Formularentscheidungen aus [ADR-008](#adr-008--kalender-v1-abgeschlossen-reminder-recurrence-editor-multi-day-2026-07-28), Decision 5 (geteiltes Picker-Sheet), und schließt die Tasks-Reihe ab.
+
+### Context
+
+Die Aufgaben-Formulare brauchen dieselben Bausteine, die bisher unter `app-sections/event/` lagen: Datums-/Zeit-Picker, Personen-Auswahl, Typ-Pills. Ein Import von `app-sections/task/` nach `app-sections/event/` würde zwei Features aneinanderkoppeln, die fachlich nichts teilen. Zusätzlich rendert `@react-native-community/datetimepicker` auf Web gar nicht (`Maximum update depth exceeded`, offener TODO-Eintrag seit der Multi-Day-Iteration) — damit wäre das neue Formular auf Web weder bedienbar noch per `bun run web` prüfbar.
+
+### Decisions
+
+1. **Drei Komponenten wandern nach `app-sections/shared/`.** `DateTimePickerSheet` verliert dabei seine Kalender-Typen und nimmt statt `RangeField`/`DateRange` ein `mode` plus `value`; die Range-Logik (welches Ende wird bearbeitet) bleibt als zwei Zeilen in den beiden Event-Screens, wo sie hingehört. `TypePicker` nimmt fertige `{id,label,color}`-Items entgegen, statt Slug-zu-Farbe und Slug-zu-Label selbst aufzulösen — die Auflösung ist pro Feature verschieden, die Pill-Darstellung nicht. `MemberPicker` zieht unverändert um.
+2. **Der Web-Picker ist eine Plattform-Datei, kein `Platform.OS`-Zweig.** `DateTimePickerSheet.web.tsx` rendert `<input type="date">`/`type="time"` in derselben Modal-Hülle; Metro wählt sie automatisch, und das native Modul landet gar nicht erst im Web-Bundle. Der geteilte Props-Typ liegt in `DateTimePickerSheet.types.ts` — ein Import aus `./DateTimePickerSheet` würde auf Web auf die Web-Datei selbst auflösen.
+3. **Kein Dringlichkeits- oder Status-Feld im Formular.** Die `tasks`-Tabelle hat für beides keine Spalte: Dringlichkeit wird in `features/tasks/stats.ts` aus `due_date` abgeleitet, Status ist `is_done` und gehört der Zeilen-Checkbox mit ihrer symmetrischen Drei-Spalten-Invariante. Ein Override wie in `patterns/homework.md` angedeutet bräuchte Migration plus zweite Wahrheitsquelle in der Sektionierung — nicht auf Verdacht.
+4. **Ein `TaskForm` für beide Screens** statt der Kalender-Duplikation. Bei Terminen unterscheiden sich Create und Edit inhaltlich (Ganztägig-Switch, Kollisionshinweis, Scope-Dialog); bei Aufgaben ist der Feldsatz identisch, und zwei Kopien würden auseinanderdriften.
+5. **`useTask` ist ein Selektor auf `useFamilyTasks`,** keine eigene Query. Ein `taskKeys.detail(id)`-Eintrag wäre eine zweite Kopie derselben Zeile, die keine der vier Mutations patcht.
+6. **Bestätigung destruktiver Aktionen über `confirmDestructive`, Fehlermeldungen über `showAlert`.** `Alert` ist auf react-native-web für beide Fälle ein No-op — für den Ja/Nein-Dialog ebenso wie für eine reine Hinweis-Nachricht (z. B. eine fehlgeschlagene Löschung); ein Callback dahinter würde auf Web still nie feuern. `confirmDestructive` folgt der Promise-Form von `pickScope`, `showAlert` ist das dismissible Pendant ohne Ja/Nein-Wahl.
+
+### Consequences
+
+- `app-sections/event/{DateTimePickerSheet,TypePicker,MemberPicker}.tsx` existieren nicht mehr; beide Event-Screens importieren aus `@/app-sections/shared`.
+- Datums- und Zeitauswahl funktionieren auf Web erstmals — für Aufgaben **und** Kalender. Der entsprechende TODO-Eintrag entfällt.
+- Die Typ-Pills bekommen `hitSlop`, um bei 36 px Höhe auf 44 px Trefferfläche zu kommen, ohne die Optik des Handoff-Bundles anzufassen.
+- Neue Catalog-Keys (`hw.add`, `hw.notFound`, `hw.create.*`, `hw.edit.*`, `hw.form.*`, `hw.delete.*`, `hw.type.*`, drei neue `hw.error.*`). Nachtrag in der designer-eigenen [docs/COPY.md](./COPY.md) steht aus → [docs/TODO.md](./TODO.md).
+- `patterns/homework.md` beschreibt weiterhin kein Formular; die Screens folgen dem Kalender-Formularmuster. Abstimmung mit dem Designer steht aus → [docs/TODO.md](./TODO.md).
+
+---
