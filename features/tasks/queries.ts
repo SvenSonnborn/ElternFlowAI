@@ -120,6 +120,10 @@ export function useFamilyTasks(): UseFamilyTasksResult {
 interface UseTaskResult {
   data: TaskWithType | undefined;
   isLoading: boolean;
+  /** Surfaced from `useFamilyTasks` so a failed load isn't indistinguishable
+   * from a task that's genuinely gone — the edit screen tells the two apart. */
+  error: unknown;
+  refetch: () => void;
 }
 
 /**
@@ -133,9 +137,9 @@ interface UseTaskResult {
  * is in the cache by definition.
  */
 export function useTask(taskId: string): UseTaskResult {
-  const { data, isLoading } = useFamilyTasks();
+  const { data, isLoading, error, refetch } = useFamilyTasks();
   const task = useMemo(() => data.find((row) => row.id === taskId), [data, taskId]);
-  return { data: task, isLoading };
+  return { data: task, isLoading, error, refetch };
 }
 
 export function useTasksByChild(): TaskGroup[] {
