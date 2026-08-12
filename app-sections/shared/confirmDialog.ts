@@ -31,3 +31,25 @@ export function confirmDestructive(labels: ConfirmLabels): Promise<boolean> {
     );
   });
 }
+
+export interface AlertLabels {
+  title: string;
+  body: string;
+}
+
+/**
+ * A dismissible, titled message — an acknowledgement rather than the yes/no
+ * choice `confirmDestructive` asks for (e.g. reporting a failed mutation).
+ *
+ * The web branch exists for the same reason as `confirmDestructive`'s:
+ * react-native-web's `Alert.alert` is a no-op (`static alert() {}` in
+ * react-native-web/src/exports/Alert/index.js), so a message shown only via
+ * `Alert.alert` never reaches a web user — it just silently never happens.
+ */
+export function showAlert(labels: AlertLabels): void {
+  if (Platform.OS === "web") {
+    window.alert(`${labels.title}\n\n${labels.body}`);
+    return;
+  }
+  Alert.alert(labels.title, labels.body);
+}
