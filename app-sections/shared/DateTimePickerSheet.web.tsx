@@ -81,6 +81,7 @@ export function DateTimePickerSheet({ mode, value, onPick, onClose }: DateTimePi
                 fontSize: 16,
                 padding: 12,
                 width: "100%",
+                minHeight: 44,
                 boxSizing: "border-box",
                 borderRadius: 12,
                 border: `1px solid ${theme.line}`,
