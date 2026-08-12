@@ -1,10 +1,9 @@
 import { router, Stack } from "expo-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import type { MemberOption, TypePickerItem } from "@/app-sections/shared";
 import type { TaskFormState } from "@/features/tasks";
 
 import { useTheme } from "@/design-system/ThemeProvider";
@@ -14,8 +13,6 @@ import {
   emptyTaskForm,
   hasTaskFormErrors,
   mapTaskError,
-  taskTypeColorFor,
-  taskTypeLabelKey,
   toCreateVars,
   useCreateTask,
   useTaskTypes,
@@ -23,6 +20,7 @@ import {
 } from "@/features/tasks";
 
 import { TaskForm } from "./TaskForm";
+import { useTaskFormOptions } from "./useTaskFormOptions";
 
 export function TaskCreateScreen() {
   const { t } = useTranslation();
@@ -56,26 +54,7 @@ export function TaskCreateScreen() {
     });
   }
 
-  const typeItems: TypePickerItem[] = useMemo(
-    () =>
-      (types.data ?? []).map((type) => ({
-        id: type.id,
-        label: t(taskTypeLabelKey(type.slug), { defaultValue: type.slug }),
-        color: taskTypeColorFor(type.color, theme),
-      })),
-    [types.data, t, theme],
-  );
-
-  const childOptions: MemberOption[] = useMemo(
-    () =>
-      (children ?? []).map((child) => ({
-        id: child.id,
-        name: child.name,
-        color: child.color,
-        kind: "child" as const,
-      })),
-    [children],
-  );
+  const { typeItems, childOptions } = useTaskFormOptions(types.data, children);
 
   const errors = validateTaskForm(state);
   const canSave = !hasTaskFormErrors(errors) && !createMutation.isPending;
