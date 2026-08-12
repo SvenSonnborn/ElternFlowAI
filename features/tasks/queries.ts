@@ -117,6 +117,27 @@ export function useFamilyTasks(): UseFamilyTasksResult {
   };
 }
 
+interface UseTaskResult {
+  data: TaskWithType | undefined;
+  isLoading: boolean;
+}
+
+/**
+ * One task out of the family list — a selector, not a second query. The list
+ * is the only cache entry the mutations patch; a `taskKeys.detail(id)` entry
+ * would be a second copy of the same row that nothing invalidates.
+ *
+ * Consequence: a task outside the list's window (open, or completed less than
+ * DONE_WINDOW_DAYS ago) resolves to `undefined`, and the edit screen renders
+ * its not-found state. Reachable only by deep link — every row the list shows
+ * is in the cache by definition.
+ */
+export function useTask(taskId: string): UseTaskResult {
+  const { data, isLoading } = useFamilyTasks();
+  const task = useMemo(() => data.find((row) => row.id === taskId), [data, taskId]);
+  return { data: task, isLoading };
+}
+
 export function useTasksByChild(): TaskGroup[] {
   const { data } = useFamilyTasks();
   return useMemo(() => groupTasksByChild(data), [data]);

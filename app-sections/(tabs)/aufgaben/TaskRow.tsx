@@ -1,5 +1,6 @@
 import { format, parseISO } from "date-fns";
 import { de, enUS } from "date-fns/locale";
+import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Alert, Pressable, View } from "react-native";
 
@@ -77,7 +78,12 @@ export function TaskRow({ task, child, urgent }: TaskRowProps) {
         </View>
       </Pressable>
 
-      <View className="flex-1">
+      <Pressable
+        onPress={() => router.push({ pathname: "/task/edit/[id]", params: { id: task.id } })}
+        accessibilityRole="button"
+        accessibilityLabel={task.title}
+        className="flex-1 active:opacity-70"
+      >
         {task.subject || urgent ? (
           <View className="mb-1 flex-row items-center gap-1.5">
             {task.subject ? (
@@ -104,7 +110,7 @@ export function TaskRow({ task, child, urgent }: TaskRowProps) {
         <Text variant="caption" tone="inkSecondary" className="mt-0.5">
           {t("hw.due", { when: due })}
         </Text>
-      </View>
+      </Pressable>
 
       {child ? <ChildAvatar name={child.name} color={child.color} size="sm" /> : null}
     </Card>
