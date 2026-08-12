@@ -1,5 +1,16 @@
 export { mapTaskError, MissingParentError, type TaskErrorKey } from "./errors";
 export {
+  CHILD_ALL,
+  CHILD_NONE,
+  DEFAULT_TASK_FILTER,
+  filterTasks,
+  isFiltered,
+  type DueFilter,
+  type StatusFilter,
+  type TaskFilter,
+} from "./filter";
+export { useTaskFilter, useTaskFilterStore } from "./filterStore";
+export {
   useCreateTask,
   useDeleteTask,
   useToggleTaskDone,
@@ -27,6 +38,7 @@ export {
   fetchTaskTypes,
   taskKeys,
   useFamilyTasks,
+  useFilteredTaskSections,
   useTask,
   useTaskTypes,
   useTasksByChild,

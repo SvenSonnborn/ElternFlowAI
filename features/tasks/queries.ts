@@ -7,6 +7,8 @@ import { supabase } from "@/features/supabase";
 
 import type { TaskGroup, TaskSections, TaskStats, TaskTypeRow, TaskWithType } from "./types";
 
+import { filterTasks } from "./filter";
+import { useTaskFilter } from "./filterStore";
 import { computeTaskStats, groupTasksByChild, groupTasksByDue } from "./stats";
 
 const SELECT = "*, task_types(*)";
@@ -153,6 +155,25 @@ export function useTasksSections(): TaskSections {
   // groupTasksByDue only reads the calendar day off `now`, so local midnight is
   // as good as the wall clock — and it keeps the memo from re-running.
   return useMemo(() => groupTasksByDue(data, today), [data, today]);
+}
+
+/**
+ * Die Sektionen für den Screen: dieselbe Ableitung wie `useTasksSections`, aber
+ * durch den aktiven Filter hindurch.
+ *
+ * Gefiltert wird im Cache, nicht in der Query — `useFamilyTasks` lädt ohnehin
+ * alles, und ein Filter im Query-Key würde pro Chip-Tap einen Roundtrip kosten
+ * und jede Mutation zwingen, statt eines Eintrags alle Varianten zu patchen.
+ */
+export function useFilteredTaskSections(): TaskSections {
+  const { data } = useFamilyTasks();
+  const today = useToday();
+  const filter = useTaskFilter();
+
+  return useMemo(
+    () => groupTasksByDue(filterTasks(data, filter, today), today),
+    [data, filter, today],
+  );
 }
 
 export function useTasksStats(): TaskStats {
