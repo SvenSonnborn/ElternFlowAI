@@ -376,6 +376,7 @@
     "overdue": "Overdue",
     "upcoming": "Upcoming",
     "doneToday": "Done today",
+    "doneRecent": "Recently done",
     "doneRate": "Done rate",
     "openCount_one": "{{count}} open",
     "openCount_other": "{{count}} open",
@@ -415,6 +416,22 @@
       "hausaufgaben": "Homework",
       "besorgung": "Errand",
       "elternAufgabe": "Parent task"
+    },
+    "filter": {
+      "all": "All",
+      "open": "Open",
+      "done": "Done",
+      "today": "Today",
+      "reset": "Clear filters",
+      "empty": {
+        "title": "No matches",
+        "sub": "No tasks match these filters right now."
+      },
+      "a11y": {
+        "status": "Filter by status",
+        "due": "Filter by due date",
+        "child": "Filter by child"
+      }
     },
     "error": {
       "notAuthenticated": "Please sign in again.",

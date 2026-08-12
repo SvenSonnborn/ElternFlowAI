@@ -376,6 +376,7 @@
     "overdue": "Überfällig",
     "upcoming": "Demnächst",
     "doneToday": "Erledigt heute",
+    "doneRecent": "Zuletzt erledigt",
     "doneRate": "Quote",
     "openCount_one": "{{count}} offen",
     "openCount_other": "{{count}} offen",
@@ -415,6 +416,22 @@
       "hausaufgaben": "Hausaufgaben",
       "besorgung": "Besorgung",
       "elternAufgabe": "Eltern-Aufgabe"
+    },
+    "filter": {
+      "all": "Alle",
+      "open": "Offen",
+      "done": "Erledigt",
+      "today": "Heute",
+      "reset": "Filter zurücksetzen",
+      "empty": {
+        "title": "Keine Treffer",
+        "sub": "Für diese Filter gibt es gerade keine Aufgaben."
+      },
+      "a11y": {
+        "status": "Status filtern",
+        "due": "Fälligkeit filtern",
+        "child": "Nach Kind filtern"
+      }
     },
     "error": {
       "notAuthenticated": "Bitte erneut anmelden.",

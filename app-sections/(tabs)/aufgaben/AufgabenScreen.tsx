@@ -5,11 +5,23 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, RefreshControl, View } from "react-native";
 
-import { TopBar } from "@/app-sections/shared";
+import { FilterChipRow, TopBar, type FilterChipOption } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren } from "@/features/auth";
-import { mapTaskError, useFamilyTasks, useTasksSections, useTasksStats } from "@/features/tasks";
+import {
+  CHILD_ALL,
+  CHILD_NONE,
+  isFiltered,
+  mapTaskError,
+  useFamilyTasks,
+  useFilteredTaskSections,
+  useTaskFilter,
+  useTaskFilterStore,
+  useTasksStats,
+  type DueFilter,
+  type StatusFilter,
+} from "@/features/tasks";
 
 import { TaskRow } from "./TaskRow";
 
@@ -18,7 +30,14 @@ export function AufgabenScreen() {
   const { theme } = useTheme();
 
   const { isLoading, isRefetching, error, refetch } = useFamilyTasks();
-  const sections = useTasksSections();
+  const sections = useFilteredTaskSections();
+
+  const filter = useTaskFilter();
+  const setStatus = useTaskFilterStore((s) => s.setStatus);
+  const setDue = useTaskFilterStore((s) => s.setDue);
+  const setChild = useTaskFilterStore((s) => s.setChild);
+  const resetFilter = useTaskFilterStore((s) => s.reset);
+  const filterActive = isFiltered(filter);
   const stats = useTasksStats();
 
   const { data: parent } = useCurrentParent();
@@ -28,6 +47,32 @@ export function AufgabenScreen() {
     () => new Map((children ?? []).map((child) => [child.id, child])),
     [children],
   );
+
+  const statusOptions: FilterChipOption<StatusFilter>[] = [
+    { id: "all", label: t("hw.filter.all") },
+    { id: "open", label: t("hw.filter.open") },
+    { id: "done", label: t("hw.filter.done") },
+  ];
+
+  // Die Fenster spiegeln die Stat-Kacheln: „Diese Woche" liefert genau die
+  // Zeilen, die die gleichnamige Kachel zählt.
+  const dueOptions: FilterChipOption<DueFilter>[] = [
+    { id: "all", label: t("hw.filter.all") },
+    { id: "overdue", label: t("hw.overdue") },
+    { id: "today", label: t("hw.filter.today") },
+    { id: "week", label: t("hw.thisWeek") },
+    { id: "longTerm", label: t("hw.longTerm") },
+  ];
+
+  const childOptions: FilterChipOption<string>[] = [
+    { id: CHILD_ALL, label: t("hw.filter.all") },
+    ...(children ?? []).map((child) => ({
+      id: child.id,
+      label: child.name,
+      dotColor: child.color,
+    })),
+    { id: CHILD_NONE, label: t("hw.form.noChild") },
+  ];
 
   const locale = i18n.language.startsWith("de") ? de : enUS;
 
@@ -72,6 +117,18 @@ export function AufgabenScreen() {
       items: sections.doneToday,
       urgency: "none" as const,
     },
+    // Nur unter dem Erledigt-Filter: unter „Alle" würde die Default-Ansicht
+    // sonst um eine Woche Historie wachsen.
+    ...(filter.status === "done"
+      ? [
+          {
+            key: "doneRecent",
+            label: t("hw.doneRecent"),
+            items: sections.doneRecent,
+            urgency: "none" as const,
+          },
+        ]
+      : []),
   ].filter((group) => group.items.length > 0);
 
   return (
@@ -123,12 +180,61 @@ export function AufgabenScreen() {
             ))}
           </View>
 
+          <View className="mt-4 gap-2">
+            <FilterChipRow
+              accessibilityLabel={t("hw.filter.a11y.status")}
+              options={statusOptions}
+              selectedId={filter.status}
+              onSelect={setStatus}
+            />
+            <FilterChipRow
+              accessibilityLabel={t("hw.filter.a11y.due")}
+              options={dueOptions}
+              selectedId={filter.due}
+              onSelect={setDue}
+            />
+            {/* Ohne Kinder in der Familie hat weder „Alle" noch „Ohne Kind"
+                eine Bedeutung — dieselbe Logik wie MemberPickers Early-Return. */}
+            {(children ?? []).length > 0 ? (
+              <FilterChipRow
+                accessibilityLabel={t("hw.filter.a11y.child")}
+                options={childOptions}
+                selectedId={filter.childId}
+                onSelect={setChild}
+              />
+            ) : null}
+            {filterActive ? (
+              <View className="items-end">
+                <Button
+                  label={t("hw.filter.reset")}
+                  variant="ghost"
+                  tone="neutral"
+                  onPress={resetFilter}
+                />
+              </View>
+            ) : null}
+          </View>
+
           {groups.length === 0 ? (
-            <Card className="mt-5 gap-1">
-              <Text variant="bodyEmph">{t("hw.empty.title")}</Text>
-              <Text variant="caption" tone="inkSecondary">
-                {t("hw.empty.sub")}
+            <Card className="mt-5 items-start gap-1">
+              <Text variant="bodyEmph">
+                {filterActive ? t("hw.filter.empty.title") : t("hw.empty.title")}
               </Text>
+              <Text variant="caption" tone="inkSecondary">
+                {filterActive ? t("hw.filter.empty.sub") : t("hw.empty.sub")}
+              </Text>
+              {/* Im Card `soft` statt `ghost` wie in der Leiste: ein
+                  transparenter Button wäre hier der einzige Ausweg und dürfte
+                  nicht der unauffälligste sein. Gleiche Wahl wie die
+                  Retry-Aktion der Fehler-Card. */}
+              {filterActive ? (
+                <Button
+                  label={t("hw.filter.reset")}
+                  variant="soft"
+                  onPress={resetFilter}
+                  className="mt-2"
+                />
+              ) : null}
             </Card>
           ) : (
             groups.map((group) => (
