@@ -24,11 +24,21 @@ export interface TaskGroup {
   openCount: number;
 }
 
-/** The three sections of patterns/homework.md V2, as `groupTasksByDue` returns them. */
+/**
+ * Die Sektionen des Aufgaben-Screens. `overdue` und `doneRecent` sind mit der
+ * Filter-Iteration dazugekommen: Überfälliges lag vorher unsichtbar in `today`,
+ * und älter als heute Erledigtes lag ungenutzt im 7-Tage-Cache.
+ */
 export interface TaskSections {
+  /** Offen, `due_date` vor heute. */
+  overdue: TaskWithType[];
+  /** Offen, `due_date` ist heute. */
   today: TaskWithType[];
+  /** Offen, `due_date` nach heute — inklusive langfristiger Aufgaben. */
   upcoming: TaskWithType[];
   doneToday: TaskWithType[];
+  /** Erledigt vor heute, innerhalb des `DONE_WINDOW_DAYS`-Fensters. */
+  doneRecent: TaskWithType[];
 }
 
 export interface TaskStats {

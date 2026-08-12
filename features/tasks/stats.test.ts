@@ -98,6 +98,15 @@ describe("groupTasksByChild", () => {
     groupTasksByChild(tasks);
     expect(tasks.map((t) => t.id)).toEqual(["a", "b"]);
   });
+
+  test("inherits the due_time tiebreaker", () => {
+    const groups = groupTasksByChild([
+      makeTask({ id: "no-time", child_id: "child-1", due_date: "2026-07-29", due_time: null }),
+      makeTask({ id: "timed", child_id: "child-1", due_date: "2026-07-29", due_time: "09:00:00" }),
+    ]);
+
+    expect(groups[0].tasks.map((t) => t.id)).toEqual(["timed", "no-time"]);
+  });
 });
 
 /** Wednesday, 2026-07-29. ISO week: Mon 2026-07-27 … Sun 2026-08-02. */
@@ -222,14 +231,27 @@ describe("computeTaskStats", () => {
 });
 
 describe("groupTasksByDue", () => {
-  test("empty input yields three empty sections", () => {
-    expect(groupTasksByDue([], NOW)).toEqual({ today: [], upcoming: [], doneToday: [] });
+  test("empty input yields five empty sections", () => {
+    expect(groupTasksByDue([], NOW)).toEqual({
+      overdue: [],
+      today: [],
+      upcoming: [],
+      doneToday: [],
+      doneRecent: [],
+    });
   });
 
-  test("overdue tasks land in today, not upcoming", () => {
-    const sections = groupTasksByDue([makeTask({ id: "overdue", due_date: "2026-07-27" })], NOW);
+  test("overdue tasks land in their own section, not in today", () => {
+    const sections = groupTasksByDue(
+      [
+        makeTask({ id: "overdue", due_date: "2026-07-27" }),
+        makeTask({ id: "today", due_date: "2026-07-29" }),
+      ],
+      NOW,
+    );
 
-    expect(sections.today.map((t) => t.id)).toEqual(["overdue"]);
+    expect(sections.overdue.map((t) => t.id)).toEqual(["overdue"]);
+    expect(sections.today.map((t) => t.id)).toEqual(["today"]);
     expect(sections.upcoming).toHaveLength(0);
   });
 
@@ -252,29 +274,36 @@ describe("groupTasksByDue", () => {
     expect(sections.upcoming.map((t) => t.id)).toEqual(["far"]);
   });
 
-  test("done today lands in doneToday, done yesterday in no section", () => {
-    const sections = groupTasksByDue(
-      [makeDone("today", localNoon(29)), makeDone("yesterday", localNoon(28))],
-      NOW,
-    );
-
-    expect(sections.doneToday.map((t) => t.id)).toEqual(["today"]);
-    expect(sections.today).toHaveLength(0);
-    expect(sections.upcoming).toHaveLength(0);
-  });
-
-  test("today and upcoming sort by due date ascending", () => {
+  test("done today lands in doneToday, everything older in doneRecent, newest first", () => {
     const sections = groupTasksByDue(
       [
-        makeTask({ id: "late", due_date: "2026-08-20" }),
-        makeTask({ id: "overdue", due_date: "2026-07-20" }),
-        makeTask({ id: "soon", due_date: "2026-08-01" }),
-        makeTask({ id: "today", due_date: "2026-07-29" }),
+        makeDone("today", localNoon(29)),
+        makeDone("two-days-ago", localNoon(27)),
+        makeDone("yesterday", localNoon(28)),
       ],
       NOW,
     );
 
-    expect(sections.today.map((t) => t.id)).toEqual(["overdue", "today"]);
+    expect(sections.doneToday.map((t) => t.id)).toEqual(["today"]);
+    expect(sections.doneRecent.map((t) => t.id)).toEqual(["yesterday", "two-days-ago"]);
+    expect(sections.today).toHaveLength(0);
+    expect(sections.upcoming).toHaveLength(0);
+  });
+
+  test("every section sorts by due date ascending", () => {
+    const sections = groupTasksByDue(
+      [
+        makeTask({ id: "late", due_date: "2026-08-20" }),
+        makeTask({ id: "long-overdue", due_date: "2026-07-20" }),
+        makeTask({ id: "soon", due_date: "2026-08-01" }),
+        makeTask({ id: "today", due_date: "2026-07-29" }),
+        makeTask({ id: "overdue", due_date: "2026-07-28" }),
+      ],
+      NOW,
+    );
+
+    expect(sections.overdue.map((t) => t.id)).toEqual(["long-overdue", "overdue"]);
+    expect(sections.today.map((t) => t.id)).toEqual(["today"]);
     expect(sections.upcoming.map((t) => t.id)).toEqual(["soon", "late"]);
   });
 
@@ -299,8 +328,35 @@ describe("groupTasksByDue", () => {
     ];
 
     const sections = groupTasksByDue(tasks, NOW);
-    const placed = [...sections.today, ...sections.upcoming].map((t) => t.id).sort();
+    const placed = [...sections.overdue, ...sections.today, ...sections.upcoming]
+      .map((t) => t.id)
+      .sort();
 
     expect(placed).toEqual(["far", "overdue", "today", "tomorrow"]);
+  });
+
+  test("same due date sorts by due_time, tasks without a time last", () => {
+    const sections = groupTasksByDue(
+      [
+        makeTask({ id: "no-time", due_date: "2026-07-29", due_time: null, title: "Aaa" }),
+        makeTask({ id: "late", due_date: "2026-07-29", due_time: "16:00:00", title: "Bbb" }),
+        makeTask({ id: "early", due_date: "2026-07-29", due_time: "07:30:00", title: "Ccc" }),
+      ],
+      NOW,
+    );
+
+    expect(sections.today.map((t) => t.id)).toEqual(["early", "late", "no-time"]);
+  });
+
+  test("same due date and no time sorts by title", () => {
+    const sections = groupTasksByDue(
+      [
+        makeTask({ id: "z", due_date: "2026-07-29", title: "Zimmer aufräumen" }),
+        makeTask({ id: "a", due_date: "2026-07-29", title: "Anziehsachen rauslegen" }),
+      ],
+      NOW,
+    );
+
+    expect(sections.today.map((t) => t.id)).toEqual(["a", "z"]);
   });
 });
