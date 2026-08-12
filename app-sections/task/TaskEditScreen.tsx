@@ -1,12 +1,13 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, View } from "react-native";
+import { Alert, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { MemberOption, TypePickerItem } from "@/app-sections/shared";
 import type { TaskFormState } from "@/features/tasks";
 
+import { confirmDestructive } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren } from "@/features/auth";
@@ -18,6 +19,7 @@ import {
   taskTypeColorFor,
   taskTypeLabelKey,
   toTaskChanges,
+  useDeleteTask,
   useTask,
   useTaskTypes,
   useUpdateTask,
@@ -37,6 +39,7 @@ export function TaskEditScreen() {
   const { data: parent } = useCurrentParent();
   const { data: children } = useFamilyChildren(parent?.family_id);
   const updateMutation = useUpdateTask();
+  const deleteMutation = useDeleteTask();
 
   const [state, setState] = useState<TaskFormState>(() => emptyTaskForm(new Date()));
   const [hydrated, setHydrated] = useState(false);
@@ -85,6 +88,24 @@ export function TaskEditScreen() {
     const changes = toTaskChanges(state);
     if (!changes || !task || updateMutation.isPending) return;
     updateMutation.mutate({ taskId: task.id, changes }, { onSuccess: () => router.back() });
+  }
+
+  async function onDelete() {
+    if (!task || deleteMutation.isPending) return;
+    const confirmed = await confirmDestructive({
+      title: t("hw.delete.confirmTitle"),
+      body: t("hw.delete.confirmBody"),
+      confirm: t("hw.delete.confirmOk"),
+      cancel: t("action.cancel"),
+    });
+    if (!confirmed) return;
+    deleteMutation.mutate(
+      { taskId: task.id },
+      {
+        onSuccess: () => router.back(),
+        onError: (err) => Alert.alert(t("hw.delete.error"), t(mapTaskError(err))),
+      },
+    );
   }
 
   return (
@@ -162,6 +183,18 @@ export function TaskEditScreen() {
               disabled={!canSave}
               onPress={onSave}
             />
+            <View className="mt-3">
+              <Button
+                block
+                variant="soft"
+                tone="danger"
+                label={
+                  deleteMutation.isPending ? t("hw.delete.deleting") : t("hw.delete.confirmOk")
+                }
+                disabled={deleteMutation.isPending || updateMutation.isPending}
+                onPress={() => void onDelete()}
+              />
+            </View>
           </View>
         </ScrollView>
       )}

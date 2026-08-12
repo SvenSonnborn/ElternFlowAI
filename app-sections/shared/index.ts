@@ -1,4 +1,5 @@
 export { ChildAvatar } from "./ChildAvatar";
+export { confirmDestructive, type ConfirmLabels } from "./confirmDialog";
 export { DateTimePickerSheet } from "./DateTimePickerSheet";
 export type { DateTimePickerMode, DateTimePickerSheetProps } from "./DateTimePickerSheet.types";
 export { EventRow, type EventRowProps } from "./EventRow";
