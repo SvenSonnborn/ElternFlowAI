@@ -308,56 +308,25 @@ Die Aufgaben-Formulare brauchen dieselben Bausteine, die bisher unter `app-secti
 
 ## ADR-011 — Aufgaben-Filter client-seitig, Überfällig als eigene Sektion (2026-08-12)
 
-**Kontext.** Der Aufgaben-Screen zeigte alles, was im Query-Fenster lag, ohne
-Möglichkeit einzuengen. `useFamilyTasks` lädt alle offenen Aufgaben plus sieben
-Tage Erledigtes in genau einen Cache-Eintrag. `tasks` hat keine
-Prioritätsspalte; „Dringlichkeit" ist laut `patterns/homework.md` aus
-`due_date` abgeleitet.
+### Status
 
-**Decision 1 — Gefiltert wird im Cache, nicht in der Query.** Der Filter ist
-eine reine Funktion (`features/tasks/filter.ts`) über die bereits geladenen
-Zeilen. Ein Filter im Query-Key hätte pro Chip-Tap einen Roundtrip gekostet,
-die Cache-Einträge vervielfacht und jede Mutation gezwungen, statt eines
-Eintrags alle Varianten zu patchen. Ein Hybrid (Status server-seitig) wurde
-verworfen, weil er zwei Orte schafft, an denen „was ist sichtbar" definiert
-ist.
+Accepted. Baut auf [ADR-010](#adr-010--formular-bausteine-nach-app-sectionsshared-web-zweig-per-plattform-datei-2026-08-11) auf und ergänzt den Aufgaben-Screen um eine Filter- und Sortier-Iteration.
 
-**Decision 2 — Die Fälligkeits-Chips sind überlappende Fenster, keine
-disjunkten Eimer.** `today` und `week` schließen Überfälliges ein, exakt wie
-die gleichnamigen Stat-Kacheln in `computeTaskStats`. Damit wird die Chip-Reihe
-zum Drilldown der Stat-Leiste, statt eine zweite Zählweise danebenzustellen.
-Das Prädikat liest nur `due_date`, unabhängig von `is_done`, damit auch
-„Erledigt + Diese Woche" definiert ist.
+### Context
 
-**Decision 3 — Überfällige Aufgaben bekommen eine eigene Sektion, auch
-ungefiltert.** `groupTasksByDue` teilt offene Aufgaben jetzt in `overdue`,
-`today` und `upcoming`. Konsequenz: die Kachel sagt „3 Heute fällig", während
-die Liste „Überfällig 2" und „Heute fällig 1" zeigt. Bewusst in Kauf genommen —
-die Kachel zählt, was heute zu tun ist, die Sektionen erklären, warum. Die
-Alternative, die Überschrift nur bei aktivem Filter umzubenennen, hätte sie von
-einer Beschreibung des Inhalts zu einer Funktion des UI-Zustands gemacht.
-`TaskRow`s `urgent: boolean` wurde dafür zu `urgency: "none" | "today" |
-"overdue"`; beide dringenden Zustände tönen die Card `warning`, weil `Card`s
-`TintTone` kein `danger` kennt und `design-system/` Handoff-Bundle ist.
+Der Aufgaben-Screen zeigte alles, was im Query-Fenster lag, ohne Möglichkeit einzuengen. `useFamilyTasks` lädt alle offenen Aufgaben plus sieben Tage Erledigtes in genau einen Cache-Eintrag. `tasks` hat keine Prioritätsspalte; „Dringlichkeit" ist laut `patterns/homework.md` aus `due_date` abgeleitet.
 
-**Decision 4 — `due_time` ist der Dringlichkeits-Tiebreaker.** Sortiert wird
-`due_date` asc → `due_time` asc (NULL ans Ende) → Titel. Ohne Prioritätsspalte
-ist „bis 8 Uhr abgeben ist dringender als irgendwann heute" die Bedeutung, die
-„dann Dringlichkeit" tragen kann. Nebeneffekt: die Reihenfolge bei gleichem
-Datum ist erstmals deterministisch. Eine echte `tasks.priority`-Spalte
-(Migration, zwei Formularfelder, Types-Regen) wäre eine eigene Iteration und
-ohne Nutzersignal spekulativ.
+### Decisions
 
-**Decision 5 — Der Filter lebt in einem Zustand-Store ohne `persist`.** Er
-überlebt Tab-Wechsel und den Weg ins Formular, wird beim App-Start
-zurückgesetzt. `useState` im Screen wäre nicht isoliert testbar;
-`zustand/middleware`-`persist` führt Hydration-Handling und einen Web-Zweig neu
-im Repo ein — und ein vor einer Woche gesetzter Kind-Filter würde eine
-unvollständige Liste zeigen, ohne dass erkennbar wäre, warum.
+1. **Gefiltert wird im Cache, nicht in der Query.** Der Filter ist eine reine Funktion (`features/tasks/filter.ts`) über die bereits geladenen Zeilen. Ein Filter im Query-Key hätte pro Chip-Tap einen Roundtrip gekostet, die Cache-Einträge vervielfacht und jede Mutation gezwungen, statt eines Eintrags alle Varianten zu patchen. Ein Hybrid (Status server-seitig) wurde verworfen, weil er zwei Orte schafft, an denen „was ist sichtbar" definiert ist.
+2. **Die Fälligkeits-Chips sind überlappende Fenster, keine disjunkten Eimer.** `today` und `week` schließen Überfälliges ein, exakt wie die gleichnamigen Stat-Kacheln in `computeTaskStats`. Damit wird die Chip-Reihe zum Drilldown der Stat-Leiste, statt eine zweite Zählweise danebenzustellen. Das Prädikat liest nur `due_date`, unabhängig von `is_done`, damit auch „Erledigt + Diese Woche" definiert ist.
+3. **Überfällige Aufgaben bekommen eine eigene Sektion, auch ungefiltert.** `groupTasksByDue` teilt offene Aufgaben jetzt in `overdue`, `today` und `upcoming`. Konsequenz: die Kachel sagt „3 Heute fällig", während die Liste „Überfällig 2" und „Heute fällig 1" zeigt. Bewusst in Kauf genommen — die Kachel zählt, was heute zu tun ist, die Sektionen erklären, warum. Die Alternative, die Überschrift nur bei aktivem Filter umzubenennen, hätte sie von einer Beschreibung des Inhalts zu einer Funktion des UI-Zustands gemacht. `TaskRow`s `urgent: boolean` wurde dafür zu `urgency: "none" | "today" | "overdue"`; beide dringenden Zustände tönen die Card `warning`, weil `Card`s `TintTone` kein `danger` kennt und `design-system/` Handoff-Bundle ist.
+4. **`due_time` ist der Dringlichkeits-Tiebreaker.** Sortiert wird `due_date` asc → `due_time` asc (NULL ans Ende) → Titel. Ohne Prioritätsspalte ist „bis 8 Uhr abgeben ist dringender als irgendwann heute" die Bedeutung, die „dann Dringlichkeit" tragen kann. Nebeneffekt: die Reihenfolge bei gleichem Datum ist erstmals deterministisch. Eine echte `tasks.priority`-Spalte (Migration, zwei Formularfelder, Types-Regen) wäre eine eigene Iteration und ohne Nutzersignal spekulativ.
+5. **Der Filter lebt in einem Zustand-Store ohne `persist`.** Er überlebt Tab-Wechsel und den Weg ins Formular, wird beim App-Start zurückgesetzt. `useState` im Screen wäre nicht isoliert testbar; `zustand/middleware`-`persist` führt Hydration-Handling und einen Web-Zweig neu im Repo ein — und ein vor einer Woche gesetzter Kind-Filter würde eine unvollständige Liste zeigen, ohne dass erkennbar wäre, warum.
 
-**Konsequenzen.** `patterns/homework.md` kennt weder die Filterleiste noch mehr
-als drei Sektionen, und die zwölf neuen `hw.*`-Keys fehlen in `docs/COPY.md` —
-beides als Designer-Abstimmung in `docs/TODO.md`. `useTasksByChild` bleibt
-ungenutzt: ein Kind-_Filter_ ersetzt keine Kind-_Gruppierung_.
+### Consequences
+
+- `patterns/homework.md` kennt weder die Filterleiste noch mehr als drei Sektionen, und die zwölf neuen `hw.*`-Keys fehlen in `docs/COPY.md` — beides als Designer-Abstimmung in `docs/TODO.md`.
+- `useTasksByChild` bleibt ungenutzt: ein Kind-_Filter_ ersetzt keine Kind-_Gruppierung_.
 
 ---

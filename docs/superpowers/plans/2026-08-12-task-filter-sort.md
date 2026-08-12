@@ -1565,7 +1565,7 @@ In `docs/TODO.md` ans Ende des Abschnitts `## Aufgaben / Tasks (Daten-Layer V1)`
 
 - [ ] **Step 3: Den bestehenden V1/V2-Umschalter-Eintrag ergänzen**
 
-In `docs/TODO.md` den Eintrag, der mit `**`patterns/homework.md` beschreibt einen V1/V2-Umschalter, den es nicht gibt**` beginnt, um einen Satz am Ende erweitern:
+In `docs/TODO.md` den Eintrag mit dem Titel **`patterns/homework.md` beschreibt einen V1/V2-Umschalter, den es nicht gibt** um einen Satz am Ende erweitern:
 
 ```markdown
 Seit ADR-011 gibt es einen Kind-_Filter_ in der Leiste — der ersetzt die Kind-_Gruppierung_ aber nicht: `useTasksByChild` liefert Avatar-Header samt Offen-Zähler pro Kind und bleibt weiterhin ungenutzt.
