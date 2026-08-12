@@ -27,6 +27,7 @@ export {
   fetchTaskTypes,
   taskKeys,
   useFamilyTasks,
+  useTask,
   useTaskTypes,
   useTasksByChild,
   useTasksSections,
