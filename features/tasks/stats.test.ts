@@ -359,4 +359,18 @@ describe("groupTasksByDue", () => {
 
     expect(sections.today.map((t) => t.id)).toEqual(["a", "z"]);
   });
+
+  test("identical due date, time and title still sort deterministically by id", () => {
+    // Zwei Kinder, dieselbe Aufgabe, derselbe Termin — ohne den id-Vergleich
+    // gäbe der Comparator 0 zurück und die Reihenfolge käme aus der Query.
+    const rows = [
+      makeTask({ id: "b2", child_id: "child-2", due_time: "18:00:00", title: "Lesen 20 Min" }),
+      makeTask({ id: "a1", child_id: "child-1", due_time: "18:00:00", title: "Lesen 20 Min" }),
+    ];
+
+    expect(groupTasksByDue(rows, NOW).today.map((t) => t.id)).toEqual(["a1", "b2"]);
+    // Dieselbe Ausgabe aus der umgekehrten Eingabe: das belegt, dass sie vom
+    // Comparator kommt und nicht von der stabilen Sortierung.
+    expect(groupTasksByDue([...rows].reverse(), NOW).today.map((t) => t.id)).toEqual(["a1", "b2"]);
+  });
 });

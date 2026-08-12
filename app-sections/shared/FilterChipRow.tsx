@@ -39,10 +39,15 @@ export function FilterChipRow<T extends string>({
     // ohne sie unerreichbar zu machen. Die Chips selbst sind `radio`, nicht
     // `button` — die Reihe ist Einfachauswahl mit einem verpflichtenden
     // Default, genau das, was eine Radiogroup semantisch beschreibt.
+    // `py-1` ist kein Abstand, sondern Voraussetzung für das Touch-Target der
+    // Chips: React Native beschneidet `hitSlop` an den Grenzen des Elternteils,
+    // und ohne Polsterung ist dieser Container bei einer einzeiligen Reihe
+    // exakt so hoch wie ein Chip (36px) — die 4px oben und unten fielen dann
+    // ersatzlos weg. Zwischen umbrochenen Reihen liefert `gap-2` dieselben 4px.
     <View
       accessibilityRole="radiogroup"
       accessibilityLabel={accessibilityLabel}
-      className="flex-row flex-wrap gap-2"
+      className="flex-row flex-wrap gap-2 py-1"
     >
       {options.map((option) => {
         const active = option.id === selectedId;
@@ -54,8 +59,10 @@ export function FilterChipRow<T extends string>({
             accessibilityState={{ checked: active }}
             onPress={() => onSelect(option.id)}
             // Der Chip ist per Design 36px hoch; hitSlop bringt das
-            // Touch-Target auf 44, ohne die Optik anzufassen — wie in
-            // TypePicker.
+            // Touch-Target auf 44, ohne die Optik anzufassen. Wirksam wird das
+            // erst durch das `py-1` des Containers — siehe dort. (TypePicker
+            // und MemberPicker benutzen denselben hitSlop ohne diese
+            // Polsterung; dort greift er deshalb nicht, siehe docs/TODO.md.)
             hitSlop={{ top: 4, bottom: 4 }}
             className="h-9 flex-row items-center justify-center gap-1.5 rounded-pill border px-3 active:opacity-70"
             style={{
