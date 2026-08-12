@@ -82,7 +82,10 @@ export function TaskRow({ task, child, urgent }: TaskRowProps) {
         onPress={() => router.push({ pathname: "/task/edit/[id]", params: { id: task.id } })}
         accessibilityRole="button"
         accessibilityLabel={task.title}
-        className="flex-1 active:opacity-70"
+        // `min-h-11` guarantees a 44px touch height for a short title with no
+        // subject pill; `justify-center` keeps that case centred without
+        // shifting normal-length rows, whose content already exceeds it.
+        className="min-h-11 flex-1 justify-center active:opacity-70"
       >
         {task.subject || urgent ? (
           <View className="mb-1 flex-row items-center gap-1.5">
