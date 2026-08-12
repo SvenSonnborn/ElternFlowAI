@@ -33,7 +33,12 @@ interface TaskFormProps {
  */
 export function TaskForm({ state, onChange, types, childOptions, errors }: TaskFormProps) {
   const { t, i18n } = useTranslation();
-  const dateLocale = i18n.language.startsWith("de") ? deLocale : enLocale;
+  const isGerman = i18n.language.startsWith("de");
+  const dateLocale = isGerman ? deLocale : enLocale;
+  // The pattern differs per language, not just the month name: the dot after
+  // the day is a German convention, English wants "Thu, Aug 14, 2026" — same
+  // reasoning as TaskRow's `due` format.
+  const dueDatePattern = isGerman ? "E, d. MMM yyyy" : "E, MMM d, yyyy";
   const [picker, setPicker] = useState<DateTimePickerMode | null>(null);
 
   // A row with an unparsable due_date must not reach format() — date-fns
@@ -81,7 +86,7 @@ export function TaskForm({ state, onChange, types, childOptions, errors }: TaskF
             label={t("hw.form.fieldDue")}
             iconName="calendar"
             value={
-              dueDateValid ? format(state.dueDate, "E, d. MMM yyyy", { locale: dateLocale }) : "—"
+              dueDateValid ? format(state.dueDate, dueDatePattern, { locale: dateLocale }) : "—"
             }
             onPress={() => setPicker("date")}
             error={errors.dueDate}
