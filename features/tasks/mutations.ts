@@ -112,8 +112,26 @@ export function useUpdateTask() {
 
   return useMutation({
     mutationFn: async (vars: UpdateTaskVars): Promise<void> => {
-      const { error } = await supabase.from("tasks").update(vars.changes).eq("id", vars.taskId);
+      // `.select("id").maybeSingle()` turns a same-family-but-vanished row
+      // into a genuine error. Without it, an `UPDATE … WHERE id = …` that
+      // matches zero rows — because another family member deleted the task
+      // while this edit was in flight — still reports `error: null`, and the
+      // screen would navigate away believing the edit was saved.
+      const { data, error } = await supabase
+        .from("tasks")
+        .update(vars.changes)
+        .eq("id", vars.taskId)
+        .select("id")
+        .maybeSingle();
       if (error) throw error;
+      if (!data) {
+        // `hw.error.staleReference` names a stale *child or task type*
+        // reference specifically — using it here (the task row itself is
+        // gone) would misdescribe the failure. A plain Error falls through
+        // mapTaskError's classification to `hw.error.generic`, which is the
+        // closer fit.
+        throw new Error("Task no longer exists");
+      }
     },
     onMutate: (vars) =>
       patchTaskCaches(qc, (tasks) => applyUpdate(tasks, vars.taskId, vars.changes)),
