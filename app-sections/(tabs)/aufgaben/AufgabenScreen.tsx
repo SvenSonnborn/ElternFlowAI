@@ -53,9 +53,25 @@ export function AufgabenScreen() {
   ];
 
   const groups = [
-    { key: "today", label: t("hw.dueToday"), items: sections.today, urgent: true },
-    { key: "upcoming", label: t("hw.upcoming"), items: sections.upcoming, urgent: false },
-    { key: "doneToday", label: t("hw.doneToday"), items: sections.doneToday, urgent: false },
+    {
+      key: "overdue",
+      label: t("hw.overdue"),
+      items: sections.overdue,
+      urgency: "overdue" as const,
+    },
+    { key: "today", label: t("hw.dueToday"), items: sections.today, urgency: "today" as const },
+    {
+      key: "upcoming",
+      label: t("hw.upcoming"),
+      items: sections.upcoming,
+      urgency: "none" as const,
+    },
+    {
+      key: "doneToday",
+      label: t("hw.doneToday"),
+      items: sections.doneToday,
+      urgency: "none" as const,
+    },
   ].filter((group) => group.items.length > 0);
 
   return (
@@ -126,7 +142,7 @@ export function AufgabenScreen() {
                       key={task.id}
                       task={task}
                       child={task.child_id ? childById.get(task.child_id) : undefined}
-                      urgent={group.urgent}
+                      urgency={group.urgency}
                     />
                   ))}
                 </View>
