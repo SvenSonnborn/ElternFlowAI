@@ -127,6 +127,7 @@ export function TaskForm({ state, onChange, types, childOptions, errors }: TaskF
       <DateTimePickerSheet
         mode={picker}
         value={pickerValue}
+        accessibilityLabel={picker === "time" ? t("hw.form.fieldDueTime") : t("hw.form.fieldDue")}
         onPick={(selected) => onChange(picker === "time" ? "dueTime" : "dueDate", selected)}
         onClose={() => setPicker(null)}
       />

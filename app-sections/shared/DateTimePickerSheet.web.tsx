@@ -15,7 +15,13 @@ import type { DateTimePickerSheetProps } from "./DateTimePickerSheet.types";
  *
  * Raw `<input>` is legitimate here: on web the renderer is react-dom.
  */
-export function DateTimePickerSheet({ mode, value, onPick, onClose }: DateTimePickerSheetProps) {
+export function DateTimePickerSheet({
+  mode,
+  value,
+  accessibilityLabel,
+  onPick,
+  onClose,
+}: DateTimePickerSheetProps) {
   const { t } = useTranslation();
   const { theme } = useTheme();
 
@@ -48,6 +54,9 @@ export function DateTimePickerSheet({ mode, value, onPick, onClose }: DateTimePi
           <View>
             <input
               type={isDateMode ? "date" : "time"}
+              // The only naming this control gets: the sheet has no visible
+              // label, and the field that opened it is behind the modal.
+              aria-label={accessibilityLabel}
               value={isValid(value) ? format(value, pattern) : ""}
               onChange={(event) => {
                 // date-fns parse() only back-fills unspecified units from the

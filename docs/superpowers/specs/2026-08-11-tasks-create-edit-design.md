@@ -188,9 +188,14 @@ export interface TaskFormErrors {
 export function emptyTaskForm(now: Date): TaskFormState;
 export function taskToForm(task: TaskWithType): TaskFormState;
 export function validateTaskForm(state: TaskFormState): TaskFormErrors;
-export function toCreateVars(state: TaskFormState): CreateTaskVars;
-export function toTaskChanges(state: TaskFormState): TaskChanges;
+export function toCreateVars(state: TaskFormState): CreateTaskVars | null;
+export function toTaskChanges(state: TaskFormState): TaskChanges | null;
 ```
+
+Beide Serialisierer geben `null` zurück, wenn der State nicht validiert oder
+`typeId` fehlt — `type_id` ist `not null`, und ein `CreateTaskVars` mit `null`
+darin gibt es nicht. Die Screens prüfen das Ergebnis, bevor sie die Mutation
+rufen; das ist der Typ-Backstop hinter dem deaktivierten Speichern-Button.
 
 Die Fehler kommen als **i18n-Keys** zurück, nicht als fertige Strings —
 Präzedenz ist `mapTaskError` in [errors.ts](../../../features/tasks/errors.ts):
@@ -223,8 +228,9 @@ Fehlermeldungen hängen am Feld (`Field`-`error`-Prop), nicht in einer Sammelzei
   `parse(task.due_time, "HH:mm:ss", referenceDate)`. `parseISO` statt
   `new Date()`, aus demselben Grund wie in `TaskRow` — `new Date("2026-08-11")`
   liest UTC-Mitternacht und verschiebt den Tag.
-- Leere Freitextfelder werden zu `null`, nicht zu `""` (`title.trim() || null`
-  für `subject` und `description`) — konsistent mit `EventCreateScreen`.
+- Leere Freitextfelder werden zu `null`, nicht zu `""` — `state.subject.trim() || null`
+  für `subject` und `state.notes.trim() || null` für `description`, konsistent mit
+  `EventCreateScreen`. `title` ist Pflichtfeld und wird nur getrimmt, nie genullt.
 
 `toTaskChanges` schickt **immer den vollen bearbeitbaren Feldsatz**, nicht nur
 die geänderten Felder. Ein Diff wäre hier nur Aufwand: `applyUpdate` merged
@@ -241,8 +247,14 @@ Es gibt keine Einzel-Query für eine Task. Statt eine zweite anzulegen, kommt
 export function useTask(taskId: string): {
   data: TaskWithType | undefined;
   isLoading: boolean;
+  error: unknown;
+  refetch: () => void;
 };
 ```
+
+`error` und `refetch` reicht der Hook mit durch, damit der Edit-Screen einen
+fehlgeschlagenen Ladevorgang von „gibt es nicht" unterscheiden kann — sonst
+meldet er dem Nutzer beim Offline-Deep-Link, seine Aufgabe sei weg.
 
 Eine Query, ein Cache-Eintrag — und damit derselbe, den die vier Mutations
 bereits patchen. Ein eigener `taskKeys.detail(id)`-Eintrag wäre eine zweite
@@ -256,27 +268,48 @@ Definition im Cache. Dieser Fall bekommt die Not-Found-Karte.
 
 ### Zustände
 
-| Zustand                 | Darstellung                                                         |
-| ----------------------- | ------------------------------------------------------------------- |
-| Edit lädt (`isLoading`) | Platzhalter-Block wie in `EventEditScreen`                          |
-| Task nicht gefunden     | Karte `hw.notFound` + Button `action.back` → `router.back()`        |
-| Mutation läuft          | Speichern-Button zeigt `hw.*.saving`, ist deaktiviert               |
-| Mutationsfehler         | Caption in `danger` unter dem Formular, Text `t(mapTaskError(err))` |
-| Erfolg                  | `router.back()`                                                     |
+| Zustand                 | Darstellung                                                             |
+| ----------------------- | ----------------------------------------------------------------------- |
+| Edit lädt (`isLoading`) | Platzhalter-Block wie in `EventEditScreen`                              |
+| Laden fehlgeschlagen    | Karte `hw.loadError` + `t(mapTaskError(error))` + Button `action.retry` |
+| Task nicht gefunden     | Karte `hw.notFound` + Button `action.back`                              |
+| Mutation läuft          | Speichern-Button zeigt `hw.*.saving`, ist deaktiviert                   |
+| Mutationsfehler         | Caption in `danger` unter dem Formular, Text `t(mapTaskError(err))`     |
+| Erfolg                  | zurück zur Liste                                                        |
+
+Zurück heißt `router.back()`, wenn es eine History gibt, sonst `router.replace`
+auf den Aufgaben-Tab: Beide Screens sind per Deep-Link direkt erreichbar, und
+nach einem Cold-Start gibt es nichts, wohin `back()` führen könnte.
 
 Fehler laufen über `mapTaskError` — kein roher `error.message` im UI, anders als
-in den Kalender-Formularen, die die Supabase-Meldung anhängen. `features/tasks`
-hat die Klassifizierung bereits, und `hw.error.staleReference` („Kind oder
-Aufgabentyp existiert nicht mehr") ist für dieses Formular exakt der richtige
-Fall.
+in den Kalender-Formularen, die die Supabase-Meldung anhängen. Die
+Klassifizierung liegt bereits in `features/tasks`. Zwei Fälle sind dabei
+auseinanderzuhalten:
+
+- **`hw.error.staleReference`** („Kind oder Aufgabentyp existiert nicht mehr")
+  gilt ausschließlich für eine ins Leere zeigende **Fremdschlüssel-Referenz**
+  — `child_id` oder `type_id` (Postgres 23503).
+- **`hw.error.generic`** deckt die **verschwundene Task-Zeile** ab: Löscht ein
+  anderes Familienmitglied die Aufgabe, während jemand sie bearbeitet, trifft
+  das `UPDATE` keine Zeile. Supabase meldet dafür keinen Fehler, deshalb
+  erkennt `useUpdateTask` den Fall selbst und wirft — mit einem einfachen
+  `Error`, den `mapTaskError` auf `generic` abbildet. `staleReference` wäre hier
+  falsch: seine Copy benennt Kind und Aufgabentyp, nicht die Aufgabe selbst.
 
 ### Löschen
 
 Unten im Edit-Screen, unter dem Speichern-Button und optisch abgesetzt:
-`variant="soft"`, `tone="danger"`. Tap öffnet `Alert.alert` mit
+`variant="soft"`, `tone="danger"`. Tap öffnet die Rückfrage mit
 `hw.delete.confirmTitle` / `hw.delete.confirmBody`, Bestätigung ruft
-`useDeleteTask` → `router.back()`. Fehlschlag zeigt `hw.delete.error` plus
-`t(mapTaskError(err))`. Muster und Kopfzeilen sind die von `EventDetailScreen`.
+`useDeleteTask` und geht zurück zur Liste. Fehlschlag zeigt `hw.delete.error`
+plus `t(mapTaskError(err))`.
+
+Beide Dialoge laufen über die Helfer aus `app-sections/shared/confirmDialog.ts`
+— `confirmDestructive` für die Ja/Nein-Rückfrage, `showAlert` für die
+Fehlermeldung —, nicht über `Alert.alert` direkt: `Alert` ist auf
+react-native-web für beide Fälle ein No-op, ein Löschen hinter einem
+Alert-Callback würde dort still nie feuern und ein Fehlschlag unbemerkt bleiben
+(ADR-010, Decision 6). Kopfzeilen und Ablauf folgen `EventDetailScreen`.
 
 ## Geteilte Form-Bausteine
 

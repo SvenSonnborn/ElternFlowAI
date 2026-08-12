@@ -18,6 +18,7 @@ export {
   isDateRangeInvalid,
   isMultiDay,
   isTimeRangeInvalid,
+  rangeFieldLabelKey,
   toAllDayRange,
   type DateRange,
   type RangeField,
