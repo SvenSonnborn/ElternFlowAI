@@ -1,13 +1,13 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { MemberOption, TypePickerItem } from "@/app-sections/shared";
 import type { TaskFormState } from "@/features/tasks";
 
-import { confirmDestructive } from "@/app-sections/shared";
+import { confirmDestructive, showAlert } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren } from "@/features/auth";
@@ -82,16 +82,20 @@ export function TaskEditScreen() {
   );
 
   const errors = validateTaskForm(state);
-  const canSave = hydrated && !hasTaskFormErrors(errors) && !updateMutation.isPending;
+  const canSave =
+    hydrated &&
+    !hasTaskFormErrors(errors) &&
+    !updateMutation.isPending &&
+    !deleteMutation.isPending;
 
   function onSave() {
     const changes = toTaskChanges(state);
-    if (!changes || !task || updateMutation.isPending) return;
-    updateMutation.mutate({ taskId: task.id, changes }, { onSuccess: () => router.back() });
+    if (!changes || !taskId || updateMutation.isPending || deleteMutation.isPending) return;
+    updateMutation.mutate({ taskId, changes }, { onSuccess: () => router.back() });
   }
 
   async function onDelete() {
-    if (!task || deleteMutation.isPending) return;
+    if (!taskId || deleteMutation.isPending) return;
     const confirmed = await confirmDestructive({
       title: t("hw.delete.confirmTitle"),
       body: t("hw.delete.confirmBody"),
@@ -100,10 +104,10 @@ export function TaskEditScreen() {
     });
     if (!confirmed) return;
     deleteMutation.mutate(
-      { taskId: task.id },
+      { taskId },
       {
         onSuccess: () => router.back(),
-        onError: (err) => Alert.alert(t("hw.delete.error"), t(mapTaskError(err))),
+        onError: (err) => showAlert({ title: t("hw.delete.error"), body: t(mapTaskError(err)) }),
       },
     );
   }
@@ -120,7 +124,12 @@ export function TaskEditScreen() {
         <View className="flex-1 items-center justify-center px-6">
           <View className="h-24 w-full rounded-2xl" style={{ backgroundColor: theme.cardSubtle }} />
         </View>
-      ) : !task ? (
+      ) : !task && !hydrated ? (
+        // `!task` alone would also fire mid-delete: the mutation's onMutate
+        // optimistically removes the row from the same cache `useTask` reads,
+        // well before `onSuccess` navigates away. `hydrated` (set once real
+        // data has populated `state`) tells the two apart — a task that was
+        // never there keeps `hydrated` false, one being deleted does not.
         <View className="flex-1 items-center justify-center px-6">
           <Text variant="listTitle" tone="danger">
             {t("hw.notFound")}
