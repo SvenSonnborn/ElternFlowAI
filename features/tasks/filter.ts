@@ -45,7 +45,14 @@ function matchesChild(task: TaskWithType, childId: string): boolean {
   return task.child_id === childId;
 }
 
-function matchesDue(task: TaskWithType, due: DueFilter, now: Date): boolean {
+/** Die drei Tages-/Wochengrenzen, die `matchesDue` gegen `due_date` prüft. */
+interface DueBounds {
+  dayStart: Date;
+  dayEnd: Date;
+  weekEnd: Date;
+}
+
+function matchesDue(task: TaskWithType, due: DueFilter, bounds: DueBounds): boolean {
   if (due === "all") return true;
 
   // parseISO, nie new Date(): `due_date` ist ein Postgres-`date`, und
@@ -54,10 +61,10 @@ function matchesDue(task: TaskWithType, due: DueFilter, now: Date): boolean {
 
   // Absichtlich ohne is_done-Prüfung: das Fenster beschreibt allein den
   // Fälligkeitstag, damit auch „Erledigt + Diese Woche" eine Bedeutung hat.
-  if (due === "overdue") return dueAt < startOfDay(now);
-  if (due === "today") return dueAt <= endOfDay(now);
-  if (due === "week") return dueAt <= endOfWeek(now, { weekStartsOn: 1 });
-  return dueAt > endOfWeek(now, { weekStartsOn: 1 });
+  if (due === "overdue") return dueAt < bounds.dayStart;
+  if (due === "today") return dueAt <= bounds.dayEnd;
+  if (due === "week") return dueAt <= bounds.weekEnd;
+  return dueAt > bounds.weekEnd;
 }
 
 /**
@@ -65,11 +72,19 @@ function matchesDue(task: TaskWithType, due: DueFilter, now: Date): boolean {
  * deterministisch bleiben — wie bei `computeTaskStats`.
  */
 export function filterTasks(rows: TaskWithType[], f: TaskFilter, now: Date): TaskWithType[] {
+  // Einmal pro Aufruf statt einmal pro Zeile: die drei Grenzen hängen nur an
+  // `now`, nicht an der einzelnen Aufgabe.
+  const bounds: DueBounds = {
+    dayStart: startOfDay(now),
+    dayEnd: endOfDay(now),
+    weekEnd: endOfWeek(now, { weekStartsOn: 1 }),
+  };
+
   return rows.filter(
     (task) =>
       matchesStatus(task, f.status) &&
       matchesChild(task, f.childId) &&
-      matchesDue(task, f.due, now),
+      matchesDue(task, f.due, bounds),
   );
 }
 
