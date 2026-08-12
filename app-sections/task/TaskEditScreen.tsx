@@ -138,7 +138,10 @@ export function TaskEditScreen() {
             {t("hw.notFound")}
           </Text>
           <View className="mt-4">
-            <Button label={t("action.back")} variant="soft" onPress={() => router.back()} />
+            {/* The state this button appears in is reached by deep link more
+                often than by navigation, and a cold start has no history —
+                `router.back()` alone would leave the user stuck here. */}
+            <Button label={t("action.back")} variant="soft" onPress={goBackOrToTasks} />
           </View>
         </View>
       ) : (

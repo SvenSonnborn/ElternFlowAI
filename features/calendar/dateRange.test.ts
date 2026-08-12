@@ -5,6 +5,7 @@ import {
   isDateRangeInvalid,
   isMultiDay,
   isTimeRangeInvalid,
+  rangeFieldLabelKey,
   toAllDayRange,
   type DateRange,
 } from "./dateRange";
@@ -85,5 +86,21 @@ describe("isMultiDay", () => {
   test("true only once the end falls on a later calendar day", () => {
     expect(isMultiDay(makeRange("2026-06-03T09:00:00", "2026-06-03T23:59:00"))).toBe(false);
     expect(isMultiDay(makeRange("2026-06-03T23:00:00", "2026-06-04T01:00:00"))).toBe(true);
+  });
+});
+
+describe("rangeFieldLabelKey", () => {
+  test("names each of the four pickers distinctly", () => {
+    const keys = (["startDate", "endDate", "startTime", "endTime"] as const).map(
+      rangeFieldLabelKey,
+    );
+    expect(keys).toEqual([
+      "cal.edit.fieldStartDate",
+      "cal.edit.fieldEndDate",
+      "cal.edit.fieldStart",
+      "cal.edit.fieldEnd",
+    ]);
+    // A screen reader can only tell the four pickers apart if the keys do.
+    expect(new Set(keys).size).toBe(4);
   });
 });

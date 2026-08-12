@@ -40,6 +40,25 @@ export function applyRangePick(range: DateRange, field: RangeField, selected: Da
   }
 }
 
+/**
+ * The catalog key naming a range field, for the picker sheet's accessible
+ * name. The sheet renders a bare `<input>` on web with no visible label of its
+ * own, so without this a screen reader cannot tell which end of the range is
+ * being edited.
+ */
+export function rangeFieldLabelKey(field: RangeField): string {
+  switch (field) {
+    case "startDate":
+      return "cal.edit.fieldStartDate";
+    case "endDate":
+      return "cal.edit.fieldEndDate";
+    case "startTime":
+      return "cal.edit.fieldStart";
+    case "endTime":
+      return "cal.edit.fieldEnd";
+  }
+}
+
 /** The end day falls before the start day — invalid whatever the times say. */
 export function isDateRangeInvalid(range: DateRange): boolean {
   return startOfDay(range.endAt) < startOfDay(range.startAt);

@@ -25,6 +25,7 @@ import {
   isDateRangeInvalid,
   isTimeRangeInvalid,
   parseRecurrenceCount,
+  rangeFieldLabelKey,
   toAllDayRange,
   typeLabelsForSlug,
   useCreateEvent,
@@ -379,6 +380,7 @@ export function EventCreateScreen() {
       <DateTimePickerSheet
         mode={pickerMode}
         value={pickerValue}
+        accessibilityLabel={picker ? t(rangeFieldLabelKey(picker)) : ""}
         onPick={(selected) => {
           if (picker) setRange((prev) => applyRangePick(prev, picker, selected));
         }}
