@@ -109,8 +109,13 @@ design-system/           Handoff bundle + theming runtime
 features/                Cross-cutting feature logic
 ├─ i18n/                 react-i18next init + de.json + en.json
 ├─ auth/                 Session-Store · AuthGate · DeepLinkHandler · Onboarding-Mutations
+├─ calendar/             Queries · Mutations · RRULE-Expansion · Reminder
+├─ tasks/                Queries · Mutations · Filter · Stats
+├─ children/             Kinderprofile
+├─ meals/                Meal-Planner-Daten-Layer (Queries · JSONB-Normalisierung · Wochenlogik)
+├─ shared/               Feature-übergreifende Hooks (useToday)
+├─ sample-data/          Mock-Daten für noch nicht verdrahtete Screens
 ├─ voice-assistant/      (placeholder)
-├─ meal-planner/         (placeholder)
 ├─ supabase/             client.ts (createClient + AsyncStorage session) + barrel
 └─ notifications/        (placeholder)
 
