@@ -2,7 +2,14 @@ import { describe, expect, test } from "bun:test";
 
 import type { MealPlanEntryWithRecipe } from "./types";
 
-import { groupByDay, slotForTime, toDateKey, weekDayKeys, weekStartFor } from "./week";
+import {
+  groupByDay,
+  nextSlotBoundary,
+  slotForTime,
+  toDateKey,
+  weekDayKeys,
+  weekStartFor,
+} from "./week";
 
 function makeEntry(overrides: Partial<MealPlanEntryWithRecipe> = {}): MealPlanEntryWithRecipe {
   return {
@@ -126,5 +133,50 @@ describe("slotForTime", () => {
     expect(slotForTime(new Date(2026, 7, 13, 14, 59))).toBe("lunch");
     expect(slotForTime(new Date(2026, 7, 13, 15, 0))).toBe("dinner");
     expect(slotForTime(new Date(2026, 7, 13, 23, 59))).toBe("dinner");
+  });
+});
+
+describe("nextSlotBoundary", () => {
+  test("zielt vormittags auf 11:00 desselben Tages", () => {
+    expect(nextSlotBoundary(new Date(2026, 7, 13, 7, 30, 12, 500))).toEqual(
+      new Date(2026, 7, 13, 11, 0, 0, 0),
+    );
+    expect(nextSlotBoundary(new Date(2026, 7, 13, 10, 59, 59))).toEqual(
+      new Date(2026, 7, 13, 11, 0, 0, 0),
+    );
+  });
+
+  test("zielt mittags auf 15:00 desselben Tages", () => {
+    expect(nextSlotBoundary(new Date(2026, 7, 13, 11, 0))).toEqual(
+      new Date(2026, 7, 13, 15, 0, 0, 0),
+    );
+    expect(nextSlotBoundary(new Date(2026, 7, 13, 14, 59, 59))).toEqual(
+      new Date(2026, 7, 13, 15, 0, 0, 0),
+    );
+  });
+
+  test("zielt abends auf Mitternacht — dinner haelt bis zum Tageswechsel", () => {
+    expect(nextSlotBoundary(new Date(2026, 7, 13, 15, 0))).toEqual(
+      new Date(2026, 7, 14, 0, 0, 0, 0),
+    );
+    expect(nextSlotBoundary(new Date(2026, 7, 13, 23, 59, 59))).toEqual(
+      new Date(2026, 7, 14, 0, 0, 0, 0),
+    );
+  });
+
+  test("traegt ueber die Monatsgrenze", () => {
+    expect(nextSlotBoundary(new Date(2026, 7, 31, 20, 0))).toEqual(
+      new Date(2026, 8, 1, 0, 0, 0, 0),
+    );
+  });
+
+  test("liegt immer in der Zukunft und wechselt den Slot", () => {
+    const probes = [0, 6, 10, 11, 14, 15, 20, 23].map((hour) => new Date(2026, 7, 13, hour, 30));
+
+    for (const now of probes) {
+      const boundary = nextSlotBoundary(now);
+      expect(boundary.getTime()).toBeGreaterThan(now.getTime());
+      expect(slotForTime(boundary)).not.toBe(slotForTime(now));
+    }
   });
 });

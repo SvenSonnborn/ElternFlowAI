@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { addDays } from "date-fns";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { AppState } from "react-native";
 
 import { useToday } from "@/features/shared";
 import { supabase } from "@/features/supabase";
@@ -15,7 +16,7 @@ import type {
 } from "./types";
 
 import { escapeLike, normalizeRecipe } from "./normalize";
-import { groupByDay, slotForTime, toDateKey, weekStartFor } from "./week";
+import { groupByDay, nextSlotBoundary, slotForTime, toDateKey, weekStartFor } from "./week";
 
 const ENTRY_SELECT = "*, recipes(*)";
 
@@ -58,8 +59,22 @@ export function normalizeRecipeFilter(filter: RecipeFilter): NormalizedRecipeFil
   return {
     search: filter.search?.trim() ?? "",
     excludeAllergens: [...new Set(codes)].sort(),
-    limit: filter.limit ?? DEFAULT_RECIPE_LIMIT,
+    limit: normalizeLimit(filter.limit),
   };
+}
+
+/**
+ * Nur positive Ganzzahlen erreichen `.limit()`. `??` allein reichte nicht: es
+ * fängt bloß `null`/`undefined`, sodass `limit: 0` als `.limit(0)` durchging
+ * und still eine leere Liste lieferte, während negative, gebrochene, `NaN`- und
+ * `Infinity`-Werte PostgREST mit 400 quittierten.
+ *
+ * Bewusst ohne Obergrenze: eine solche wäre eine neue Richtlinie, und der
+ * Aufrufer, der 5000 Rezepte anfordert, will sie auch.
+ */
+function normalizeLimit(limit: number | undefined): number {
+  if (limit === undefined) return DEFAULT_RECIPE_LIMIT;
+  return Number.isSafeInteger(limit) && limit > 0 ? limit : DEFAULT_RECIPE_LIMIT;
 }
 
 /**
@@ -177,6 +192,43 @@ interface UseTodaysMealResult {
 }
 
 /**
+ * Der Slot der aktuellen Uhrzeit, neu berechnet sobald er sich ändert.
+ *
+ * Derselbe Aufbau wie `useToday`, aus demselben Grund: der Timer fängt die
+ * Grenze, während die App im Vordergrund liegt, der `AppState`-Listener die
+ * Grenzen, die im Hintergrund vergangen sind — JS-Timer schlafen dort und
+ * feuern nie nach. Ohne beides bliebe „Was essen wir?" um 11:30 beim
+ * Frühstück stehen, wenn der Screen um 10:58 geöffnet wurde.
+ *
+ * Der Slot behält seine Identität, solange er sich nicht ändert, damit der
+ * Effekt nicht bei jedem Vordergrund-Wechsel neu aufsetzt.
+ */
+function useCurrentSlot(): Exclude<MealSlot, "snack"> {
+  const [slot, setSlot] = useState(() => slotForTime(new Date()));
+
+  useEffect(() => {
+    const sync = () => {
+      const current = slotForTime(new Date());
+      setSlot((prev) => (prev === current ? prev : current));
+    };
+
+    // Die zusätzliche Sekunde verhindert, dass ein knapp zu früh feuernder
+    // Timer sich auf ~0 ms neu stellt und in einer Schleife landet.
+    const timer = setTimeout(sync, nextSlotBoundary(new Date()).getTime() - Date.now() + 1_000);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") sync();
+    });
+
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
+  }, [slot]);
+
+  return slot;
+}
+
+/**
  * Die Mahlzeit für jetzt — ein Selektor auf `useMealPlans`, keine eigene Query.
  * Heute liegt per Definition in der aktuellen Woche, der Cache-Eintrag existiert
  * also ohnehin; ein eigener Key wäre eine zweite Kopie derselben Zeile, die
@@ -186,10 +238,7 @@ export function useTodaysMeal(): UseTodaysMealResult {
   const today = useToday();
   const weekStart = useMemo(() => weekStartFor(today), [today]);
   const { data, isLoading, error } = useMealPlans(weekStart);
-
-  // Der Slot wird pro Render aus der Uhrzeit gelesen und aktualisiert sich nicht
-  // von selbst, wenn 11:00 oder 15:00 bei offenem Screen vergeht (docs/TODO.md).
-  const slot = slotForTime(new Date());
+  const slot = useCurrentSlot();
 
   const entry = useMemo(() => data.find((day) => day.isToday)?.slots[slot] ?? null, [data, slot]);
 

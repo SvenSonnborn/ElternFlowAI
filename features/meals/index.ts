@@ -29,4 +29,11 @@ export type {
   RecipeFilter,
   RecipeRow,
 } from "./types";
-export { groupByDay, slotForTime, toDateKey, weekDayKeys, weekStartFor } from "./week";
+export {
+  groupByDay,
+  nextSlotBoundary,
+  slotForTime,
+  toDateKey,
+  weekDayKeys,
+  weekStartFor,
+} from "./week";

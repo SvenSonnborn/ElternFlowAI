@@ -1,4 +1,4 @@
-import { addDays, format, startOfWeek } from "date-fns";
+import { addDays, format, set, startOfDay, startOfWeek } from "date-fns";
 
 import type { MealPlanDay, MealPlanEntryWithRecipe, MealSlot } from "./types";
 
@@ -72,4 +72,19 @@ export function slotForTime(now: Date): Exclude<MealSlot, "snack"> {
   if (hour < 11) return "breakfast";
   if (hour < 15) return "lunch";
   return "dinner";
+}
+
+/**
+ * Der nächste Zeitpunkt, zu dem `slotForTime` etwas anderes liefert.
+ *
+ * Drei Grenzen, nicht zwei: 11:00 und 15:00 innerhalb des Tages, dazu
+ * Mitternacht — nach 15:00 gilt `dinner` bis zum Tageswechsel, danach wieder
+ * `breakfast`. `startOfDay(addDays(…))` rechnet kalendarisch und übersteht
+ * damit die DST-Umstellung, die ein `+24h` verfehlen würde.
+ */
+export function nextSlotBoundary(now: Date): Date {
+  const hour = now.getHours();
+  if (hour < 11) return set(now, { hours: 11, minutes: 0, seconds: 0, milliseconds: 0 });
+  if (hour < 15) return set(now, { hours: 15, minutes: 0, seconds: 0, milliseconds: 0 });
+  return startOfDay(addDays(now, 1));
 }
