@@ -33,7 +33,14 @@ function byDueAsc(a: TaskWithType, b: TaskWithType): number {
 }
 
 function byCompletedAtDesc(a: TaskWithType, b: TaskWithType): number {
-  return (b.completed_at ?? "").localeCompare(a.completed_at ?? "");
+  const byCompleted = (b.completed_at ?? "").localeCompare(a.completed_at ?? "");
+  if (byCompleted !== 0) return byCompleted;
+
+  // Zwei Aufgaben mit demselben Zeitstempel — derselbe Gleichstandsbrecher wie
+  // in `byDueAsc`, damit auch die Erledigt-Sektionen nicht von der Reihenfolge
+  // der Query abhängen. Aufsteigend, also entgegen der Sortierrichtung: die
+  // Richtung ist hier beliebig, nur die Stabilität zählt.
+  return a.id.localeCompare(b.id);
 }
 
 export function groupTasksByChild(tasks: TaskWithType[]): TaskGroup[] {

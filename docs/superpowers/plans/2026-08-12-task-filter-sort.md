@@ -17,7 +17,7 @@
 - **Handoff-Bundle ist tabu.** `design-system/{colors,typography,spacing,themes,components,index}.ts`, `docs/{HANDOFF,COPY,ICONS,README}.md` und `patterns/*.md` werden in diesem Plan **nicht** editiert. Fehlende Copy-Deck-Einträge und Pattern-Ergänzungen wandern nach `docs/TODO.md`.
 - **Kein UI-String im Code.** Jeder sichtbare Text kommt aus `features/i18n/locales/de.json` / `en.json`. DE ist kanonisch, EN spiegelt.
 - **Du-Form, nie Sie.** Markenstimme: warm, ruhig, modern. Niemals kindlich.
-- **Touch-Targets ≥ 44×44.** Chips sind 36px hoch und erreichen 44 per `hitSlop={{ top: 4, bottom: 4 }}` — derselbe Kniff wie in `TypePicker`. `Button size="sm"` (h-9) ist verboten, `md` (h-11) ist der Default.
+- **Touch-Targets ≥ 44×44.** Chips sind 36px hoch und erreichen 44 per `hitSlop={{ top: 4, bottom: 4 }}` **plus `py-1` am Container**: React Native beschneidet `hitSlop` an den Grenzen des Elternteils, ohne die Polsterung verpufft es also. (`TypePicker` benutzt denselben hitSlop ohne Polsterung — dort greift er deshalb nicht, siehe `docs/TODO.md`.) `Button size="sm"` (h-9) ist verboten, `md` (h-11) ist der Default.
 - **Commits:** Conventional-Commits-Präfix mit Scope, **niemals** ein `Co-Authored-By: Claude`-Trailer, **niemals** `--no-verify`.
 - **`bun test`, nicht `npx jest`.** Testdateien importieren aus `bun:test`.
 - **`parseISO`, nie `new Date("YYYY-MM-DD")`.** `tasks.due_date` ist ein Postgres-`date`; `new Date()` läse UTC-Mitternacht und verschöbe den Tag.
@@ -270,8 +270,9 @@ import { endOfDay, endOfWeek, isSameDay, parseISO, startOfDay, startOfWeek } fro
  * geparst.
  *
  * Eine Aufgabe ohne Uhrzeit ist der vageste Termin ihres Tages und sortiert
- * hinter die terminierten; der Titel bricht den Rest der Gleichstände, damit
- * die Reihenfolge stabil ist statt „was Postgres gerade lieferte".
+ * hinter die terminierten; Titel und zuletzt `id` brechen den Rest der
+ * Gleichstände, damit die Reihenfolge stabil ist statt „was Postgres gerade
+ * lieferte".
  */
 function byDueAsc(a: TaskWithType, b: TaskWithType): number {
   const byDate = a.due_date.localeCompare(b.due_date);
@@ -283,7 +284,13 @@ function byDueAsc(a: TaskWithType, b: TaskWithType): number {
     return a.due_time.localeCompare(b.due_time);
   }
 
-  return a.title.localeCompare(b.title);
+  const byTitle = a.title.localeCompare(b.title);
+  if (byTitle !== 0) return byTitle;
+
+  // Ohne diesen letzten Vergleich gäbe der Comparator bei gleichem Termin und
+  // gleichem Titel 0 zurück. `Array.sort` ist stabil, übernähme also die
+  // Reihenfolge der Query — und die ist bei Gleichstand nicht festgelegt.
+  return a.id.localeCompare(b.id);
 }
 ```
 
@@ -1135,7 +1142,7 @@ export function FilterChipRow<T extends string>({
     <View
       accessibilityRole="radiogroup"
       accessibilityLabel={accessibilityLabel}
-      className="flex-row flex-wrap gap-2"
+      className="flex-row flex-wrap gap-2 py-1"
     >
       {options.map((option) => {
         const active = option.id === selectedId;
@@ -1556,7 +1563,7 @@ beides als Designer-Abstimmung in `docs/TODO.md`. `useTasksByChild` bleibt
 ungenutzt: ein Kind-_Filter_ ersetzt keine Kind-_Gruppierung_.
 ```
 
-- [ ] **Step 2: Die zwei neuen TODO-Einträge anhängen**
+- [ ] **Step 2: Die neuen TODO-Einträge anhängen**
 
 In `docs/TODO.md` ans Ende des Abschnitts `## Aufgaben / Tasks (Daten-Layer V1)` anhängen:
 
@@ -1608,7 +1615,7 @@ Jeden Fund entweder beheben oder mit Begründung bewusst verwerfen. Rate-Limit b
 | Kriterium (Spec)                                                      | Belegt durch                                                                      |
 | --------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | Drei Chip-Reihen, `Alle` als Default, Kind-Reihe entfällt ohne Kinder | Task 6 Step 7 · Sichtprüfung Punkt 1 und 5                                        |
-| Chips erreichen 44×44                                                 | Task 5 Step 1 (`h-9` + `hitSlop`)                                                 |
+| Chips erreichen 44×44                                                 | Task 5 Step 1 (`h-9` + `hitSlop` + `py-1` am Container)                           |
 | Chip-Tap ohne Request                                                 | Task 4 Step 5 (Filter im `useMemo`, kein Query-Key)                               |
 | Filter überlebt Tab-Wechsel, nicht den Neustart                       | Task 4 Step 3 (Store ohne `persist`) · Sichtprüfung Punkt 8                       |
 | „Diese Woche" == Stat-Kachel                                          | Task 3 Step 1 (`'week' reicht bis einschließlich Sonntag`) · Sichtprüfung Punkt 4 |

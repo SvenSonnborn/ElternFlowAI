@@ -373,4 +373,17 @@ describe("groupTasksByDue", () => {
     // Comparator kommt und nicht von der stabilen Sortierung.
     expect(groupTasksByDue([...rows].reverse(), NOW).today.map((t) => t.id)).toEqual(["a1", "b2"]);
   });
+
+  test("identical completed_at still sorts deterministically by id", () => {
+    // Zwei Aufgaben, im selben Millisekunden-Stempel abgehakt — ohne den
+    // id-Vergleich in byCompletedAtDesc käme die Reihenfolge aus der Query.
+    const at = localNoon(29);
+    const rows = [makeDone("b2", at), makeDone("a1", at)];
+
+    expect(groupTasksByDue(rows, NOW).doneToday.map((t) => t.id)).toEqual(["a1", "b2"]);
+    expect(groupTasksByDue([...rows].reverse(), NOW).doneToday.map((t) => t.id)).toEqual([
+      "a1",
+      "b2",
+    ]);
+  });
 });

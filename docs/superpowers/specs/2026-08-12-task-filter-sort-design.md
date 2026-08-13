@@ -15,7 +15,7 @@ dem Nutzer kein Werkzeug gibt, die Liste einzuengen.
 ## Scope
 
 **Drin:** drei Chip-Reihen, ein Zustand-Store für den aktiven Filter, eine reine
-Filter-Funktion im Layer, dreistufige Sortierung, zwei neue Sektionen
+Filter-Funktion im Layer, vierstufige Sortierung, zwei neue Sektionen
 (`Überfällig`, `Zuletzt erledigt`), ein zweiter Leerzustand für „Filter trifft
 nichts", zwölf neue i18n-Keys, ADR-011 und drei TODO-Einträge.
 
@@ -128,16 +128,21 @@ macht.
 
 ### 4 · `due_time` ist der Dringlichkeits-Tiebreaker
 
-Sortierung in drei Stufen:
+Sortierung in vier Stufen:
 
 ```
-due_date asc  →  due_time asc (NULL ans Ende)  →  title alphabetisch
+due_date asc  →  due_time asc (NULL ans Ende)  →  title alphabetisch  →  id
 ```
 
 „bis 8 Uhr abgeben" ist dringender als „irgendwann heute" — das ist die
 Bedeutung, die „dann Dringlichkeit" ohne Prioritätsspalte tragen kann. Beide
 Felder sind Strings in lexikalisch korrekter Ordnung (`YYYY-MM-DD`,
 `HH:MM:SS`), es wird also nichts geparst.
+
+Die `id` schließt die Kette ab: ohne sie gäbe der Comparator bei gleichem
+Termin und gleichem Titel `0` zurück, und die stabile `Array.sort` übernähme die
+Reihenfolge der Query — die bei Gleichstand nicht festgelegt ist. Dieselbe
+Absicherung trägt `byCompletedAtDesc` in den Erledigt-Sektionen.
 
 Nebeneffekt: die Reihenfolge bei gleichem Datum ist erstmals deterministisch
 statt „was Postgres zufällig liefert". Der Comparator wird von
@@ -207,7 +212,7 @@ export function isFiltered(f: TaskFilter): boolean;
 
 ### Geändert: `features/tasks/stats.ts`
 
-`byDueDateAsc` wird zum dreistufigen Comparator (Entscheidung 4).
+`byDueDateAsc` wird zum vierstufigen Comparator (Entscheidung 4).
 `groupTasksByDue` liefert fünf Eimer statt drei:
 
 ```ts
@@ -266,8 +271,13 @@ Optisch 1:1 die „Ohne Kind"-Pille aus
 `cardSubtle`/`line`/`inkSecondary`. Kein neues visuelles Vokabular.
 
 - **Touch-Target:** die 36px-Höhe kommt per `hitSlop={{ top: 4, bottom: 4 }}` auf
-  44 — derselbe Kniff wie in
-  [TypePicker](../../../app-sections/shared/TypePicker.tsx).
+  44 — **notwendige Bedingung dafür ist ein `py-1` am Container.** React Native
+  beschneidet `hitSlop` an den Grenzen des Elternteils, und ohne Polsterung ist
+  der Container bei einer einzeiligen Reihe exakt so hoch wie ein Chip; die 4px
+  fielen ersatzlos weg. Zwischen umbrochenen Reihen liefert `gap-2` dieselben
+  4px. ([TypePicker](../../../app-sections/shared/TypePicker.tsx) benutzt
+  denselben hitSlop ohne Polsterung — dort greift er deshalb nicht, siehe
+  `docs/TODO.md`.)
 - **Umbruch:** `flex-wrap`, nicht horizontaler Scroll, damit „Langfristig" nicht
   hinter der Kante verschwindet.
 - **A11y:** `accessibilityRole="button"` plus
@@ -378,7 +388,9 @@ braucht „Heute", die Überschrift „Heute fällig".
 
 - **ADR-011** in [docs/decision-log.md](../../decision-log.md) — die
   Entscheidungen 1 bis 5 mit Begründung und Konsequenzen.
-- **[docs/TODO.md](../../TODO.md)**, drei Einträge:
+- **[docs/TODO.md](../../TODO.md)** — im Lauf der Iteration sind aus den drei
+  geplanten Einträgen fünf geworden; die letzten beiden kamen aus dem finalen
+  Review und dem PR-Review dazu:
   - `patterns/homework.md` kennt keine Filterleiste, und der V2-Abschnitt nennt
     drei Sektionen, während der Screen jetzt bis zu fünf rendert. Mit dem
     Designer abstimmen, damit der Pattern-Doc die Anatomie mitführt.
@@ -388,6 +400,15 @@ braucht „Heute", die Überschrift „Heute fällig".
   - Der bestehende Eintrag zum V1/V2-Umschalter wird **ergänzt**, nicht gelöscht:
     `useTasksByChild` ist weiterhin ungenutzt; ein Kind-_Filter_ ersetzt keine
     Kind-_Gruppierung_.
+  - Ein gelöschtes Kind lässt den Kind-Filter auf eine nicht mehr existierende
+    `id` zeigen — die Chip-Reihe hebt dann nichts hervor, „Filter zurücksetzen"
+    bleibt aber sichtbar und funktionsfähig.
+  - `hitSlop` vergrößert das Touch-Target in `TypePicker` und `MemberPicker`
+    nicht, weil dort die Container-Polsterung fehlt. Beide liegen außerhalb
+    dieser Iteration.
+  - `useTasksSections` ist seit dem Umstieg des Screens auf
+    `useFilteredTaskSections` ungenutzt und bleibt bewusst als Layer-API
+    stehen.
 
 ## Berührte Dateien
 
@@ -412,7 +433,8 @@ braucht „Heute", die Überschrift „Heute fällig".
 
 1. Drei Chip-Reihen über der Liste; jede Einfachauswahl mit `Alle` als Default;
    die Kind-Reihe fehlt, wenn die Familie keine Kinder hat.
-2. Jeder Chip erreicht 44×44 (36px Höhe + `hitSlop`).
+2. Jeder Chip erreicht 44×44: 36px Höhe plus `hitSlop`, wirksam gemacht durch
+   das `py-1` am Container. `minWidth: 44` deckt die Breite ab.
 3. Ein Chip-Tap wirkt ohne Netzwerk-Request und ohne Spinner.
 4. Der Filter überlebt einen Tab-Wechsel und den Weg ins Aufgaben-Formular und
    zurück; ein App-Neustart setzt ihn auf `Alle`.
