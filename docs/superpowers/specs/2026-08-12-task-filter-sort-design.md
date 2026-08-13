@@ -418,8 +418,10 @@ braucht „Heute", die Überschrift „Heute fällig".
    zurück; ein App-Neustart setzt ihn auf `Alle`.
 5. „Diese Woche" liefert genau so viele offene Aufgaben, wie die gleichnamige
    Stat-Kachel zählt.
-6. Sobald ein Filter aktiv ist, erscheinen „Erledigt heute“ und „Zuletzt
-   erledigt“; im ungefilterten Default-Zustand nur „Erledigt heute“.
+6. Sobald ein Filter aktiv ist, kommen „Erledigt heute“ und „Zuletzt erledigt“
+   beide in Frage; im ungefilterten Default-Zustand nur „Erledigt heute“.
+   Gerendert wird davon, was Treffer hat — leere Sektionen fallen wie alle
+   anderen weg.
 7. Überfällige Aufgaben stehen unter „Überfällig", auch ohne aktiven Filter,
    und tragen die Pille „Überfällig" statt „Heute fällig".
 8. Bei gleichem `due_date` sortiert die frühere `due_time` nach oben, Zeilen
