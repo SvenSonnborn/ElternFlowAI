@@ -1,0 +1,33 @@
+name: Renovate Config
+
+# Läuft nur, wenn die Renovate-Config selbst angefasst wird — also fast nie.
+# Grund für den Aufwand: eine schema-ungültige Config lässt Renovate auf seine
+# Defaults zurückfallen, und Defaults heißt hier, dass die Expo-Regel nicht
+# greift und react-native-Majors ins Haus stehen. Siehe ADR-013.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/renovate.json5"
+      - ".github/workflows/renovate-validate.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: renovate-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: renovate-config-validator
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Kein Devdep im Repo: das renovate-Paket ist groß und würde bei jedem
+      # `bun install` mitgezogen, obwohl es nur hier gebraucht wird.
+      - name: Validate
+        run: npx --yes --package renovate -- renovate-config-validator --strict .github/renovate.json5
