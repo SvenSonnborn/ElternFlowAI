@@ -70,6 +70,17 @@ The **JDK 17 pin is what makes the Android build work**: the Gradle wrapper (8.1
 
 Deferred to later iterations (not yet wired): Auth-Flow + Realtime + Edge Functions, gustar.io Worker, Stripe, real STT + LLM, Expo Notifications.
 
+## MCP-Server
+
+`.mcp.json` ist projekt-scoped und eingecheckt; `.claude/settings.local.json` setzt `enableAllProjectMcpServers: true`, ein neuer Eintrag ist nach Claude-Code-Neustart also ohne Freigabe-Dialog aktiv. Beides sind hosted HTTP-Server — kein `npx`, keine lokale Node-Runtime.
+
+| Server     | URL                                                        | Auth                                                                       |
+| ---------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `supabase` | `mcp.supabase.com` (project-scoped, `features=`-Whitelist) | Personal Access Token, ADR-009                                             |
+| `context7` | `mcp.context7.com`                                         | `${CONTEXT7_API_KEY:-}` als `Authorization`-Header — **optional**, ADR-012 |
+
+**Context7** (Upstash) liefert versionsaktuelle Bibliotheks-Dokumentation gegen genau das Problem, das dieses Repo hat: veraltetes Trainingswissen über Expo SDK 57, RN 0.86, NativeWind v4, Reanimated v4. Zwei Tools — `resolve-library-id` (Name → ID wie `/expo/expo`) und `query-docs` (Doku zu einer ID, nach Frage gerankt). Ohne Key verbindet er anonym und teilt das gemeinsame Anonym-Rate-Limit; das `:-`-Default in `.mcp.json` hält den Server dabei verbunden, statt an einer nicht expandierbaren Variable zu scheitern. Eigenen Key aus <https://context7.com/dashboard> nach `.env.local` legen (siehe `.env.example`), mise exportiert ihn in die Shell.
+
 ## Folder structure
 
 ```

@@ -330,3 +330,30 @@ Der Aufgaben-Screen zeigte alles, was im Query-Fenster lag, ohne Möglichkeit ei
 - `useTasksByChild` bleibt ungenutzt: ein Kind-_Filter_ ersetzt keine Kind-_Gruppierung_.
 
 ---
+
+## ADR-012 — Context7-MCP im Projekt-Scope, API-Key optional (2026-08-13)
+
+### Status
+
+Accepted. Ergänzt [ADR-009](#adr-009--supabase-mcp-authentifiziert-per-personal-access-token-statt-oauth-2026-07-28) um einen zweiten MCP-Server; ersetzt keine Entscheidung daraus.
+
+### Context
+
+Der Stack ist an mehreren Stellen jünger als jedes Trainingswissen: Expo SDK 57 + Router 57, RN 0.86, React 19.2, TypeScript ~6.0, NativeWind v4, Reanimated v4 + Worklets. Genau dort entstehen die teuren Fehler — erfundene APIs, Migrationen auf eine Major-Version, die es so nie gab, Babel-Plugin-Reihenfolgen aus der Vorgänger-SDK. Context7 (Upstash) zieht Doku und Code-Beispiele versionsspezifisch aus den Quell-Repos und stellt sie über zwei Tools bereit: `resolve-library-id` und `query-docs`.
+
+### Decisions
+
+1. **Projekt-Scope in `.mcp.json`, nicht User-Scope.** Der Nutzen hängt am Stack dieses Repos, und der eingecheckte Eintrag gilt für jeden, der klont — genau wie beim Supabase-Server. Ein `claude mcp add --scope user` hätte den Server an die Maschine statt an das Projekt gebunden und wäre in keinem Review sichtbar. `enableAllProjectMcpServers: true` in `.claude/settings.local.json` ist dabei lokal und pro Entwickler; der Eintrag selbst trägt keine Freigabe.
+2. **Hosted HTTP-Transport (`mcp.context7.com/mcp`), kein lokales `npx @upstash/context7-mcp`.** Ein stdio-Server bräuchte eine Node-Runtime neben der mise-Pinnung und einen weiteren Prozess pro Session. Der HTTP-Server ist derselbe Bautyp wie der Supabase-Eintrag — eine URL, ein optionaler Header.
+3. **Der API-Key ist optional, mit `:-`-Default.** `"Authorization": "${CONTEXT7_API_KEY:-}"` expandiert bei nicht gesetzter Variable zu einem leeren Header; verifiziert, dass Context7 darauf mit `200` und vollständiger Tool-Liste antwortet (anonymes Rate-Limit). Ohne den Default würde eine fehlende Variable die Expansion scheitern lassen — für einen Server, der auch anonym nutzbar ist, wäre das ein selbstgebauter Ausfall. Unterschied zu ADR-009: der Supabase-Token ist Pflicht (kein anonymer Modus), deshalb steht dort kein Default.
+4. **Kein `Bearer `-Präfix im Header-Template.** Context7 nimmt den rohen Key entgegen; das Präfix ins Template zu schreiben, würde bei leerer Variable ein `Authorization: Bearer ` senden — ein Header, der wie ein kaputter Token aussieht statt wie „keiner".
+5. **Der Key liegt in `.env.local`, nicht in `~/.zshrc`.** Damit gilt dieselbe Kette wie für `SUPABASE_ACCESS_TOKEN` (mise `[env] _.file` → Shell → `.mcp.json`-Expansion), und es gibt genau einen Ort für Projekt-Secrets. Der Upstream-Plugin-README empfiehlt die Shell-RC-Variante; die würde den Key global setzen und aus dem `.env.example`-Vertrag herausfallen.
+
+### Consequences
+
+- Zwei neue Tools (`resolve-library-id`, `query-docs`) sind nach Claude-Code-Neustart verfügbar. Bis dahin bleibt die Session ohne sie — MCP-Server werden beim Start verbunden, nicht bei Config-Änderung.
+- Ohne Key teilen sich alle Entwickler das Anonym-Kontingent. Wenn Doku-Abfragen anfangen zu limitieren, ist der Fix ein Key pro Entwickler in `.env.local` — keine Config-Änderung.
+- `.mcp.json` ist damit nicht mehr Supabase-only; die Server-Tabelle in `CLAUDE.md` ist ab jetzt die Übersicht.
+- Der als optional deklarierte `CONTEXT7_API_KEY` ist der erste Eintrag in `.env.example`, dessen Leerlassen ein gültiger Endzustand ist — der Kommentar dort sagt das explizit, damit ihn niemand als vergessene Konfiguration liest.
+
+---
