@@ -1,0 +1,190 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+
+  extends: [
+    "config:recommended",
+    // Alle Renovate-Commits als `chore(deps): …`. Passend zu CLAUDE.md
+    // ("chore = Wartung / Tooling / CI"). Ohne diesen Preset trennt
+    // config:recommended nach `fix(deps)` für prod- und `chore(deps)` für
+    // devDependencies — zwei Prefixes für dieselbe Art Arbeit.
+    ":semanticCommitTypeAll(chore)",
+  ],
+
+  timezone: "Europe/Berlin",
+  // Ein Schwung pro Woche statt Tröpfeln über sieben Tage.
+  schedule: ["before 6am on monday"],
+
+  prConcurrentLimit: 5,
+  prHourlyLimit: 2,
+
+  // Renovate rebased nur bei Konflikt. Notwendig für expo-sdk-sync.yml: dessen
+  // `expo install --fix`-Commit liegt in Renovates eigenem Branch und darf nicht
+  // wegrebased werden.
+  rebaseWhen: "conflicted",
+
+  labels: ["chore", "dependencies"],
+
+  // Das Ruleset `main protection` erlaubt ausschließlich Rebase-Merges
+  // (allowed_merge_methods) und erzwingt lineare Historie.
+  automergeStrategy: "rebase",
+  // Renovate merged über die API selbst, damit der Ruleset-Bypass eindeutig auf
+  // den handelnden Actor greift. GitHubs natives Auto-Merge in Kombination mit
+  // Bypass-Actors ist zu unklar dokumentiert, um hier blind darauf zu bauen.
+  // Umstellung auf true steht in docs/TODO.md.
+  platformAutomerge: false,
+
+  lockFileMaintenance: {
+    enabled: true,
+    automerge: true,
+  },
+
+  osvVulnerabilityAlerts: true,
+  vulnerabilityAlerts: {
+    labels: ["chore", "dependencies", "security"],
+    // Leerer Schedule = sofort. CVEs warten nicht bis Montag.
+    schedule: [],
+  },
+
+  customManagers: [
+    {
+      customType: "regex",
+      // `bun 1.3.10` steht doppelt im Repo: in mise.toml (sieht Renovates
+      // mise-Manager) und als `bun-version:`-Input in ci.yml (sieht er NICHT —
+      // der github-actions-Manager fasst nur `uses:`-Zeilen an, keine `with:`-
+      // Inputs). Ohne diesen Manager driftet "local == CI" beim ersten
+      // Bun-Update auseinander.
+      description: "bun-version: in ci.yml an mise.toml koppeln",
+      // Validator (renovate@37.440.7) kennt trotz Schema-Angebot noch nicht
+      // `managerFilePatterns` (das aus dem Brief) — dessen allowedKeys-Liste
+      // fuer customManagers erwartet weiterhin `fileMatch`, unveraendert seit
+      // vor der Umbenennung. `fileMatch`-Eintraege sind reine Regex-Strings
+      // ohne Slash-Delimiter (kein `/…/`-Wrapping wie bei matchPackageNames).
+      fileMatch: ["^\\.github/workflows/ci\\.yml$"],
+      matchStrings: ["bun-version:\\s*(?<currentValue>\\S+)"],
+      depNameTemplate: "bun",
+      datasourceTemplate: "github-releases",
+      packageNameTemplate: "oven-sh/bun",
+      extractVersionTemplate: "^bun-v(?<version>.*)$",
+    },
+  ],
+
+  // ACHTUNG — die Reihenfolge ist Teil der Semantik: spätere Regeln
+  // überschreiben frühere für die Eigenschaften, die sie setzen. Jede Regel
+  // setzt `automerge` explizit, damit Überlappungen nicht von Defaults abhängen.
+  packageRules: [
+    {
+      // 1 — devDependencies sammeln und automergen. Die CI-Gates
+      // (format/lint/typecheck/test/web-build) sind das Sicherheitsnetz.
+      description: "devDependencies (minor+patch)",
+      matchDepTypes: ["devDependencies"],
+      matchUpdateTypes: ["minor", "patch"],
+      groupName: "dev-dependencies",
+      automerge: true,
+    },
+    {
+      // 2 — Action-Pins. Majors bleiben manuell, die ändern gern Inputs.
+      description: "GitHub Actions (minor/patch/digest)",
+      matchManagers: ["github-actions"],
+      matchUpdateTypes: ["minor", "patch", "digest"],
+      groupName: "github actions",
+      automerge: true,
+    },
+    {
+      // 3 — Von Expo SDK verwaltet: die Version bestimmt das SDK, nicht
+      // npm-latest. `in-range-only` heißt: nur Updates, die die bereits in
+      // package.json stehende Range erfüllen. `~57.0.7` bekommt 57.0.9
+      // (lockfile-only), aber nie 58.x — außer für `expo` selbst, das Regel 4
+      // gleich danach wieder aufweicht (Begründung dort). Exakt gepinnte
+      // Pakete wie react-native 0.86.0 bewegen sich damit gar nicht — gewollt,
+      // denn genau dort bricht ein eigenmächtiger Bump den Native-Build, den
+      // die CI (nur Web-Export) nicht prüft.
+      //
+      // Steht bewusst NACH Regel 1: jest-expo, eslint-config-expo, @types/react
+      // und react-test-renderer sind devDeps *und* Expo-verwaltet. Diese Regel
+      // gewinnt, sie landen also ohne Automerge in der Expo-Gruppe.
+      description: "Expo-SDK-verwaltete Pakete — nur in-range",
+      matchPackageNames: [
+        "expo",
+        "/^expo-/",
+        "/^@expo\\//",
+        "react",
+        "react-dom",
+        "react-test-renderer",
+        "@types/react",
+        "react-native",
+        "/^react-native-/",
+        "/^@react-native\\//",
+        "/^@react-native-community\\//",
+        "jest-expo",
+        "eslint-config-expo",
+      ],
+      rangeStrategy: "in-range-only",
+      groupName: "expo sdk (in-range)",
+      automerge: false,
+    },
+    {
+      // 4 — Override von Regel 3, nur für `expo` selbst. Der Renovate-
+      // Validator verbietet, rangeStrategy und matchUpdateTypes in derselben
+      // Regel zu kombinieren (rangeStrategy wird VOR der Update-Type-
+      // Bestimmung ausgewertet — Renovate wüsste sonst nicht, wonach es
+      // überhaupt suchen soll; siehe Validator-Meldung "packageRules cannot
+      // combine both matchUpdateTypes and rangeStrategy"). Deshalb kann
+      // Regel 6 (Expo-Major) das rangeStrategy-Verhalten für Majors nicht
+      // selbst setzen — es muss hier, paketbezogen statt updateType-bezogen,
+      // passieren. `in-range-only` (Regel 3) verwirft Out-of-Range-Updates
+      // komplett, noch bevor Regel 6 sie zu Gesicht bekommt — die Expo-Major-
+      // Regel liefe damit ins Leere. `update-lockfile` verhält sich für
+      // In-Range-Updates identisch zu `in-range-only` (Lockfile-only,
+      // `~57.0.7` → 57.0.9), fällt für Out-of-Range-Updates (58.x) aber auf
+      // `replace` zurück und schlägt package.json vor — genau diesen Fall
+      // fängt Regel 6 ab und sperrt ihn hinter dependencyDashboardApproval.
+      description: "expo: rangeStrategy-Override, damit Regel 6 Majors überhaupt sieht",
+      matchPackageNames: ["expo"],
+      rangeStrategy: "update-lockfile",
+      automerge: false,
+    },
+    {
+      // 5 — Korrigiert Regel 3: deren Regex /^react-native-/ fängt diese beiden
+      // mit ein, obwohl Expo sie nicht verwaltet. Zwei benannte Ausnahmen statt
+      // einer gepflegten Zwanzig-Pakete-Liste.
+      description: "Trotz react-native-Präfix nicht von Expo verwaltet",
+      matchPackageNames: ["react-native-calendars", "react-native-url-polyfill"],
+      rangeStrategy: "replace",
+      groupName: null,
+      automerge: false,
+    },
+    {
+      // 6 — Der SDK-Sprung. Renovate hebt NUR `expo`; expo-sdk-sync.yml zieht
+      // react-native, expo-*, react und @types/react per `expo install --fix`
+      // nach. dependencyDashboardApproval heißt: kein PR, bis die Checkbox im
+      // Dashboard gesetzt wird. Kein eigenes rangeStrategy hier — das liefert
+      // bereits Regel 4 (siehe deren Begründung: Validator verbietet die
+      // Kombination mit matchUpdateTypes in derselben Regel).
+      description: "Expo-Major = SDK-Sprung, nur auf Zuruf",
+      matchPackageNames: ["expo"],
+      matchUpdateTypes: ["major"],
+      groupName: null,
+      dependencyDashboardApproval: true,
+      automerge: false,
+      labels: ["chore", "dependencies", "expo-sdk"],
+      commitMessageTopic: "Expo SDK",
+    },
+    {
+      // 7 — JDK bleibt 17: der Gradle-Wrapper (8.14.3) läuft nur auf JDK <= 24.
+      // Ausführliche Begründung im Kommentar in mise.toml.
+      description: "JDK-Pin nicht anfassen (Gradle 8.14.3 braucht JDK <= 24)",
+      matchManagers: ["mise"],
+      matchDepNames: ["java"],
+      enabled: false,
+    },
+    {
+      // 8 — mise.toml und ci.yml müssen dieselbe Bun-Version tragen. Der
+      // customManager oben liefert die zweite Fundstelle unter demselben
+      // depName, beide landen so in einem PR.
+      description: "Bun-Toolchain (mise.toml + ci.yml gemeinsam)",
+      matchDepNames: ["bun"],
+      groupName: "bun toolchain",
+      automerge: false,
+    },
+  ],
+}
