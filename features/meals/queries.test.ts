@@ -95,14 +95,14 @@ const supabase = {
 
 void mock.module("@/features/supabase", () => ({ supabase }));
 
-// `queries.ts` also imports `useToday`, which reaches for `AppState` from
-// `react-native` at module scope — `bun.test.preload.ts`'s global mock
-// doesn't stub that export, and none of the functions under test here call
-// the hook, so a trivial stub keeps the import side-effect-free.
-void mock.module("@/features/shared", () => ({ useToday: () => new Date() }));
+// `@/features/shared` is deliberately NOT mocked here. `queries.ts` imports
+// `useToday` from it, which only fails to load because the preload's
+// `react-native` stub was missing `AppState`; stubbing that there fixes it for
+// every suite at once, whereas mocking a project module here would fix it for
+// this file and leave the next one to rediscover the same problem.
 
-// Imported after the module mocks are installed: a static import would be
-// hoisted above them and `queries.ts` would capture the real modules.
+// Imported after the module mock is installed: a static import would be
+// hoisted above it and `queries.ts` would capture the real client.
 const { fetchMealPlanWeek, fetchRecipeById, fetchRecipes, normalizeRecipeFilter } =
   await import("./queries");
 

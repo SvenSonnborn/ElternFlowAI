@@ -13,6 +13,16 @@ process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??= "sb_publishable_test";
 
 void mock.module("react-native", () => ({
   Platform: { OS: "web", select: <T>(o: { web?: T; default?: T }) => o.web ?? o.default },
+  // Needed as a named export even by modules that never call it: importing a
+  // name the mocked module doesn't define is a load-time error under Bun, so
+  // `features/shared/useToday.ts` cannot be imported without this. Stubbing it
+  // here keeps the real hook loadable in every suite; the alternative — each
+  // suite mocking `@/features/shared` — patches a project module to work
+  // around a gap in this third-party one.
+  AppState: {
+    currentState: "active",
+    addEventListener: () => ({ remove() {} }),
+  },
   NativeModules: {},
   TurboModuleRegistry: { get: () => null, getEnforcing: () => ({}) },
   NativeEventEmitter: class {
