@@ -281,6 +281,21 @@ describe("normalizeRecipeFilter", () => {
 
   test("übernimmt ein explizites Limit unverändert", () => {
     expect(normalizeRecipeFilter({ limit: 12 }).limit).toBe(12);
+    expect(normalizeRecipeFilter({ limit: 1 }).limit).toBe(1);
+  });
+
+  test("ersetzt unbrauchbare Limits durch das Default", () => {
+    // 0 ging als `.limit(0)` durch und lieferte still eine leere Liste; der
+    // Rest quittierte PostgREST mit 400.
+    for (const limit of [0, -1, -50, 2.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(normalizeRecipeFilter({ limit }).limit).toBe(50);
+    }
+  });
+
+  test("reicht das normalisierte Limit an die Query weiter", async () => {
+    await fetchRecipes(normalizeRecipeFilter({ limit: 0 }));
+
+    expect(methodCalls(only("recipes"), "limit")).toEqual([[50]]);
   });
 
   test("verwirft Codes, die nicht auf das Allergen-Muster passen", () => {
