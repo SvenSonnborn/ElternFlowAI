@@ -10,6 +10,29 @@
 
 **Spec:** [docs/superpowers/specs/2026-08-13-meals-data-layer-design.md](../specs/2026-08-13-meals-data-layer-design.md)
 
+> **Nachtrag nach der Umsetzung.** Drei Stellen dieses Plans weichen vom
+> ausgelieferten Code ab. Der Originaltext bleibt stehen — verbindlich ist der
+> Code, nicht dieser Plan.
+>
+> 1. **Task 2, `toIngredients`:** Der Implementierungs-Code in Step 4 behandelt
+>    ein nacktes String-Element als Zutatennamen, der Test in Step 2 („kein
+>    Objekt" wird verworfen) verlangt das Gegenteil — der Plan widerspricht sich
+>    selbst. Ausgeliefert ist die Test-Variante: ein String als _Array-Element_
+>    wird verworfen, weil er sich nicht von einer Mengenangabe unterscheiden
+>    lässt; ein String im `name`-**Feld** eines Zutaten-Objekts bleibt gültig.
+>    `toInstructions` nimmt nackte Strings weiterhin an — ein Zubereitungsschritt
+>    _ist_ nur Text. Siehe [features/meals/normalize.ts](../../../features/meals/normalize.ts).
+> 2. **Task 4, Kommentar zum Allergenfilter:** „trifft `recipes_contains_allergens_gin`"
+>    ist falsch. Ein negiertes Overlap ist nicht indizierbar; Postgres
+>    sequenz-scannt. Im Code korrigiert, Index-Bedarf in [docs/TODO.md](../../TODO.md).
+> 3. **Task 4, „keine Unit-Tests":** gilt nur für die Hooks. Die Fetcher sind in
+>    `features/meals/queries.test.ts` abgedeckt, nach dem Muster von
+>    [features/calendar/reminders.test.ts](../../../features/calendar/reminders.test.ts).
+>
+> Ebenfalls ungenau: Task 5, Step 2 erwartet beim Grep „nur der Treffer in
+> `CLAUDE.md`" — es sind zwei, der zweite steht in
+> `docs/eltern-flow-ai-project-structure.md` und ist als TODO erfasst.
+
 ## Global Constraints
 
 - **Branch:** `feat/meals-data-layer`. Bereits angelegt, die Spec ist darauf committed.

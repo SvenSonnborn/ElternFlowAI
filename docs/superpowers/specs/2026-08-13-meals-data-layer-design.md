@@ -2,6 +2,26 @@
 
 **Datum:** 2026-08-13 · **Branch:** `feat/meals-data-layer` · **Status:** freigegeben
 
+> **Nachtrag nach der Umsetzung.** Zwei Aussagen weiter unten haben sich als
+> falsch erwiesen. Der Originaltext bleibt stehen, damit die Begründungskette
+> nachvollziehbar bleibt — verbindlich ist der Code.
+>
+> 1. **Der Allergenfilter nutzt keinen Index** (Abschnitt „Die vier Hooks",
+>    `useRecipes`, und Ausgangslage-Punkt 1). `not(…, "ov", …)` ist ein
+>    _negiertes_ Overlap und damit kein indizierbares Prädikat — Postgres
+>    sequenz-scannt. `recipes_contains_allergens_gin` bedient `&&`, `@>`, `<@`,
+>    nicht deren Negation. Auch `ilike '%…%'` und `order by created_at` laufen
+>    ohne Index. Damit trägt „die Indizes existieren bereits" den Beschluss
+>    nicht, `useRecipes` sofort zu bauen; der Beschluss selbst bleibt richtig,
+>    weil die Abfrage klein ist und ein zweiter Durchgang teurer wäre. Der
+>    Index-Bedarf steht als Eintrag in [docs/TODO.md](../../TODO.md).
+> 2. **Die Hooks blieben untestet, die Fetcher nicht** (Abschnitt „Tests").
+>    Die Begründung „im Repo gibt es keine Infrastruktur dafür" gilt nur für
+>    React-Hooks. Für Supabase-Fetcher existiert sie sehr wohl:
+>    [features/calendar/reminders.test.ts](../../../features/calendar/reminders.test.ts)
+>    etabliert das `mock.module`-Muster. `features/meals/queries.test.ts` folgt
+>    ihm und deckt die drei Fetcher plus `normalizeRecipeFilter` ab.
+
 ## Ziel
 
 `features/meals/` liefert dem Essen-Tab die Daten, die er heute aus
