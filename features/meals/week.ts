@@ -64,9 +64,10 @@ export function groupByDay(
 /**
  * Der Slot, den der Nutzer gerade meint. Regel aus `patterns/meals.md`
  * ("Behaviour rules"): vor 11 Frühstück, 11–15 Mittag, sonst Abendessen.
- * `snack` wird nie automatisch gewählt.
+ * `snack` wird nie automatisch gewählt — der Rückgabetyp schließt ihn deshalb
+ * aus, statt Aufrufer einen unerreichbaren Zweig schreiben zu lassen.
  */
-export function slotForTime(now: Date): MealSlot {
+export function slotForTime(now: Date): Exclude<MealSlot, "snack"> {
   const hour = now.getHours();
   if (hour < 11) return "breakfast";
   if (hour < 15) return "lunch";
