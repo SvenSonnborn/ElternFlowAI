@@ -17,14 +17,15 @@ dem Nutzer kein Werkzeug gibt, die Liste einzuengen.
 **Drin:** drei Chip-Reihen, ein Zustand-Store für den aktiven Filter, eine reine
 Filter-Funktion im Layer, vierstufige Sortierung, zwei neue Sektionen
 (`Überfällig`, `Zuletzt erledigt`), ein zweiter Leerzustand für „Filter trifft
-nichts", zwölf neue i18n-Keys, ADR-011 und drei TODO-Einträge.
+nichts“, zwölf neue i18n-Keys, ADR-011 sowie fünf neue TODO-Einträge und die
+Ergänzung eines bestehenden.
 
 **Bewusst draußen:**
 
 - **Mehrfachauswahl pro Dimension.** Jede Reihe ist Einfachauswahl mit `Alle` als
   Default. Mehrfachauswahl bräuchte eine andere Chip-Semantik (Toggle statt
-  Radio) und einen sichtbaren Unterschied zwischen „nichts gewählt" und „alles
-  gewählt".
+  Radio) und einen sichtbaren Unterschied zwischen „nichts gewählt“ und „alles
+  gewählt“.
 - **Filter nach Aufgabentyp** (`task_types`). Die drei Typen (Hausaufgaben,
   Besorgung, Eltern-Aufgabe) korrelieren stark mit dem Kind-Filter — eine vierte
   Chip-Reihe wäre viel Platz für wenig zusätzliche Trennschärfe.
@@ -50,7 +51,7 @@ Vier Beobachtungen prägen das Design:
 
 - **Die Daten liegen schon vollständig im Cache.** Filtern ist damit eine reine
   Selektion, kein Datenzugriff.
-- **`tasks` hat keine Prioritätsspalte.** „Dringlichkeit" ist in
+- **`tasks` hat keine Prioritätsspalte.** „Dringlichkeit“ ist in
   [patterns/homework.md](../../../patterns/homework.md) aus `due_date`
   abgeleitet (`today` / `thisWeek` / `longTerm`). Nach Fälligkeit aufsteigend zu
   sortieren _ist_ damit bereits nach Dringlichkeit sortiert — der Zusatz braucht
@@ -58,7 +59,7 @@ Vier Beobachtungen prägen das Design:
 - **`due_time` ist unbenutzt.** Die Spalte existiert seit der ersten Migration,
   wird im Formular gepflegt, beeinflusst aber weder Sortierung noch Anzeige.
 - **Überfällige Aufgaben sind unsichtbar.** `groupTasksByDue` klappt sie bewusst
-  in „Heute fällig" hinein. Eine drei Tage überfällige Aufgabe sieht exakt aus
+  in „Heute fällig“ hinein. Eine drei Tage überfällige Aufgabe sieht exakt aus
   wie eine, die heute Abend fällig ist.
 
 ## Entscheidungen
@@ -75,7 +76,7 @@ Datenmenge, die ohnehin komplett geladen wird, kauft man sich damit nur
 Nachteile ein.
 
 Ein Hybrid (Status server-seitig, weil `is_done` schon in der `.or()`-Klausel
-steckt) wurde verworfen: er schafft zwei Orte, an denen „was ist sichtbar"
+steckt) wurde verworfen: er schafft zwei Orte, an denen „was ist sichtbar“
 definiert ist.
 
 ### 2 · Fälligkeits-Chips sind Fenster, keine Eimer
@@ -92,15 +93,15 @@ daneben zu stellen:
 
 Die ersten drei Fenster sind ineinander geschachtelt (`Überfällig ⊂ Heute ⊂
 Diese Woche`), `Langfristig` ist das Komplement zu `Diese Woche`. Das ist
-Absicht: tippt man „Diese Woche", stehen exakt die Zeilen da, die die
+Absicht: tippt man „Diese Woche“, stehen exakt die Zeilen da, die die
 gleichnamige Kachel behauptet. Die Chip-Reihe wird damit zum Drilldown der
 Stat-Leiste, und [`computeTaskStats`](../../../features/tasks/stats.ts) bleibt
 unangetastet.
 
 Das Prädikat liest **nur `due_date`, unabhängig von `is_done`**. So hat auch die
-Kombination „Erledigt + Diese Woche" eine definierte Bedeutung: „war diese Woche
-fällig und ist erledigt". `Überfällig` liest sich für eine erledigte Aufgabe als
-„war vor heute fällig".
+Kombination „Erledigt + Diese Woche“ eine definierte Bedeutung: „war diese Woche
+fällig und ist erledigt“. `Überfällig` liest sich für eine erledigte Aufgabe als
+„war vor heute fällig“.
 
 ### 3 · Überfällige bekommen eine eigene Sektion — auch ungefiltert
 
@@ -113,14 +114,14 @@ sprechen dafür:
 
 - Es ist die einzige Art, unter dem Filter `Überfällig` eine ehrliche
   Überschrift zu haben. Sonst stünden ausschließlich überfällige Zeilen unter
-  „Heute fällig".
+  „Heute fällig“.
 - Überfälligkeit ist heute nicht erkennbar — ein echter Mangel, kein
   kosmetischer.
 - Filter und Sektionen teilen sich danach _eine_ Fälligkeits-Definition statt
   zweier, die auseinanderdriften können.
 
-**Bewusst in Kauf genommen:** die Kachel sagt „3 Heute fällig", die Liste zeigt
-„Überfällig 2" + „Heute fällig 1". Die Kachel zählt, was heute zu tun ist; die
+**Bewusst in Kauf genommen:** die Kachel sagt „3 Heute fällig“, die Liste zeigt
+„Überfällig 2“ + „Heute fällig 1“. Die Kachel zählt, was heute zu tun ist; die
 Sektionen erklären, warum. Die billigere Alternative — Sektionen lassen, die
 Überschrift nur bei aktivem Filter umbenennen — wurde verworfen, weil sie die
 Überschrift von einer Beschreibung des Inhalts zu einer Funktion des UI-Zustands
@@ -130,12 +131,12 @@ macht.
 
 Sortierung in vier Stufen:
 
-```
+```text
 due_date asc  →  due_time asc (NULL ans Ende)  →  title alphabetisch  →  id
 ```
 
-„bis 8 Uhr abgeben" ist dringender als „irgendwann heute" — das ist die
-Bedeutung, die „dann Dringlichkeit" ohne Prioritätsspalte tragen kann. Beide
+„bis 8 Uhr abgeben“ ist dringender als „irgendwann heute“ — das ist die
+Bedeutung, die „dann Dringlichkeit“ ohne Prioritätsspalte tragen kann. Beide
 Felder sind Strings in lexikalisch korrekter Ordnung (`YYYY-MM-DD`,
 `HH:MM:SS`), es wird also nichts geparst.
 
@@ -145,7 +146,7 @@ Reihenfolge der Query — die bei Gleichstand nicht festgelegt ist. Dieselbe
 Absicherung trägt `byCompletedAtDesc` in den Erledigt-Sektionen.
 
 Nebeneffekt: die Reihenfolge bei gleichem Datum ist erstmals deterministisch
-statt „was Postgres zufällig liefert". Der Comparator wird von
+statt „was Postgres zufällig liefert“. Der Comparator wird von
 `groupTasksByDue` **und** `groupTasksByChild` benutzt, beide profitieren.
 
 Eine echte `tasks.priority`-Spalte wurde verworfen: Migration, zwei
@@ -265,7 +266,7 @@ interface FilterChipRowProps {
 }
 ```
 
-Optisch 1:1 die „Ohne Kind"-Pille aus
+Optisch 1:1 die „Ohne Kind“-Pille aus
 [MemberPicker](../../../app-sections/shared/MemberPicker.tsx) — `h-9`,
 `rounded-pill`, `border`, aktiv `primarySoft`/`primary`/`primaryStrong`, inaktiv
 `cardSubtle`/`line`/`inkSecondary`. Kein neues visuelles Vokabular.
@@ -278,7 +279,7 @@ Optisch 1:1 die „Ohne Kind"-Pille aus
   4px. ([TypePicker](../../../app-sections/shared/TypePicker.tsx) benutzt
   denselben hitSlop ohne Polsterung — dort greift er deshalb nicht, siehe
   `docs/TODO.md`.)
-- **Umbruch:** `flex-wrap`, nicht horizontaler Scroll, damit „Langfristig" nicht
+- **Umbruch:** `flex-wrap`, nicht horizontaler Scroll, damit „Langfristig“ nicht
   hinter der Kante verschwindet.
 - **A11y:** `accessibilityRole="button"` plus
   `accessibilityState={{ selected }}` je Chip, wie in `TypePicker` und
@@ -316,10 +317,10 @@ Heute fällig
 
 ### `TaskRow`: `urgent: boolean` → `urgency`
 
-Die Zeile kennt heute nur „dringend oder nicht" und leitet daraus **beides** ab:
+Die Zeile kennt heute nur „dringend oder nicht“ und leitet daraus **beides** ab:
 die Warn-Tönung der Card und die Pille mit dem Label `hw.dueToday`. Mit der
 neuen `overdue`-Sektion reicht das nicht mehr — eine überfällige Zeile würde
-sonst „Heute fällig" behaupten.
+sonst „Heute fällig“ behaupten.
 
 ```ts
 urgency: "none" | "today" | "overdue";
@@ -335,7 +336,7 @@ urgency: "none" | "today" | "overdue";
 
 ### Zwei unterscheidbare Leerzustände
 
-Heute gibt es nur `hw.empty` („Nichts zu tun"). Das ist die falsche Botschaft,
+Heute gibt es nur `hw.empty` („Nichts zu tun“). Das ist die falsche Botschaft,
 wenn zehn Aufgaben offen sind und bloß der Filter nichts trifft.
 
 - `isFiltered() === false` → `hw.empty.*` wie bisher.
@@ -366,10 +367,10 @@ zweiter Key.
 
 Wiederverwendet ohne Änderung: `hw.thisWeek` und `hw.longTerm` (beide bisher
 ungenutzt) als Chip-Label, `hw.dueToday` / `hw.upcoming` / `hw.doneToday` als
-Sektionsüberschriften, `hw.form.noChild` („Ohne Kind") als Chip der Kind-Reihe.
+Sektionsüberschriften, `hw.form.noChild` („Ohne Kind“) als Chip der Kind-Reihe.
 
 `hw.filter.today` ist bewusst ein eigener Key und nicht `hw.dueToday`: der Chip
-braucht „Heute", die Überschrift „Heute fällig".
+braucht „Heute“, die Überschrift „Heute fällig“.
 
 ## Tests (`bun test`)
 
@@ -388,9 +389,9 @@ braucht „Heute", die Überschrift „Heute fällig".
 
 - **ADR-011** in [docs/decision-log.md](../../decision-log.md) — die
   Entscheidungen 1 bis 5 mit Begründung und Konsequenzen.
-- **[docs/TODO.md](../../TODO.md)** — im Lauf der Iteration sind aus den drei
-  geplanten Einträgen fünf geworden; die letzten beiden kamen aus dem finalen
-  Review und dem PR-Review dazu:
+- **[docs/TODO.md](../../TODO.md)** — aus den drei geplanten Einträgen sind
+  fünf neue geworden, dazu die Ergänzung eines bestehenden. Die letzten drei
+  kamen aus dem finalen Review und dem PR-Review:
   - `patterns/homework.md` kennt keine Filterleiste, und der V2-Abschnitt nennt
     drei Sektionen, während der Screen jetzt bis zu fünf rendert. Mit dem
     Designer abstimmen, damit der Pattern-Doc die Anatomie mitführt.
@@ -401,7 +402,7 @@ braucht „Heute", die Überschrift „Heute fällig".
     `useTasksByChild` ist weiterhin ungenutzt; ein Kind-_Filter_ ersetzt keine
     Kind-_Gruppierung_.
   - Ein gelöschtes Kind lässt den Kind-Filter auf eine nicht mehr existierende
-    `id` zeigen — die Chip-Reihe hebt dann nichts hervor, „Filter zurücksetzen"
+    `id` zeigen — die Chip-Reihe hebt dann nichts hervor, „Filter zurücksetzen“
     bleibt aber sichtbar und funktionsfähig.
   - `hitSlop` vergrößert das Touch-Target in `TypePicker` und `MemberPicker`
     nicht, weil dort die Container-Polsterung fehlt. Beide liegen außerhalb
@@ -438,17 +439,17 @@ braucht „Heute", die Überschrift „Heute fällig".
 3. Ein Chip-Tap wirkt ohne Netzwerk-Request und ohne Spinner.
 4. Der Filter überlebt einen Tab-Wechsel und den Weg ins Aufgaben-Formular und
    zurück; ein App-Neustart setzt ihn auf `Alle`.
-5. „Diese Woche" liefert genau so viele offene Aufgaben, wie die gleichnamige
+5. „Diese Woche“ liefert genau so viele offene Aufgaben, wie die gleichnamige
    Stat-Kachel zählt.
 6. Sobald ein Filter aktiv ist, kommen „Erledigt heute“ und „Zuletzt erledigt“
    beide in Frage; im ungefilterten Default-Zustand nur „Erledigt heute“.
    Gerendert wird davon, was Treffer hat — leere Sektionen fallen wie alle
    anderen weg.
-7. Überfällige Aufgaben stehen unter „Überfällig", auch ohne aktiven Filter,
-   und tragen die Pille „Überfällig" statt „Heute fällig".
+7. Überfällige Aufgaben stehen unter „Überfällig“, auch ohne aktiven Filter,
+   und tragen die Pille „Überfällig“ statt „Heute fällig“.
 8. Bei gleichem `due_date` sortiert die frühere `due_time` nach oben, Zeilen
    ohne Uhrzeit stehen alphabetisch am Ende.
 9. Trifft der Filter nichts, erscheint `hw.filter.empty.*` mit Reset — nicht
-   „Nichts zu tun".
+   „Nichts zu tun“.
 10. Kein hartcodierter String im Screen; `bun run typecheck`, `bun lint`,
     `bun test` und `bunx expo export --platform web` laufen durch.
