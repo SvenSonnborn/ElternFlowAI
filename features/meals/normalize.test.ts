@@ -76,6 +76,10 @@ describe("toOptionalLocalizedText", () => {
     expect(toOptionalLocalizedText({ de: "Cremig" })).toEqual({ de: "Cremig" });
     expect(toOptionalLocalizedText({ en: "Creamy" })).toEqual({ de: "", en: "Creamy" });
   });
+
+  test("behandelt einen durchweg leeren Whitespace-String wie einen leeren", () => {
+    expect(toOptionalLocalizedText({ de: "   " })).toBeNull();
+  });
 });
 
 describe("toIngredients", () => {
@@ -121,6 +125,10 @@ describe("toInstructions", () => {
 
   test("verwirft leere Schritte", () => {
     expect(toInstructions([{ de: "" }, "", { de: "Umrühren" }])).toEqual([{ de: "Umrühren" }]);
+  });
+
+  test("verwirft einen Whitespace-only-Schritt statt eine Leerzeile zu rendern", () => {
+    expect(toInstructions(["   ", { de: "Umrühren" }])).toEqual([{ de: "Umrühren" }]);
   });
 
   test("gibt [] zurück, wenn der Wert kein Array ist", () => {

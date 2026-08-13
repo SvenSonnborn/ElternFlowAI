@@ -16,8 +16,9 @@ function asScalar(value: Json | undefined): string | null {
   return null;
 }
 
+/** Trim-aware wie `asScalar` und `localize`s `primary?.trim()` — Whitespace zählt als leer. */
 function isEmpty(text: LocalizedText): boolean {
-  return !text.de && !text.en;
+  return !text.de?.trim() && !text.en?.trim();
 }
 
 /**
@@ -48,6 +49,12 @@ export function toIngredients(value: Json): Ingredient[] {
 
   return value.flatMap((item) => {
     const record = asRecord(item);
+    // Anders als `toInstructions` akzeptiert dies keinen nackten String: eine
+    // Instruction *ist* nur Text, aber eine Zutat ohne Struktur lässt sich
+    // nicht von einer Menge oder Einheit unterscheiden — und
+    // `recipe_dedup_hash` wird aus Name+Menge+Einheit gebildet, der Schreiber
+    // liefert also immer Objekte. Ein bare String in `record.name` bleibt
+    // erlaubt (siehe `toLocalizedText`), das ist ein anderer Fall.
     if (!record) return [];
 
     const name = toLocalizedText(record.name);

@@ -53,7 +53,13 @@ export interface MealPlanDay {
 
 export interface RecipeFilter {
   search?: string;
-  /** Normalisierte Codes wie in `recipes.contains_allergens` (`milk`, `egg`, …). */
+  /**
+   * Rezept-seitige Codes wie in `recipes.contains_allergens` (`milk`, `egg`,
+   * `wheat`, …) — **nicht** die `AllergyKey`-Werte aus
+   * `features/children/allergies.ts` (`peanuts`, `milk`, `eggs`, `gluten`,
+   * `soy`, `nuts`). Die beiden Vokabulare überlappen nur bei `milk`; eine
+   * Zuordnung fehlt noch (docs/TODO.md).
+   */
   excludeAllergens?: string[];
   limit?: number;
 }

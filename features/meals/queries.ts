@@ -36,15 +36,28 @@ export const mealKeys = {
   recipe: (id: string) => ["meals", "recipe", id] as const,
 };
 
+/** Was ein Allergen-Code sein darf — dieselbe Form wie `contains_allergens`. */
+const ALLERGEN_CODE_PATTERN = /^[a-z0-9_-]+$/;
+
 /**
  * Bringt einen Filter in die Form, die Cache-Key und Abfrage teilen. Ohne das
  * wären `{}` und `{ limit: 50 }` zwei Einträge für dieselbe Abfrage, und
  * `["milk","egg"]` ein dritter neben `["egg","milk"]`.
+ *
+ * Codes, die nicht auf `ALLERGEN_CODE_PATTERN` passen, werden verworfen statt
+ * durchgereicht: Ein `,` würde in der Postgres-Array-Literalsyntax
+ * `{a,b}` ein zweites Element aufmachen, `""` ergäbe das leere Literal `{}`
+ * (matcht nichts), und `}` würde PostgREST mit 400 quittieren. Kein
+ * Injection-Risiko — PostgREST bindet das geparste Array als Parameter —, aber
+ * ein Verhaltensfehler, sobald ein freies "+ Andere"-Allergenfeld existiert
+ * (docs/TODO.md).
  */
 export function normalizeRecipeFilter(filter: RecipeFilter): NormalizedRecipeFilter {
+  const codes = (filter.excludeAllergens ?? []).filter((code) => ALLERGEN_CODE_PATTERN.test(code));
+
   return {
     search: filter.search?.trim() ?? "",
-    excludeAllergens: [...new Set(filter.excludeAllergens ?? [])].sort(),
+    excludeAllergens: [...new Set(codes)].sort(),
     limit: filter.limit ?? DEFAULT_RECIPE_LIMIT,
   };
 }
@@ -84,7 +97,11 @@ export async function fetchRecipeById(id: string): Promise<RecipeRow | null> {
  * Gefiltert wird gegen `contains_allergens`, nicht gegen `diet_tags` — der
  * Spaltenkommentar in der Migration ist da eindeutig: `diet_tags` sind
  * UI-Badges, `contains_allergens` ist die Quelle der Wahrheit. `not(…, "ov", …)`
- * heißt "überlappt nicht" und trifft `recipes_contains_allergens_gin`.
+ * heißt "überlappt nicht" — eine *negierte* Overlap-Bedingung ist aber nicht
+ * indexierbar, `recipes_contains_allergens_gin` bedient nur `&&`/`@>`/`<@`, also
+ * scannt Postgres hier sequenziell. Dasselbe gilt für die beiden anderen
+ * Prädikate unten: `ilike '%…%'` hat keinen Trigram-Index, `created_at` gar
+ * keinen (docs/TODO.md — kein Problem, solange der Pool leer ist).
  */
 export async function fetchRecipes(filter: NormalizedRecipeFilter): Promise<RecipeRow[]> {
   let query = supabase.from("recipes").select("*");
@@ -96,7 +113,14 @@ export async function fetchRecipes(filter: NormalizedRecipeFilter): Promise<Reci
     query = query.not("contains_allergens", "ov", `{${filter.excludeAllergens.join(",")}}`);
   }
 
-  const { data, error } = await query.order("created_at", { ascending: false }).limit(filter.limit);
+  const { data, error } = await query
+    .order("created_at", { ascending: false })
+    // Tiebreaker: `created_at` defaults to transaction time, so a bulk insert
+    // from the gustar.io worker shares one timestamp across a whole batch and
+    // Postgres may return those rows in any order between calls. Same fix as
+    // `byDueAsc`'s `id`-tiebreak in features/tasks/stats.ts.
+    .order("id", { ascending: true })
+    .limit(filter.limit);
   if (error) throw error;
 
   return (data ?? []).map(normalizeRecipe);
@@ -146,7 +170,8 @@ export function useMealPlans(weekStart: Date): UseMealPlansResult {
 interface UseTodaysMealResult {
   /** `null`, wenn für diesen Slot nichts geplant ist — kein Fallback auf einen anderen. */
   entry: MealPlanEntryWithRecipe | null;
-  slot: MealSlot;
+  /** `slotForTime` wählt nie `snack` — der Typ hält diese Garantie an einer Stelle. */
+  slot: Exclude<MealSlot, "snack">;
   isLoading: boolean;
   error: unknown;
 }
