@@ -1,9 +1,10 @@
 name: Renovate Config
 
-# Läuft nur, wenn die Renovate-Config selbst angefasst wird — also fast nie.
-# Grund für den Aufwand: eine schema-ungültige Config lässt Renovate auf seine
-# Defaults zurückfallen, und Defaults heißt hier, dass die Expo-Regel nicht
-# greift und react-native-Majors ins Haus stehen. Siehe ADR-013.
+# Läuft nur, wenn die Renovate-Config oder dieser Workflow selbst angefasst
+# wird — also fast nie. Grund für den Aufwand: eine schema-ungültige Config
+# lässt Renovate auf seine Defaults zurückfallen, und Defaults heißt hier,
+# dass die Expo-Regel nicht greift und react-native-Majors ins Haus stehen.
+# Siehe ADR-013.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
