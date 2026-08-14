@@ -2,11 +2,7 @@ export type TabKey = "dashboard" | "calendar" | "meals" | "homework" | "family";
 
 export type AuthRoute = "/(auth)/login";
 export type TabRoute =
-  | "/(tabs)"
-  | "/(tabs)/kalender"
-  | "/(tabs)/essen"
-  | "/(tabs)/aufgaben"
-  | "/(tabs)/familie";
+  "/(tabs)" | "/(tabs)/kalender" | "/(tabs)/essen" | "/(tabs)/aufgaben" | "/(tabs)/familie";
 
 export interface TabConfig {
   key: TabKey;

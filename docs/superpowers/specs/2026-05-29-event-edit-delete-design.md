@@ -198,18 +198,19 @@ Delete-Flow analog mit den entsprechenden DELETE-Statements aus der Scope-Tabell
 `bun:test` mit gemocktem `supabase`-Client (Spy-Object). Pro Scope ein Test pro Operation, asserting auf die Call-Argumente von `supabase.from(...).upsert/update/insert/delete`.
 
 Test-Matrix:
-| Scenario | Erwartung |
-|---|---|
-| Delete this, recurring | `event_exceptions.upsert({action:'cancelled', ...})` aufgerufen |
-| Delete this, single | `events.delete().eq('id', master)` aufgerufen |
-| Delete forward | `events.update({rrule_until: ...}).eq('id', master)` UND `event_exceptions.delete().gte(...).eq(...)` |
-| Delete all | `events.delete().eq('id', master)` |
-| Edit this, recurring | `event_exceptions.upsert({action:'modified', override: {...}})` |
-| Edit this, single | `events.update(changes).eq('id', master)` |
-| Edit forward | 3 calls in sequence: update, insert, delete |
-| Edit all | `events.update(changes).eq('id', master)` |
-| Edit forward cutoff < dtstart | Verhält sich wie scope=`all` |
-| Edit Multi-Day-Event | Save bleibt disabled, kein Mutation-Call |
+
+| Scenario                      | Erwartung                                                                                             |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Delete this, recurring        | `event_exceptions.upsert({action:'cancelled', ...})` aufgerufen                                       |
+| Delete this, single           | `events.delete().eq('id', master)` aufgerufen                                                         |
+| Delete forward                | `events.update({rrule_until: ...}).eq('id', master)` UND `event_exceptions.delete().gte(...).eq(...)` |
+| Delete all                    | `events.delete().eq('id', master)`                                                                    |
+| Edit this, recurring          | `event_exceptions.upsert({action:'modified', override: {...}})`                                       |
+| Edit this, single             | `events.update(changes).eq('id', master)`                                                             |
+| Edit forward                  | 3 calls in sequence: update, insert, delete                                                           |
+| Edit all                      | `events.update(changes).eq('id', master)`                                                             |
+| Edit forward cutoff < dtstart | Verhält sich wie scope=`all`                                                                          |
+| Edit Multi-Day-Event          | Save bleibt disabled, kein Mutation-Call                                                              |
 
 ### Manual Smoke (`bun run web`)
 
