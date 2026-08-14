@@ -147,6 +147,22 @@ describe("scanIngredients", () => {
     expect(hits[0]?.evidence).toBe("Haselnusskerne");
   });
 
+  test("nennt die Sprachvariante, die den Treffer ausgelöst hat", () => {
+    // Trifft nur der englische Name, wäre der deutsche als evidence irreführend:
+    // er benennt eine Zutat, die nichts ausgelöst hat.
+    const hits = scanIngredients([ing("Spezialpaste", "peanut butter")]);
+    // "peanut butter" trifft zwei Keys: `peanut` und `butter` (Milch).
+    expect(hits.map((h) => h.key).sort()).toEqual(["milk", "peanuts"]);
+    for (const hit of hits) {
+      expect(hit.evidence).toBe("peanut butter");
+    }
+  });
+
+  test("bevorzugt den deutschen Namen, wenn beide treffen", () => {
+    const hits = scanIngredients([ing("Haselnuss", "hazelnut")]);
+    expect(hits[0]?.evidence).toBe("Haselnuss");
+  });
+
   test("liefert für eine leere Liste nichts", () => {
     expect(scanIngredients([])).toEqual([]);
   });

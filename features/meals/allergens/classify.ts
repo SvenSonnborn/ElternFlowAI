@@ -108,13 +108,17 @@ export function scanIngredients(ingredients: readonly Ingredient[]): TermMatch[]
   const out: TermMatch[] = [];
 
   for (const ingredient of ingredients) {
-    const evidence = ingredient.name.de?.trim() || ingredient.name.en?.trim() || "";
-
     for (const variant of [ingredient.name.de, ingredient.name.en]) {
-      if (!variant) continue;
-      for (const key of scanText(variant)) {
+      const evidence = variant?.trim();
+      if (!evidence) continue;
+
+      for (const key of scanText(evidence)) {
         if (seen.has(key)) continue;
         seen.add(key);
+        // Die Variante, die den Treffer AUSGELÖST hat — nicht pauschal die
+        // deutsche. Trifft nur der englische Name, benennt ein deutscher
+        // `evidence`-Wert eine Zutat, die gar nichts ausgelöst hat, und die
+        // Fehlersuche zeigt auf die falsche Stelle.
         out.push({ key, evidence });
       }
     }
