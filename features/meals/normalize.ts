@@ -103,6 +103,20 @@ export function localize(text: LocalizedText | null | undefined, lang: string): 
 }
 
 /**
+ * Menge und Einheit als eine Zeile — „400 g", „4", „Prise".
+ *
+ * Beide Felder sind einzeln nullable: der Crawler liefert Stückzahlen ohne
+ * Einheit („4 Eigelb") und Einheiten ohne Menge („Prise Salz"). Eine fehlende
+ * Menge wird deshalb nicht mit „1" aufgefüllt — das wäre erfunden.
+ */
+export function formatAmount(ingredient: Ingredient): string {
+  return [ingredient.amount, ingredient.unit]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .join(" ");
+}
+
+/**
  * Macht eine Nutzereingabe für `ilike` harmlos. `%` und `_` sind LIKE-Platzhalter
  * und werden maskiert; `*` lässt sich nicht maskieren, weil PostgREST es vor der
  * Abfrage selbst durch `%` ersetzt — es fliegt deshalb raus.

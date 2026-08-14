@@ -3,6 +3,7 @@ export {
   isAllergenKey,
   isRecipeSafeForFamily,
   judgeRecipe,
+  judgeWithAllergyState,
   keysForDeclaredCode,
   matchedAllergens,
   mergeAllergies,
@@ -11,11 +12,13 @@ export {
   type AllergenHit,
   type AllergenKey,
   type AllergenSource,
+  type FamilyAllergyState,
   type JudgeableRecipe,
   type RecipeAllergenVerdict,
 } from "./allergens";
 export {
   escapeLike,
+  formatAmount,
   localize,
   normalizeRecipe,
   toIngredients,
@@ -46,6 +49,7 @@ export type {
   RecipeRow,
 } from "./types";
 export { useFamilyAllergies } from "./useFamilyAllergies";
+export { useRecipeJudge } from "./useRecipeJudge";
 export {
   groupByDay,
   nextSlotBoundary,

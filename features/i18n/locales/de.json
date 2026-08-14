@@ -514,7 +514,6 @@
     "deleteConfirmMsg": "Das Profil wird dauerhaft entfernt. Das lässt sich nicht rückgängig machen."
   },
   "recipe": {
-    "title": "Kürbis-Risotto mit Salbei",
     "servings_one": "{{count}} Portion",
     "servings_other": "{{count}} Portionen",
     "tab": {
@@ -522,8 +521,27 @@
       "steps": "Zubereitung",
       "nutrition": "Nährwerte"
     },
-    "noteLabel": "Hinweis",
-    "note": "Mia: laktosefrei zubereitet — Parmesan weggelassen.",
+    "difficulty": {
+      "easy": "einfach",
+      "medium": "mittel",
+      "hard": "aufwendig"
+    },
+    "empty": {
+      "ingredients": "Für dieses Rezept sind keine Zutaten hinterlegt.",
+      "steps": "Für dieses Rezept ist keine Zubereitung hinterlegt.",
+      "nutrition": "Nährwerte haben wir für dieses Rezept noch nicht."
+    },
+    "allergy": {
+      "unsafe": "Enthält {{list}}",
+      "unsafeBody": "Das Rezept deklariert ein Allergen, das in eurer Familie vorkommt.",
+      "caution": "Enthält möglicherweise {{list}}",
+      "cautionBody": "Gefunden in: {{evidence}}",
+      "unverified": "Allergene nicht geprüft",
+      "unverifiedBody": "Für dieses Rezept liegt keine geprüfte Angabe vor — schau die Zutaten bitte selbst durch."
+    },
+    "loadError": "Das Rezept konnte nicht geladen werden.",
+    "notFound": "Dieses Rezept gibt es nicht mehr.",
+    "close": "Schließen",
     "shopping": "Einkauf",
     "startCooking": "Kochen starten"
   },

@@ -1,4 +1,4 @@
-import type { Recipe, WeeklyMeal } from "./types";
+import type { WeeklyMeal } from "./types";
 
 export const weeklyMeals: WeeklyMeal[] = [
   {
@@ -72,24 +72,3 @@ export const weeklyMeals: WeeklyMeal[] = [
     isToday: false,
   },
 ];
-
-export const recipe: Recipe = {
-  id: "kurbis-risotto",
-  title: "Kürbis-Risotto mit Salbei",
-  titleEn: "Pumpkin risotto with sage",
-  emoji: "🍛",
-  durationMin: 35,
-  servings: 4,
-  spice: "mild",
-  ingredients: [
-    { amount: "300 g", name: "Risotto-Reis (Arborio)", nameEn: "Risotto rice (Arborio)" },
-    { amount: "400 g", name: "Hokkaido-Kürbis, gewürfelt", nameEn: "Hokkaido pumpkin, diced" },
-    { amount: "1 l", name: "Gemüsebrühe", nameEn: "Vegetable stock" },
-    { amount: "1", name: "Schalotte", nameEn: "Shallot" },
-    { amount: "100 ml", name: "Weißwein (optional)", nameEn: "White wine (optional)" },
-    { amount: "8", name: "Salbeiblätter", nameEn: "Sage leaves" },
-    { amount: "2 EL", name: "Olivenöl", nameEn: "Olive oil" },
-  ],
-  note: "Mia: laktosefrei zubereitet — Parmesan weggelassen.",
-  noteEn: "Mia: lactose-free — Parmesan omitted.",
-};

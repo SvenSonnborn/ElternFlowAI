@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test";
 
 import type { Ingredient } from "../types";
 
-import { isRecipeSafeForFamily, judgeRecipe, matchedAllergens } from "./judge";
+import {
+  isRecipeSafeForFamily,
+  judgeRecipe,
+  judgeWithAllergyState,
+  matchedAllergens,
+} from "./judge";
 
 function ing(de: string): Ingredient {
   return { amount: null, unit: null, name: { de } };
@@ -118,6 +123,39 @@ describe("isRecipeSafeForFamily", () => {
     expect(isRecipeSafeForFamily(CARBONARA, ["eggs"])).toBe(false);
     expect(isRecipeSafeForFamily(UNDECLARED_CARBONARA, ["eggs"])).toBe(false);
     expect(isRecipeSafeForFamily(NOTHING_KNOWN, ["eggs"])).toBe(false);
+  });
+});
+
+describe("judgeWithAllergyState", () => {
+  test("urteilt normal, sobald die Allergien geladen sind", () => {
+    const loaded = { keys: ["eggs"] as const, isLoading: false, error: null };
+
+    expect(judgeWithAllergyState(CARBONARA, loaded).status).toBe("unsafe");
+    expect(judgeWithAllergyState(DECLARED_CLEAN, loaded).status).toBe("safe");
+  });
+
+  test("sagt während des Ladens 'nicht geprüft' statt 'safe'", () => {
+    // Ein leeres `keys` heißt für `judgeRecipe` „diese Familie hat keine
+    // Allergien" — im Ladezustand wäre das eine Entwarnung, die niemand geben
+    // kann. Ohne diesen Zweig blitzte jedes Rezept erst unmarkiert auf.
+    const loading = { keys: [], isLoading: true, error: null };
+
+    expect(judgeWithAllergyState(CARBONARA, loading)).toEqual({ status: "unverified" });
+    expect(judgeWithAllergyState(DECLARED_CLEAN, loading)).toEqual({ status: "unverified" });
+  });
+
+  test("sagt auch bei einem Ladefehler 'nicht geprüft'", () => {
+    const failed = { keys: [], isLoading: false, error: new Error("offline") };
+
+    expect(judgeWithAllergyState(DECLARED_CLEAN, failed)).toEqual({ status: "unverified" });
+  });
+
+  test("behandelt das erfolgreiche null als 'kein Fehler'", () => {
+    // `useFamilyAllergies` faltet drei Query-Fehler mit `??` zusammen; im
+    // Erfolgsfall steht dort `null`, nicht `undefined`.
+    expect(judgeWithAllergyState(CARBONARA, { keys: [], isLoading: false, error: null })).toEqual({
+      status: "safe",
+    });
   });
 });
 
