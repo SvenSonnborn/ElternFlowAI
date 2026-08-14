@@ -68,7 +68,14 @@ export function DashboardScreen() {
       </Card>
 
       <SectionHeader title={t("dash.meal.question")} action={t("dash.meal.refresh")} />
-      <MealHeroCard meal={mealPick} onOpenRecipe={() => router.push(`/recipe/${mealPick.id}`)} />
+      {/*
+       * Kein `onOpenRecipe`: `mealPick` ist Sample-Data, seine `id`
+       * ("kurbis-risotto") ist keine UUID und `recipes.id` ist `uuid` — der
+       * Aufruf endete in der Detailansicht im Fehlerzweig. Solange die Karte
+       * nicht an `useTodaysMeal` hängt, hat sie keine echte Rezept-ID zu
+       * verlinken (docs/TODO.md); `onAddToShopping` fehlt aus demselben Grund.
+       */}
+      <MealHeroCard meal={mealPick} />
 
       <SectionHeader title={t("dash.section.tomorrow")} />
       <Card>

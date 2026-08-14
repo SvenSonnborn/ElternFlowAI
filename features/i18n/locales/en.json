@@ -514,7 +514,6 @@
     "deleteConfirmMsg": "This profile will be permanently removed. This can't be undone."
   },
   "recipe": {
-    "title": "Pumpkin risotto with sage",
     "servings_one": "{{count}} serving",
     "servings_other": "{{count}} servings",
     "tab": {
@@ -522,8 +521,27 @@
       "steps": "Steps",
       "nutrition": "Nutrition"
     },
-    "noteLabel": "Note",
-    "note": "Mia: lactose-free — Parmesan omitted.",
+    "difficulty": {
+      "easy": "easy",
+      "medium": "medium",
+      "hard": "advanced"
+    },
+    "empty": {
+      "ingredients": "No ingredients on file for this recipe.",
+      "steps": "No steps on file for this recipe.",
+      "nutrition": "We don't have nutrition data for this recipe yet."
+    },
+    "allergy": {
+      "unsafe": "Contains {{list}}",
+      "unsafeBody": "This recipe declares an allergen that occurs in your family.",
+      "caution": "May contain {{list}}",
+      "cautionBody": "Found in: {{evidence}}",
+      "unverified": "Allergens not checked",
+      "unverifiedBody": "There's no verified allergen info for this recipe — please check the ingredients yourself."
+    },
+    "loadError": "The recipe could not be loaded.",
+    "notFound": "This recipe no longer exists.",
+    "close": "Close",
     "shopping": "List",
     "startCooking": "Start cooking"
   },

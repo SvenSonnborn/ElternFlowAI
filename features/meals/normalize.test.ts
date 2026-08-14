@@ -4,6 +4,7 @@ import type { Database, Json } from "@/features/supabase/database.types";
 
 import {
   escapeLike,
+  formatAmount,
   localize,
   normalizeRecipe,
   toIngredients,
@@ -155,6 +156,31 @@ describe("localize", () => {
     expect(localize({ de: "" }, "de")).toBe("");
     expect(localize(null, "de")).toBe("");
     expect(localize(undefined, "de")).toBe("");
+  });
+});
+
+describe("formatAmount", () => {
+  test("setzt Menge und Einheit mit einem Leerzeichen zusammen", () => {
+    expect(formatAmount({ amount: "400", unit: "g", name: { de: "Spaghetti" } })).toBe("400 g");
+  });
+
+  test("gibt die Menge allein zurück, wenn keine Einheit da ist", () => {
+    expect(formatAmount({ amount: "4", unit: null, name: { de: "Eigelb" } })).toBe("4");
+  });
+
+  test("gibt die Einheit allein zurück, wenn keine Menge da ist", () => {
+    // "1 Prise" ohne die 1 bleibt als "Prise" lesbar — eine erfundene Menge wäre falsch.
+    expect(formatAmount({ amount: null, unit: "Prise", name: { de: "Salz" } })).toBe("Prise");
+  });
+
+  test("gibt einen leeren String zurück, wenn beides fehlt", () => {
+    expect(formatAmount({ amount: null, unit: null, name: { de: "Olivenöl" } })).toBe("");
+  });
+
+  test("behandelt reinen Whitespace wie ein leeres Feld", () => {
+    // `toIngredients` trimmt bereits, aber der Helfer ist exportiert und darf
+    // sich nicht darauf verlassen, nur von dort gefüttert zu werden.
+    expect(formatAmount({ amount: "  ", unit: " g ", name: { de: "Mehl" } })).toBe("g");
   });
 });
 

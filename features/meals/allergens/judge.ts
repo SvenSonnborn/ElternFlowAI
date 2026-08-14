@@ -74,6 +74,34 @@ export function judgeRecipe(
     : { status: "unverified" };
 }
 
+/** Was `useFamilyAllergies` liefert — als Parameter, damit die Regel ohne React testbar bleibt. */
+export interface FamilyAllergyState {
+  readonly keys: readonly AllergenKey[];
+  readonly isLoading: boolean;
+  readonly error: unknown;
+}
+
+/**
+ * Das Urteil **inklusive** des Ladezustands der Familien-Allergien.
+ *
+ * Ein leeres `keys` heißt für `judgeRecipe` „diese Familie hat keine Allergien"
+ * und ergibt `safe` — im Lade- oder Fehlerfall wäre das eine Entwarnung, die
+ * niemand geben kann. Bei einem Gesundheitsfeature ist das die falsche
+ * Richtung: solange wir es nicht wissen, sagen wir „nicht geprüft".
+ *
+ * Die Regel steht hier statt in jedem Screen, der urteilt — sonst hätte sie ab
+ * dem zweiten Aufrufer zwei Definitionen, die auseinanderlaufen können.
+ */
+export function judgeWithAllergyState(
+  recipe: JudgeableRecipe,
+  allergies: FamilyAllergyState,
+): RecipeAllergenVerdict {
+  // Truthiness statt `!== undefined`: `useFamilyAllergies` faltet drei
+  // Query-Fehler mit `??` zusammen, im Erfolgsfall steht dort also `null`.
+  if (allergies.isLoading || Boolean(allergies.error)) return { status: "unverified" };
+  return judgeRecipe(recipe, allergies.keys);
+}
+
 /** Der schmale Boolean für Aufrufer ohne Bedarf an Nuancen — etwa die KI-Vorschlagslogik. */
 export function isRecipeSafeForFamily(
   recipe: JudgeableRecipe,

@@ -1,14 +1,14 @@
+import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import { Field, Icon, SectionHeader } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Text } from "@/design-system/ui";
 import {
-  judgeRecipe,
   localize,
-  useFamilyAllergies,
+  useRecipeJudge,
   useRecipes,
   type RecipeAllergenVerdict,
   type RecipeRow,
@@ -26,30 +26,17 @@ export function RecipeBrowser() {
   const { theme } = useTheme();
   const [search, setSearch] = useState("");
 
-  const allergies = useFamilyAllergies();
+  // Der Urteiler kennt den Ladezustand der Familien-Allergien und sagt "nicht
+  // geprüft", solange er unbekannt ist — die Regel liegt in `judgeWithAllergyState`.
+  const judge = useRecipeJudge();
   const { data, isLoading, error } = useRecipes({ search });
-
-  // Solange die Allergien nicht geladen sind, ist `keys` leer — und ein leeres
-  // `keys` heißt für `judgeRecipe` "diese Familie hat keine Allergien", also
-  // `safe`. Ohne diesen Zweig blitzte jedes Rezept erst unmarkiert auf und
-  // würde dann rot: bei einem Gesundheitsfeature die falsche Richtung. Solange
-  // wir es nicht wissen, sagen wir "nicht geprüft". Dasselbe bei einem Fehler.
-  // Truthiness statt `!== undefined`: der Hook faltet drei Query-Fehler mit
-  // `??` zusammen, im Erfolgsfall steht dort also `null`.
-  const allergiesUnknown = allergies.isLoading || Boolean(allergies.error);
 
   // Bewusst KEIN `excludeAllergens` an die Query: serverseitiges Filtern
   // entfernte die Zeilen, statt sie auszugrauen — der Nutzer könnte "existiert
   // nicht" nicht von "wurde gefiltert" unterscheiden (ADR-014).
   const judged = useMemo<JudgedRecipe[]>(
-    () =>
-      (data ?? []).map((recipe) => ({
-        recipe,
-        verdict: allergiesUnknown
-          ? ({ status: "unverified" } as const)
-          : judgeRecipe(recipe, allergies.keys),
-      })),
-    [data, allergies.keys, allergiesUnknown],
+    () => (data ?? []).map((recipe) => ({ recipe, verdict: judge(recipe) })),
+    [data, judge],
   );
 
   return (
@@ -83,6 +70,7 @@ export function RecipeBrowser() {
         {judged.map(({ recipe, verdict }) => (
           <RecipeRowItem
             key={recipe.id}
+            id={recipe.id}
             title={localize(recipe.title, i18n.language)}
             durationMin={recipe.duration_min}
             verdict={verdict}
@@ -94,12 +82,13 @@ export function RecipeBrowser() {
 }
 
 interface RecipeRowItemProps {
+  id: string;
   title: string;
   durationMin: number | null;
   verdict: RecipeAllergenVerdict;
 }
 
-function RecipeRowItem({ title, durationMin, verdict }: RecipeRowItemProps) {
+function RecipeRowItem({ id, title, durationMin, verdict }: RecipeRowItemProps) {
   const { t } = useTranslation();
   const { theme } = useTheme();
 
@@ -119,10 +108,15 @@ function RecipeRowItem({ title, durationMin, verdict }: RecipeRowItemProps) {
   }, [verdict, title, t]);
 
   return (
-    <View
+    // Auch ein ausgegrautes Rezept bleibt drückbar: ADR-014 graut aus statt zu
+    // entfernen, und die Detailansicht ist genau der Ort, an dem das Urteil
+    // seine Belege nennt.
+    <Pressable
       accessible
+      accessibilityRole="button"
       accessibilityLabel={a11yLabel}
-      className={`gap-2 rounded-2xl border border-line bg-card p-3 ${dimmed ? "opacity-50" : ""}`}
+      onPress={() => router.push({ pathname: "/recipe/[id]", params: { id } })}
+      className={`gap-2 rounded-2xl border border-line bg-card p-3 active:opacity-80 ${dimmed ? "opacity-50" : ""}`}
     >
       <Text variant="listTitle" numberOfLines={1}>
         {title}
@@ -139,6 +133,6 @@ function RecipeRowItem({ title, durationMin, verdict }: RecipeRowItemProps) {
         ) : null}
         <AllergenBadge verdict={verdict} />
       </View>
-    </View>
+    </Pressable>
   );
 }

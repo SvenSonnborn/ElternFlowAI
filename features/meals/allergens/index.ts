@@ -3,9 +3,11 @@ export { fold } from "./fold";
 export {
   isRecipeSafeForFamily,
   judgeRecipe,
+  judgeWithAllergyState,
   matchedAllergens,
   type AllergenHit,
   type AllergenSource,
+  type FamilyAllergyState,
   type JudgeableRecipe,
   type RecipeAllergenVerdict,
 } from "./judge";

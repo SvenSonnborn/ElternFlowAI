@@ -67,22 +67,3 @@ export interface CalendarDayCell {
   isToday: boolean;
   dots: string[];
 }
-
-export interface Ingredient {
-  amount: string;
-  name: string;
-  nameEn: string;
-}
-
-export interface Recipe {
-  id: string;
-  title: string;
-  titleEn: string;
-  emoji: string;
-  durationMin: number;
-  servings: number;
-  spice: string;
-  ingredients: Ingredient[];
-  note: string;
-  noteEn: string;
-}
