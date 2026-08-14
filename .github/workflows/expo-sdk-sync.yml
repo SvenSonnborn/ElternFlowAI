@@ -10,15 +10,28 @@ name: Expo SDK Sync
 # gehosteten Mend-App nicht verfügbar. Siehe ADR-013.
 on:
   pull_request:
+    # Bewusst OHNE `reopened`: die dokumentierte Abhilfe gegen den fehlenden
+    # CI-Retrigger (siehe Kommentar am "PR kommentieren"-Schritt unten) ist,
+    # den PR einmal zu schließen und wieder zu öffnen. Der Sync soll dabei
+    # nicht erneut auf seinem eigenen, bereits gepushten Commit feuern.
     types: [opened, labeled, synchronize]
 
 permissions:
   contents: write
   pull-requests: write
 
+# Renovate setzt seine Labels nach dem Anlegen des PR über die Issues-API, was
+# pro Label ein eigenes `labeled`-Event auslöst — plus `opened`. Es landen also
+# bis zu vier Runs in derselben Concurrency-Gruppe. `cancel-in-progress: false`,
+# weil ein abgebrochener Run, der schon gepusht, aber den Schritt "PR
+# kommentieren" noch nicht erreicht hat, diesen Hinweis auf Schließen/
+# Wiederöffnen sonst verschluckt — und `main` hat aktuell keine Required Status
+# Checks, der Kommentar ist also die gesamte Absicherung. Serialisierung kostet
+# dafür nur ein paar Runner-Minuten: die Runs sind idempotent, ein zweiter
+# findet keinen Diff mehr und ist ein No-op.
 concurrency:
   group: expo-sdk-sync-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   sync:
@@ -76,6 +89,8 @@ jobs:
       # unauthentifiziert und dieser Push schlüge fehl.
       - name: Commit & push
         id: sync
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           if git diff --quiet -- package.json bun.lock; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -87,7 +102,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json bun.lock
           git commit -m "chore(deps): expo install --fix nach SDK-Bump"
-          git push
+          git push origin HEAD:"$HEAD_REF"
 
       - name: PR kommentieren
         if: steps.sync.outputs.changed == 'true'
