@@ -106,6 +106,21 @@
       // Steht bewusst NACH Regel 1: jest-expo, eslint-config-expo, @types/react
       // und react-test-renderer sind devDeps *und* Expo-verwaltet. Diese Regel
       // gewinnt, sie landen also ohne Automerge in der Expo-Gruppe.
+      //
+      // WICHTIG für alle, die diese Liste pflegen: Expo schreibt Versionen über
+      // ZWEI Kanäle vor, und beide müssen hier abgedeckt sein.
+      //   (a) `node_modules/expo/bundledNativeModules.json` — die Native-Module.
+      //       Web: https://api.expo.dev/v2/sdks/<version>/native-modules
+      //   (b) `relatedPackages` der Versions-API — die Toolchain drumherum.
+      //       Web: https://api.expo.dev/v2/versions/latest
+      //       → .data.sdkVersions["57.0.0"].relatedPackages
+      // Kanal (b) enthält u. a. `jest`, `@types/jest` und `typescript` — Pakete,
+      // die kein Expo-Namensmuster tragen und deshalb ohne ausdrücklichen
+      // Eintrag durch alle Regex-Patterns fallen. Genau das ist 2026-08-14
+      // passiert (ADR-015): drei Renovate-PRs wollten typescript auf 7, jest auf
+      // 30 und async-storage auf 3 heben, alle drei außerhalb dessen, was SDK 57
+      // vorschreibt. Wer hier etwas streicht, prüft es vorher gegen beide Kanäle
+      // — `bunx expo install --check` ist die schnellste Gegenprobe.
       description: "Expo-SDK-verwaltete Pakete — nur in-range",
       matchPackageNames: [
         "expo",
@@ -117,10 +132,19 @@
         "@types/react",
         "react-native",
         "/^react-native-/",
-        "/^@react-native\\//",
-        "/^@react-native-community\\//",
+        // Deckt `@react-native/`, `@react-native-community/` und
+        // `@react-native-async-storage/` in einem Muster ab. Vorher standen hier
+        // die ersten beiden Scopes einzeln — `@react-native-async-storage/`
+        // passte auf keinen von beiden (nach `native` steht ein `-`, kein `/`),
+        // wodurch async-storage komplett ungeregelt lief. Bewusst breit gefasst:
+        // Fehltreffer nimmt Regel 5 wieder heraus, so wie bei `/^react-native-/`.
+        "/^@react-native[-\\/]/",
         "jest-expo",
         "eslint-config-expo",
+        // Toolchain aus Kanal (b) — kein Expo-Namensmuster, daher namentlich.
+        "jest",
+        "@types/jest",
+        "typescript",
       ],
       rangeStrategy: "in-range-only",
       groupName: "expo sdk (in-range)",
