@@ -29,5 +29,12 @@ jobs:
 
       # Kein Devdep im Repo: das renovate-Paket ist groß und würde bei jedem
       # `bun install` mitgezogen, obwohl es nur hier gebraucht wird.
+      #
+      # `renovate@latest` statt bare `renovate`: ein bare Spec lässt npx jeden
+      # zwischengespeicherten Cache-Treffer wiederverwenden, wodurch lokale
+      # Läufe und CI unbemerkt gegen unterschiedliche Renovate-Versionen
+      # validieren können (siehe Fix-Runde 1 in task-1-report.md). `--no-global`
+      # validiert `.github/renovate.json5` explizit im richtigen Scope — es ist
+      # eine Repo-Config, keine globale Renovate-Config.
       - name: Validate
-        run: npx --yes --package renovate -- renovate-config-validator --strict .github/renovate.json5
+        run: npx --yes --package renovate@latest -- renovate-config-validator --strict --no-global .github/renovate.json5
