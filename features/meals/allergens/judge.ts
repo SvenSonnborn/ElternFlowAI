@@ -1,0 +1,81 @@
+import type { Ingredient } from "../types";
+import type { AllergenKey } from "./keys";
+
+import { scanIngredients } from "./classify";
+import { keyForDeclaredCode } from "./terms";
+
+export type AllergenSource = "declared" | "ingredient";
+
+export interface AllergenHit {
+  readonly key: AllergenKey;
+  readonly source: AllergenSource;
+  readonly evidence: string;
+}
+
+export type RecipeAllergenVerdict =
+  | { status: "safe" }
+  | { status: "unsafe"; hits: AllergenHit[] }
+  | { status: "caution"; hits: AllergenHit[] }
+  | { status: "unverified" };
+
+/**
+ * Strukturell getypt statt an `RecipeRow` gebunden: die spätere
+ * Klassifizierungs-Edge-Function reicht ein einfaches Objekt herein und muss
+ * dafür nicht die halbe Datenbank-Typdatei importieren.
+ */
+export interface JudgeableRecipe {
+  readonly contains_allergens: readonly string[] | null;
+  readonly ingredients: readonly Ingredient[];
+}
+
+export function judgeRecipe(
+  recipe: JudgeableRecipe,
+  familyKeys: readonly AllergenKey[],
+): RecipeAllergenVerdict {
+  // Nichts zu prüfen — und ohne diesen Kurzschluss stünde bei jeder Familie
+  // ohne Allergie-Eintrag überall "nicht geprüft".
+  if (familyKeys.length === 0) return { status: "safe" };
+
+  const relevant = new Set(familyKeys);
+  const declaredCodes = recipe.contains_allergens ?? [];
+
+  const declaredHits: AllergenHit[] = [];
+  for (const code of declaredCodes) {
+    const key = keyForDeclaredCode(code);
+    if (key && relevant.has(key) && !declaredHits.some((hit) => hit.key === key)) {
+      declaredHits.push({ key, source: "declared", evidence: code });
+    }
+  }
+  if (declaredHits.length > 0) return { status: "unsafe", hits: declaredHits };
+
+  const ingredientHits = scanIngredients(recipe.ingredients)
+    .filter((match) => relevant.has(match.key))
+    .map((match): AllergenHit => ({ ...match, source: "ingredient" }));
+  if (ingredientHits.length > 0) return { status: "caution", hits: ingredientHits };
+
+  // Eine befüllte Deklaration ohne Treffer ist eine echte Entwarnung. Eine
+  // leere ist keine: die Heuristik kann Anwesenheit belegen, nie Abwesenheit.
+  return declaredCodes.length > 0 ? { status: "safe" } : { status: "unverified" };
+}
+
+/** Der schmale Boolean für Aufrufer ohne Bedarf an Nuancen — etwa die KI-Vorschlagslogik. */
+export function isRecipeSafeForFamily(
+  recipe: JudgeableRecipe,
+  familyKeys: readonly AllergenKey[],
+): boolean {
+  return judgeRecipe(recipe, familyKeys).status === "safe";
+}
+
+/**
+ * Die betroffenen Keys — als `AllergenKey`, nicht als Rezept-Code: lokalisierte
+ * Labels gibt es nur für die Keys (`onb.s4.allergies.<key>`), ein rohes `wheat`
+ * hätte keinen Katalog-Eintrag fürs Badge.
+ */
+export function matchedAllergens(
+  recipe: JudgeableRecipe,
+  familyKeys: readonly AllergenKey[],
+): AllergenKey[] {
+  const verdict = judgeRecipe(recipe, familyKeys);
+  if (verdict.status === "safe" || verdict.status === "unverified") return [];
+  return [...new Set(verdict.hits.map((hit) => hit.key))].sort();
+}

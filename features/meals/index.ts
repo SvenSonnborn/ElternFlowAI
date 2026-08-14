@@ -1,4 +1,19 @@
 export {
+  ALLERGEN_KEYS,
+  isAllergenKey,
+  isRecipeSafeForFamily,
+  judgeRecipe,
+  keyForDeclaredCode,
+  matchedAllergens,
+  scanIngredients,
+  scanText,
+  type AllergenHit,
+  type AllergenKey,
+  type AllergenSource,
+  type JudgeableRecipe,
+  type RecipeAllergenVerdict,
+} from "./allergens";
+export {
   escapeLike,
   localize,
   normalizeRecipe,
