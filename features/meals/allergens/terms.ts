@@ -342,7 +342,11 @@ const DECLARED_INDEX = ALLERGEN_SPECS.reduce((index, spec) => {
  * gewertet.
  */
 export function keysForDeclaredCode(code: string): AllergenKey[] {
-  return DECLARED_INDEX.get(fold(code)) ?? [];
+  // Kopie, nicht die Referenz aus dem Index: `.sort()` und `.push()` arbeiten
+  // in place, ein Aufrufer würde damit das Vokabular für alle folgenden
+  // Urteile umschreiben. Der Testfall zu `shellfish` sortiert das Ergebnis
+  // tatsächlich — dort fiele es nur nicht auf, weil die Liste schon sortiert ist.
+  return DECLARED_INDEX.get(fold(code))?.slice() ?? [];
 }
 
 /**
