@@ -35,7 +35,7 @@ jobs:
       # wie ein Node-Problem. mise.toml pinnt Node 24 lokal; dieser Schritt
       # spiegelt das für den Runner.
       - name: Setup Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version: 24
 
