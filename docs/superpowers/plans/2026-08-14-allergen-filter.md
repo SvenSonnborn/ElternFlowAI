@@ -1918,7 +1918,7 @@ In der Sektion **Essen / Meal-Planner**, je ein Bullet mit Datei-Referenz und Be
 
 Im `features/`-Block, beim `meals/`-Eintrag:
 
-```
+```text
 ├─ meals/                Meal-Planner-Daten-Layer (Queries · JSONB-Normalisierung · Wochenlogik)
 │  └─ allergens/         EU-14-Vokabular · Begriffslisten · Zutaten-Klassifizierer · Urteil (ADR-014)
 ```

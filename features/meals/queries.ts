@@ -78,6 +78,19 @@ function normalizeLimit(limit: number | undefined): number {
 }
 
 /**
+ * Ein Wert innerhalb eines `.or(…)`-Ausdrucks.
+ *
+ * PostgREST trennt die Bedingungen an Kommas und den Operator am Punkt — ein
+ * Suchbegriff, der `,`, `.`, `(` oder `)` enthält, risse den Ausdruck sonst
+ * auseinander und quittierte mit 400. Doppelte Anführungszeichen schützen
+ * davor; darin werden `"` und `\` mit Backslash maskiert. Der LIKE-Escape aus
+ * `escapeLike` läuft davor und bleibt dabei erhalten.
+ */
+function quoteOrValue(value: string): string {
+  return `"${value.replace(/["\\]/g, (char) => `\\${char}`)}"`;
+}
+
+/**
  * Die Einträge einer Kalenderwoche.
  *
  * Kein `family_id`-Filter: `meal_plan_entries` läuft mit `force row level
@@ -122,7 +135,12 @@ export async function fetchRecipes(filter: NormalizedRecipeFilter): Promise<Reci
   let query = supabase.from("recipes").select("*");
 
   if (filter.search) {
-    query = query.ilike("title->>de", `%${escapeLike(filter.search)}%`);
+    // Beide Titelsprachen, nicht nur `de`: der Rezept-Browser rendert über
+    // `localize()` sprachübergreifend, eine Suche nach "soup" muss die
+    // angezeigte "Carrot soup" also auch finden. Bei einem nackten
+    // jsonb-String ist `title->>de` zudem NULL, und `NULL ILIKE …` ist nie wahr.
+    const pattern = quoteOrValue(`%${escapeLike(filter.search)}%`);
+    query = query.or(`title->>de.ilike.${pattern},title->>en.ilike.${pattern}`);
   }
   if (filter.excludeAllergens.length > 0) {
     query = query.not("contains_allergens", "ov", `{${filter.excludeAllergens.join(",")}}`);

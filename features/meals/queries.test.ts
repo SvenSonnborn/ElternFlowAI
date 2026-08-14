@@ -4,8 +4,6 @@ import type { Database } from "@/features/supabase/database.types";
 
 import type { NormalizedRecipeFilter } from "./types";
 
-import { escapeLike } from "./normalize";
-
 /**
  * Same shape as features/calendar/reminders.test.ts: `fetchMealPlanWeek` and
  * `fetchRecipes` have no logic worth testing beyond the query they build —
@@ -52,6 +50,10 @@ function chain(call: RecordedCall) {
     eq(column: string, value: unknown) {
       call.calls.push({ method: "eq", args: [column, value] });
       return self;
+    },
+    or(filters: string) {
+      call.calls.push({ method: "or", args: [filters] });
+      return chain(call);
     },
     ilike(column: string, value: unknown) {
       call.calls.push({ method: "ilike", args: [column, value] });
@@ -224,18 +226,40 @@ describe("fetchRecipeById", () => {
 describe("fetchRecipes", () => {
   const baseFilter: NormalizedRecipeFilter = { search: "", excludeAllergens: [], limit: 50 };
 
-  test("überspringt den ilike-Filter, wenn die Suche leer ist", async () => {
+  test("überspringt den Such-Filter, wenn die Suche leer ist", async () => {
     await fetchRecipes(baseFilter);
 
     const call = only("recipes");
-    expect(methodCalls(call, "ilike")).toEqual([]);
+    expect(methodCalls(call, "or")).toEqual([]);
   });
 
-  test("hüllt die escapte Suche in %…% und zielt auf title->>de", async () => {
-    await fetchRecipes({ ...baseFilter, search: "50% Käse" });
+  test("hüllt die escapte Suche in %…% und zielt auf beide Titelsprachen", async () => {
+    await fetchRecipes({ ...baseFilter, search: "50% cheese" });
 
-    const call = only("recipes");
-    expect(methodCalls(call, "ilike")).toEqual([["title->>de", `%${escapeLike("50% Käse")}%`]]);
+    // Bewusst ausgeschrieben statt aus `escapeLike` abgeleitet: der Test soll
+    // die Zeichenkette prüfen, die tatsächlich rausgeht. `%` wird von
+    // `escapeLike` zu `\%` (LIKE-Escape), die or-Quotierung verdoppelt den
+    // Backslash, PostgREST löst ihn beim Entquoten wieder auf.
+    const expected = String.raw`title->>de.ilike."%50\\% cheese%",title->>en.ilike."%50\\% cheese%"`;
+    expect(methodCalls(only("recipes"), "or")).toEqual([[expected]]);
+  });
+
+  test("quotet Suchbegriffe, die den or-Ausdruck sonst zerreißen würden", async () => {
+    // Komma und Punkt sind PostgREST-Trennzeichen: unquotiert würde
+    // `Salz, Pfeffer` als zwei Bedingungen gelesen und mit 400 quittiert.
+    await fetchRecipes({ ...baseFilter, search: "Salz, Pfeffer" });
+
+    const [args] = methodCalls(only("recipes"), "or");
+    expect(args?.[0]).toBe('title->>de.ilike."%Salz, Pfeffer%",title->>en.ilike."%Salz, Pfeffer%"');
+  });
+
+  test("maskiert Anführungszeichen und Backslashes innerhalb der Quotes", async () => {
+    await fetchRecipes({ ...baseFilter, search: 'cheese "extra"' });
+
+    const [args] = methodCalls(only("recipes"), "or");
+    expect(args?.[0]).toBe(
+      'title->>de.ilike."%cheese \\"extra\\"%",title->>en.ilike."%cheese \\"extra\\"%"',
+    );
   });
 
   test("baut das Allergen-Literal als {a,b} aus sortierten Codes", async () => {
