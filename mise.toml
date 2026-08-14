@@ -3,11 +3,18 @@
 # activated in the shell via `eval "$(mise activate zsh)"`).
 #
 # java 17 — required by the Android Gradle build: the project's Gradle wrapper
-#           (8.14.3) runs only on JDK <= 24, but the machine default is JDK 26
-#           ("Unsupported class file major version 70"). 17 is React Native's
-#           canonical JDK. Bump to 21 if a future SDK's Android build needs it.
+#           (9.3.1, from the SDK 57 template) runs on JDK 17-25 — JDK 26 needs
+#           Gradle 9.4+ — but the machine default is JDK 26 ("Unsupported class
+#           file major version 70"). 17 is both React Native's canonical JDK and
+#           Gradle 9's own floor. Bump to 21 if a future SDK's Android build
+#           needs it; Renovate is deliberately disabled for this pin (ADR-013).
 # node 24 — current LTS; the Expo/Metro-supported track.
-# bun 1.3.10 — matches the pinned Bun in CI (.github/workflows/ci.yml) so local == CI.
+# bun 1.3.14 — matches the pinned Bun in CI (.github/workflows/ci.yml) so local == CI.
+#
+# .github/workflows/native-build.yml consumes THIS FILE directly (jdx/mise-action)
+# rather than re-pinning in YAML — the native builds are where the java pin and
+# the RCT_USE_PREBUILT_RNCORE value below are load-bearing (ADR-016). Editing a
+# pin here therefore changes CI too. `ci.yml` still pins Bun via oven-sh/setup-bun.
 [tools]
 java = "temurin-17"
 node = "24"
@@ -25,6 +32,10 @@ _.file = ".env.local"
 # React-Core 0.83.6 source — whose headers predate RCTDevMenuConfiguration, so the
 # iOS build fails with "expected a type" in Expo's EXReactRootViewFactory.h.
 # Forcing RN to build from source (the SDK-54 behaviour) sidesteps the prebuilt
-# binary entirely. The project Podfile reads this var: `ENV['RCT_USE_PREBUILT_RNCORE'] ||= '1'`.
+# binary entirely. The generated ios/Podfile (line 19) reads it as
+# `ENV['RCT_USE_PREBUILT_RNCORE'] ||= podfile_properties['ios.buildReactNativeFromSource'] == 'true' ? '0' : '1'`
+# — and this project sets no such key, so without this variable the value falls
+# back to '1'. That makes this line the ONLY thing holding the pin, which is why
+# native-build.yml asserts it explicitly instead of trusting it through.
 # Trade-off: slower iOS builds. Revisit once a later SDK's prebuilt RN is stable.
 RCT_USE_PREBUILT_RNCORE = "0"
