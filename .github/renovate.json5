@@ -138,6 +138,10 @@
         // passte auf keinen von beiden (nach `native` steht ein `-`, kein `/`),
         // wodurch async-storage komplett ungeregelt lief. Bewusst breit gefasst:
         // Fehltreffer nimmt Regel 5 wieder heraus, so wie bei `/^react-native-/`.
+        // `@react-native/jest-preset` fängt das Muster mit — unverändert
+        // gegenüber vorher, `/^@react-native\//` traf es ebenfalls, und das ist
+        // gewollt: das Paket ist auf `0.86.0` gepinnt und muss exakt der
+        // react-native-Version folgen, nicht npm-latest. Keine Regel-5-Ausnahme.
         "/^@react-native[-\\/]/",
         "jest-expo",
         "eslint-config-expo",
