@@ -5,6 +5,7 @@ export {
   judgeRecipe,
   keyForDeclaredCode,
   matchedAllergens,
+  mergeAllergies,
   scanIngredients,
   scanText,
   type AllergenHit,
@@ -44,6 +45,7 @@ export type {
   RecipeFilter,
   RecipeRow,
 } from "./types";
+export { useFamilyAllergies } from "./useFamilyAllergies";
 export {
   groupByDay,
   nextSlotBoundary,

@@ -10,6 +10,7 @@ export {
   type RecipeAllergenVerdict,
 } from "./judge";
 export { ALLERGEN_KEYS, isAllergenKey, type AllergenKey } from "./keys";
+export { mergeAllergies, type AllergyBearer } from "./members";
 export {
   ALLERGEN_SPECS,
   keyForDeclaredCode,
