@@ -270,7 +270,7 @@ type RecipeAllergenVerdict =
   | { status: "safe" }
   | { status: "unsafe"; hits: AllergenHit[] } // mind. ein declared-Treffer
   | { status: "caution"; hits: AllergenHit[] } // nur ingredient-Treffer
-  | { status: "unverified" }; // keine Deklaration, nichts gefunden
+  | { status: "unverified" }; // keine oder unvollständig verstandene Deklaration
 ```
 
 Entscheidungsreihenfolge:
@@ -278,10 +278,14 @@ Entscheidungsreihenfolge:
 1. Familie hat keine Allergien → `safe`. Kein Rauschen für Familien ohne Allergien; ohne diese Regel bekäme jede Familie ohne Eintrag überall `unverified`.
 2. Mindestens ein `declared`-Treffer → `unsafe`.
 3. Mindestens ein `ingredient`-Treffer → `caution`.
-4. Kein Treffer, `contains_allergens` **nicht leer** → `safe`.
-5. Kein Treffer, `contains_allergens` leer → `unverified`.
+4. Kein Treffer, `contains_allergens` **nicht leer und vollständig verstanden** → `safe`.
+5. Kein Treffer, `contains_allergens` leer **oder mit einem unbekannten Code** → `unverified`.
 
 **Regel 5 ist der Kern.** Eine leere Deklaration wird nie zu Grün: die Heuristik kann Anwesenheit belegen, niemals Abwesenheit. Solange kein klassifizierter Rezept-Pool existiert, ist die Liste dadurch laut — das ist der bewusst gewählte, ehrliche Preis.
+
+Der Zusatz „vollständig verstanden" kam bei der Umsetzung dazu (CodeRabbit-Befund am PR): ein Code, den `keysForDeclaredCode` nicht auflösen kann, könnte in einem fremden Vokabular genau das gesuchte Allergen benennen — ihn als Entwarnung zu lesen wäre derselbe stille False Negative, gegen den dieses Modul gebaut ist. Einzige Ausnahme ist der ausdrückliche Marker `NO_ALLERGENS_CODE` (`'none'`), der kein Allergen benennt, aber als bekannt gilt und damit „geprüft, nichts gefunden" ausdrückbar macht.
+
+Ein Deklarations-Code kann außerdem auf **mehrere** Keys zeigen: `shellfish` deckt umgangssprachlich Krebs- und Weichtiere ab, `keysForDeclaredCode` liefert deshalb `AllergenKey[]`, nicht einen einzelnen Key. Wäre der Code nur einer Gruppe zugeordnet, ergäbe ein Rezept damit für die andere fälschlich `safe` — bekannter Code, aber am Allergen vorbei.
 
 `isRecipeSafeForFamily(recipe, keys)` ist der schmale Boolean-Wrapper (`status === "safe"`) für Aufrufer, die kein differenziertes Urteil brauchen — etwa die spätere KI-Vorschlagslogik. `matchedAllergens(recipe, keys)` liefert nur die Keys, für die Badge-Beschriftung.
 
