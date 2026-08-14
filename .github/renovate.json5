@@ -54,12 +54,7 @@
       // Inputs). Ohne diesen Manager driftet "local == CI" beim ersten
       // Bun-Update auseinander.
       description: "bun-version: in ci.yml an mise.toml koppeln",
-      // Validator (renovate@37.440.7) kennt trotz Schema-Angebot noch nicht
-      // `managerFilePatterns` (das aus dem Brief) — dessen allowedKeys-Liste
-      // fuer customManagers erwartet weiterhin `fileMatch`, unveraendert seit
-      // vor der Umbenennung. `fileMatch`-Eintraege sind reine Regex-Strings
-      // ohne Slash-Delimiter (kein `/…/`-Wrapping wie bei matchPackageNames).
-      fileMatch: ["^\\.github/workflows/ci\\.yml$"],
+      managerFilePatterns: ["/^\\.github/workflows/ci\\.yml$/"],
       matchStrings: ["bun-version:\\s*(?<currentValue>\\S+)"],
       depNameTemplate: "bun",
       datasourceTemplate: "github-releases",
@@ -69,8 +64,10 @@
   ],
 
   // ACHTUNG — die Reihenfolge ist Teil der Semantik: spätere Regeln
-  // überschreiben frühere für die Eigenschaften, die sie setzen. Jede Regel
-  // setzt `automerge` explizit, damit Überlappungen nicht von Defaults abhängen.
+  // überschreiben frühere für die Eigenschaften, die sie setzen. Jede aktive
+  // Regel setzt `automerge` explizit, damit Überlappungen nicht von Defaults
+  // abhängen — Ausnahme ist Regel 7, die den Dep über `enabled: false`
+  // komplett stilllegt, wo automerge gegenstandslos ist.
   packageRules: [
     {
       // 1 — devDependencies sammeln und automergen. Die CI-Gates
@@ -92,12 +89,19 @@
     {
       // 3 — Von Expo SDK verwaltet: die Version bestimmt das SDK, nicht
       // npm-latest. `in-range-only` heißt: nur Updates, die die bereits in
-      // package.json stehende Range erfüllen. `~57.0.7` bekommt 57.0.9
-      // (lockfile-only), aber nie 58.x — außer für `expo` selbst, das Regel 4
-      // gleich danach wieder aufweicht (Begründung dort). Exakt gepinnte
-      // Pakete wie react-native 0.86.0 bewegen sich damit gar nicht — gewollt,
-      // denn genau dort bricht ein eigenmächtiger Bump den Native-Build, den
-      // die CI (nur Web-Export) nicht prüft.
+      // package.json stehende Range erfüllen, werden übernommen — alles
+      // außerhalb wird komplett verworfen, nie vorgeschlagen. Unter Bun
+      // bedeutet "übernehmen" hier aber KEINEN eigenen Lockfile-only-PR pro
+      // Paket: Renovates bun-Manager liest anders als der npm-Manager keine
+      // `lockedVersion` aus der Lockfile (extrahiert nur package.json), daher
+      // taucht ein In-Range-Patch wie `~57.0.7` → 57.0.9 hier nicht als
+      // Einzel-Update auf — aktuell gehalten wird das ausschließlich über die
+      // wöchentliche, automerged `lockFileMaintenance` (oben). 58.x
+      // (SDK-Major) bleibt für diese Gruppe trotzdem tabu — außer für `expo`
+      // selbst, das Regel 4 gleich danach wieder aufweicht (Begründung dort).
+      // Exakt gepinnte Pakete wie react-native 0.86.0 bewegen sich damit gar
+      // nicht — gewollt, denn genau dort bricht ein eigenmächtiger Bump den
+      // Native-Build, den die CI (nur Web-Export) nicht prüft.
       //
       // Steht bewusst NACH Regel 1: jest-expo, eslint-config-expo, @types/react
       // und react-test-renderer sind devDeps *und* Expo-verwaltet. Diese Regel
@@ -129,15 +133,18 @@
       // Bestimmung ausgewertet — Renovate wüsste sonst nicht, wonach es
       // überhaupt suchen soll; siehe Validator-Meldung "packageRules cannot
       // combine both matchUpdateTypes and rangeStrategy"). Deshalb kann
-      // Regel 6 (Expo-Major) das rangeStrategy-Verhalten für Majors nicht
-      // selbst setzen — es muss hier, paketbezogen statt updateType-bezogen,
-      // passieren. `in-range-only` (Regel 3) verwirft Out-of-Range-Updates
-      // komplett, noch bevor Regel 6 sie zu Gesicht bekommt — die Expo-Major-
-      // Regel liefe damit ins Leere. `update-lockfile` verhält sich für
-      // In-Range-Updates identisch zu `in-range-only` (Lockfile-only,
-      // `~57.0.7` → 57.0.9), fällt für Out-of-Range-Updates (58.x) aber auf
-      // `replace` zurück und schlägt package.json vor — genau diesen Fall
-      // fängt Regel 6 ab und sperrt ihn hinter dependencyDashboardApproval.
+      // Regel 6 (Expo-Major) das rangeStrategy-Verhalten nicht selbst setzen
+      // — es muss hier, paketbezogen statt updateType-bezogen, passieren.
+      // `in-range-only` (Regel 3) verwirft Out-of-Range-Updates komplett,
+      // noch bevor Regel 6 sie zu Gesicht bekommt — die Expo-Major-Regel liefe
+      // damit ins Leere. `update-lockfile` verhält sich für In-Range-Updates
+      // identisch zu `in-range-only` (unter Bun: kein Einzel-PR, siehe
+      // Begründung in Regel 3 — beide verlassen sich für In-Range auf
+      // `lockFileMaintenance`), fällt für Out-of-Range-Updates aber auf
+      // `replace` zurück und schlägt package.json vor. Das trifft nicht nur
+      // 58.x (Major), sondern auch einen Minor wie 57.1.0 gegen die Range
+      // `~57.0.7` — beide Fälle fängt Regel 6 ab und sperrt sie hinter
+      // dependencyDashboardApproval.
       description: "expo: rangeStrategy-Override, damit Regel 6 Majors überhaupt sieht",
       matchPackageNames: ["expo"],
       rangeStrategy: "update-lockfile",
@@ -160,9 +167,18 @@
       // Dashboard gesetzt wird. Kein eigenes rangeStrategy hier — das liefert
       // bereits Regel 4 (siehe deren Begründung: Validator verbietet die
       // Kombination mit matchUpdateTypes in derselben Regel).
+      //
+      // matchUpdateTypes enthält neben "major" auch "minor": Regel 4s
+      // `update-lockfile` fällt nicht nur für einen SDK-Major (58.x) auf
+      // `replace` zurück, sondern für JEDES Out-of-Range-Update — und bei der
+      // Tilde-Range `~57.0.7` ist ein Minor-Bump (z. B. 57.1.0) per Definition
+      // immer out-of-range. Ohne diese Zeile würde so ein Minor package.json
+      // umschreiben, aber OHNE `expo-sdk`-Label und OHNE Dashboard-Freigabe —
+      // expo-sdk-sync.yml würde dafür nie feuern, ein halb migrierter Zustand
+      // könnte gemergt werden. Diese Regel fängt beide Fälle ab.
       description: "Expo-Major = SDK-Sprung, nur auf Zuruf",
       matchPackageNames: ["expo"],
-      matchUpdateTypes: ["major"],
+      matchUpdateTypes: ["major", "minor"],
       groupName: null,
       dependencyDashboardApproval: true,
       automerge: false,
