@@ -192,7 +192,7 @@ interface AllergenSpec {
 }
 ```
 
-Als Faustregel folgt der Modus der Sprache: **deutsche Terme laufen Substring** (Komposita werden zusammengeschrieben — `nuss` muss "Nussmischung" und "Haselnusskerne" finden), **kurze englische Terme laufen `word`** (dort trennt das Leerzeichen ohnehin, und `nut` als Substring träfe "nutmeg", "coconut", "nutrition"). Ausnahme in beide Richtungen sind Terme, die so kurz sind, dass sie in anderen Wörtern aufgehen — `ei` und `hafer` laufen auch auf Deutsch als `word`.
+Als Faustregel folgt der Modus der Sprache: **deutsche Terme laufen Substring** (Komposita werden zusammengeschrieben — `nuss` muss "Nussmischung" und "Haselnusskerne" finden, `hafer` muss "Haferflocken" finden), **kurze englische Terme laufen `word`** (dort trennt das Leerzeichen ohnehin, und `nut` als Substring träfe "nutmeg", "coconut", "nutrition"). Einzige deutsche Ausnahme ist `ei` — zwei Buchstaben gehen in zu vielen Wörtern auf.
 
 Häufige Komposita stehen zusätzlich explizit in der Liste (`eigelb`, `eiweiss`, `eiernudeln`), weil `word` sie sonst verfehlt.
 
@@ -219,12 +219,12 @@ Die Negation hebt außerdem nur den **getroffenen** Key auf: veganer Käse aus C
 
 `exclude` verwirft ein Vorkommen, wenn es Teil eines gelisteten Begriffs ist:
 
-| Key         | exclude                                                                                                                                      | Grund                                              |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `nuts`      | `erdnuss`, `peanut`, `kokosnuss`, `coconut`, `muskatnuss`, `muskat`, `nutmeg`, `nutrition`                                                   | Keine Schalenfrüchte im Sinne der EU-Kennzeichnung |
-| `gluten`    | `buchweizen`, `buckwheat`, `mandelmehl`, `reismehl`, `maismehl`, `kokosmehl`, `kichererbsenmehl`, `almond flour`, `rice flour`, `corn flour` | Glutenfreie Mehle und Pseudogetreide               |
-| `milk`      | `hafermilch`, `sojamilch`, `mandelmilch`, `reismilch`, `kokosmilch`, `oat milk`, `soy milk`, `almond milk`, `rice milk`, `coconut milk`      | Pflanzendrinks enthalten kein Milcheiweiß          |
-| `sulphites` | `schwein`                                                                                                                                    | "Schweinefleisch" enthält den Term `wein`          |
+| Key         | exclude                                                                                                                                                                                 | Grund                                              |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `nuts`      | `erdnuss`, `peanut`, `kokosnuss`, `coconut`, `muskatnuss`, `muskat`, `nutmeg`, `nutrition`                                                                                              | Keine Schalenfrüchte im Sinne der EU-Kennzeichnung |
+| `gluten`    | `buchweizen`, `buckwheat`, `reisnudeln`, `glasnudeln`, `rice noodle`, `mandelmehl`, `reismehl`, `maismehl`, `kokosmehl`, `kichererbsenmehl`, `almond flour`, `rice flour`, `corn flour` | Glutenfreie Mehle, Pseudogetreide und Reisnudeln   |
+| `milk`      | `hafermilch`, `sojamilch`, `mandelmilch`, `reismilch`, `kokosmilch`, `oat milk`, `soy milk`, `almond milk`, `rice milk`, `coconut milk`                                                 | Pflanzendrinks enthalten kein Milcheiweiß          |
+| `sulphites` | `schwein`                                                                                                                                                                               | "Schweinefleisch" enthält den Term `wein`          |
 
 Buchweizen ist der lehrreichste Eintrag: er enthält `weizen` als Substring, ist aber ein Pseudogetreide und **glutenfrei**. Ohne diesen Ausschluss würde die App einem Zöliakie-Kind ausgerechnet die Rezepte sperren, die für es gemacht sind — ein False Positive, der das Feature aktiv schädlich macht statt nur lästig.
 
@@ -236,10 +236,10 @@ Nicht vollständig, sondern der Stand, gegen den die Tests laufen. Erweiterung i
 
 | Key           | DE                                                                                                                                 | EN                                                                                     |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `gluten`      | weizen, dinkel, roggen, gerste, `hafer`(word), grieß, bulgur, couscous, seitan, paniermehl, vollkorn                               | wheat, barley, rye, spelt, oats, semolina, breadcrumb                                  |
+| `gluten`      | weizen, dinkel, roggen, gerste, hafer, grieß, bulgur, couscous, seitan, paniermehl, vollkorn, nudeln, spaghetti, pasta, brot       | wheat, barley, rye, spelt, oats, semolina, breadcrumb, pasta, noodle, bread            |
 | `crustaceans` | garnele, krabbe, hummer, krebs, scampi                                                                                             | shrimp, prawn, lobster, crab, crayfish                                                 |
 | `eggs`        | `ei`(word), `eier`(word), eigelb, eiweiss, eiernudeln, mayonnaise                                                                  | egg, yolk, albumen, mayonnaise                                                         |
-| `fish`        | fisch, lachs, thunfisch, kabeljau, hering, sardelle, anchovi, worcester                                                            | fish, salmon, tuna, cod, herring, anchovy, worcestershire                              |
+| `fish`        | fisch, lachs, thunfisch, kabeljau, hering, sardelle, anchovi, worcester, dashi, bonito                                             | fish, salmon, tuna, cod, herring, anchovy, worcestershire, dashi, bonito               |
 | `peanuts`     | erdnuss, erdnuesse                                                                                                                 | peanut, groundnut, arachis                                                             |
 | `soy`         | soja, tofu, edamame, miso, tempeh                                                                                                  | soy, soya, soybean, tofu, edamame                                                      |
 | `milk`        | milch, butter, sahne, quark, joghurt, kaese, parmesan, mozzarella, frischkaese, schmand, mascarpone, ricotta, molke, laktose, ghee | milk, cream, cheese, yogurt, whey, butter, lactose                                     |
@@ -332,7 +332,9 @@ Bei mehreren Treffern listet das Badge bis zu zwei Labels und hängt "+N" an.
 
 ### 7.3 Badge-Ton
 
-`DS.components.pill` liefert die Geometrie (Höhe 24, `paddingX` `space[2.5]`, `radius.pill`, `textStyles.pill`), hat aber **keinen `danger`-Ton** — `pill.tones` kennt nur mint, orange, warn, success, neutral. `design-system/components.ts` gehört zum Handoff-Bundle und wird nicht editiert. Der Ton wird deshalb lokal aus `bg-danger-soft`/`text-danger` komponiert; der fehlende Ton geht als Designer-Follow-up in `docs/TODO.md`.
+`app-sections/shared/Pill.tsx` führt bereits alle drei benötigten Töne: `danger` (`bg-danger-soft`/`text-danger`), `warn` und `ink`. `AllergenBadge` ist deshalb ein dünner Wrapper um `Pill`, der nur Verdict → Ton + lokalisiertes Label + "+N"-Kürzung abbildet — keine eigene Ton-Komposition.
+
+Die SPEC-Datei `design-system/components.ts` kennt in `pill.tones` keinen `danger`-Eintrag, aber das ist der Handoff-Katalog, nicht die Implementierung; die React-Komponente ist Claude-eigen und vollständig. Kein Designer-Follow-up nötig.
 
 ### 7.4 Picker (Decision 9)
 
@@ -395,6 +397,6 @@ Abschließend `bun run typecheck`, `bun lint`, `bun format:check`, `bunx expo ex
 
 **ADR-014** — die Mapping- und Urteilsentscheidung: wer besitzt das Rezept-Vokabular, warum vier Zustände statt Boolean, warum clientseitig gefiltert, warum `laktosefrei` eine Ausnahme ist.
 
-**`docs/TODO.md`** — entfällt: der Vokabular-Mismatch-Eintrag (durch diese Iteration gelöst). Angepasst: der Eintrag zum leeren Rezept-Pool (Seeds da, gustar.io-Worker offen) und der zu `excludeAllergens` (der Parameter bleibt ungenutzt, das Urteil fällt clientseitig). Neu: Klassifizierungs-Edge-Function als Owner des `declared`-Kanals; fehlender `danger`-Pillton; neue i18n-Keys für `docs/COPY.md`; dichtere Chip-Reihe in beiden Pattern-Docs; `intolerances` ungenutzt; kein Freitext-Allergen.
+**`docs/TODO.md`** — entfällt: der Vokabular-Mismatch-Eintrag (durch diese Iteration gelöst). Angepasst: der Eintrag zum leeren Rezept-Pool (Seeds da, gustar.io-Worker offen) und der zu `excludeAllergens` (der Parameter bleibt ungenutzt, das Urteil fällt clientseitig). Neu: Klassifizierungs-Edge-Function als Owner des `declared`-Kanals; neue i18n-Keys für `docs/COPY.md`; dichtere Chip-Reihe in beiden Pattern-Docs; `intolerances` ungenutzt; kein Freitext-Allergen; Begriffslisten als lebender Korpus, der mit echten Rezeptdaten nachgeschärft werden muss.
 
 **`CLAUDE.md`** — der neue Ordner `features/meals/allergens/` in der Folder-Structure.
