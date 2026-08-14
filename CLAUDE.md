@@ -124,6 +124,7 @@ features/                Cross-cutting feature logic
 ├─ tasks/                Queries · Mutations · Filter · Stats
 ├─ children/             Kinderprofile
 ├─ meals/                Meal-Planner-Daten-Layer (Queries · JSONB-Normalisierung · Wochenlogik)
+│  └─ allergens/         EU-14-Vokabular · DE/EN-Begriffslisten · Zutaten-Klassifizierer · Urteil (ADR-014)
 ├─ shared/               Feature-übergreifende Hooks (useToday)
 ├─ sample-data/          Mock-Daten für noch nicht verdrahtete Screens
 ├─ voice-assistant/      (placeholder)
