@@ -10,8 +10,13 @@ describe("ALLERGEN_KEYS", () => {
   test("enthält die sechs bestehenden Keys wortgleich", () => {
     // Diese sechs stehen bereits in children.allergies/parents.allergies.
     // Eine Umbenennung wäre ein Datenmigrations-Fall — der Test hält sie fest.
+    //
+    // Auf `readonly string[]` verbreitert, weil `toContain` sonst einen
+    // `AllergenKey` erwartet — und dann prüfte der Test die Typebene statt der
+    // Laufzeit, also genau das nicht mehr, worum es hier geht.
+    const keys: readonly string[] = ALLERGEN_KEYS;
     for (const key of ["peanuts", "milk", "eggs", "gluten", "soy", "nuts"]) {
-      expect(ALLERGEN_KEYS).toContain(key);
+      expect(keys).toContain(key);
     }
   });
 
