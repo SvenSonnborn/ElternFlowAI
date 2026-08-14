@@ -178,6 +178,14 @@ describe("ALLERGEN_SPECS — Vollständigkeit", () => {
     expect(keysForDeclaredCode("unbekannt")).toEqual([]);
   });
 
+  test("das Ergebnis ist eine Kopie, keine Referenz auf den Index", () => {
+    // Sonst schriebe ein Aufrufer mit `.sort()` oder `.push()` das Vokabular
+    // für alle folgenden Urteile um.
+    const first = keysForDeclaredCode("shellfish");
+    first.push("eggs");
+    expect(keysForDeclaredCode("shellfish")).not.toContain("eggs");
+  });
+
   test("ein mehrdeutiger Code trifft alle Keys, die er bedeuten kann", () => {
     // `shellfish` deckt umgangssprachlich Krebs- UND Weichtiere ab. Wäre der
     // Code nur einer Seite zugeordnet, ergäbe ein Rezept damit für die andere
