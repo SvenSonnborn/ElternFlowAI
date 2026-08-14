@@ -91,6 +91,14 @@ describe("judgeRecipe", () => {
     ).toEqual({ status: "unverified" });
   });
 
+  test("ein mehrdeutiger Deklarations-Code trifft beide Gruppen", () => {
+    // Vor dem Fix ergab das `safe`: `shellfish` war nur `crustaceans`
+    // zugeordnet, galt damit als bekannt und ging an `molluscs` vorbei.
+    const shellfishDish = { contains_allergens: ["shellfish"], ingredients: [] };
+    expect(judgeRecipe(shellfishDish, ["molluscs"]).status).toBe("unsafe");
+    expect(judgeRecipe(shellfishDish, ["crustaceans"]).status).toBe("unsafe");
+  });
+
   test("null in contains_allergens verhält sich wie leer", () => {
     expect(judgeRecipe({ ...NOTHING_KNOWN, contains_allergens: null }, ["eggs"])).toEqual({
       status: "unverified",

@@ -4,7 +4,7 @@ import type { Ingredient } from "../types";
 
 import { scanIngredients, scanText } from "./classify";
 import { ALLERGEN_KEYS } from "./keys";
-import { ALLERGEN_SPECS, keyForDeclaredCode } from "./terms";
+import { ALLERGEN_SPECS, keysForDeclaredCode } from "./terms";
 
 function ing(de: string, en?: string): Ingredient {
   return { amount: null, unit: null, name: en ? { de, en } : { de } };
@@ -39,6 +39,8 @@ const FALSE_FRIENDS: [string, string][] = [
   ["Schweinefleisch", "sulphites"],
   ["Kokosnuss", "nuts"],
   ["Muskatnuss", "nuts"],
+  // `oats` steckt als Substring in "goats" — daher `word`-Modus.
+  ["Goats cheese", "gluten"],
 ];
 
 const NEGATED: [string, string][] = [
@@ -163,21 +165,23 @@ describe("ALLERGEN_SPECS — Vollständigkeit", () => {
     }
   });
 
-  test("kein Deklarations-Code gehört zu zwei Keys", () => {
-    const codes = ALLERGEN_SPECS.flatMap((s) => s.declaredCodes);
-    expect(new Set(codes).size).toBe(codes.length);
-  });
-
   test("jeder Key ist über seinen eigenen Namen deklarierbar", () => {
     for (const key of ALLERGEN_KEYS) {
-      expect(keyForDeclaredCode(key), `${key} nicht als Code deklarierbar`).toBe(key);
+      expect(keysForDeclaredCode(key), `${key} nicht als Code deklarierbar`).toContain(key);
     }
   });
 
-  test("keyForDeclaredCode bildet die Rezept-Codes der Migration ab", () => {
-    expect(keyForDeclaredCode("egg")).toBe("eggs");
-    expect(keyForDeclaredCode("wheat")).toBe("gluten");
-    expect(keyForDeclaredCode("MILK")).toBe("milk");
-    expect(keyForDeclaredCode("unbekannt")).toBeNull();
+  test("keysForDeclaredCode bildet die Rezept-Codes der Migration ab", () => {
+    expect(keysForDeclaredCode("egg")).toEqual(["eggs"]);
+    expect(keysForDeclaredCode("wheat")).toEqual(["gluten"]);
+    expect(keysForDeclaredCode("MILK")).toEqual(["milk"]);
+    expect(keysForDeclaredCode("unbekannt")).toEqual([]);
+  });
+
+  test("ein mehrdeutiger Code trifft alle Keys, die er bedeuten kann", () => {
+    // `shellfish` deckt umgangssprachlich Krebs- UND Weichtiere ab. Wäre der
+    // Code nur einer Seite zugeordnet, ergäbe ein Rezept damit für die andere
+    // fälschlich `safe` — bekannter Code, aber am Allergen vorbei.
+    expect(keysForDeclaredCode("shellfish").sort()).toEqual(["crustaceans", "molluscs"]);
   });
 });

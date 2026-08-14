@@ -3,7 +3,7 @@ export {
   isAllergenKey,
   isRecipeSafeForFamily,
   judgeRecipe,
-  keyForDeclaredCode,
+  keysForDeclaredCode,
   matchedAllergens,
   mergeAllergies,
   scanIngredients,

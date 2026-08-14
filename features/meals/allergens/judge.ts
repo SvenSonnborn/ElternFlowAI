@@ -2,7 +2,7 @@ import type { Ingredient } from "../types";
 import type { AllergenKey } from "./keys";
 
 import { scanIngredients } from "./classify";
-import { isKnownDeclaredCode, keyForDeclaredCode } from "./terms";
+import { isKnownDeclaredCode, keysForDeclaredCode } from "./terms";
 
 export type AllergenSource = "declared" | "ingredient";
 
@@ -43,16 +43,20 @@ export function judgeRecipe(
   let hasUnknownCode = false;
 
   for (const code of declaredCodes) {
-    const key = keyForDeclaredCode(code);
-    if (!key) {
+    // Mehrzahl: ein mehrdeutiger Code wie `shellfish` meint Krebs- UND
+    // Weichtiere und muss beide treffen.
+    const keys = keysForDeclaredCode(code);
+    if (keys.length === 0) {
       // Ein Code, den wir nicht auflösen können, ist keine Entwarnung: er
       // könnte in einem fremden Vokabular genau das gesuchte Allergen
       // benennen. `NO_ALLERGENS_CODE` ist die eine bekannte Ausnahme.
       if (!isKnownDeclaredCode(code)) hasUnknownCode = true;
       continue;
     }
-    if (relevant.has(key) && !declaredHits.some((hit) => hit.key === key)) {
-      declaredHits.push({ key, source: "declared", evidence: code });
+    for (const key of keys) {
+      if (relevant.has(key) && !declaredHits.some((hit) => hit.key === key)) {
+        declaredHits.push({ key, source: "declared", evidence: code });
+      }
     }
   }
   if (declaredHits.length > 0) return { status: "unsafe", hits: declaredHits };

@@ -55,7 +55,9 @@ export const ALLERGEN_SPECS: readonly AllergenSpec[] = [
       t("barley"),
       t("rye"),
       t("spelt"),
-      t("oats"),
+      // `word`, weil `oats` als Substring in "goats cheese" steckt und einem
+      // glutenallergischen Kind Ziegenkäse als bedenklich meldete.
+      t("oats", "word"),
       t("semolina"),
       t("breadcrumb"),
       t("noodle"),
@@ -83,6 +85,9 @@ export const ALLERGEN_SPECS: readonly AllergenSpec[] = [
   },
   {
     key: "crustaceans",
+    // `shellfish` steht bewusst auch bei `molluscs`: umgangssprachlich deckt
+    // der Begriff beide Gruppen ab, und ein Code, der nur einer Seite
+    // zugeordnet ist, ließe die andere fälschlich als sicher durchgehen.
     declaredCodes: ["crustaceans", "crustacean", "shellfish"],
     terms: [
       t("garnele"),
@@ -275,7 +280,7 @@ export const ALLERGEN_SPECS: readonly AllergenSpec[] = [
   },
   {
     key: "molluscs",
-    declaredCodes: ["molluscs", "mollusks"],
+    declaredCodes: ["molluscs", "mollusks", "shellfish"],
     terms: [
       t("muschel"),
       t("tintenfisch"),
@@ -315,19 +320,29 @@ export const FOLDED_SPECS: readonly FoldedSpec[] = ALLERGEN_SPECS.map((spec) => 
   exclude: spec.exclude.map(fold),
 }));
 
-const DECLARED_INDEX = new Map<string, AllergenKey>(
-  ALLERGEN_SPECS.flatMap((spec) =>
-    spec.declaredCodes.map((code): [string, AllergenKey] => [fold(code), spec.key]),
-  ),
-);
+/**
+ * Ein Code kann auf **mehrere** Keys zeigen. `shellfish` etwa deckt
+ * umgangssprachlich Krebs- und Weichtiere ab; wäre er nur einem Key
+ * zugeordnet, ergäbe ein Rezept mit `contains_allergens: ["shellfish"]` für
+ * eine weichtierallergische Familie `safe` — der Code wäre bekannt, träfe aber
+ * am Allergen vorbei.
+ */
+const DECLARED_INDEX = ALLERGEN_SPECS.reduce((index, spec) => {
+  for (const code of spec.declaredCodes) {
+    const folded = fold(code);
+    index.set(folded, [...(index.get(folded) ?? []), spec.key]);
+  }
+  return index;
+}, new Map<string, AllergenKey[]>());
 
 /**
- * Ein Code aus `recipes.contains_allergens` → Key, oder `null`. Groß- und
- * Kleinschreibung sowie Trennzeichen sind egal; `null` heißt "kennen wir
- * nicht" und wird vom Urteil bewusst nicht als Entwarnung gewertet.
+ * Ein Code aus `recipes.contains_allergens` → alle Keys, die er bedeuten kann.
+ * Groß- und Kleinschreibung sowie Trennzeichen sind egal; ein leeres Ergebnis
+ * heißt "kennen wir nicht" und wird vom Urteil bewusst nicht als Entwarnung
+ * gewertet.
  */
-export function keyForDeclaredCode(code: string): AllergenKey | null {
-  return DECLARED_INDEX.get(fold(code)) ?? null;
+export function keysForDeclaredCode(code: string): AllergenKey[] {
+  return DECLARED_INDEX.get(fold(code)) ?? [];
 }
 
 /**

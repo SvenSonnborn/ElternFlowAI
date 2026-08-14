@@ -14,7 +14,7 @@ export { mergeAllergies, type AllergyBearer } from "./members";
 export {
   ALLERGEN_SPECS,
   isKnownDeclaredCode,
-  keyForDeclaredCode,
+  keysForDeclaredCode,
   NO_ALLERGENS_CODE,
   type AllergenSpec,
   type MatchMode,

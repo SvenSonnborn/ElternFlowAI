@@ -22,7 +22,7 @@ Die ursprüngliche Aufgabenstellung ging von drei Annahmen aus, die alle nicht z
 
 Die dritte ist die folgenreiche. Die reale Kette ist vierstufig:
 
-```
+```text
 Zutat "Weizenmehl" / "wheat flour"
   → [1. Klassifizierer]  → contains_allergens: {wheat}
   → [2. Mapping]         → AllergenKey: gluten
@@ -80,7 +80,7 @@ Das LLM ist dann kein Ersatz, sondern eine zusätzliche Quelle: es füllt den `d
 
 ### 3.2 Datenfluss
 
-```
+```text
 children.allergies[] ─┐
                       ├─ useFamilyAllergies() → AllergenKey[]
 parents.allergies[]  ─┘                              │
@@ -94,7 +94,7 @@ recipes.ingredients[].name{de,en} ─→ scanIngredients() ─┘              �
 
 ### 3.3 Dateien
 
-```
+```text
 features/meals/allergens/
 ├─ keys.ts        AllergenKey (EU-14) + ALLERGEN_KEYS
 ├─ fold.ts        fold() — Sprach-Normalisierung
@@ -146,7 +146,7 @@ Freitext wurde verworfen, weil er genau dort ansetzt, wo das Matching still sche
 
 ### 5.1 Normalisierung — `fold()` (Decision 5)
 
-```
+```text
 fold(s):
   1. toLowerCase()
   2. ä→ae · ö→oe · ü→ue · ß→ss

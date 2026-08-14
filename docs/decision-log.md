@@ -398,7 +398,7 @@ Renovate kennt die Expo-Kompatibilitätsmatrix nicht; sie liegt in `bundledNativ
 
 ### Status
 
-Accepted. Ergänzt [ADR-004](#adr-004--supabase-schema-2026-05-29) um das Allergen-Vokabular und löst Decision 5c dort nicht ab, sondern füllt sie aus: `contains_allergens` bleibt Source-of-Truth, bekommt hier aber erstmals eine definierte Code-Menge und einen Umgang mit dem Fall, dass sie leer ist.
+Accepted. Ergänzt [ADR-004](#adr-004--db-schema-für-family-organizer-2026-05-29) um das Allergen-Vokabular und löst Decision 5c dort nicht ab, sondern füllt sie aus: `contains_allergens` bleibt Source-of-Truth, bekommt hier aber erstmals eine definierte Code-Menge und einen Umgang mit dem Fall, dass sie leer ist.
 
 ### Context
 
