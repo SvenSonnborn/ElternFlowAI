@@ -12,9 +12,9 @@ Invarianten zu verletzen, die das Repo heute von Hand hält:
    sondern von Expo SDK 57. `react-native 0.86.0` steht dort, weil SDK 57 es so
    will — nicht, weil es die neueste Version wäre.
 2. **`local == CI`.** [mise.toml](../../../mise.toml) und
-   [.github/workflows/ci.yml](../../../.github/workflows/ci.yml) tragen dieselbe
-   Bun-Version (`1.3.10`) an zwei Stellen, und der JDK-Pin auf 17 ist eine
-   bewusste Entscheidung gegen neuere JDKs.
+   [.github/workflows/ci.yml](../../../.github/workflows/ci.yml) tragen (Stand
+   heute) dieselbe Bun-Version (`1.3.10`) mehrfach, und der JDK-Pin auf 17 ist
+   eine bewusste Entscheidung gegen neuere JDKs.
 
 Ein naiv konfiguriertes Renovate bricht beide. Diese Spec beschreibt die
 Konfiguration, die sie stattdessen absichert.
@@ -158,14 +158,16 @@ verdeckter.
 
 ### 5 — Bun-Version wird an beiden Stellen gemeinsam gehoben
 
-`bun 1.3.10` steht doppelt im Repo: in `mise.toml` (Renovates `mise`-Manager
-sieht das) und als `bun-version:`-Input in `ci.yml` (sieht er **nicht** — der
-`github-actions`-Manager fasst nur `uses:`-Zeilen an). Ohne Gegenmaßnahme
-driftet `local == CI` beim ersten Bun-Update auseinander.
+`bun 1.3.10` steht mehrfach im Repo: in `mise.toml` (Renovates `mise`-Manager
+sieht das) und als `bun-version:`-Input in allen `.github/workflows/*.yml`
+(sieht er **nicht** — der `github-actions`-Manager fasst nur `uses:`-Zeilen
+an). Ohne Gegenmaßnahme driftet `local == CI` beim ersten Bun-Update
+auseinander.
 
-Ein `customManagers`-Eintrag liest die `bun-version:`-Zeile als Bun-Datasource;
-beide Fundstellen landen über `matchDepNames: ["bun"]` in einer gemeinsamen
-Gruppe. Ein PR bumpt künftig beide.
+Ein `customManagers`-Eintrag liest jede `bun-version:`-Zeile in
+`.github/workflows/*.yml` als Bun-Datasource; alle Fundstellen landen über
+`matchDepNames: ["bun"]` in einer gemeinsamen Gruppe. Ein PR bumpt künftig
+alle gemeinsam.
 
 ### 6 — JDK bleibt bei 17
 
@@ -218,8 +220,11 @@ grün.
 }
 ```
 
-`schedule: ["before 6am on monday"]` gilt auch für `lockFileMaintenance`, weil
-der globale Schedule vererbt wird.
+`lockFileMaintenance` läuft trotz des globalen `schedule: ["before 6am on
+monday"]` nicht danach, sondern nach seinem eigenen Default (`"before 4am on
+monday"`) — ein Kindwert gewinnt gegen den geerbten Elternwert, vererbt wird
+also gerade nicht. Im Ergebnis praktisch gleichwertig (beides früh am Montag),
+nur eben aus einem anderen Grund.
 
 ### Package-Rules
 
@@ -343,7 +348,7 @@ der Test — und Phase 1 des Rollouts ist genau dafür da.
   Syntax beim Push.
 - **Semantik der Package-Rules:** nicht offline testbar. Phase 1 liefert die
   Evidenz — konkret ist zu prüfen, dass (a) kein PR eine Expo-Range verlässt,
-  (b) `java` in keinem PR auftaucht, (c) ein Bun-Update beide Fundstellen
+  (b) `java` in keinem PR auftaucht, (c) ein Bun-Update alle Fundstellen
   anfasst.
 - **`expo-sdk-sync.yml`:** erst beim SDK-58-Sprung real auslösbar. Vorher per
   `workflow_dispatch`-Variante gegen einen Wegwerf-Branch mit künstlich
@@ -361,11 +366,12 @@ der Test — und Phase 1 des Rollouts ist genau dafür da.
    mergen. Gemildert durch den engen Umfang (Regel 1 und 2), dadurch dass
    Renovate den Branch-Status vor dem Merge selbst prüft, und durch den
    Required Status Check aus Schritt 4.
-3. **Der Custom-Manager-Regex hängt an der Textform von `ci.yml`.** Wird
-   `bun-version: 1.3.10` umformatiert, greift er still nicht mehr — Renovate
-   meldet keinen Fehler, es passiert einfach nichts. Prettier formatiert die
-   Datei stabil, aber ein stiller Ausfall bleibt möglich. Sichtbar wird er
-   dadurch, dass ein Bun-Update nur noch `mise.toml` anfasst.
+3. **Der Custom-Manager-Regex hängt an der Textform der `bun-version:`-Zeilen.**
+   Wird eine davon umformatiert, greift er für genau diese Datei still nicht
+   mehr — Renovate meldet keinen Fehler, es passiert einfach nichts. Prettier
+   formatiert die Dateien stabil, aber ein stiller Ausfall bleibt möglich.
+   Sichtbar wird er dadurch, dass ein Bun-Update nur noch `mise.toml` und einen
+   Teil der Workflow-Dateien anfasst.
 4. **Renovate-Config-Keys wandern zwischen Versionen** (`fileMatch` →
    `managerFilePatterns` ist ein Beispiel aus jüngerer Zeit). Die gehostete App
    läuft immer auf aktuellem Renovate; ein umbenannter Key fällt daher

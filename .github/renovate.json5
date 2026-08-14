@@ -48,13 +48,13 @@
   customManagers: [
     {
       customType: "regex",
-      // `bun 1.3.10` steht doppelt im Repo: in mise.toml (sieht Renovates
-      // mise-Manager) und als `bun-version:`-Input in ci.yml (sieht er NICHT —
-      // der github-actions-Manager fasst nur `uses:`-Zeilen an, keine `with:`-
-      // Inputs). Ohne diesen Manager driftet "local == CI" beim ersten
-      // Bun-Update auseinander.
-      description: "bun-version: in ci.yml an mise.toml koppeln",
-      managerFilePatterns: ["/^\\.github/workflows/ci\\.yml$/"],
+      // `bun 1.3.10` steht mehrfach im Repo: in mise.toml (sieht Renovates
+      // mise-Manager) und als `bun-version:`-Input in allen
+      // .github/workflows/*.yml (sieht er NICHT — der github-actions-Manager
+      // fasst nur `uses:`-Zeilen an, keine `with:`-Inputs). Ohne diesen
+      // Manager driftet "local == CI" beim ersten Bun-Update auseinander.
+      description: "bun-version: in allen Workflow-Dateien an mise.toml koppeln",
+      managerFilePatterns: ["/^\\.github/workflows/.+\\.ya?ml$/"],
       matchStrings: ["bun-version:\\s*(?<currentValue>\\S+)"],
       depNameTemplate: "bun",
       datasourceTemplate: "github-releases",
@@ -145,7 +145,7 @@
       // 58.x (Major), sondern auch einen Minor wie 57.1.0 gegen die Range
       // `~57.0.7` — beide Fälle fängt Regel 6 ab und sperrt sie hinter
       // dependencyDashboardApproval.
-      description: "expo: rangeStrategy-Override, damit Regel 6 Majors überhaupt sieht",
+      description: "expo: rangeStrategy-Override, damit Regel 6 Majors und Minors überhaupt sieht",
       matchPackageNames: ["expo"],
       rangeStrategy: "update-lockfile",
       automerge: false,
@@ -194,10 +194,10 @@
       enabled: false,
     },
     {
-      // 8 — mise.toml und ci.yml müssen dieselbe Bun-Version tragen. Der
-      // customManager oben liefert die zweite Fundstelle unter demselben
-      // depName, beide landen so in einem PR.
-      description: "Bun-Toolchain (mise.toml + ci.yml gemeinsam)",
+      // 8 — mise.toml und alle Workflow-Dateien müssen dieselbe Bun-Version
+      // tragen. Der customManager oben liefert die weiteren Fundstellen unter
+      // demselben depName, sie landen so gemeinsam in einem PR.
+      description: "Bun-Toolchain (mise.toml + Workflow-Dateien gemeinsam)",
       matchDepNames: ["bun"],
       groupName: "bun toolchain",
       automerge: false,
