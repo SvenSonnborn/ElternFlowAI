@@ -70,6 +70,27 @@ describe("judgeRecipe", () => {
     expect(judgeRecipe(NOTHING_KNOWN, ["eggs"])).toEqual({ status: "unverified" });
   });
 
+  test("ein unbekannter Deklarations-Code verhindert safe", () => {
+    // Ein Code aus einem fremden Vokabular könnte genau das gesuchte Allergen
+    // benennen. Ihn als Entwarnung zu lesen wäre derselbe stille False
+    // Negative, gegen den dieses Modul überhaupt gebaut ist.
+    expect(judgeRecipe({ contains_allergens: ["sesam_de"], ingredients: [] }, ["sesame"])).toEqual({
+      status: "unverified",
+    });
+  });
+
+  test("der NO_ALLERGENS_CODE gilt als verstanden und erlaubt safe", () => {
+    expect(judgeRecipe({ contains_allergens: ["none"], ingredients: [] }, ["eggs"])).toEqual({
+      status: "safe",
+    });
+  });
+
+  test("ein unbekannter Code neben einem bekannten verhindert safe ebenfalls", () => {
+    expect(
+      judgeRecipe({ contains_allergens: ["wheat", "sesam_de"], ingredients: [] }, ["eggs"]),
+    ).toEqual({ status: "unverified" });
+  });
+
   test("null in contains_allergens verhält sich wie leer", () => {
     expect(judgeRecipe({ ...NOTHING_KNOWN, contains_allergens: null }, ["eggs"])).toEqual({
       status: "unverified",

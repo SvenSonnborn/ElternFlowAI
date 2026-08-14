@@ -347,7 +347,7 @@ Die SPEC-Datei `design-system/components.ts` kennt in `pill.tones` keinen `dange
 Neue Keys in `de.json` + `en.json`:
 
 - `onb.s4.allergies.{crustaceans,fish,celery,mustard,sesame,sulphites,lupin,molluscs}` — 8 × 2 Sprachen
-- `meals.browse.{title,search,empty,loadError}`
+- `meals.browse.{title,search,searchPlaceholder,empty,loadError}`
 - `meals.allergen.{contains,maybe,unverified,more}` — z. B. `"enthält {{list}}"`, `"möglicherweise {{list}}"`, `"nicht geprüft"`, `"+{{n}}"`
 - `meals.a11y.{unsafeRecipe,cautionRecipe,unverifiedRecipe}`
 
@@ -357,7 +357,7 @@ Neue Keys in `de.json` + `en.json`:
 
 ## 8. Seeds (Decision 10)
 
-Migration mit ~10 globalen Rezepten (`created_by_family_id = null`), realistischen Zutaten in DE+EN und **korrekt befülltem** `contains_allergens`. Ohne sie ist die Liste leer und nichts von alledem ist am laufenden Gerät prüfbar.
+Migration mit sechs globalen Rezepten (`created_by_family_id = null`), realistischen Zutaten in DE+EN und **korrekt befülltem** `contains_allergens`. Ohne sie ist die Liste leer und nichts von alledem ist am laufenden Gerät prüfbar.
 
 `recipe_dedup_hash` ist `not null unique` — die Seeds setzen ein stabiles `'seed-' || slug` statt eines berechneten Hashes; das ist ehrlicher als ein Pseudo-Hash und kollidiert nicht mit echten Importen. `on conflict (recipe_dedup_hash) do nothing` macht die Migration wiederholbar.
 

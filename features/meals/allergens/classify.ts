@@ -11,7 +11,12 @@ export interface TermMatch {
 }
 
 // Angehängt oder mit Space: "glutenfrei" wie "gluten free".
-const NEGATION_SUFFIXES = ["frei", "free", "los", "ersatz", "alternative"] as const;
+//
+// Der Vergleich läuft gegen das *vollständige* Folgewort, nicht gegen dessen
+// Anfang: ein `startsWith("frei")` hielt "Eier, Freilandhaltung" für eine
+// Negation und verschluckte den Ei-Treffer. Die Endungsgruppe fängt die
+// deutschen Beugungen ("glutenfreie", "-freier", "-freies").
+const NEGATION_SUFFIX_RE = /^(frei|free|los|ersatz|alternative)(e|es|er|en|em)?$/;
 
 // Als vorangehendes Wort: "ohne Ei", "vegane Sahne".
 const NEGATION_PREFIXES = [
@@ -63,7 +68,8 @@ function isExcluded(
 function isNegated(haystack: string, start: number, end: number): boolean {
   const after = haystack.slice(end);
   const attached = after.startsWith(" ") ? after.slice(1) : after;
-  if (NEGATION_SUFFIXES.some((suffix) => attached.startsWith(suffix))) return true;
+  const nextWord = attached.split(" ", 1)[0] ?? "";
+  if (NEGATION_SUFFIX_RE.test(nextWord)) return true;
 
   const before = haystack.slice(0, start).trimEnd();
   const lastWord = before.slice(before.lastIndexOf(" ") + 1);
