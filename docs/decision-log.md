@@ -362,7 +362,7 @@ Der Stack ist an mehreren Stellen jünger als jedes Trainingswissen: Expo SDK 57
 
 ### Status
 
-Accepted.
+Accepted. Löst den Dependabot-Follow-up aus [ADR-006](#adr-006--cicd-via-github-actions-2026-07-21)s Consequences ab — Renovate übernimmt dessen Scope (GitHub-Actions- und npm/Bun-Updates); ADR-006 bleibt darüber hinaus unverändert gültig.
 
 ### Context
 
