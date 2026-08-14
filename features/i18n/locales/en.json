@@ -368,6 +368,24 @@
     "recipe": {
       "cta": "Start cooking",
       "note": "Note"
+    },
+    "browse": {
+      "title": "Browse recipes",
+      "search": "Search",
+      "searchPlaceholder": "Pasta, soup, quick …",
+      "empty": "No recipes found.",
+      "loadError": "Recipes could not be loaded."
+    },
+    "allergen": {
+      "contains": "contains {{list}}",
+      "maybe": "may contain {{list}}",
+      "unverified": "not checked",
+      "more": "+{{n}}"
+    },
+    "a11y": {
+      "unsafeRecipe": "{{title}} — contains {{list}}",
+      "cautionRecipe": "{{title}} — may contain {{list}}",
+      "unverifiedRecipe": "{{title}} — allergens not checked"
     }
   },
   "hw": {

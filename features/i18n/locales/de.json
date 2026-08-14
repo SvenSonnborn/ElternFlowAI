@@ -368,6 +368,24 @@
     "recipe": {
       "cta": "Kochen starten",
       "note": "Hinweis"
+    },
+    "browse": {
+      "title": "Rezepte durchsuchen",
+      "search": "Suche",
+      "searchPlaceholder": "Nudeln, Suppe, schnell …",
+      "empty": "Keine Rezepte gefunden.",
+      "loadError": "Rezepte konnten nicht geladen werden."
+    },
+    "allergen": {
+      "contains": "enthält {{list}}",
+      "maybe": "möglicherweise {{list}}",
+      "unverified": "nicht geprüft",
+      "more": "+{{n}}"
+    },
+    "a11y": {
+      "unsafeRecipe": "{{title}} — enthält {{list}}",
+      "cautionRecipe": "{{title}} — enthält möglicherweise {{list}}",
+      "unverifiedRecipe": "{{title}} — Allergene nicht geprüft"
     }
   },
   "hw": {

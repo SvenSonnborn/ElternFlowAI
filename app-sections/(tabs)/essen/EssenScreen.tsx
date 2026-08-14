@@ -8,6 +8,8 @@ import { useTheme } from "@/design-system/ThemeProvider";
 import { Screen, Text } from "@/design-system/ui";
 import { weeklyMeals } from "@/features/sample-data";
 
+import { RecipeBrowser } from "./RecipeBrowser";
+
 const TABS_DE = ["Abendessen", "Mittag", "Frühstück"];
 const TABS_EN = ["Dinner", "Lunch", "Breakfast"];
 
@@ -134,6 +136,8 @@ export function EssenScreen() {
           </View>
         </LinearGradient>
       </Pressable>
+
+      <RecipeBrowser />
     </Screen>
   );
 }
