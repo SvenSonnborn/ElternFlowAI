@@ -1,0 +1,240 @@
+name: Native Build
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Same Supabase placeholders as ci.yml. Strictly only the `bundle` job needs
+# them: Metro inlines EXPO_PUBLIC_* at bundle time, so leaving them unset would
+# bake `undefined` into the native bundle instead of the string the app expects.
+# The two compile jobs build Debug variants, which don't bundle JS at all —
+# harmless there, and keeping one env block avoids two places to update.
+env:
+  EXPO_PUBLIC_SUPABASE_URL: https://test.supabase.invalid
+  EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_test
+
+# Three independent jobs, deliberately WITHOUT `needs:` between them. Runner
+# minutes are free on a public repo, so the only currency is wall-clock: running
+# them in parallel makes the PR wait max(bundle, android, ios) instead of the
+# sum. iOS dominates either way.
+#
+# Toolchain comes from mise.toml via mise-action (java 17 · node 24 · bun) —
+# NOT from setup-bun as in ci.yml. The native builds are exactly where the pins
+# in mise.toml are load-bearing (see ADR-016), so they read the same file the
+# developer's shell does rather than a second copy in YAML.
+jobs:
+  bundle:
+    name: Metro bundle (ios · android)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup toolchain (mise)
+        uses: jdx/mise-action@v4
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        id: install
+        run: bun install --frozen-lockfile
+
+      # The native JS bundle is built NOWHERE else in CI. ci.yml's web export
+      # resolves `DateTimePickerSheet.web.tsx`; the native sibling
+      # `DateTimePickerSheet.tsx` (split off in ADR-010) is never compiled by it.
+      # Debug APK/IPA builds don't close that gap either — they load JS from
+      # Metro at runtime instead of bundling it. Two invocations because
+      # `expo export -p` takes a single platform, and `all` would redo the web
+      # export ci.yml already covers.
+      - name: Metro bundle (iOS)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bunx expo export --platform ios --output-dir dist-ios
+
+      - name: Metro bundle (Android)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bunx expo export --platform android --output-dir dist-android
+
+  android:
+    name: Android (prebuild · assembleDebug)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup toolchain (mise)
+        uses: jdx/mise-action@v4
+
+      # A wrong JDK fails Gradle with "Unsupported class file major version",
+      # which reads like a project bug rather than a toolchain mismatch. The
+      # ubuntu runner ships its own JDK and its own JAVA_HOME, so assert that
+      # mise's pin actually won before spending 15 minutes finding out.
+      - name: Assert JDK pin from mise.toml
+        run: |
+          set -e
+          echo "JAVA_HOME=${JAVA_HOME:-<unset>}"
+          java -version
+          major="$(java -version 2>&1 | sed -n '1s/.*version "\([0-9]*\).*/\1/p')"
+          if [ "$major" != "17" ]; then
+            echo "::error::Expected JDK 17 (mise.toml pin), got major version '${major:-<unknown>}'."
+            exit 1
+          fi
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        id: install
+        run: bun install --frozen-lockfile
+
+      # `android/` is gitignored (CNG), so it never exists in a fresh checkout.
+      # `--clean` states the invariant anyway: CI always compiles a freshly
+      # generated native project, never a stale one. `--no-install` skips the
+      # package-manager run that `bun install` above already did.
+      - name: Prebuild (android)
+        run: bunx expo prebuild --platform android --no-install --clean
+
+      # Restored AFTER prebuild: `--clean` wipes the native directory, so a
+      # cache seeded before it would be thrown away.
+      - name: Cache Gradle
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('bun.lock', 'app.json') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # Debug, not Release: Release additionally bundles and minifies JS (the
+      # `bundle` job already covers that) and would need a signing keystore.
+      - name: Gradle assembleDebug
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+  ios:
+    name: iOS (prebuild · pod install · xcodebuild)
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      # Explicit, deterministic ccache location — ccache's own default differs
+      # between platforms and versions, and the cache step needs a fixed path.
+      CCACHE_DIR: /tmp/ccache
+      # Kept small on purpose: the ccache key below is SHA-suffixed, so every
+      # push writes a new entry. GitHub's per-repo cache budget is 10 GB with
+      # LRU eviction, and an oversized ccache would evict the Gradle and
+      # CocoaPods caches that the other job depends on.
+      CCACHE_MAXSIZE: 1G
+      # Read by the Expo Podfile's `ccache_enabled?` helper (env takes
+      # precedence over Podfile.properties.json). This is what makes the
+      # from-source React Native build survivable as a per-PR gate.
+      USE_CCACHE: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup toolchain (mise)
+        uses: jdx/mise-action@v4
+
+      # mise.toml pins RCT_USE_PREBUILT_RNCORE=0 to force React Native to build
+      # from source: CocoaPods has resolved a stale, version-mismatched
+      # React-Core-prebuilt binary here before, failing the build inside Expo's
+      # own headers (see the mise.toml comment). ios/Podfile:19 assigns with
+      # `||=` against a Podfile.properties.json key this project does not set,
+      # so the environment variable is the ONLY thing holding the pin. If
+      # mise-action ever stops exporting it, the fallback is a silent `1` and a
+      # build that diverges from every developer machine — fail loudly instead.
+      - name: Assert RN-from-source pin from mise.toml
+        run: |
+          if [ "${RCT_USE_PREBUILT_RNCORE:-}" != "0" ]; then
+            echo "::error::RCT_USE_PREBUILT_RNCORE is '${RCT_USE_PREBUILT_RNCORE:-<unset>}', expected '0' from mise.toml [env]."
+            exit 1
+          fi
+
+      - name: Install ccache
+        run: brew list ccache >/dev/null 2>&1 || brew install ccache
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        id: install
+        run: bun install --frozen-lockfile
+
+      # `--no-install` skips BOTH the package-manager run and `pod install`;
+      # pods are installed explicitly below, after the CocoaPods cache is back.
+      - name: Prebuild (ios)
+        run: bunx expo prebuild --platform ios --no-install --clean
+
+      # Keyed on bun.lock + app.json rather than Podfile.lock: the lockfile is
+      # generated by the prebuild step above and does not exist when the key is
+      # evaluated.
+      - name: Cache CocoaPods
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+            ios/Pods
+          key: pods-${{ runner.os }}-${{ hashFiles('bun.lock', 'app.json') }}
+          restore-keys: |
+            pods-${{ runner.os }}-
+
+      - name: Cache ccache
+        uses: actions/cache@v6
+        with:
+          path: /tmp/ccache
+          key: ccache-${{ runner.os }}-${{ hashFiles('bun.lock', 'app.json') }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ hashFiles('bun.lock', 'app.json') }}-
+            ccache-${{ runner.os }}-
+
+      - name: Pod install
+        working-directory: ios
+        run: pod install
+
+      # Simulator destination + CODE_SIGNING_ALLOWED=NO is what keeps this gate
+      # credential-free: no certificates, no provisioning profiles, no secrets,
+      # no Expo account. It proves the project compiles, which is the question
+      # being asked — producing an installable artifact is a separate concern
+      # (see docs/TODO.md on EAS).
+      #
+      # No pipe into a log formatter on purpose: a pipeline without `pipefail`
+      # masks the exit status, the same trap expo-sdk-sync.yml documents.
+      - name: Xcodebuild (simulator, unsigned)
+        run: |
+          xcodebuild \
+            -workspace ios/ElternFlowAI.xcworkspace \
+            -scheme ElternFlowAI \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: ccache statistics
+        if: ${{ !cancelled() }}
+        run: ccache --show-stats
