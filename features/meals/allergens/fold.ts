@@ -14,7 +14,11 @@ const UMLAUTS: readonly (readonly [RegExp, string])[] = [
 ];
 
 export function fold(input: string): string {
-  let out = input.toLowerCase();
+  // NFC zuerst: die Umlaut-Regexe unten treffen nur vorkomponierte Zeichen.
+  // Kommt "ü" zerlegt herein (u + combining diaeresis — macOS-Dateisysteme und
+  // manche APIs liefern NFD), liefe es an ihnen vorbei und der NFD-Strip
+  // darunter machte "nusse" statt "nuesse" daraus.
+  let out = input.normalize("NFC").toLowerCase();
   for (const [pattern, replacement] of UMLAUTS) {
     out = out.replace(pattern, replacement);
   }

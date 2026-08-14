@@ -22,6 +22,14 @@ describe("fold", () => {
     expect(fold("Crème fraîche")).toBe("creme fraiche");
   });
 
+  test("faltet auch zerlegt vorliegende Umlaute", () => {
+    // NFD-Eingabe: "u" + combining diaeresis statt eines vorkomponierten "ü".
+    // So liefern es macOS-Dateisysteme und manche APIs.
+    const decomposed = "Nu\u0308sse";
+    expect(decomposed.normalize("NFC")).toBe("N\u00fcsse");
+    expect(fold(decomposed)).toBe("nuesse");
+  });
+
   test("ersetzt Nicht-Alphanumerisches durch einzelne Spaces", () => {
     expect(fold("Weizen-Mehl")).toBe("weizen mehl");
     expect(fold("  Soja  ,  Tofu ")).toBe("soja tofu");

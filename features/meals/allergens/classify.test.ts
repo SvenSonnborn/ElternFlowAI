@@ -98,6 +98,35 @@ describe("scanText — Negation", () => {
   test("Mandelmilch ist nuts, nicht milk", () => {
     expect(scanText("Mandelmilch")).toEqual(["nuts"]);
   });
+
+  test("ein Wort, das nur mit einem Negationswort beginnt, negiert nicht", () => {
+    // "frei" als Präfix von "Freilandhaltung" ist keine Negation. Ohne
+    // vollständigen Token-Vergleich verschluckte der Guard hier den
+    // Ei-Treffer — ein plausibler Zutatentext, der ein Allergen verliert.
+    expect(scanText("Eier, Freilandhaltung")).toContain("eggs");
+    expect(scanText("Ei Freilandhaltung")).toContain("eggs");
+  });
+
+  test("gebeugte Negationsformen greifen weiterhin", () => {
+    expect(scanText("glutenfreier Teig")).not.toContain("gluten");
+    expect(scanText("glutenfreies Mehl")).not.toContain("gluten");
+    expect(scanText("laktosefreier Joghurt")).toContain("milk");
+  });
+
+  test.todo("ein negiertes Schlüsselwort räumt den ganzen Key ab", () => {
+    // "glutenfreie Nudeln" meldet aktuell `gluten`: der Term `gluten` wird
+    // negiert, aber `nudeln` trifft unabhängig davon. Das ist ein False
+    // Positive — also die sichere Richtung —, aber bei einem so verbreiteten
+    // Produkt störend.
+    //
+    // Der Fix ist nicht "Negation gilt für den ganzen Key": genau daran hängt
+    // der laktosefrei-Fall, wo `milch` stehen bleiben MUSS. Die Trennlinie
+    // verläuft anders — `gluten` ist der Name des Allergens selbst, `laktose`
+    // dagegen nur ein Begleitstoff der Milch. Nötig wäre ein `selfTerms`-Feld
+    // je Spec: wird ein Term negiert, der das Allergen selbst benennt, fällt
+    // der ganze Key. Siehe docs/TODO.md.
+    expect(scanText("glutenfreie Nudeln")).not.toContain("gluten");
+  });
 });
 
 describe("scanIngredients", () => {

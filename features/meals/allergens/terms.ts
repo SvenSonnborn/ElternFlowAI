@@ -329,3 +329,26 @@ const DECLARED_INDEX = new Map<string, AllergenKey>(
 export function keyForDeclaredCode(code: string): AllergenKey | null {
   return DECLARED_INDEX.get(fold(code)) ?? null;
 }
+
+/**
+ * Marker für "geprüft, kein Allergen gefunden".
+ *
+ * Ohne ihn wäre das ein leeres Array — und das liest das Urteil als "nie
+ * klassifiziert". Ein Klassifizierer, der ein Rezept prüft und nichts findet,
+ * hätte also keine Ausdrucksform, und `safe` wäre unerreichbar. Der Code
+ * benennt kein Allergen und trifft deshalb nie, gilt aber als verstanden.
+ *
+ * Übergangslösung: sauber wäre eine eigene Spalte `allergens_classified_at`
+ * (siehe docs/TODO.md und ADR-014).
+ */
+export const NO_ALLERGENS_CODE = "none";
+
+/**
+ * Kennen wir diesen Code? Ein unbekannter Code darf `safe` verhindern — er
+ * könnte in einem fremden Vokabular genau das Allergen benennen, nach dem
+ * gesucht wird.
+ */
+export function isKnownDeclaredCode(code: string): boolean {
+  const folded = fold(code);
+  return folded === NO_ALLERGENS_CODE || DECLARED_INDEX.has(folded);
+}

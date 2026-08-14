@@ -2,7 +2,7 @@ import type { Ingredient } from "../types";
 import type { AllergenKey } from "./keys";
 
 import { scanIngredients } from "./classify";
-import { keyForDeclaredCode } from "./terms";
+import { isKnownDeclaredCode, keyForDeclaredCode } from "./terms";
 
 export type AllergenSource = "declared" | "ingredient";
 
@@ -40,9 +40,18 @@ export function judgeRecipe(
   const declaredCodes = recipe.contains_allergens ?? [];
 
   const declaredHits: AllergenHit[] = [];
+  let hasUnknownCode = false;
+
   for (const code of declaredCodes) {
     const key = keyForDeclaredCode(code);
-    if (key && relevant.has(key) && !declaredHits.some((hit) => hit.key === key)) {
+    if (!key) {
+      // Ein Code, den wir nicht auflösen können, ist keine Entwarnung: er
+      // könnte in einem fremden Vokabular genau das gesuchte Allergen
+      // benennen. `NO_ALLERGENS_CODE` ist die eine bekannte Ausnahme.
+      if (!isKnownDeclaredCode(code)) hasUnknownCode = true;
+      continue;
+    }
+    if (relevant.has(key) && !declaredHits.some((hit) => hit.key === key)) {
       declaredHits.push({ key, source: "declared", evidence: code });
     }
   }
@@ -53,9 +62,12 @@ export function judgeRecipe(
     .map((match): AllergenHit => ({ ...match, source: "ingredient" }));
   if (ingredientHits.length > 0) return { status: "caution", hits: ingredientHits };
 
-  // Eine befüllte Deklaration ohne Treffer ist eine echte Entwarnung. Eine
-  // leere ist keine: die Heuristik kann Anwesenheit belegen, nie Abwesenheit.
-  return declaredCodes.length > 0 ? { status: "safe" } : { status: "unverified" };
+  // Eine vollständig verstandene Deklaration ohne Treffer ist eine echte
+  // Entwarnung. Eine leere ist keine — die Heuristik kann Anwesenheit belegen,
+  // nie Abwesenheit —, und eine mit unbekanntem Code ebenfalls nicht.
+  return declaredCodes.length > 0 && !hasUnknownCode
+    ? { status: "safe" }
+    : { status: "unverified" };
 }
 
 /** Der schmale Boolean für Aufrufer ohne Bedarf an Nuancen — etwa die KI-Vorschlagslogik. */

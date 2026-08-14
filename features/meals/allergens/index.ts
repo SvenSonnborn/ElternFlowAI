@@ -13,7 +13,9 @@ export { ALLERGEN_KEYS, isAllergenKey, type AllergenKey } from "./keys";
 export { mergeAllergies, type AllergyBearer } from "./members";
 export {
   ALLERGEN_SPECS,
+  isKnownDeclaredCode,
   keyForDeclaredCode,
+  NO_ALLERGENS_CODE,
   type AllergenSpec,
   type MatchMode,
   type Term,

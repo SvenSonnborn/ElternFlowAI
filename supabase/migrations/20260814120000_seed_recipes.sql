@@ -16,8 +16,12 @@
 -- Ausdrucksform — der Zustand `safe` wäre in der Praxis unerreichbar. Bis das
 -- Schema das sauber trennt (eigene Spalte `allergens_classified_at`, siehe
 -- docs/TODO.md), markiert der Code 'none' ein geprüftes Rezept ohne Fund.
--- `keyForDeclaredCode('none')` liefert null, der Code trifft also nie ein
--- Allergen, macht das Array aber nicht-leer.
+--
+-- Der Code ist im Klassifizierer als `NO_ALLERGENS_CODE` geführt
+-- (features/meals/allergens/terms.ts) und damit ein BEKANNTER Code: er benennt
+-- kein Allergen und trifft nie, gilt aber als verstanden. Das ist der
+-- Unterschied, der zählt — ein *unbekannter* Code verhindert `safe`, weil er
+-- in einem fremden Vokabular genau das gesuchte Allergen benennen könnte.
 --
 -- `recipe_dedup_hash` ist `not null unique`. Statt einen echten sha256 zu
 -- berechnen, tragen die Seeds ein stabiles 'seed-<slug>' — ehrlicher als ein
