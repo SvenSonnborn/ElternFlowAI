@@ -147,12 +147,20 @@
       "skip": "Überspringen",
       "avatarFallback": "?",
       "allergies": {
-        "peanuts": "Erdnüsse",
-        "milk": "Milch",
-        "eggs": "Eier",
         "gluten": "Gluten",
+        "crustaceans": "Krebstiere",
+        "eggs": "Eier",
+        "fish": "Fisch",
+        "peanuts": "Erdnüsse",
         "soy": "Soja",
-        "nuts": "Nüsse"
+        "milk": "Milch",
+        "nuts": "Nüsse",
+        "celery": "Sellerie",
+        "mustard": "Senf",
+        "sesame": "Sesam",
+        "sulphites": "Sulfite",
+        "lupin": "Lupinen",
+        "molluscs": "Weichtiere"
       }
     },
     "s5": {
