@@ -428,3 +428,40 @@ Befund 3 ist der folgenreiche: er macht aus einer Mapping-Aufgabe eine Klassifiz
 - **Die Chip-Reihe in Onboarding und Kinderprofil wird sichtbar dichter** (6 → 14 Optionen). Beide Screens brauchten keine Code-Änderung — sie mappen über `ALLERGY_KEYS`, das jetzt auf `ALLERGEN_KEYS` re-exportiert. `patterns/onboarding.md` und `patterns/child-profile.md` beschreiben noch sechs; mit dem Designer abzustimmen.
 - **`intolerances` bleibt ungelesen.** Unverträglichkeiten sind medizinisch etwas anderes als Allergien — der Laktose-Fall in Decision 5 zeigt, dass die beiden Achsen nicht dasselbe Urteilsmodell teilen können.
 - `features/children/allergies.ts` ist zur Re-Export-Schicht geworden; `AllergyKey` bleibt als Alias auf `AllergenKey` bestehen, damit die bestehenden Importpfade unverändert weiterlaufen.
+
+## ADR-015 — Renovate: Expos Versionshoheit deckt beide Vorgabe-Kanäle ab (2026-08-14)
+
+### Status
+
+Accepted. Korrigiert die **Umsetzung** von [ADR-013](#adr-013--renovate-als-gehostete-app-expo-kompatibilität-bleibt-bei-expo-install---fix-2026-08-13) Decision 2, ohne die Entscheidung selbst abzulösen: „Expo-verwaltete Pakete laufen `rangeStrategy: in-range-only`" gilt unverändert weiter — die Paketliste, die diese Absicht durchsetzen sollte, war nur unvollständig.
+
+### Context
+
+Am 2026-08-14 standen sieben Renovate-PRs offen. Drei davon wollten Pakete anheben, deren Version Expo SDK 57 ausdrücklich vorschreibt:
+
+| PR  | Paket                                       | Vorschlag                                    | SDK 57 schreibt vor   |
+| --- | ------------------------------------------- | -------------------------------------------- | --------------------- |
+| #80 | `@react-native-async-storage/async-storage` | `2.2.0` → `3.1.1`                            | `2.2.0`               |
+| #84 | `typescript`                                | `~6.0.3` → `~7.0.0`                          | `~6.0.3`              |
+| #85 | `jest` / `@types/jest`                      | `~29.7.0` → `~30.4.0` / `29.5.14` → `30.0.0` | `~29.7.0` / `29.5.14` |
+
+Alle drei waren in CI grün — was nichts beweist: `ci.yml` endet beim Web-Export, und `expo-doctor` läuft nur in `expo-sdk-sync.yml`, das mangels `expo-sdk`-Label korrekt übersprungen wurde. Bei async-storage v3 wäre der ungeprüfte Teil der größte gewesen: ein Native-Rewrite mit vendored `SharedAsyncStorage.xcframework` auf iOS, Room + KSP auf Android und umbenanntem TurboModule (`RNCAsyncStorage` → `RNAsyncStorage`).
+
+Zwei getrennte Ursachen, beide in derselben Liste (Regel 3, `matchPackageNames`):
+
+1. **Ein Scope-Muster traf nicht.** Gelistet waren `/^@react-native\//` und `/^@react-native-community\//`. Der Scope `@react-native-async-storage/` passt auf keines von beiden — nach `native` steht ein `-`, kein `/`. Das Paket lief dadurch komplett ungeregelt.
+2. **Ein ganzer Vorgabe-Kanal fehlte.** Die Annahme hinter der Liste war, Expos Vorgaben stünden in `bundledNativeModules.json`. Das ist nur die Hälfte: die Toolchain — `jest`, `@types/jest`, `typescript`, `metro`, `babel-preset-expo` — liegt in `relatedPackages` der Versions-API. Diese Pakete tragen kein Expo-Namensmuster und fallen deshalb durch jedes Regex.
+
+### Decisions
+
+1. **Beide Kanäle sind normativ, und der Kommentar in `renovate.json5` benennt sie samt Abruf-URL.** `bundledNativeModules.json` (bzw. `api.expo.dev/v2/sdks/<version>/native-modules`) für Native-Module, `relatedPackages` aus `api.expo.dev/v2/versions/latest` für die Toolchain. Ohne diese Notiz sieht `typescript` in einer Liste namens „Expo-SDK-verwaltete Pakete" wie ein Versehen aus und wird beim nächsten Aufräumen gestrichen — die Lücke käme zurück. `bunx expo install --check` ist die schnellste Gegenprobe, weil es gegen genau diese beiden Quellen prüft.
+2. **Die Scope-Muster werden zu `/^@react-native[-\/]/` zusammengezogen, statt den fehlenden Scope einzeln nachzutragen.** Ein Einzeleintrag hätte den konkreten PR erledigt und die Fehlerklasse gelassen: jeder künftige `@react-native-*`-Scope wäre erneut still durchgefallen. Breit fassen und Fehltreffer über Regel 5 herausnehmen ist außerdem exakt das Muster, das `/^react-native-/` hier bereits nutzt — die Config bekommt damit eine Konvention statt zwei.
+3. **`jest`, `@types/jest` und `typescript` stehen namentlich in Regel 3.** Kein Muster kann sie fassen. Weil Regel 3 nach Regel 1 (devDeps, Automerge) steht, gewinnt sie — die drei landen ohne Automerge in der Expo-Gruppe, wie `jest-expo` und `@types/react` vorher schon.
+4. **`react-test-renderer` bleibt in der Liste, obwohl SDK 57 es nicht mehr vorschreibt** (React 19 hat es deprecated; es steht in keinem der beiden Kanäle). Streichen würde es unter Regel 1 stellen und damit automergefähig machen — für ein Paket, das im Repo nirgends importiert wird und ohnehin schon direkte Dependency von `jest-expo` ist, wäre das mehr Bewegung statt weniger. Der Eintrag friert einen exakten Pin ein und kostet nichts. Aufräumen gehört an die Entscheidung über `@testing-library/react-native` (siehe `docs/TODO.md`), nicht hierher.
+
+### Consequences
+
+- **Die drei PRs schließt Renovate beim nächsten Lauf selbst.** `in-range-only` verwirft Out-of-Range-Updates vollständig, statt sie vorzuschlagen — sie werden nicht neu erzeugt. Manuelles Schließen ist unnötig und wäre sogar schlechter: ein per Hand geschlossener Renovate-PR gilt als dauerhaftes Ignore und würde einen später legitimen Bump ebenfalls unterdrücken.
+- **Diese vier Pakete bewegen sich ab jetzt nur noch über `expo install --fix` bzw. `lockFileMaintenance`.** Für `typescript ~6.0.3` und `jest ~29.7.0` heißt das: Patches fließen in-range über die wöchentliche Lockfile-Pflege, ein Sprung auf TS 7 oder Jest 30 kommt erst mit dem SDK, das ihn vorschreibt. Das ist der bewusste Preis — dieselbe Logik wie bei `react-native` in ADR-013.
+- **Die Liste bleibt wartungsbedürftig, und zwar bei jedem SDK-Sprung.** `relatedPackages` ist SDK-versioniert; SDK 58 kann Pakete aufnehmen oder entlassen. Der Abgleich gehört damit in die Nacharbeit von `expo-sdk-sync.yml` — vermerkt in `docs/TODO.md`.
+- **Grüne CI bleibt für Native-Pakete ein schwaches Signal.** Diese ADR schließt die Lücke bei der Auswahl, nicht bei der Prüfung: ein Native-Bump, der es doch bis in einen PR schafft, wird von `format/lint/typecheck/test/web-export` weiterhin nicht bemerkt. Ein `expo-doctor`-Schritt auf jedem Dependency-PR wäre die eigentliche Absicherung — offen in `docs/TODO.md`.
