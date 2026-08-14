@@ -11,7 +11,7 @@
 [tools]
 java = "temurin-17"
 node = "24"
-bun = "1.3.10"
+bun = "1.3.14"
 
 [env]
 # Load the gitignored .env.local into the shell. Needed so `.mcp.json` can expand
