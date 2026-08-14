@@ -147,12 +147,20 @@
       "skip": "Skip",
       "avatarFallback": "?",
       "allergies": {
-        "peanuts": "Peanuts",
-        "milk": "Milk",
-        "eggs": "Eggs",
         "gluten": "Gluten",
+        "crustaceans": "Crustaceans",
+        "eggs": "Eggs",
+        "fish": "Fish",
+        "peanuts": "Peanuts",
         "soy": "Soy",
-        "nuts": "Nuts"
+        "milk": "Milk",
+        "nuts": "Nuts",
+        "celery": "Celery",
+        "mustard": "Mustard",
+        "sesame": "Sesame",
+        "sulphites": "Sulphites",
+        "lupin": "Lupin",
+        "molluscs": "Molluscs"
       }
     },
     "s5": {
