@@ -57,13 +57,23 @@ jobs:
         run: bun install
 
       # Nur Bericht, kein Gate: expo-doctor meldet auch Dinge, die einen
-      # SDK-Sprung nicht blockieren. Log liegt außerhalb des Arbeitsbaums, damit
-      # es nicht im Commit unten landet.
+      # SDK-Sprung nicht blockieren. Ohne Pipe/Umleitung, damit der
+      # Schritt-Exit-Status der von expo-doctor bleibt (bash -e ohne
+      # pipefail würde ihn hinter einem `tee` sonst immer auf 0 setzen) —
+      # die Ausgabe landet ohnehin im Job-Log.
       - name: expo-doctor
         id: doctor
         continue-on-error: true
-        run: bunx expo-doctor 2>&1 | tee "$RUNNER_TEMP/doctor.log"
+        run: bunx expo-doctor
 
+      # commit/push laufen bewusst durch die Repo-Hooks (simple-git-hooks
+      # aus dem `bun install` oben installiert sie auch auf dem Runner):
+      # pre-commit lässt Prettier über die von expo install --fix
+      # geschriebene package.json laufen, sonst könnte format:check auf
+      # genau diesem PR rot werden. pre-push ist aktuell per exit 0
+      # deaktiviert (scripts/coderabbit-prepush.sh) — eine künftige
+      # Reaktivierung muss CI ausnehmen, sonst liefe coderabbit review hier
+      # unauthentifiziert und dieser Push schlüge fehl.
       - name: Commit & push
         id: sync
         run: |
