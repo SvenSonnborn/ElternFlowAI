@@ -11,10 +11,7 @@ export class MissingParentError extends Error {
 }
 
 export type TaskErrorKey =
-  | "hw.error.notAuthenticated"
-  | "hw.error.staleReference"
-  | "hw.error.network"
-  | "hw.error.generic";
+  "hw.error.notAuthenticated" | "hw.error.staleReference" | "hw.error.network" | "hw.error.generic";
 
 interface ErrorLike {
   message?: string;

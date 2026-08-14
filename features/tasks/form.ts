@@ -27,9 +27,7 @@ export interface TaskFormState {
 }
 
 export type TaskFormErrorKey =
-  | "hw.error.titleRequired"
-  | "hw.error.typeRequired"
-  | "hw.error.dateRequired";
+  "hw.error.titleRequired" | "hw.error.typeRequired" | "hw.error.dateRequired";
 
 export interface TaskFormErrors {
   title?: TaskFormErrorKey;

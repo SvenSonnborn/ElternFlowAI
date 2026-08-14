@@ -3917,34 +3917,35 @@ git commit -m "docs(adr): ADR-004 Supabase auth + onboarding (Approach C)"
 The existing tables already cover `auth.signIn`, `auth.signUp`, `auth.email`, `auth.password`, `auth.forgot`, `auth.stay`, `auth.or`, `auth.google`, `auth.apple`, `auth.tagline`, `auth.error.title`, `auth.error.help`, `auth.magicLink`, `auth.newHere`.
 
 Add to the Auth table:
-| Key | DE | EN |
-| --- | --- | --- |
-| `auth.signOut` | Abmelden | Sign out |
-| `auth.soon` | Bald verfügbar | Coming soon |
-| `auth.register.title` | Konto erstellen | Create your account |
-| `auth.register.sub` | Mit dieser E-Mail teilst du später Kalender und Listen mit deinem Partner. | You'll use this email to share calendar and lists with your partner. |
-| `auth.register.terms` | Ich stimme den AGB und der Datenschutzerklärung zu. | I agree to the terms and privacy policy. |
-| `auth.register.submit` | Konto erstellen | Create account |
-| `auth.checkEmail.title` | Schau in dein Postfach | Check your inbox |
-| `auth.checkEmail.sub` | Wir haben dir einen Link an {{email}} geschickt. Tippe ihn an, um deine E-Mail zu bestätigen. | We sent a link to {{email}}. Tap it to confirm your email. |
-| `auth.checkEmail.resend` | Mail erneut senden | Resend email |
-| `auth.checkEmail.wrongEmail` | Falsche E-Mail? Zurück | Wrong email? Go back |
-| `auth.reset.title` | Passwort zurücksetzen | Reset password |
-| `auth.reset.sub` | Wir senden dir einen Link an deine E-Mail. | We'll send a link to your email. |
-| `auth.reset.submit` | Link senden | Send link |
-| `auth.reset.success` | Falls die E-Mail registriert ist, findest du gleich einen Link in deinem Postfach. | If that email is registered, you'll find a link in your inbox shortly. |
-| `auth.reset.backToLogin` | Doch wieder eingefallen? Anmelden | Remembered it? Sign in |
-| `auth.newPassword.*` | (siehe `de.json`) | (siehe `en.json`) |
-| `auth.password.strength.{weak\|fair\|good\|strong}` | Schwach / Okay / Gut / Stark | Weak / OK / Good / Strong |
-| `auth.error.invalidCredentials` | E-Mail oder Passwort falsch. | Email or password incorrect. |
-| `auth.error.emailTaken` | Diese E-Mail ist bereits registriert. | This email is already registered. |
-| `auth.error.emailNotConfirmed` | Bitte bestätige zuerst deine E-Mail. | Please confirm your email first. |
-| `auth.error.weakPassword` | Mindestens 8 Zeichen, bitte. | At least 8 characters, please. |
-| `auth.error.alreadyInFamily` | Du gehörst bereits zu einer Familie. | You're already part of a family. |
-| `auth.error.linkExpired` | Der Link ist abgelaufen oder wurde bereits verwendet. | This link has expired or was already used. |
-| `auth.error.notAuthenticated` | Bitte erneut anmelden. | Please sign in again. |
-| `auth.error.network` | Verbindung fehlgeschlagen. Bitte später erneut versuchen. | Connection failed. Please try again later. |
-| `auth.error.generic` | Etwas ist schiefgelaufen. Bitte später erneut versuchen. | Something went wrong. Please try again later. |
+
+| Key                                                 | DE                                                                                            | EN                                                                     |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `auth.signOut`                                      | Abmelden                                                                                      | Sign out                                                               |
+| `auth.soon`                                         | Bald verfügbar                                                                                | Coming soon                                                            |
+| `auth.register.title`                               | Konto erstellen                                                                               | Create your account                                                    |
+| `auth.register.sub`                                 | Mit dieser E-Mail teilst du später Kalender und Listen mit deinem Partner.                    | You'll use this email to share calendar and lists with your partner.   |
+| `auth.register.terms`                               | Ich stimme den AGB und der Datenschutzerklärung zu.                                           | I agree to the terms and privacy policy.                               |
+| `auth.register.submit`                              | Konto erstellen                                                                               | Create account                                                         |
+| `auth.checkEmail.title`                             | Schau in dein Postfach                                                                        | Check your inbox                                                       |
+| `auth.checkEmail.sub`                               | Wir haben dir einen Link an {{email}} geschickt. Tippe ihn an, um deine E-Mail zu bestätigen. | We sent a link to {{email}}. Tap it to confirm your email.             |
+| `auth.checkEmail.resend`                            | Mail erneut senden                                                                            | Resend email                                                           |
+| `auth.checkEmail.wrongEmail`                        | Falsche E-Mail? Zurück                                                                        | Wrong email? Go back                                                   |
+| `auth.reset.title`                                  | Passwort zurücksetzen                                                                         | Reset password                                                         |
+| `auth.reset.sub`                                    | Wir senden dir einen Link an deine E-Mail.                                                    | We'll send a link to your email.                                       |
+| `auth.reset.submit`                                 | Link senden                                                                                   | Send link                                                              |
+| `auth.reset.success`                                | Falls die E-Mail registriert ist, findest du gleich einen Link in deinem Postfach.            | If that email is registered, you'll find a link in your inbox shortly. |
+| `auth.reset.backToLogin`                            | Doch wieder eingefallen? Anmelden                                                             | Remembered it? Sign in                                                 |
+| `auth.newPassword.*`                                | (siehe `de.json`)                                                                             | (siehe `en.json`)                                                      |
+| `auth.password.strength.{weak\|fair\|good\|strong}` | Schwach / Okay / Gut / Stark                                                                  | Weak / OK / Good / Strong                                              |
+| `auth.error.invalidCredentials`                     | E-Mail oder Passwort falsch.                                                                  | Email or password incorrect.                                           |
+| `auth.error.emailTaken`                             | Diese E-Mail ist bereits registriert.                                                         | This email is already registered.                                      |
+| `auth.error.emailNotConfirmed`                      | Bitte bestätige zuerst deine E-Mail.                                                          | Please confirm your email first.                                       |
+| `auth.error.weakPassword`                           | Mindestens 8 Zeichen, bitte.                                                                  | At least 8 characters, please.                                         |
+| `auth.error.alreadyInFamily`                        | Du gehörst bereits zu einer Familie.                                                          | You're already part of a family.                                       |
+| `auth.error.linkExpired`                            | Der Link ist abgelaufen oder wurde bereits verwendet.                                         | This link has expired or was already used.                             |
+| `auth.error.notAuthenticated`                       | Bitte erneut anmelden.                                                                        | Please sign in again.                                                  |
+| `auth.error.network`                                | Verbindung fehlgeschlagen. Bitte später erneut versuchen.                                     | Connection failed. Please try again later.                             |
+| `auth.error.generic`                                | Etwas ist schiefgelaufen. Bitte später erneut versuchen.                                      | Something went wrong. Please try again later.                          |
 
 Add to the Onboarding table the new sub-keys: `onb.s2.parentName.*`, `onb.s2.color.*`, `onb.s2.submitInvite`, `onb.s3.shareSubject`, `onb.s3.shareMessage`, `onb.s3.pendingPill`, `onb.s3.shared.*`, `onb.s4.skip`, `onb.s4.voice`, `onb.s5.recap.*`, `onb.s5.empty.*`.
 

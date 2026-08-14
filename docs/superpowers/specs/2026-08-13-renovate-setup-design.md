@@ -214,9 +214,7 @@ grün.
       extractVersionTemplate: "^bun-v(?<version>.*)$",
     },
   ],
-  packageRules: [
-    /* siehe Tabelle unten */
-  ],
+  packageRules: [/* siehe Tabelle unten */],
 }
 ```
 
