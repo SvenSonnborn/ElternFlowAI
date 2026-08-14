@@ -69,11 +69,12 @@ export function DashboardScreen() {
 
       <SectionHeader title={t("dash.meal.question")} action={t("dash.meal.refresh")} />
       {/*
-       * Kein `onOpenRecipe`: `mealPick` ist Sample-Data, seine `id`
-       * ("kurbis-risotto") ist keine UUID und `recipes.id` ist `uuid` — der
-       * Aufruf endete in der Detailansicht im Fehlerzweig. Solange die Karte
-       * nicht an `useTodaysMeal` hängt, hat sie keine echte Rezept-ID zu
-       * verlinken (docs/TODO.md); `onAddToShopping` fehlt aus demselben Grund.
+       * Kein `onOpenRecipe`: `mealPick` ist Sample-Data, seine `id` ("meal-1")
+       * ist keine UUID und `recipes.id` ist `uuid` — der Aufruf endete in der
+       * Detailansicht im Fehlerzweig. Solange die Karte nicht an
+       * `useTodaysMeal` hängt, hat sie keine echte Rezept-ID zu verlinken
+       * (docs/TODO.md); `onAddToShopping` fehlt aus demselben Grund. Ohne
+       * beide Callbacks blendet die Karte ihre Aktionszeile aus.
        */}
       <MealHeroCard meal={mealPick} />
 

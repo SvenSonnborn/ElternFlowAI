@@ -42,26 +42,39 @@ export function MealHeroCard({ meal, onOpenRecipe, onAddToShopping }: MealHeroCa
           <Text style={{ fontSize: 30 }}>{meal.emoji}</Text>
         </View>
       </View>
-      <View className="mt-4 flex-row gap-2">
-        <Pressable
-          onPress={onOpenRecipe}
-          className="h-11 flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-white active:opacity-85"
-        >
-          <Icon name="book-open" size={15} color={palette.slate[700]} />
-          <Text variant="button" tone="ink">
-            {t("dash.meal.openRecipe")}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={onAddToShopping}
-          className="h-11 flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-black/20 active:opacity-85"
-        >
-          <Icon name="shopping-cart" size={15} color="#FFFFFF" />
-          <Text variant="button" tone="white">
-            {t("dash.meal.toShopping")}
-          </Text>
-        </Pressable>
-      </View>
+      {/*
+       * Jede Aktion hängt an ihrem Callback: beide Props sind optional, und ein
+       * sichtbarer Button ohne `onPress` sieht aus wie ein Angebot, das die
+       * Karte nicht einlösen kann. Fehlen beide, entfällt die Zeile ganz.
+       */}
+      {onOpenRecipe || onAddToShopping ? (
+        <View className="mt-4 flex-row gap-2">
+          {onOpenRecipe ? (
+            <Pressable
+              onPress={onOpenRecipe}
+              accessibilityRole="button"
+              className="h-11 flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-white active:opacity-85"
+            >
+              <Icon name="book-open" size={15} color={palette.slate[700]} />
+              <Text variant="button" tone="ink">
+                {t("dash.meal.openRecipe")}
+              </Text>
+            </Pressable>
+          ) : null}
+          {onAddToShopping ? (
+            <Pressable
+              onPress={onAddToShopping}
+              accessibilityRole="button"
+              className="h-11 flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-black/20 active:opacity-85"
+            >
+              <Icon name="shopping-cart" size={15} color="#FFFFFF" />
+              <Text variant="button" tone="white">
+                {t("dash.meal.toShopping")}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </LinearGradient>
   );
 }
