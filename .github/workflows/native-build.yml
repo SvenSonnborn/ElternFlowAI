@@ -145,9 +145,18 @@ jobs:
 
       # Debug, not Release: Release additionally bundles and minifies JS (the
       # `bundle` job already covers that) and would need a signing keystore.
+      #
+      # `--build-cache` weil `prebuild --clean` jeden Lauf sämtlichen
+      # inkrementellen Build-Zustand in `android/` löscht — ohne ihn cached der
+      # Gradle-Cache oben NUR heruntergeladene Dependencies, also nicht den
+      # teuren Teil. Der lokale Build-Cache liegt unter
+      # ~/.gradle/caches/build-cache-1 und ist damit vom bestehenden
+      # Cache-Step bereits abgedeckt. Erwartungsmanagement: das beschleunigt
+      # Kotlin-/Java-Compile und Resource-Tasks, NICHT die CMake/NDK-Schritte —
+      # `externalNativeBuild`-Tasks sind nicht cachebar.
       - name: Gradle assembleDebug
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleDebug --no-daemon --stacktrace --build-cache
 
   ios:
     name: iOS (prebuild · pod install · xcodebuild)
@@ -251,6 +260,14 @@ jobs:
       #
       # No pipe into a log formatter on purpose: a pipeline without `pipefail`
       # masks the exit status, the same trap expo-sdk-sync.yml documents.
+      #
+      # CCACHE_DIR/CCACHE_MAXSIZE werden als BUILD SETTINGS übergeben, nicht nur
+      # als Step-`env:`. Grund: Xcode reicht Shell-Umgebungsvariablen nicht an
+      # Compiler-Tasks durch, sondern baut eine kontrollierte Umgebung aus den
+      # Build-Settings. Genau darüber erreicht RNs `CCACHE_BINARY` sein
+      # Wrapper-Skript (scripts/xcode/ccache-clang.sh), und genau daran ist der
+      # erste Anlauf gescheitert: ccache lief, schrieb aber in sein
+      # Standardverzeichnis, während hier /tmp/ccache gecacht wurde — 0 Byte.
       - name: Xcodebuild (simulator, unsigned)
         run: |
           xcodebuild \
@@ -260,8 +277,22 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath ios/build \
             CODE_SIGNING_ALLOWED=NO \
+            CCACHE_DIR="$CCACHE_DIR" \
+            CCACHE_MAXSIZE="$CCACHE_MAXSIZE" \
             build
 
+      # Bewusst diagnosefähig statt nur `--show-stats`: der vorherige Lauf
+      # meldete korrekt "0 Byte" für /tmp/ccache und verschwieg dabei, dass der
+      # echte Cache woanders lag. Die Größen BEIDER Kandidaten zu drucken macht
+      # den nächsten Lauf eindeutig — greift der Fix, wächst /tmp/ccache und
+      # ~/Library/Caches/ccache bleibt leer.
       - name: ccache statistics
         if: ${{ !cancelled() }}
-        run: ccache --show-stats
+        run: |
+          echo "--- ccache config (wie die Shell sie sieht) ---"
+          ccache --show-config 2>/dev/null | grep -E 'cache_dir|max_size' || true
+          echo "--- stats für CCACHE_DIR=${CCACHE_DIR} ---"
+          ccache --show-stats
+          echo "--- Größe beider Kandidaten ---"
+          du -sh "${CCACHE_DIR}" 2>/dev/null || echo "  ${CCACHE_DIR}: leer/fehlt"
+          du -sh "${HOME}/Library/Caches/ccache" 2>/dev/null || echo "  ~/Library/Caches/ccache: leer/fehlt"
