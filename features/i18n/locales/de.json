@@ -341,7 +341,12 @@
   },
   "meals": {
     "title": "Essensplanung",
-    "weekLabel": "Woche 20 · 12.–18. Mai",
+    "weekLabel": "Woche {{week}} · {{range}}",
+    "plan": {
+      "empty": "Für diese Woche ist noch nichts geplant.",
+      "emptyDay": "Noch nichts geplant",
+      "loadError": "Der Wochenplan konnte nicht geladen werden."
+    },
     "aiPlan": "KI plant die Woche",
     "aiPlanSub": "In 5 Sek. auf eure Familie zugeschnitten",
     "shoppingSub": "23 Zutaten · automatisch aus Plan",

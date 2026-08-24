@@ -1,4 +1,5 @@
 import { addDays, format, set, startOfDay, startOfWeek } from "date-fns";
+import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 
 import type { MealPlanDay, MealPlanEntryWithRecipe, MealSlot } from "./types";
 
@@ -19,6 +20,39 @@ export function weekStartFor(date: Date): Date {
 /** Die sieben Kalendertage einer Woche, Mo–So. */
 export function weekDayKeys(weekStart: Date): string[] {
   return Array.from({ length: 7 }, (_, offset) => toDateKey(addDays(weekStart, offset)));
+}
+
+/**
+ * Der Datumsbereich einer Woche als Text — „11.–17. Mai" bzw. „May 11–17".
+ *
+ * Wechselt die Woche den Monat, muss er zweimal auftauchen („27. Apr. – 3.
+ * Mai"): „27.–3. Mai" wäre schlicht falsch. Der Trenner folgt derselben Regel
+ * wie im Duden und im Chicago Manual — ohne Leerzeichen zwischen zwei nackten
+ * Zahlen, mit Leerzeichen, sobald beide Seiten einen Monat tragen.
+ *
+ * Die Sprache steuert mehr als den Monatsnamen, deshalb zwei Muster statt
+ * eines lokalisierten: Deutsch stellt den Tag voran und punktiert ihn, Englisch
+ * stellt den Monat voran — dieselbe Begründung wie `dueDatePattern` in
+ * app-sections/task/TaskForm.tsx.
+ *
+ * `date` darf irgendein Tag der Woche sein; wie `useMealPlans` zieht die
+ * Funktion selbst auf den Montag, damit Label und Raster nie auseinanderlaufen.
+ */
+export function formatWeekRange(date: Date, lang: "de" | "en"): string {
+  const start = weekStartFor(date);
+  const end = addDays(start, 6);
+  const locale = lang === "de" ? deLocale : enLocale;
+  const spansMonths = start.getMonth() !== end.getMonth();
+
+  if (lang === "de") {
+    return spansMonths
+      ? `${format(start, "d. MMM", { locale })} – ${format(end, "d. MMM", { locale })}`
+      : `${format(start, "d.")}–${format(end, "d. MMMM", { locale })}`;
+  }
+
+  return spansMonths
+    ? `${format(start, "MMM d", { locale })} – ${format(end, "MMM d", { locale })}`
+    : `${format(start, "MMMM d", { locale })}–${format(end, "d")}`;
 }
 
 /**

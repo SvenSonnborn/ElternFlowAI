@@ -51,6 +51,7 @@ export type {
 export { useFamilyAllergies } from "./useFamilyAllergies";
 export { useRecipeJudge } from "./useRecipeJudge";
 export {
+  formatWeekRange,
   groupByDay,
   nextSlotBoundary,
   slotForTime,

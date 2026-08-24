@@ -50,17 +50,6 @@ export interface MealPick {
   reasonItems: string[];
 }
 
-export interface WeeklyMeal {
-  weekdayShort: string;
-  weekdayShortEn: string;
-  date: number;
-  emoji: string;
-  name: string;
-  nameEn: string;
-  durationMin: number;
-  isToday: boolean;
-}
-
 export interface CalendarDayCell {
   day: number;
   isCurrentMonth: boolean;
