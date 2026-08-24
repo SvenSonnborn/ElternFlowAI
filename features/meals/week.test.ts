@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { MealPlanEntryWithRecipe } from "./types";
 
 import {
+  formatWeekRange,
   groupByDay,
   nextSlotBoundary,
   slotForTime,
@@ -178,5 +179,34 @@ describe("nextSlotBoundary", () => {
       expect(boundary.getTime()).toBeGreaterThan(now.getTime());
       expect(slotForTime(boundary)).not.toBe(slotForTime(now));
     }
+  });
+});
+
+/**
+ * Der Bereich hinter „Woche 20 · …" im TopBar des Essen-Tabs. Zwei Achsen:
+ * Sprache und ob die Woche den Monat wechselt.
+ */
+describe("formatWeekRange", () => {
+  test("nennt den Monat einmal, solange die Woche in ihm bleibt (de)", () => {
+    expect(formatWeekRange(new Date(2026, 4, 11), "de")).toBe("11.–17. Mai");
+  });
+
+  test("nennt beide Monate ueber die Monatsgrenze (de)", () => {
+    expect(formatWeekRange(new Date(2026, 3, 27), "de")).toBe("27. Apr. – 3. Mai");
+  });
+
+  test("stellt den Monat voran, solange die Woche in ihm bleibt (en)", () => {
+    expect(formatWeekRange(new Date(2026, 4, 11), "en")).toBe("May 11–17");
+  });
+
+  test("nennt beide Monate ueber die Monatsgrenze (en)", () => {
+    expect(formatWeekRange(new Date(2026, 3, 27), "en")).toBe("Apr 27 – May 3");
+  });
+
+  // Dieselbe Zusage wie `useMealPlans`: irgendein Tag der Woche genuegt. Ohne
+  // sie koennte das Label eine andere Woche benennen als das Raster zeigt.
+  test("zieht ein beliebiges Datum der Woche auf den Montag", () => {
+    const sunday = new Date(2026, 4, 17);
+    expect(formatWeekRange(sunday, "de")).toBe(formatWeekRange(new Date(2026, 4, 11), "de"));
   });
 });

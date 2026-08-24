@@ -341,7 +341,12 @@
   },
   "meals": {
     "title": "Meal plan",
-    "weekLabel": "Week 20 · May 12–18",
+    "weekLabel": "Week {{week}} · {{range}}",
+    "plan": {
+      "empty": "Nothing planned for this week yet.",
+      "emptyDay": "Nothing planned",
+      "loadError": "The weekly plan could not be loaded."
+    },
     "aiPlan": "Let AI plan the week",
     "aiPlanSub": "Tailored to your family in 5 sec",
     "shoppingSub": "23 ingredients · auto from plan",

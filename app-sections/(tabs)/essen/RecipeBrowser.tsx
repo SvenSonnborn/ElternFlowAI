@@ -15,6 +15,7 @@ import {
 } from "@/features/meals";
 
 import { AllergenBadge } from "./AllergenBadge";
+import { recipeA11yLabel } from "./recipeA11y";
 
 interface JudgedRecipe {
   recipe: RecipeRow;
@@ -94,18 +95,7 @@ function RecipeRowItem({ id, title, durationMin, verdict }: RecipeRowItemProps) 
 
   const dimmed = verdict.status === "unsafe" || verdict.status === "caution";
 
-  const a11yLabel = useMemo(() => {
-    if (verdict.status === "safe") return title;
-    if (verdict.status === "unverified") return t("meals.a11y.unverifiedRecipe", { title });
-
-    const list = [...new Set(verdict.hits.map((hit) => hit.key))]
-      .map((key) => t(`onb.s4.allergies.${key}`))
-      .join(", ");
-
-    return verdict.status === "unsafe"
-      ? t("meals.a11y.unsafeRecipe", { title, list })
-      : t("meals.a11y.cautionRecipe", { title, list });
-  }, [verdict, title, t]);
+  const a11yLabel = useMemo(() => recipeA11yLabel(t, title, verdict), [t, title, verdict]);
 
   return (
     // Auch ein ausgegrautes Rezept bleibt drückbar: ADR-014 graut aus statt zu
