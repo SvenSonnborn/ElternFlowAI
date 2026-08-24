@@ -162,19 +162,15 @@ jobs:
     name: iOS (prebuild · pod install · xcodebuild)
     runs-on: macos-latest
     timeout-minutes: 90
-    env:
-      # Explicit, deterministic ccache location — ccache's own default differs
-      # between platforms and versions, and the cache step needs a fixed path.
-      CCACHE_DIR: /tmp/ccache
-      # Kept small on purpose: the ccache key below is SHA-suffixed, so every
-      # push writes a new entry. GitHub's per-repo cache budget is 10 GB with
-      # LRU eviction, and an oversized ccache would evict the Gradle and
-      # CocoaPods caches that the other job depends on.
-      CCACHE_MAXSIZE: 1G
-      # Read by the Expo Podfile's `ccache_enabled?` helper (env takes
-      # precedence over Podfile.properties.json). This is what makes the
-      # from-source React Native build survivable as a per-PR gate.
-      USE_CCACHE: "1"
+    # KEIN ccache hier — bewusst entfernt, nicht vergessen. Zwei Anläufe
+    # (USE_CCACHE=1 als Step-env, dann CCACHE_DIR zusätzlich als
+    # xcodebuild-Build-Setting) haben nachweislich NULL ccache-Aufrufe erzeugt:
+    # `ccache --show-stats` meldete keine einzige "Cacheable call", und sowohl
+    # /tmp/ccache als auch ~/Library/Caches/ccache blieben leer. RNs Wrapper
+    # endet auf `exec $CCACHE_BINARY clang "$@"` — erreicht CCACHE_BINARY den
+    # Compiler-Prozess nicht, degradiert die Zeile still zu plain clang, der
+    # Build wird grün und nichts wird gecacht. Vor einem dritten Versuch erst
+    # BELEGEN, dass die Variable ankommt (ADR-016, Consequences).
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -206,9 +202,6 @@ jobs:
             exit 1
           fi
 
-      - name: Install ccache
-        run: brew list ccache >/dev/null 2>&1 || brew install ccache
-
       - name: Cache Bun dependencies
         uses: actions/cache@v6
         with:
@@ -239,15 +232,6 @@ jobs:
           restore-keys: |
             pods-${{ runner.os }}-
 
-      - name: Cache ccache
-        uses: actions/cache@v6
-        with:
-          path: /tmp/ccache
-          key: ccache-${{ runner.os }}-${{ hashFiles('bun.lock', 'app.json') }}-${{ github.sha }}
-          restore-keys: |
-            ccache-${{ runner.os }}-${{ hashFiles('bun.lock', 'app.json') }}-
-            ccache-${{ runner.os }}-
-
       - name: Pod install
         working-directory: ios
         run: pod install
@@ -260,14 +244,6 @@ jobs:
       #
       # No pipe into a log formatter on purpose: a pipeline without `pipefail`
       # masks the exit status, the same trap expo-sdk-sync.yml documents.
-      #
-      # CCACHE_DIR/CCACHE_MAXSIZE werden als BUILD SETTINGS übergeben, nicht nur
-      # als Step-`env:`. Grund: Xcode reicht Shell-Umgebungsvariablen nicht an
-      # Compiler-Tasks durch, sondern baut eine kontrollierte Umgebung aus den
-      # Build-Settings. Genau darüber erreicht RNs `CCACHE_BINARY` sein
-      # Wrapper-Skript (scripts/xcode/ccache-clang.sh), und genau daran ist der
-      # erste Anlauf gescheitert: ccache lief, schrieb aber in sein
-      # Standardverzeichnis, während hier /tmp/ccache gecacht wurde — 0 Byte.
       - name: Xcodebuild (simulator, unsigned)
         run: |
           xcodebuild \
@@ -277,22 +253,4 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath ios/build \
             CODE_SIGNING_ALLOWED=NO \
-            CCACHE_DIR="$CCACHE_DIR" \
-            CCACHE_MAXSIZE="$CCACHE_MAXSIZE" \
             build
-
-      # Bewusst diagnosefähig statt nur `--show-stats`: der vorherige Lauf
-      # meldete korrekt "0 Byte" für /tmp/ccache und verschwieg dabei, dass der
-      # echte Cache woanders lag. Die Größen BEIDER Kandidaten zu drucken macht
-      # den nächsten Lauf eindeutig — greift der Fix, wächst /tmp/ccache und
-      # ~/Library/Caches/ccache bleibt leer.
-      - name: ccache statistics
-        if: ${{ !cancelled() }}
-        run: |
-          echo "--- ccache config (wie die Shell sie sieht) ---"
-          ccache --show-config 2>/dev/null | grep -E 'cache_dir|max_size' || true
-          echo "--- stats für CCACHE_DIR=${CCACHE_DIR} ---"
-          ccache --show-stats
-          echo "--- Größe beider Kandidaten ---"
-          du -sh "${CCACHE_DIR}" 2>/dev/null || echo "  ${CCACHE_DIR}: leer/fehlt"
-          du -sh "${HOME}/Library/Caches/ccache" 2>/dev/null || echo "  ~/Library/Caches/ccache: leer/fehlt"
