@@ -193,6 +193,11 @@
       "empty": "All quiet today — movie night, maybe?"
     },
     "addPerson": "Add person",
+    "a11y": {
+      "openChild": "Open {{name}}'s profile",
+      "openFamily": "{{name}} · open family",
+      "moreMembers": "Show {{count}} more family members"
+    },
     "section": {
       "today": "Today",
       "tomorrow": "Prep for tomorrow"

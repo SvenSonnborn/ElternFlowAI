@@ -10,9 +10,10 @@ import { useTheme } from "@/design-system/ThemeProvider";
 import { Card, Screen, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
 import { segmentsForDay, segmentTimeLabel, useFamilyEvents } from "@/features/calendar";
-import { children, familyName, mealPick, parents, tomorrowPrep } from "@/features/sample-data";
+import { familyName, mealPick, tomorrowPrep } from "@/features/sample-data";
 import { useToday } from "@/features/shared";
 
+import { buildAvatarRow } from "./avatarRow";
 import { MealHeroCard } from "./MealHeroCard";
 
 const tonePrepBg = {
@@ -38,28 +39,64 @@ export function DashboardScreen() {
   const familyChildren = useFamilyChildren(parent.data?.family_id);
   const familyParents = useFamilyParents(parent.data?.family_id);
 
-  const greeting = t("dash.greeting.morning", { name: parents[0]?.short ?? "" });
+  const greeting = t("dash.greeting.morning", { name: parent.data?.short ?? "" });
   const subtitle = t("dash.subtitle", {
     family: familyName,
     date: format(today, "EEEE, d. MMMM", { locale: dateLocale }),
   });
 
-  const avatarRow = [
-    ...parents.map((p) => ({ key: `parent-${p.short}`, label: p.short, color: p.color })),
-    ...children.map((c) => ({ key: `child-${c.id}`, label: c.name, color: c.color })),
-  ];
+  // Vor dem ersten Fetch ist die Reihe leer — der `+`-Chip bleibt trotzdem
+  // stehen, Anlegen funktioniert auch ohne geladene Familie.
+  const { visible: avatarRow, overflow } = useMemo(
+    () => buildAvatarRow(familyParents.data ?? [], familyChildren.data ?? []),
+    [familyParents.data, familyChildren.data],
+  );
 
   return (
     <Screen scroll>
       <TopBar title={greeting} sub={subtitle} />
 
-      <View className="mb-1 flex-row items-center gap-2 pl-0.5">
-        {avatarRow.map((p) => (
-          <ChildAvatar key={p.key} name={p.label} color={p.color} />
+      {/*
+       * Jede Kachel ist echte 44x44 statt 32px + hitSlop: die Ziele liegen
+       * nebeneinander, ein hitSlop würde in den Nachbarn hineinragen. Die
+       * 44er-Box zentriert einen 32px-Avatar, lässt also 6px Luft nach links —
+       * `-ml-1` zieht die Reihe wieder auf die Kante der Karten darunter.
+       * `flex-wrap`, weil die volle Reihe (5 Avatare + Overflow + Anlegen =
+       * 308px) auf einem 320pt-Gerät breiter ist als der Inhalt: ohne Umbruch
+       * schnitte RN den `+`-Button ab, statt ihn in die zweite Zeile zu legen.
+       */}
+      <View className="-ml-1 mb-1 flex-row flex-wrap items-center">
+        {avatarRow.map((entry) => (
+          <Pressable
+            key={`${entry.kind}-${entry.id}`}
+            onPress={() =>
+              entry.kind === "child" ? router.push(`/child/${entry.id}`) : router.push("/familie")
+            }
+            accessibilityRole="button"
+            accessibilityLabel={
+              entry.kind === "child"
+                ? t("dash.a11y.openChild", { name: entry.name })
+                : t("dash.a11y.openFamily", { name: entry.name })
+            }
+            className="h-11 w-11 items-center justify-center active:opacity-80"
+          >
+            <ChildAvatar name={entry.name} color={entry.color} />
+          </Pressable>
         ))}
+        {overflow > 0 ? (
+          <Pressable
+            onPress={() => router.push("/familie")}
+            accessibilityRole="button"
+            accessibilityLabel={t("dash.a11y.moreMembers", { count: overflow })}
+            className="h-11 w-11 items-center justify-center active:opacity-80"
+          >
+            <View className="h-8 w-8 items-center justify-center rounded-pill border border-line bg-card-subtle">
+              <Text variant="pill" tone="inkSecondary">{`+${overflow}`}</Text>
+            </View>
+          </Pressable>
+        ) : null}
         <Pressable
           onPress={() => router.push("/child/new")}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={t("dash.addPerson")}
           className="h-11 w-11 items-center justify-center rounded-pill border border-dashed border-line-strong active:opacity-80"
