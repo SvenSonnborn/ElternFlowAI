@@ -17,10 +17,3 @@ export interface Child {
   likes: string[];
   dislikes: string[];
 }
-
-export interface CalendarDayCell {
-  day: number;
-  isCurrentMonth: boolean;
-  isToday: boolean;
-  dots: string[];
-}
