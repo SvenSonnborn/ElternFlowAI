@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, View } from "react-native";
 
-import { Field, Icon, SectionHeader } from "@/app-sections/shared";
+import { AllergenBadge, Field, Icon, recipeA11yLabel, SectionHeader } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Text } from "@/design-system/ui";
 import {
@@ -13,9 +13,6 @@ import {
   type RecipeAllergenVerdict,
   type RecipeRow,
 } from "@/features/meals";
-
-import { AllergenBadge } from "./AllergenBadge";
-import { recipeA11yLabel } from "./recipeA11y";
 
 interface JudgedRecipe {
   recipe: RecipeRow;

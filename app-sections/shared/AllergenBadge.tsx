@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import type { RecipeAllergenVerdict } from "@/features/meals";
 
-import { Pill } from "@/app-sections/shared";
+import { Pill } from "./Pill";
 
 /** Mehr als zwei Labels sprengen die Zeile — der Rest wird gezählt. */
 const MAX_LABELS = 2;
@@ -15,6 +15,9 @@ interface AllergenBadgeProps {
  * Übersetzt ein Urteil in genau eine Pille. `Pill` führt die drei nötigen Töne
  * bereits (`danger`, `warn`, `ink`), deshalb ist das hier ein dünner Wrapper
  * und keine eigene Ton-Komposition.
+ *
+ * Liegt in `shared/`, weil ihn drei Oberflächen zeigen — Wochenraster,
+ * Rezept-Browser und der Meal-Hero des Dashboards.
  */
 export function AllergenBadge({ verdict }: AllergenBadgeProps) {
   const { t } = useTranslation();

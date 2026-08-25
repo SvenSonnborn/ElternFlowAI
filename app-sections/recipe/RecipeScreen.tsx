@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Image, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Icon, Pill } from "@/app-sections/shared";
+import { Icon, MEAL_PLACEHOLDER_EMOJI, Pill } from "@/app-sections/shared";
 import { palette } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
@@ -31,13 +31,6 @@ const DIFFICULTY_KEYS = ["easy", "medium", "hard"] as const;
 function isDifficultyKey(value: string | null): value is (typeof DIFFICULTY_KEYS)[number] {
   return DIFFICULTY_KEYS.some((key) => key === value);
 }
-
-/**
- * Der Platzhalter im Header. `recipes` führt keine Emoji-Spalte — anders als die
- * früheren Sample-Daten, wo je Gericht eines hinterlegt war. Ein aus dem Titel
- * geratenes Emoji wäre schlechter als ein neutrales.
- */
-const FALLBACK_EMOJI = "🍽";
 
 export function RecipeScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -142,7 +135,7 @@ function RecipeContent({ recipe }: { recipe: RecipeRow }) {
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants"
             >
-              {FALLBACK_EMOJI}
+              {MEAL_PLACEHOLDER_EMOJI}
             </Text>
           </LinearGradient>
         )}

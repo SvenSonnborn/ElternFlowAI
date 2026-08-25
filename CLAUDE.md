@@ -103,7 +103,8 @@ app-sections/            Real screen implementations
 ├─ modals/
 ├─ task/                 Anlegen/Bearbeiten von Aufgaben (Create · Edit · TaskForm)
 └─ shared/               Geteilte Bausteine inkl. Formular-Primitives
-   (DateTimePickerSheet · TypePicker · MemberPicker · Field · confirmDialog)
+   (DateTimePickerSheet · TypePicker · MemberPicker · Field · confirmDialog
+   · AllergenBadge · recipeA11y · mealPlaceholder — von mehr als einem Tab benutzt)
 
 design-system/           Handoff bundle + theming runtime
 ├─ colors.ts             Palette + brand aliases (HANDOFF — do not edit)
@@ -123,7 +124,8 @@ features/                Cross-cutting feature logic
 ├─ calendar/             Queries · Mutations · RRULE-Expansion · Reminder
 ├─ tasks/                Queries · Mutations · Filter · Stats
 ├─ children/             Kinderprofile
-├─ meals/                Meal-Planner-Daten-Layer (Queries · JSONB-Normalisierung · Wochenlogik)
+├─ meals/                Meal-Planner-Daten-Layer (Queries · JSONB-Normalisierung · Wochenlogik
+│                        · Ausweichgericht-Auswahl)
 │  └─ allergens/         EU-14-Vokabular · DE/EN-Begriffslisten · Zutaten-Klassifizierer · Urteil (ADR-014)
 ├─ shared/               Feature-übergreifende Hooks (useToday)
 ├─ sample-data/          Mock-Daten für noch nicht verdrahtete Screens

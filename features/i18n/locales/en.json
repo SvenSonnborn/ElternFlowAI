@@ -203,12 +203,14 @@
       "tomorrow": "Prep for tomorrow"
     },
     "meal": {
-      "question": "What's for dinner today?",
-      "badge": "Perfect for your family",
-      "reasonExample": "Ben loves pasta · no allergies · 20 min",
+      "question": "What are we eating today?",
       "openRecipe": "Open recipe",
       "toShopping": "Add to shopping list",
-      "refresh": "Refresh"
+      "empty": {
+        "title": "Nothing planned yet",
+        "sub": "Nothing in this week's plan for this meal yet.",
+        "cta": "Plan meals"
+      }
     },
     "empty": {
       "title": "Your family awaits",

@@ -27,15 +27,6 @@ export interface PrepItem {
   iconName: IconName;
 }
 
-export interface MealPick {
-  id: string;
-  title: string;
-  emoji: string;
-  durationMin: number;
-  reason: string;
-  reasonItems: string[];
-}
-
 export interface CalendarDayCell {
   day: number;
   isCurrentMonth: boolean;

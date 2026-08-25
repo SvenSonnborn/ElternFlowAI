@@ -5,7 +5,12 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, View } from "react-native";
 
-import { Icon } from "@/app-sections/shared";
+import {
+  AllergenBadge,
+  Icon,
+  MEAL_PLACEHOLDER_EMOJI,
+  recipeA11yLabel,
+} from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Card, Text } from "@/design-system/ui";
 import {
@@ -16,9 +21,6 @@ import {
   type RecipeAllergenVerdict,
   type RecipeRow,
 } from "@/features/meals";
-
-import { AllergenBadge } from "./AllergenBadge";
-import { recipeA11yLabel } from "./recipeA11y";
 
 /**
  * Die drei ersten in der Reihenfolge aus `patterns/meals.md` V1 (Abendessen ·
@@ -32,12 +34,6 @@ import { recipeA11yLabel } from "./recipeA11y";
  */
 const SLOT_TABS = ["dinner", "lunch", "breakfast", "snack"] as const;
 type SlotTab = (typeof SLOT_TABS)[number];
-
-/**
- * `recipes` führt keine Emoji-Spalte, anders als die früheren Sample-Daten.
- * Dieselbe Vertretung wie im Header der Rezept-Detailansicht.
- */
-const FALLBACK_EMOJI = "🍽";
 
 interface WeekPlanGridProps {
   /** Genau sieben Tage, Mo–So — so, wie `useMealPlans` sie liefert. */
@@ -187,7 +183,7 @@ function DayRow({ date, isToday, recipe, verdict }: DayRowProps) {
         }`}
       >
         {recipe ? (
-          <Text style={{ fontSize: 24 }}>{FALLBACK_EMOJI}</Text>
+          <Text style={{ fontSize: 24 }}>{MEAL_PLACEHOLDER_EMOJI}</Text>
         ) : (
           <Icon name="plus" size={18} color={theme.inkTertiary} />
         )}
