@@ -526,3 +526,43 @@ Zwei Randbedingungen machen den Zuschnitt aus:
 - **Der ccache-Fehlschlag war zweimal als Erfolg getarnt.** Erst meldete der Statistik-Step „Cache size (GB): 0.0 / 1.0" — vollkommen korrekt für `/tmp/ccache` und dabei irreführend, weil er verschwieg, dass anderswo hätte geschrieben werden können. Nach dem Erweitern auf beide Kandidatenverzeichnisse war die Antwort eindeutig: **beide leer, null „Cacheable calls"**. Die Lehre ist allgemeiner als ccache: eine Diagnose, die nur den erwarteten Ort prüft, bestätigt die eigene Annahme statt sie zu testen. Der Build war in allen Fällen grün — ein stiller Fallback auf plain clang bricht nichts, er kostet nur Zeit.
 
 - **Damit ist ~30–37 Minuten der reale Preis dieses Gates**, und Decision 1 ist die Stelle, an der er verhandelt wird. Wenn das im Alltag stört, ist der Hebel der Pfad-Filter — nicht weitere Cache-Versuche. Zwei Anläufe haben dort nichts gebracht, und beide kosteten pro Iteration einen vollen CI-Lauf.
+
+---
+
+## ADR-017 — Vierter Slot-Tab im Essen-Tab, bewusste Abweichung von `patterns/meals.md` V1 (2026-08-25)
+
+### Status
+
+Accepted. **Keine Supersession.** [ADR-014](#adr-014--allergen-filter-eu-14-vokabular-vierwertiges-urteil-regelwerk-als-geteiltes-ts-modul-2026-08-14) bleibt unberührt — es geht hier um Slots, nicht um Allergene.
+
+Die Entscheidung weicht von einem Dokument des Handoff-Bundles ab und wurde deshalb ausdrücklich freigegeben, statt still umgesetzt. `patterns/meals.md` selbst bleibt **unangetastet**: es gehört dem Designer, und CLAUDE.md erlaubt Claude nicht, es zu ändern. Die Divergenz zwischen Pattern (drei Tabs) und Implementierung (vier) ist stattdessen in [docs/TODO.md](./TODO.md) vermerkt und dort vom Designer nachzuziehen — oder zurückzudrehen.
+
+### Context
+
+Das `meal_slot_enum` der Migration führt vier Slots: `breakfast`, `lunch`, `dinner`, `snack`. `groupByDay` legt bewusst alle vier in jeden der sieben Tage. `patterns/meals.md` V1 spezifiziert dagegen genau drei Tabs — „Abendessen · Mittag · Frühstück".
+
+Solange der Essen-Tab auf Sample-Daten lief, war das kein Konflikt, sondern eine offene Frage: der Layer führte `snack` mit, nichts schrieb ihn, niemand vermisste ihn. `docs/TODO.md` hielt sie unter „`snack` hat im Screen keinen Platz" mit dem Zusatz „Beim Screen-Wiring mit dem Designer klären".
+
+Mit dem echten Wochenraster wurde daraus ein Konflikt. `useMealPlans` lädt `snack` mit, `groupByDay` legt ihn in jeden Tag, und kein Tab zeigte ihn: ein `snack`-Eintrag wäre **geladen, aber unsichtbar** — und Unsichtbarkeit ist an der Oberfläche nicht von „nicht geplant" zu unterscheiden. Ein Nutzer, der nichts sieht, schließt nicht auf einen fehlenden Tab, sondern auf eine leere Woche.
+
+Heute ist der Fall unerreichbar, weil der Meals-Layer rein lesend ist — der einzige Zugriff auf `meal_plan_entries` ist ein `select`. Er wird erreichbar, sobald die Mutationen kommen oder der KI-Planer die Woche füllt, und dann still.
+
+### Decisions
+
+1. **Der Essen-Tab rendert vier Slot-Tabs**, `snack` hinten angehängt: Abendessen · Mittag · Frühstück · Snack. Die Reihenfolge der ersten drei bleibt die des Patterns.
+
+2. **`patterns/meals.md` bleibt unverändert.** Ein Handoff-Dokument aus der Implementierung heraus umzuschreiben, würde die Eigentumsgrenze aus CLAUDE.md auflösen — auch dann, wenn die Änderung inhaltlich richtig wäre. Die Nachführung ist eine Aufgabe für den Designer und steht als solche in `docs/TODO.md`.
+
+3. **Copy: „Snack" in beiden Sprachen** (`meals.tabs.snack`). Das deutsche „Zwischenmahlzeit" wäre die reinere Übersetzung, aber klinisch statt warm — und mit 16 Zeichen in einer Leiste, die sich jetzt vier Labels teilt, praktisch nicht zu setzen. Auch dieser Key fehlt noch in der designer-eigenen `docs/COPY.md`.
+
+4. **Nicht gewählt: `snack` an der Persistenzgrenze herausfiltern.** Der zweite Vorschlag aus dem Review scheiterte nicht an der Freigabe, sondern an der Sachlage — es gibt keine Schreibgrenze, an der zu filtern wäre. `MealPlanDay.slots` ist über `meal_slot_enum` typisiert, und die noch fehlenden Mutationen brauchen den Slot. Das Problem war nie, dass `snack` in den Daten liegt, sondern dass die UI ihn verschwieg.
+
+### Consequences
+
+- **Die Slot-Leiste wird eng.** Vier Labels teilen sich die Zeile, die vorher drei trug; „Abendessen" ist mit 11-px-Caption das längste. Gegenmaßnahmen: `px-1` statt `px-2`, `numberOfLines={1}` gegen den Umbruch in eine zweite Zeile (der die Höhen der Nachbarn mitzöge) und `adjustsFontSizeToFit`. **Am Gerät ungeprüft** — auf iOS skaliert `adjustsFontSizeToFit` zuverlässig, unter Android ist die Unterstützung dünner. Wenn die Leiste kippt, ist die nächste Stufe eine horizontal scrollbare Chip-Reihe, und das ist wieder eine Designer-Entscheidung.
+
+- **`snack` ist erreichbar, aber nie voreingestellt.** Der Startwert kommt aus `slotForTime`, dessen Rückgabetyp `snack` ausschließt — die Behaviour-Rule des Patterns („vor 11 Frühstück, 11–15 Mittag, sonst Abendessen") kennt ihn nicht. Das ist richtig so: eine Tageszeit, zu der „Snack" die naheliegende Antwort ist, gibt es nicht. Der Tab wird also nur durch Tippen aktiv.
+
+- **Die 44×44-Regel bleibt gewahrt.** `minHeight: 44` liegt auf dem `Pressable`, nicht auf dem Text; die schmalere Innenabstände ändern die Höhe nicht.
+
+- **Der Rückweg ist billig.** Fällt die Designer-Entscheidung gegen den vierten Tab, ist es ein Eintrag in `SLOT_TABS` und ein Copy-Key — plus die Frage, was dann mit geschriebenen `snack`-Zeilen geschieht. Diese Frage ist mit dieser ADR nicht beantwortet, sondern nur vertagt: sie wird fällig, wenn die Mutationen kommen.

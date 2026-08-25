@@ -355,7 +355,8 @@
     "tabs": {
       "dinner": "Dinner",
       "lunch": "Lunch",
-      "breakfast": "Breakfast"
+      "breakfast": "Breakfast",
+      "snack": "Snack"
     },
     "shopping": {
       "title": "Shopping list",
