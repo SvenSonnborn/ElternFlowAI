@@ -196,7 +196,10 @@
     "a11y": {
       "openChild": "Profil von {{name}} öffnen",
       "openFamily": "{{name}} · Familie öffnen",
-      "moreMembers": "{{count}} weitere Familienmitglieder anzeigen"
+      "moreMembers": "{{count}} weitere Familienmitglieder anzeigen",
+      "prepTask": "Aufgabe öffnen: {{title}}",
+      "prepEvent": "Termin öffnen: {{title}}",
+      "prepMore": "{{count}} weitere Vorbereitungen anzeigen"
     },
     "section": {
       "today": "Heute",
@@ -221,6 +224,10 @@
         "title": "Willkommen!",
         "sub": "Lass uns deine Familie einrichten"
       }
+    },
+    "tomorrow": {
+      "empty": "Für morgen ist nichts vorzubereiten.",
+      "more": "+{{count}} weitere"
     }
   },
   "voice": {

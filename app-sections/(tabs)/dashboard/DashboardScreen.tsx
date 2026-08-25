@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { addDays, format } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router } from "expo-router";
 import { useMemo } from "react";
@@ -11,18 +11,15 @@ import { Card, Screen, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
 import { segmentsForDay, segmentTimeLabel, useFamilyEvents } from "@/features/calendar";
 import { useMealAlternative, useRecipeJudge, useTodaysMeal } from "@/features/meals";
-import { familyName, tomorrowPrep } from "@/features/sample-data";
+import { familyName } from "@/features/sample-data";
 import { useToday } from "@/features/shared";
+import { useFamilyTasks } from "@/features/tasks";
 
 import { buildAvatarRow } from "./avatarRow";
 import { MealHeroCard } from "./MealHeroCard";
 import { MealHeroEmptyCard } from "./MealHeroEmptyCard";
-
-const tonePrepBg = {
-  mint: "bg-primary-soft",
-  orange: "bg-accent-soft",
-  warn: "bg-warning-soft",
-} as const;
+import { PrepRow } from "./PrepRow";
+import { buildTomorrowPrep } from "./tomorrowPrep";
 
 export function DashboardScreen() {
   const { t, i18n } = useTranslation();
@@ -67,6 +64,37 @@ export function DashboardScreen() {
     () => buildAvatarRow(familyParents.data ?? [], familyChildren.data ?? []),
     [familyParents.data, familyChildren.data],
   );
+
+  // Kein zweiter Roundtrip: `useFamilyTasks` teilt sich den Query-Key mit dem
+  // Aufgaben-Tab, und die Termine von morgen liegen ohnehin im Monatsfenster,
+  // das `useFamilyEvents` oben schon geladen hat.
+  const tasks = useFamilyTasks();
+  const tomorrowKey = format(addDays(today, 1), "yyyy-MM-dd");
+  const prepPeople = useMemo(
+    () =>
+      [...(familyParents.data ?? []), ...(familyChildren.data ?? [])].map((person) => ({
+        id: person.id,
+        name: person.name,
+      })),
+    [familyParents.data, familyChildren.data],
+  );
+  const prep = useMemo(
+    () =>
+      buildTomorrowPrep({
+        tasks: tasks.data,
+        segments,
+        date: tomorrowKey,
+        people: prepPeople,
+        theme,
+        lang,
+        t,
+      }),
+    [tasks.data, segments, tomorrowKey, prepPeople, theme, lang, t],
+  );
+  // Aus dem Objekt gelöst, damit TypeScript die Null-Prüfung bis in den
+  // `onPress`-Closure trägt.
+  const { overflowTarget } = prep;
+  const prepPending = isLoading || !!error || tasks.isLoading || !!tasks.error;
 
   return (
     <Screen scroll>
@@ -210,30 +238,57 @@ export function DashboardScreen() {
       )}
 
       <SectionHeader title={t("dash.section.tomorrow")} />
-      <Card>
-        <View className="gap-3">
-          {tomorrowPrep.map((item) => {
-            const iconColor =
-              item.tone === "mint"
-                ? theme.primaryStrong
-                : item.tone === "orange"
-                  ? theme.accentStrong
-                  : theme.warning;
-            return (
-              <View key={item.id} className="flex-row items-center gap-2.5">
-                <View
-                  className={`h-7 w-7 items-center justify-center rounded-lg ${tonePrepBg[item.tone]}`}
-                >
-                  <Icon name={item.iconName} size={14} color={iconColor} />
-                </View>
-                <Text variant="listTitle" tone="ink" className="flex-1">
-                  {item.title}
+      {/*
+       * Dieselbe Zurückhaltung wie bei der Terminliste: „nichts vorzubereiten"
+       * ist eine Aussage über morgen, und die lässt sich weder vor der Antwort
+       * beider Queries noch nach einem Fehler belegen.
+       */}
+      {prepPending ? null : prep.visible.length === 0 ? (
+        <Card className="items-center py-6">
+          <Text variant="caption" tone="inkSecondary">
+            {t("dash.tomorrow.empty")}
+          </Text>
+        </Card>
+      ) : (
+        <Card>
+          <View className="gap-1">
+            {prep.visible.map((entry) => (
+              <PrepRow
+                key={entry.key}
+                title={entry.title}
+                meta={entry.meta}
+                iconName={entry.iconName}
+                color={entry.color}
+                accessibilityLabel={t(
+                  entry.kind === "task" ? "dash.a11y.prepTask" : "dash.a11y.prepEvent",
+                  { title: entry.title },
+                )}
+                onPress={() =>
+                  entry.kind === "task"
+                    ? router.push({ pathname: "/task/edit/[id]", params: { id: entry.id } })
+                    : router.push({
+                        pathname: "/event/[id]",
+                        params: { id: entry.id, occ: entry.occurrenceDate },
+                      })
+                }
+              />
+            ))}
+            {overflowTarget ? (
+              <Pressable
+                onPress={() => router.push(overflowTarget)}
+                accessibilityRole="button"
+                accessibilityLabel={t("dash.a11y.prepMore", { count: prep.overflow })}
+                className="min-h-11 flex-row items-center justify-between border-t border-line pt-2 active:opacity-70"
+              >
+                <Text variant="caption" tone="primaryStrong">
+                  {t("dash.tomorrow.more", { count: prep.overflow })}
                 </Text>
-              </View>
-            );
-          })}
-        </View>
-      </Card>
+                <Icon name="chevron-right" size={16} color={theme.inkTertiary} />
+              </Pressable>
+            ) : null}
+          </View>
+        </Card>
+      )}
     </Screen>
   );
 }

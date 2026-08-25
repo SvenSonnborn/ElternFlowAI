@@ -612,3 +612,47 @@ Dazu kommt eine harte Grenze: der Meals-Layer ist rein lesend (`docs/TODO.md`). 
 - **`docs/COPY.md` wurde nachgezogen**, obwohl es dem Designer gehört: Drei Keys sind entfallen, drei neue (`dash.meal.empty.*`) dazugekommen, und die englische Fassung von `dash.meal.question` wurde von „What's for dinner today?“ auf „What are we eating today?“ neutralisiert — der Header steht jetzt über Frühstück, Mittag und Abendessen, die deutsche Fassung war bereits neutral (CodeRabbit-Finding). Begründung: Ein Copy-Deck, das Keys führt, die es nicht mehr gibt, ist schlechter als eines, das nachgeführt wurde. Die deutschen Fassungen sind von uns formuliert und gehören gegengelesen.
 
 - **Der Vorschlag bleibt ein Notausgang, kein Planer.** Er kennt weder Vorlieben noch Abneigungen, weder Zubereitungsdauer noch Vorrat — nur „sicher für diese Familie". Der Meal-Picker aus V2/V3 des Patterns bleibt offen und muss, wenn er kommt, `isRecipeSafeForFamily` mitbenutzen statt die Regel ein drittes Mal zu formulieren.
+
+---
+
+## ADR-019 — „Morgen vorbereiten" zeigt Aufgaben und Termine von morgen, nicht abgeleitete Handlungen (2026-08-25)
+
+### Status
+
+Accepted. Keine Supersession. Ergänzt [ADR-018](#adr-018--der-meal-hero-zeigt-den-wochenplan-nicht-einen-ki-vorschlag-warnen-statt-verstecken-alternative-deterministisch-2026-08-25) um die letzte Sample-Data-Fläche des Dashboards.
+
+### Context
+
+Die „Morgen vorbereiten"-Karte war die letzte Fläche des Dashboards auf Mock-Daten (`tomorrowPrep` — „Schwimmsachen für Mia einpacken", „Geschenk für Lisas Geburtstag (Sa.)", „Leo: Englisch-Vokabeln üben"). Beide Datenquellen lagen bereits verdrahtet daneben: `useFamilyTasks` lädt ohnehin alle offenen Aufgaben, `useFamilyEvents(today)` deckt den Monat ±7 Tage ab und enthält morgen damit immer.
+
+Der Verdrahtung standen drei Dinge im Weg:
+
+- **`patterns/dashboard.md` beschreibt etwas anderes, als sich bauen lässt.** Dort steht „actionable items the AI extracted from tomorrow's events (pack swim kit, prep lunchbox, etc.)" — eine Ableitung, die vom Termin „Schwimmen" auf die Handlung „Schwimmsachen einpacken" schließt. Genau das ist der Mock. Der LLM-Provider dafür ist nicht gewählt (`CLAUDE.md`, „Deferred to later iterations").
+- **Die Karte hat eine Quelle mehr als die Terminliste darüber.** Aufgaben und Termine in einer Liste heißt: eine gemeinsame Reihenfolge, obwohl nur eine der beiden Quellen überhaupt eine Uhrzeit garantiert (`tasks.due_time` ist nullable, `events.start_at` nicht).
+- **Der Deckel bei drei Zeilen macht die Reihenfolge zur Sichtbarkeitsfrage.** Weder `fetchFamilyTasks` noch `expandEvents` garantiert eine stabile Reihenfolge unter Gleichständen — ohne feste Regel entschiede der Zufall, welche Zeile in den Overflow rutscht, und die Karte tauschte zwischen zwei Renders ihren Inhalt.
+
+### Decisions
+
+1. **Die Karte zeigt Rohdaten, nicht Abgeleitetes.** Aufgaben mit `due_date` von morgen (offen, `is_done = false`) und die Termin-Segmente, die auf den morgigen Tag malen — Titel unverändert übernommen. Das ist die ehrliche Vorstufe dessen, was das Pattern beschreibt: eine erfundene Handlungsanweisung („Schwimmsachen einpacken") wäre von einer echten nicht zu unterscheiden und würde als KI-Leistung gelesen, die niemand erbracht hat. Dieselbe Zurückhaltung wie bei `dash.meal.badge` in [ADR-018](#adr-018--der-meal-hero-zeigt-den-wochenplan-nicht-einen-ki-vorschlag-warnen-statt-verstecken-alternative-deterministisch-2026-08-25). Kommt der Provider, ersetzt die Ableitung den Titel — die Auswahl der Zeilen bleibt dieselbe.
+
+2. **Die Sortierregel wird von der Terminliste geliehen, nicht neu erfunden.** `buildTomorrowPrep` übernimmt den `rank` aus [features/calendar/day.ts](../features/calendar/day.ts): Zeitloses zuerst, dann chronologisch. „Zeitlos" umfasst dabei drei Fälle — ganztägige Termine, Fortsetzungstage mehrtägiger Termine und Aufgaben ohne `due_time`. Die Alternative, Aufgaben und Termine als getrennte Blöcke zu zeigen, hätte die Karte nach Datenherkunft gegliedert statt nach dem, was der Nutzer fragt („was kommt morgen zuerst?").
+
+3. **Der Gleichstand wird bis zum Ende aufgelöst: Uhrzeit → Termin vor Aufgabe → Titel → Key.** Die letzten beiden Stufen sind keine Kosmetik, sondern die Voraussetzung des Deckels (siehe Context). Der Termin steht vor der Aufgabe, weil er der feste Punkt ist: Ein Termin um 9:00 findet um 9:00 statt, eine Aufgabe „fällig 9:00" kann davor erledigt werden.
+
+4. **Die Uhrzeit steht in der Meta-Zeile, nicht in einer Zeitspalte — die Karte reicht `EventRow` bewusst nicht durch.** `patterns/dashboard.md` gibt der Prep-Sektion eine leichtere Form als der Terminliste, und die 72px-Zeitspalte von `EventRow` stünde bei jeder Aufgabe ohne `due_time` leer. Ein Füllwort dafür („Ganztägig" für eine Aufgabe) hieße, den ganzen Tag zu behaupten, wo nur „ohne feste Zeit" gemeint ist. Die neue `PrepRow` setzt stattdessen „16:30 · Mia · Besorgung" unter den Titel und lässt weg, was fehlt.
+
+5. **Zeilen führen ins Detail, „+X weitere" in den Tab.** Aufgabe → `/task/edit/[id]`, Termin → `/event/[id]?occ=…` — dieselbe Navigation wie in der „Heute"-Liste direkt darüber. Die Overflow-Zeile führt in den Aufgaben-Tab, sobald im verborgenen Rest **eine** Aufgabe steckt, sonst in den Kalender: Eine Aufgabe ist das, was man abhaken kann, ein Termin nur das, was stattfindet. `overflowTarget` ist `null`, solange es keinen Rest gibt — ein Vorgabewert für einen Fall, den niemand anspringt, wäre eine Behauptung ohne Bedeutung.
+
+6. **`buildTomorrowPrep` importiert an den Barrels vorbei.** `@/features/calendar` zieht über `hooks.ts` den ThemeProvider und damit NativeWind herein, `@/features/tasks` über `queries.ts` den Supabase-Client; beides scheitert unter `bun test` beim Modul-Load. Die reine Funktion importiert deshalb aus `@/features/calendar/day` und `@/features/tasks/palette` direkt — dieselbe Trennung, die [day.test.ts](../features/calendar/day.test.ts) schon voraussetzt.
+
+### Consequences
+
+- **Kein zusätzlicher Roundtrip.** `useFamilyTasks` teilt sich seinen Query-Key (`taskKeys.family(doneSince)`) mit dem Aufgaben-Tab und `useFamilyEvents(today)` sein Monatsfenster mit dem Kalender-Tab. Das Dashboard stellt für die Karte keine eigene Abfrage.
+
+- **Die Karte schweigt im Lade- und Fehlerfall.** Sie hängt an zwei Queries und rendert gar nichts, solange eine von beiden lädt oder scheitert, statt „Für morgen ist nichts vorzubereiten" zu behaupten, bevor die Antwort da ist — [ADR-018](#adr-018--der-meal-hero-zeigt-den-wochenplan-nicht-einen-ki-vorschlag-warnen-statt-verstecken-alternative-deterministisch-2026-08-25), Decision 7 für die Meal-Karte, hier ein drittes Mal. Damit teilt sie auch deren offene Designer-Frage: Der Nutzer erfährt nicht, dass etwas schiefging (`docs/TODO.md`).
+
+- **`taskIconFor` schließt eine Lücke zwischen Seed und Icon-Map.** `task_types.icon` seedet `shopping-bag` für `besorgung`, ein Name, den [app-sections/shared/Icon.tsx](../app-sections/shared/Icon.tsx) nicht führt — `Icon` hätte dafür stillschweigend `null` gerendert. Die Funktion spiegelt `eventIconFor` (kanonischer Slug zuerst, dann der Name aus der Zeile, dann ein neutraler Fallback) und steht damit auch jedem künftigen Aufrufer zur Verfügung, der ein Aufgaben-Icon braucht. Anders als dort liegen die Tabellen als `Map` vor: `task_types.slug` ist bei familieneigenen Typen frei wählbar, und ein Objekt-Literal gäbe für `"toString"` seinen geerbten Member heraus — dieselbe Falle, gegen die sich `taskTypeColorFor` in derselben Datei schon mit einer `typeof`-Prüfung sichert (CodeRabbit-Finding).
+
+- **`features/sample-data/dashboard.ts` entfällt ersatzlos**, mitsamt dem Typ `PrepItem`. Das Dashboard liest damit alles außer `familyName` aus echten Zeilen; die Sample-Data-Kachel-Töne (`mint`/`orange`/`warn`) weichen der Typ-Farbe aus der Datenbank, getönt wie in `EventRow`.
+
+- **Fünf neue Copy-Keys sind von uns formuliert**, nicht vom Designer: `dash.tomorrow.{empty,more}` und `dash.a11y.{prepTask,prepEvent,prepMore}`. `patterns/dashboard.md` spezifiziert für die Prep-Sektion weder einen Leer- noch einen Overflow-Zustand. In `docs/TODO.md` als nachzutragen vermerkt.
