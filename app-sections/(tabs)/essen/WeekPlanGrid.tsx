@@ -21,11 +21,16 @@ import { AllergenBadge } from "./AllergenBadge";
 import { recipeA11yLabel } from "./recipeA11y";
 
 /**
- * Reihenfolge aus `patterns/meals.md` V1 (Abendessen · Mittag · Frühstück).
- * `snack` steht im `meal_slot_enum`, hat im Screen aber keinen Platz — der
- * Layer führt ihn weiter mit, sichtbar ist er nicht (docs/TODO.md).
+ * Die drei ersten in der Reihenfolge aus `patterns/meals.md` V1 (Abendessen ·
+ * Mittag · Frühstück), `snack` hinten angehängt.
+ *
+ * **Bewusste Abweichung vom Pattern**, das nur die ersten drei führt: das
+ * `meal_slot_enum` kennt vier Slots und `groupByDay` legt jeden in jeden Tag —
+ * ohne vierten Tab bliebe ein `snack`-Eintrag unsichtbar statt ungeplant. Die
+ * Abweichung ist abgestimmt und in ADR-017 protokolliert; `patterns/meals.md`
+ * gehört dem Designer und wurde deshalb nicht mitgeändert (docs/TODO.md).
  */
-const SLOT_TABS = ["dinner", "lunch", "breakfast"] as const;
+const SLOT_TABS = ["dinner", "lunch", "breakfast", "snack"] as const;
 type SlotTab = (typeof SLOT_TABS)[number];
 
 /**
@@ -90,11 +95,20 @@ export function WeekPlanGrid({ days }: WeekPlanGridProps) {
               // Dekoration, hier ist sie bedienbar — damit greift die
               // 44×44-Regel aus CLAUDE.md.
               style={{ minHeight: 44 }}
-              className={`flex-1 items-center justify-center rounded-lg px-2 active:opacity-80 ${
+              // `px-1` statt `px-2`: seit `snack` dazukam teilen sich vier
+              // Tabs die Zeile, und „Abendessen" ist mit 11px-Caption das
+              // längste Label. `numberOfLines` verhindert den Umbruch in eine
+              // zweite Zeile, der die Höhen der Nachbarn mitzöge.
+              className={`flex-1 items-center justify-center rounded-lg px-1 active:opacity-80 ${
                 active ? "bg-card" : ""
               }`}
             >
-              <Text variant="caption" tone={active ? "ink" : "inkSecondary"}>
+              <Text
+                variant="caption"
+                tone={active ? "ink" : "inkSecondary"}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
                 {t(`meals.tabs.${tab}`)}
               </Text>
             </Pressable>
