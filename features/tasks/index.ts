@@ -32,7 +32,7 @@ export {
   type TaskFormErrors,
   type TaskFormState,
 } from "./form";
-export { taskTypeColorFor, taskTypeLabelKey } from "./palette";
+export { taskIconFor, taskTypeColorFor, taskTypeLabelKey } from "./palette";
 export {
   fetchFamilyTasks,
   fetchTaskTypes,

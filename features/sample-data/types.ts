@@ -1,5 +1,3 @@
-import type { IconName } from "@/app-sections/shared";
-
 export interface Parent {
   name: string;
   short: string;
@@ -18,13 +16,6 @@ export interface Child {
   allergies: string[];
   likes: string[];
   dislikes: string[];
-}
-
-export interface PrepItem {
-  id: string;
-  title: string;
-  tone: "mint" | "orange" | "warn";
-  iconName: IconName;
 }
 
 export interface CalendarDayCell {
