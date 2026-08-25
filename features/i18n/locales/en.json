@@ -189,7 +189,9 @@
       "day": "Have a great day, {{name}}"
     },
     "subtitle": "{{family}} · {{date}}",
-    "subtitleDate": "Wed, May 14",
+    "today": {
+      "empty": "All quiet today — movie night, maybe?"
+    },
     "addPerson": "Add person",
     "section": {
       "today": "Today",

@@ -19,10 +19,11 @@ import {
 } from "@/features/auth";
 import {
   buildCalendarTheme,
+  segmentsForDay,
+  segmentTimeLabel,
   setCalendarLocale,
   useFamilyEvents,
   useMarkedDates,
-  type DaySegment,
 } from "@/features/calendar";
 
 import { CalendarDay } from "./CalendarDay";
@@ -73,20 +74,7 @@ export function KalenderScreen() {
     router.push({ pathname: "/event/new", params: date ? { date } : {} });
   };
 
-  const dayEvents = useMemo(
-    () =>
-      segments
-        .filter((s) => s.date === selectedDate)
-        .sort((a, b) => {
-          // Something running all day belongs above the day's appointments, not
-          // at the position of a start time that may be days in the past.
-          const rank = (s: DaySegment) => (s.occurrence.allDay || !s.isStart ? 0 : 1);
-          return (
-            rank(a) - rank(b) || a.occurrence.startAt.getTime() - b.occurrence.startAt.getTime()
-          );
-        }),
-    [segments, selectedDate],
-  );
+  const dayEvents = useMemo(() => segmentsForDay(segments, selectedDate), [segments, selectedDate]);
 
   const monthName = format(visibleMonth, "LLLL", { locale: dateLocale });
   const year = format(visibleMonth, "yyyy");
@@ -155,18 +143,7 @@ export function KalenderScreen() {
               0,
               Math.round((occ.endAt.getTime() - occ.startAt.getTime()) / 60_000),
             );
-            // The left column answers "what happens on THIS day", not "when did
-            // the series start" — a continuation day showing 09:00 would simply
-            // be wrong.
-            const timeLabel = occ.allDay
-              ? t("cal.span.allDay")
-              : seg.isStart && seg.isEnd
-                ? format(occ.startAt, "HH:mm")
-                : seg.isStart
-                  ? t("cal.span.from", { time: format(occ.startAt, "HH:mm") })
-                  : seg.isEnd
-                    ? t("cal.span.until", { time: format(occ.endAt, "HH:mm") })
-                    : t("cal.span.through");
+            const timeLabel = segmentTimeLabel(seg, t);
             // Empty string rather than null: the label doubles as an
             // interpolation value for the row's accessibility label below, where
             // a null would be read out verbatim.

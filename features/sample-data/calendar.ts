@@ -2,8 +2,6 @@ import { palette } from "@/design-system";
 
 import type { CalendarDayCell } from "./types";
 
-import { todayEvents } from "./dashboard";
-
 // May 2026 starts on a Friday. ISO week: Mo–So.
 // Pre-pad with last 3 days of April (28, 29, 30) so the grid begins on Monday.
 // Visible cells: 6 rows × 7 cols = 42.
@@ -47,6 +45,3 @@ export const monthLabelEn = "May";
 export const yearLabel = 2026;
 export const selectedDayDe = "Mittwoch, 14. Mai";
 export const selectedDayEn = "Wednesday, May 14";
-
-// Reuse today's events for the selected day list.
-export { todayEvents as selectedDayEvents };

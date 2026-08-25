@@ -1,18 +1,17 @@
+import { format } from "date-fns";
+import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router } from "expo-router";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, View } from "react-native";
 
 import { ChildAvatar, EventRow, Icon, SectionHeader, TopBar } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Card, Screen, Text } from "@/design-system/ui";
-import {
-  children,
-  familyName,
-  mealPick,
-  parents,
-  todayEvents,
-  tomorrowPrep,
-} from "@/features/sample-data";
+import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
+import { segmentsForDay, segmentTimeLabel, useFamilyEvents } from "@/features/calendar";
+import { children, familyName, mealPick, parents, tomorrowPrep } from "@/features/sample-data";
+import { useToday } from "@/features/shared";
 
 import { MealHeroCard } from "./MealHeroCard";
 
@@ -23,10 +22,27 @@ const tonePrepBg = {
 } as const;
 
 export function DashboardScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { theme } = useTheme();
+  const lang = i18n.language.startsWith("de") ? "de" : "en";
+  const dateLocale = lang === "de" ? deLocale : enLocale;
+
+  const today = useToday();
+  const todayKey = format(today, "yyyy-MM-dd");
+  // Passing today's date means the range key matches the calendar tab's on
+  // mount — both tabs read the same cached month instead of fetching twice.
+  const { segments, isLoading, error } = useFamilyEvents(today);
+  const todaySegments = useMemo(() => segmentsForDay(segments, todayKey), [segments, todayKey]);
+
+  const parent = useCurrentParent();
+  const familyChildren = useFamilyChildren(parent.data?.family_id);
+  const familyParents = useFamilyParents(parent.data?.family_id);
+
   const greeting = t("dash.greeting.morning", { name: parents[0]?.short ?? "" });
-  const subtitle = t("dash.subtitle", { family: familyName, date: t("dash.subtitleDate") });
+  const subtitle = t("dash.subtitle", {
+    family: familyName,
+    date: format(today, "EEEE, d. MMMM", { locale: dateLocale }),
+  });
 
   const avatarRow = [
     ...parents.map((p) => ({ key: `parent-${p.short}`, label: p.short, color: p.color })),
@@ -52,20 +68,64 @@ export function DashboardScreen() {
         </Pressable>
       </View>
 
-      <SectionHeader title={t("dash.section.today")} action={t("action.seeAll")} />
-      <Card className="overflow-hidden p-0">
-        {todayEvents.map((event, i) => (
-          <EventRow
-            key={event.id}
-            time={event.time}
-            title={event.title}
-            meta={event.who}
-            iconName={event.iconName}
-            tone={event.tone}
-            isFirst={i === 0}
-          />
-        ))}
-      </Card>
+      <SectionHeader
+        title={t("dash.section.today")}
+        action={t("action.seeAll")}
+        onPressAction={() => router.push("/kalender")}
+      />
+      {/*
+       * Nothing while the query is in flight or has failed: "alles ruhig" is a
+       * statement about the day, and claiming it before the events are in — or
+       * after they failed to arrive — would be a claim we cannot back.
+       */}
+      {isLoading || error ? null : todaySegments.length === 0 ? (
+        <Card className="items-center py-6">
+          <Text variant="caption" tone="inkSecondary">
+            {t("dash.today.empty")}
+          </Text>
+        </Card>
+      ) : (
+        <Card className="overflow-hidden p-0">
+          {todaySegments.map((seg, i) => {
+            const occ = seg.occurrence;
+            const person = occ.childId
+              ? (familyChildren.data ?? []).find((c) => c.id === occ.childId)
+              : occ.parentId
+                ? (familyParents.data ?? []).find((p) => p.id === occ.parentId)
+                : null;
+            const isSpan = seg.total > 1;
+            const timeLabel = segmentTimeLabel(seg, t);
+            const typeLabel = lang === "de" ? occ.type.labelDe : occ.type.labelEn;
+            return (
+              <EventRow
+                key={`${occ.eventId}-${occ.occurrenceDate}-${seg.date}`}
+                time={timeLabel}
+                timeCompact={isSpan && !occ.allDay}
+                title={occ.title}
+                meta={person ? `${person.name} · ${typeLabel}` : typeLabel}
+                iconName={occ.type.iconName}
+                tone={occ.type.color}
+                isFirst={i === 0}
+                accessibilityLabel={
+                  isSpan
+                    ? t("cal.a11y.eventSpan", {
+                        title: occ.title,
+                        day: t("cal.span.dayOf", { index: seg.index + 1, total: seg.total }),
+                        time: timeLabel,
+                      })
+                    : t("cal.a11y.event", { title: occ.title, time: timeLabel })
+                }
+                onPress={() =>
+                  router.push({
+                    pathname: "/event/[id]",
+                    params: { id: occ.eventId, occ: occ.occurrenceDate },
+                  })
+                }
+              />
+            );
+          })}
+        </Card>
+      )}
 
       <SectionHeader title={t("dash.meal.question")} action={t("dash.meal.refresh")} />
       {/*
