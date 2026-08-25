@@ -216,10 +216,14 @@ function DayRow({ date, isToday, recipe, verdict }: DayRowProps) {
         </View>
       </View>
 
-      {/* Dekorativ, wie die Fußzeilen-Buttons der Detailansicht: das Kebab
-          steht so in der V1-Zeilenanatomie des Patterns, es gibt aber noch
-          keine Mutation, die es auslösen könnte (docs/TODO.md). */}
-      {recipe ? <Icon name="more-horizontal" size={18} color={theme.inkTertiary} /> : null}
+      {/* Kein `more`-Kebab: Es lag ohne eigenen `onPress` innerhalb des
+          Zeilen-`Pressable` — ein Tap darauf traf die Zeile und öffnete das
+          Rezept. Ein Element, das wie ein Menü aussieht und etwas anderes tut,
+          ist schlechter als keins. Kommt zurück, sobald es eine
+          `meal_plan_entries`-Mutation gibt, an die es sich hängen kann; bis
+          dahin weicht die Zeile von der V1-Anatomie in `patterns/meals.md`
+          ab (docs/TODO.md). Dieselbe Entscheidung wie beim Herz-Button der
+          Rezept-Detailansicht. */}
     </>
   );
 
