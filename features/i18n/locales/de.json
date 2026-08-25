@@ -189,7 +189,9 @@
       "day": "Schönen Tag, {{name}}"
     },
     "subtitle": "{{family}} · {{date}}",
-    "subtitleDate": "Mittwoch, 14. Mai",
+    "today": {
+      "empty": "Tagsüber alles ruhig — perfekt für einen Filmabend?"
+    },
     "addPerson": "Person hinzufügen",
     "section": {
       "today": "Heute",

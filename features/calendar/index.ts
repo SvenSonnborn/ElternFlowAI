@@ -40,4 +40,5 @@ export {
   type RecurrenceChanges,
 } from "./recurrence";
 export { toDaySegments, toDayMarkings, type DaySegment } from "./spans";
+export { segmentsForDay, segmentTimeLabel } from "./day";
 export type { CalendarOccurrence, MarkedDates, MarkedDot, OccurrenceRrule, SpanBar } from "./types";
