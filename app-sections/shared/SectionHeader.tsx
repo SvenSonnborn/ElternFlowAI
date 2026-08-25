@@ -29,7 +29,13 @@ export function SectionHeader({
         {title}
       </Text>
       {action ? (
-        <Pressable onPress={onPressAction} className="active:opacity-60">
+        // Der Text misst 17 px Zeilenhöhe — hitSlop hebt die Trefferfläche auf
+        // die geforderten 44 px, ohne die Kopfzeile höher zu machen.
+        <Pressable
+          onPress={onPressAction}
+          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
+          className="active:opacity-60"
+        >
           <Text variant="meta" tone="primaryStrong">
             {action}
           </Text>
@@ -39,6 +45,7 @@ export function SectionHeader({
           accessibilityRole="button"
           accessibilityLabel={addLabel ?? "Add"}
           onPress={onPressAdd}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           className="h-8 w-8 items-center justify-center rounded-xl border border-line bg-card active:opacity-70"
         >
           <Icon name="plus" size={16} color={theme.inkSecondary} />
