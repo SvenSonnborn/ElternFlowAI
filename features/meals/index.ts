@@ -16,6 +16,7 @@ export {
   type JudgeableRecipe,
   type RecipeAllergenVerdict,
 } from "./allergens";
+export { pickAlternative } from "./alternative";
 export {
   escapeLike,
   formatAmount,
@@ -49,6 +50,7 @@ export type {
   RecipeRow,
 } from "./types";
 export { useFamilyAllergies } from "./useFamilyAllergies";
+export { useMealAlternative } from "./useMealAlternative";
 export { useRecipeJudge } from "./useRecipeJudge";
 export {
   formatWeekRange,

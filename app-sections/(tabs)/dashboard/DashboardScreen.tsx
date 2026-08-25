@@ -10,11 +10,13 @@ import { useTheme } from "@/design-system/ThemeProvider";
 import { Card, Screen, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
 import { segmentsForDay, segmentTimeLabel, useFamilyEvents } from "@/features/calendar";
-import { familyName, mealPick, tomorrowPrep } from "@/features/sample-data";
+import { useMealAlternative, useRecipeJudge, useTodaysMeal } from "@/features/meals";
+import { familyName, tomorrowPrep } from "@/features/sample-data";
 import { useToday } from "@/features/shared";
 
 import { buildAvatarRow } from "./avatarRow";
 import { MealHeroCard } from "./MealHeroCard";
+import { MealHeroEmptyCard } from "./MealHeroEmptyCard";
 
 const tonePrepBg = {
   mint: "bg-primary-soft",
@@ -34,6 +36,20 @@ export function DashboardScreen() {
   // mount — both tabs read the same cached month instead of fetching twice.
   const { segments, isLoading, error } = useFamilyEvents(today);
   const todaySegments = useMemo(() => segmentsForDay(segments, todayKey), [segments, todayKey]);
+
+  // Der Slot der aktuellen Uhrzeit — `useTodaysMeal` rechnet ihn selbst weiter,
+  // wenn die Grenze zwischen Frühstück, Mittag und Abendessen fällt.
+  const { entry: mealEntry, slot, isLoading: mealLoading, error: mealError } = useTodaysMeal();
+  const judge = useRecipeJudge();
+  const mealRecipe = mealEntry?.recipe ?? null;
+  const mealVerdict = useMemo(() => (mealRecipe ? judge(mealRecipe) : null), [mealRecipe, judge]);
+  // Der Rezept-Pool wird nur geladen, wenn es tatsächlich etwas auszuweichen
+  // gibt; der Seed hält den Vorschlag für die Dauer der Mahlzeit fest.
+  const alternative = useMealAlternative({
+    enabled: mealVerdict?.status === "unsafe" || mealVerdict?.status === "caution",
+    excludeId: mealRecipe?.id,
+    seed: `${todayKey}-${slot}`,
+  });
 
   const parent = useCurrentParent();
   const familyChildren = useFamilyChildren(parent.data?.family_id);
@@ -164,16 +180,34 @@ export function DashboardScreen() {
         </Card>
       )}
 
-      <SectionHeader title={t("dash.meal.question")} action={t("dash.meal.refresh")} />
+      <SectionHeader
+        title={t("dash.meal.question")}
+        action={t("action.seeAll")}
+        onPressAction={() => router.push("/essen")}
+      />
       {/*
-       * Kein `onOpenRecipe`: `mealPick` ist Sample-Data, seine `id` ("meal-1")
-       * ist keine UUID und `recipes.id` ist `uuid` — der Aufruf endete in der
-       * Detailansicht im Fehlerzweig. Solange die Karte nicht an
-       * `useTodaysMeal` hängt, hat sie keine echte Rezept-ID zu verlinken
-       * (docs/TODO.md); `onAddToShopping` fehlt aus demselben Grund. Ohne
-       * beide Callbacks blendet die Karte ihre Aktionszeile aus.
+       * Dieselbe Zurückhaltung wie bei der Terminliste: die Leer-Karte
+       * behauptete „nichts geplant", bevor die Antwort da ist — und nach einem
+       * Fehler wüssten wir es erst recht nicht.
        */}
-      <MealHeroCard meal={mealPick} />
+      {mealLoading || mealError ? null : mealRecipe && mealVerdict ? (
+        <MealHeroCard
+          recipe={mealRecipe}
+          slot={slot}
+          verdict={mealVerdict}
+          alternative={alternative}
+          onOpenRecipe={() =>
+            router.push({ pathname: "/recipe/[id]", params: { id: mealRecipe.id } })
+          }
+          onOpenAlternative={
+            alternative
+              ? () => router.push({ pathname: "/recipe/[id]", params: { id: alternative.id } })
+              : undefined
+          }
+        />
+      ) : (
+        <MealHeroEmptyCard onPressPlan={() => router.push("/essen")} />
+      )}
 
       <SectionHeader title={t("dash.section.tomorrow")} />
       <Card>

@@ -5,10 +5,12 @@ import type { RecipeAllergenVerdict } from "@/features/meals";
 /**
  * Wie ein Allergen-Urteil einem Screenreader vorgelesen wird.
  *
- * An einer Stelle, weil zwei Oberflächen dasselbe Urteil zeigen — das
- * Wochenraster und der Rezept-Browser. ADR-014 hält die *Regel* (was ist
- * unsicher?) in `features/meals/allergens/` zusammen; das hier ist ihre
- * Ansage, und sie soll aus demselben Grund nicht zweimal formuliert werden.
+ * An einer Stelle, weil drei Oberflächen dasselbe Urteil zeigen — das
+ * Wochenraster, der Rezept-Browser und der Meal-Hero des Dashboards. ADR-014
+ * hält die *Regel* (was ist unsicher?) in `features/meals/allergens/`
+ * zusammen; das hier ist ihre Ansage, und sie soll aus demselben Grund nicht
+ * zweimal formuliert werden. Liegt in `shared/`, seit der dritte Aufrufer
+ * außerhalb des Essen-Tabs sitzt.
  *
  * `t` kommt als Parameter statt aus einem Hook: so bleibt die Funktion pur und
  * testbar — dieselbe Form wie `formatDurationLabel` in KalenderScreen.

@@ -566,3 +566,49 @@ Heute ist der Fall unerreichbar, weil der Meals-Layer rein lesend ist — der ei
 - **Die 44×44-Regel bleibt gewahrt.** `minHeight: 44` liegt auf dem `Pressable`, nicht auf dem Text; die schmalere Innenabstände ändern die Höhe nicht.
 
 - **Der Rückweg ist billig.** Fällt die Designer-Entscheidung gegen den vierten Tab, ist es ein Eintrag in `SLOT_TABS` und ein Copy-Key — plus die Frage, was dann mit geschriebenen `snack`-Zeilen geschieht. Diese Frage ist mit dieser ADR nicht beantwortet, sondern nur vertagt: sie wird fällig, wenn die Mutationen kommen.
+
+## ADR-018 — Der Meal-Hero zeigt den Wochenplan, nicht einen KI-Vorschlag: warnen statt verstecken, Alternative deterministisch (2026-08-25)
+
+### Status
+
+Accepted. **Keine Supersession.** [ADR-014](#adr-014--allergen-filter-eu-14-vokabular-vierwertiges-urteil-regelwerk-als-geteiltes-ts-modul-2026-08-14) bleibt die Quelle des Urteilsmodells; diese ADR fügt ihm den ersten Verbraucher hinzu, der auf ein Urteil hin **handelt**, statt es nur anzuzeigen.
+
+### Context
+
+Der „Was essen wir heute?"-Hero des Dashboards lief als letzte Fläche des Screens auf Sample-Daten (`mealPick` — „Spaghetti mit Tomatensauce", Emoji `🍝`, Begründung „Ben liebt Nudeln · keine Allergien · 20 Min."). `useTodaysMeal` lag seit der Meals-Iteration fertig daneben und hatte keinen Aufrufer.
+
+Drei Dinge standen der bloßen Verdrahtung im Weg:
+
+- **Das Badge behauptete eine Auswahl.** „Passt perfekt zu deiner Familie" (`dash.meal.badge`) ist die Ansage eines KI-Vorschlags. Was `useTodaysMeal` liefert, ist dagegen die Zeile, die eine Familie selbst in ihren Wochenplan geschrieben hat. Dieselbe Beobachtung hatte die Rezept-Detailansicht bereits zum Entfernen desselben Keys geführt (`docs/TODO.md`).
+- **Die Header-Aktion „Neu" (`dash.meal.refresh`) hatte nie einen Handler.** Sie meint „anderer Vorschlag" und setzt damit einen Vorschlagsmechanismus voraus, den es nicht gibt.
+- **`patterns/meals.md` verlangt „Never propose a meal containing an active allergy".** Ein Wochenplan-Eintrag ist aber kein Vorschlag: er steht schon da, und er kann ein Familien-Allergen enthalten, weil ihn niemand gegen die Allergien geprüft hat.
+
+Dazu kommt eine harte Grenze: der Meals-Layer ist rein lesend (`docs/TODO.md`). Es gibt keine Mutation, die eine geplante Mahlzeit austauschen könnte.
+
+### Decisions
+
+1. **Der Hero zeigt den Slot der aktuellen Uhrzeit — inklusive Frühstück.** `useTodaysMeal` wird unverändert übernommen, samt seiner Timer- und `AppState`-Nachführung an den Slot-Grenzen (11:00 · 15:00 · Mitternacht). Die naheliegende Verengung auf „nur Mittag/Abend" hätte eine zweite Slot-Regel neben `slotForTime` aufgemacht und die Frühstückszeile des Wochenplans auf dem Dashboard unsichtbar gemacht — genau der Fehler, den [ADR-017](#adr-017--vierter-slot-tab-im-essen-tab-bewusste-abweichung-von-patternsmealsmd-v1-2026-08-25) für `snack` vermieden hat.
+
+2. **Das KI-Badge weicht dem Slot-Label, „Neu" der Aktion „Alle ansehen".** Die Karte trägt jetzt `meals.tabs.{breakfast,lunch,dinner}` mit Besteck- statt Sparkles-Icon, der Section-Header `action.seeAll` mit Ziel `/essen`. `dash.meal.badge`, `dash.meal.reasonExample` und `dash.meal.refresh` entfallen ersatzlos aus beiden Katalogen: Sie beschreiben eine Fläche, die es so nicht mehr gibt, und ein Key ohne Aufrufer ist Copy, die niemand pflegt. Kommt der KI-Picker (V2/V3 des Patterns), kommen sie mit ihm zurück — dann an einen echten Vorschlag gebunden.
+
+3. **Warnen, nicht verstecken.** Trifft die geplante Mahlzeit ein Familien-Allergen, zeigt die Karte sie trotzdem — mit `AllergenBadge` und der Ansage aus `recipeA11yLabel`, identisch zu Wochenraster und Rezept-Browser. Eine geplante Mahlzeit zu unterschlagen, wäre an der Oberfläche nicht von „nichts geplant" zu unterscheiden, und der Nutzer verlöre genau die Information, wegen der er handeln müsste.
+
+4. **Die Alternative wird nur bei `unsafe` und `caution` angeboten und nur aus `safe`-Kandidaten gezogen.** `pickAlternative` filtert über `isRecipeSafeForFamily` — der schmale Boolean, den ADR-014 ausdrücklich für „die KI-Vorschlagslogik" vorgesehen hat und der bis hierher aufruferlos war. `unverified` fällt damit als Kandidat heraus: Wer wegen eines Allergen-Treffers ausweicht, darf nicht auf einem ungeprüften Rezept landen — die Heuristik kann Anwesenheit belegen, nie Abwesenheit. Aus demselben Grund löst ein `unverified`-Urteil auch keinen Vorschlag aus: daraus einen Wechsel abzuleiten hieße, ein Urteil zu behaupten, das nicht gefällt wurde.
+
+5. **Die Auswahl ist geseedet, nicht zufällig.** `pickAlternative` hasht `<Kalendertag>-<Slot>` (FNV-1a) und indiziert damit die nach `id` sortierte Kandidatenliste. `Math.random` zeigte bei jedem Re-Render des Dashboards ein anderes Gericht; die Sortierung vor dem Zugriff hält den Vorschlag außerdem stabil, wenn `fetchRecipes` seine Zeilen in anderer Reihenfolge liefert. Der Vorschlag steht damit für die Dauer der Mahlzeit fest und wechselt an derselben Grenze, an der auch der Slot wechselt.
+
+6. **Der Vorschlag verlinkt, er ersetzt nicht.** „Anderer Vorschlag" öffnet `/recipe/[id]` der Alternative. Ohne `meal_plan_entries`-Mutation wäre ein Button, der den Plan zu ändern verspricht, tote UI — dieselbe Begründung, mit der die Rezept-Detailansicht ihren „Zum Essensplan hinzufügen"-Button bis heute nicht hat.
+
+7. **Lade- und Fehlerfall rendern nichts.** Die Leer-Karte („Noch nichts geplant") ist eine Aussage über den Wochenplan und darf nicht fallen, bevor die Antwort da ist — dieselbe Zurückhaltung, die die Terminliste darüber schon übt.
+
+### Consequences
+
+- **Der Rezept-Pool wird nur bei einem Treffer geladen.** `useMealAlternative` trägt ein `enabled`-Tor; ohne Allergen-Treffer stellt das Dashboard keine zusätzliche Abfrage. Der Query-Key ist derselbe, den der Rezept-Browser bei leerer Suche benutzt (`mealKeys.recipes(normalizeRecipeFilter({}))`) — wer vorher im Essen-Tab war, bekommt den Vorschlag ohne Netzaufruf. Der Preis: der Pool ist auf `DEFAULT_RECIPE_LIMIT` (50) begrenzt, die Alternative wird also aus den 50 jüngsten Rezepten gezogen, nicht aus allen.
+
+- **Drei Bausteine sind nach `app-sections/shared/` gewandert:** `AllergenBadge`, `recipeA11yLabel` und der Platzhalter-Emoji (`MEAL_PLACEHOLDER_EMOJI`, vorher zweimal als `FALLBACK_EMOJI` dupliziert). Der Auslöser ist die Richtung der Abhängigkeit: ohne den Umzug importierte der Dashboard-Ordner aus dem Essen-Tab.
+
+- **`features/sample-data` verliert `mealPick` und `MealPick`.** Das Dashboard liest damit alles außer `familyName` und `tomorrowPrep` aus echten Zeilen.
+
+- **`docs/COPY.md` wurde nachgezogen**, obwohl es dem Designer gehört: Drei Keys sind entfallen, drei neue (`dash.meal.empty.*`) dazugekommen, und die englische Fassung von `dash.meal.question` wurde von „What's for dinner today?“ auf „What are we eating today?“ neutralisiert — der Header steht jetzt über Frühstück, Mittag und Abendessen, die deutsche Fassung war bereits neutral (CodeRabbit-Finding). Begründung: Ein Copy-Deck, das Keys führt, die es nicht mehr gibt, ist schlechter als eines, das nachgeführt wurde. Die deutschen Fassungen sind von uns formuliert und gehören gegengelesen.
+
+- **Der Vorschlag bleibt ein Notausgang, kein Planer.** Er kennt weder Vorlieben noch Abneigungen, weder Zubereitungsdauer noch Vorrat — nur „sicher für diese Familie". Der Meal-Picker aus V2/V3 des Patterns bleibt offen und muss, wenn er kommt, `isRecipeSafeForFamily` mitbenutzen statt die Regel ein drittes Mal zu formulieren.

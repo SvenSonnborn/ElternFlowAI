@@ -204,11 +204,13 @@
     },
     "meal": {
       "question": "Was essen wir heute?",
-      "badge": "Passt perfekt zu deiner Familie",
-      "reasonExample": "Ben liebt Nudeln · keine Allergien · 20 Min.",
       "openRecipe": "Rezept öffnen",
       "toShopping": "Zur Einkaufsliste",
-      "refresh": "Neu"
+      "empty": {
+        "title": "Noch nichts geplant",
+        "sub": "Für diese Mahlzeit steht noch nichts im Wochenplan.",
+        "cta": "Essen planen"
+      }
     },
     "empty": {
       "title": "Deine Familie wartet",
