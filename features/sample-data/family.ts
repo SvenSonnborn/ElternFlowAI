@@ -66,6 +66,12 @@ export function getSampleChildren(translate: Translate): Child[] {
   ];
 }
 
+/**
+ * The one piece of sample copy that reaches a production screen: the Dashboard
+ * subtitle renders it via `dash.subtitle`. Tracked in docs/TODO.md to be
+ * replaced by the real `families.name` once it is decided what the subtitle
+ * shows while that query is still loading.
+ */
 export function getSampleFamilyName(translate: Translate): string {
   return translate("sample.family.name");
 }
