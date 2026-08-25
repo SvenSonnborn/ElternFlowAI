@@ -11,7 +11,7 @@ import { Card, Screen, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
 import { segmentsForDay, segmentTimeLabel, useFamilyEvents } from "@/features/calendar";
 import { useMealAlternative, useRecipeJudge, useTodaysMeal } from "@/features/meals";
-import { familyName } from "@/features/sample-data";
+import { getSampleFamilyName } from "@/features/sample-data";
 import { useToday } from "@/features/shared";
 import { useFamilyTasks } from "@/features/tasks";
 
@@ -54,7 +54,7 @@ export function DashboardScreen() {
 
   const greeting = t("dash.greeting.morning", { name: parent.data?.short ?? "" });
   const subtitle = t("dash.subtitle", {
-    family: familyName,
+    family: getSampleFamilyName(t),
     date: format(today, "EEEE, d. MMMM", { locale: dateLocale }),
   });
 
