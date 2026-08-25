@@ -161,6 +161,12 @@ const SAMPLE_SEEDS: Seed[] = [
   },
 ];
 
+/**
+ * Expands one seed into a full occurrence relative to `base`. Everything the UI
+ * keys on — id, dates, slug — is derived from the schedule; only `title` and
+ * `location` go through `translate`. That split is what keeps a language switch
+ * from renaming an event out from under a route that already points at it.
+ */
 function seedToOccurrence(seed: Seed, base: Date, translate: Translate): CalendarOccurrence {
   const startAt = setMinutes(
     setHours(startOfDay(addDays(base, seed.dayOffset)), seed.hour),
@@ -194,6 +200,12 @@ function seedToOccurrence(seed: Seed, base: Date, translate: Translate): Calenda
   };
 }
 
+/**
+ * All 13 sample occurrences, dated relative to `now` so the fixture always
+ * spans "today plus the next two and a half weeks" instead of drifting into the
+ * past. `translate` is required rather than defaulting to i18next's global `t` —
+ * see the module docblock for why that global is unsafe here.
+ */
 export function getSampleOccurrences(
   translate: Translate,
   now: Date = new Date(),
@@ -201,6 +213,11 @@ export function getSampleOccurrences(
   return SAMPLE_SEEDS.map((seed) => seedToOccurrence(seed, now, translate));
 }
 
+/**
+ * Looks up a single sample occurrence by `eventId`, or `null` if nothing
+ * matches. Ids are language-independent, so an id captured in German still
+ * resolves against an English `translate`.
+ */
 export function findSampleOccurrence(
   id: string,
   translate: Translate,

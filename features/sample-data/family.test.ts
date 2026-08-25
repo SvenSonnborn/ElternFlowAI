@@ -6,6 +6,11 @@ import en from "@/features/i18n/locales/en.json";
 
 import { getSampleChildren, getSampleFamilyName, sampleParents } from "./family";
 
+/**
+ * A private i18next bound to the real catalogs, so these tests exercise the
+ * shipped copy rather than a stub. `createInstance` keeps it off the global
+ * singleton, so no test file can leak a language into another.
+ */
 function catalog(lng: "de" | "en"): I18nInstance {
   const instance = createInstance();
   void instance.init({
