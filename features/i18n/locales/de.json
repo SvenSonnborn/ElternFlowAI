@@ -580,5 +580,57 @@
     "help": "Hilfe & Support",
     "logout": "Abmelden",
     "footer": "Eltern Flow · v{{version}} · Made in Berlin"
+  },
+  "sample": {
+    "family": {
+      "name": "Familie Becker"
+    },
+    "school": {
+      "ben": "Grundschule am Park",
+      "mia": "Kita Sonnenblume",
+      "leo": "Goethe-Gymnasium"
+    },
+    "grade": {
+      "ben": "2. Klasse",
+      "mia": "Vorschule",
+      "leo": "7. Klasse"
+    },
+    "food": {
+      "spaghetti": "Spaghetti",
+      "pizza": "Pizza",
+      "strawberries": "Erdbeeren",
+      "pancakes": "Pfannkuchen",
+      "apple": "Apfel",
+      "yogurt": "Joghurt",
+      "banana": "Banane",
+      "rice": "Reis",
+      "burger": "Burger",
+      "sushi": "Sushi",
+      "mushrooms": "Pilze",
+      "spinach": "Spinat",
+      "cauliflower": "Blumenkohl",
+      "tomatoes": "Tomaten",
+      "fish": "Fisch",
+      "broccoli": "Brokkoli"
+    },
+    "event": {
+      "school": "Schule",
+      "pediatrician": "Kinderarzt Dr. Weber",
+      "football": "Fußballtraining",
+      "mathHomework": "Mathe-Hausaufgaben",
+      "checkup": "Vorsorge {{name}}",
+      "swimming": "Schwimmkurs",
+      "reading": "Lesen üben",
+      "grandmaBirthday": "Geburtstag Oma",
+      "englishTest": "Klassenarbeit Englisch",
+      "mathPractice": "Mathe üben",
+      "familyDinner": "Familien-Abendessen",
+      "dentist": "Zahnarzt {{name}}"
+    },
+    "location": {
+      "practice": "Praxis Hauptstraße 12",
+      "sportsField": "Sportplatz Süd",
+      "grandma": "Bei Oma"
+    }
   }
 }

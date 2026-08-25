@@ -2,8 +2,17 @@
  * Sample calendar seeds — kept for Smoke-Test / Storybook-style verification only.
  * The app no longer imports this in production paths; AuthGate guarantees a real
  * Supabase session before any calendar screen mounts.
+ *
+ * Titles and locations are catalog keys under `sample.*`, resolved through the
+ * `translate` the caller passes in, so the seeds render in the active language
+ * instead of freezing German literals into a fixture. The `type` labels are the
+ * exception: `typeLabelsForSlug` has to produce DE *and* EN at once for
+ * `CalendarOccurrence`, which a single-language `t` cannot do, so it keeps
+ * reading the global catalogs.
  */
 import { addDays, format, setHours, setMinutes, startOfDay } from "date-fns";
+
+import type { Translate } from "@/features/shared";
 
 import { lightTheme } from "@/design-system/themes";
 
@@ -16,10 +25,14 @@ interface Seed {
   hour: number;
   minute: number;
   durationMin: number;
-  title: string;
+  /** Key under `sample.event.*`. */
+  titleKey: string;
+  /** Interpolation values for `titleKey` — proper names stay literals. */
+  titleParams?: Record<string, string>;
   slug: string;
   childId: string | null;
-  location?: string;
+  /** Key under `sample.location.*`. */
+  locationKey?: string;
 }
 
 const SAMPLE_SEEDS: Seed[] = [
@@ -28,7 +41,7 @@ const SAMPLE_SEEDS: Seed[] = [
     hour: 8,
     minute: 0,
     durationMin: 60,
-    title: "Schule",
+    titleKey: "school",
     slug: "schule",
     childId: "ben",
   },
@@ -37,27 +50,27 @@ const SAMPLE_SEEDS: Seed[] = [
     hour: 14,
     minute: 0,
     durationMin: 60,
-    title: "Kinderarzt Dr. Weber",
+    titleKey: "pediatrician",
     slug: "arzt",
     childId: "mia",
-    location: "Praxis Hauptstraße 12",
+    locationKey: "practice",
   },
   {
     dayOffset: 0,
     hour: 16,
     minute: 30,
     durationMin: 75,
-    title: "Fußballtraining",
+    titleKey: "football",
     slug: "sport",
     childId: "ben",
-    location: "Sportplatz Süd",
+    locationKey: "sportsField",
   },
   {
     dayOffset: 0,
     hour: 18,
     minute: 0,
     durationMin: 30,
-    title: "Mathe-Hausaufgaben",
+    titleKey: "mathHomework",
     slug: "ha",
     childId: "leo",
   },
@@ -67,7 +80,8 @@ const SAMPLE_SEEDS: Seed[] = [
     hour: 9,
     minute: 0,
     durationMin: 45,
-    title: "Vorsorge Mia",
+    titleKey: "checkup",
+    titleParams: { name: "Mia" },
     slug: "arzt",
     childId: "mia",
   },
@@ -76,7 +90,7 @@ const SAMPLE_SEEDS: Seed[] = [
     hour: 17,
     minute: 0,
     durationMin: 60,
-    title: "Schwimmkurs",
+    titleKey: "swimming",
     slug: "sport",
     childId: "mia",
   },
@@ -85,7 +99,7 @@ const SAMPLE_SEEDS: Seed[] = [
     hour: 19,
     minute: 0,
     durationMin: 30,
-    title: "Lesen üben",
+    titleKey: "reading",
     slug: "ha",
     childId: "ben",
   },
@@ -94,17 +108,17 @@ const SAMPLE_SEEDS: Seed[] = [
     hour: 10,
     minute: 0,
     durationMin: 120,
-    title: "Geburtstag Oma",
+    titleKey: "grandmaBirthday",
     slug: "family",
     childId: null,
-    location: "Bei Oma",
+    locationKey: "grandma",
   },
   {
     dayOffset: 10,
     hour: 8,
     minute: 0,
     durationMin: 60,
-    title: "Klassenarbeit Englisch",
+    titleKey: "englishTest",
     slug: "schule",
     childId: "leo",
   },
@@ -113,7 +127,7 @@ const SAMPLE_SEEDS: Seed[] = [
     hour: 16,
     minute: 0,
     durationMin: 60,
-    title: "Fußballtraining",
+    titleKey: "football",
     slug: "sport",
     childId: "ben",
   },
@@ -122,7 +136,7 @@ const SAMPLE_SEEDS: Seed[] = [
     hour: 18,
     minute: 30,
     durationMin: 30,
-    title: "Mathe üben",
+    titleKey: "mathPractice",
     slug: "ha",
     childId: "leo",
   },
@@ -131,7 +145,7 @@ const SAMPLE_SEEDS: Seed[] = [
     hour: 19,
     minute: 0,
     durationMin: 60,
-    title: "Familien-Abendessen",
+    titleKey: "familyDinner",
     slug: "meal",
     childId: null,
   },
@@ -140,13 +154,14 @@ const SAMPLE_SEEDS: Seed[] = [
     hour: 15,
     minute: 0,
     durationMin: 90,
-    title: "Zahnarzt Ben",
+    titleKey: "dentist",
+    titleParams: { name: "Ben" },
     slug: "arzt",
     childId: "ben",
   },
 ];
 
-function seedToOccurrence(seed: Seed, base: Date): CalendarOccurrence {
+function seedToOccurrence(seed: Seed, base: Date, translate: Translate): CalendarOccurrence {
   const startAt = setMinutes(
     setHours(startOfDay(addDays(base, seed.dayOffset)), seed.hour),
     seed.minute,
@@ -154,13 +169,15 @@ function seedToOccurrence(seed: Seed, base: Date): CalendarOccurrence {
   const endAt = new Date(startAt.getTime() + seed.durationMin * 60_000);
   const label = typeLabelsForSlug(seed.slug);
   return {
+    // Built from the schedule, never the copy — ids stay stable across a
+    // language switch, so a detail route opened in DE still resolves in EN.
     eventId: `sample-${seed.slug}-${seed.dayOffset}-${seed.hour}`,
     occurrenceDate: format(startAt, "yyyy-MM-dd"),
     startAt,
     endAt,
-    title: seed.title,
+    title: translate(`sample.event.${seed.titleKey}`, seed.titleParams),
     description: null,
-    location: seed.location ?? null,
+    location: seed.locationKey ? translate(`sample.location.${seed.locationKey}`) : null,
     allDay: false,
     childId: seed.childId,
     parentId: null,
@@ -177,13 +194,17 @@ function seedToOccurrence(seed: Seed, base: Date): CalendarOccurrence {
   };
 }
 
-export function getSampleOccurrences(now: Date = new Date()): CalendarOccurrence[] {
-  return SAMPLE_SEEDS.map((seed) => seedToOccurrence(seed, now));
+export function getSampleOccurrences(
+  translate: Translate,
+  now: Date = new Date(),
+): CalendarOccurrence[] {
+  return SAMPLE_SEEDS.map((seed) => seedToOccurrence(seed, now, translate));
 }
 
 export function findSampleOccurrence(
   id: string,
+  translate: Translate,
   now: Date = new Date(),
 ): CalendarOccurrence | null {
-  return getSampleOccurrences(now).find((o) => o.eventId === id) ?? null;
+  return getSampleOccurrences(translate, now).find((o) => o.eventId === id) ?? null;
 }

@@ -580,5 +580,57 @@
     "help": "Help & support",
     "logout": "Sign out",
     "footer": "Eltern Flow · v{{version}} · Made in Berlin"
+  },
+  "sample": {
+    "family": {
+      "name": "The Becker family"
+    },
+    "school": {
+      "ben": "Park Primary School",
+      "mia": "Sunflower Nursery",
+      "leo": "Goethe Grammar School"
+    },
+    "grade": {
+      "ben": "Year 2",
+      "mia": "Pre-school",
+      "leo": "Year 7"
+    },
+    "food": {
+      "spaghetti": "Spaghetti",
+      "pizza": "Pizza",
+      "strawberries": "Strawberries",
+      "pancakes": "Pancakes",
+      "apple": "Apple",
+      "yogurt": "Yoghurt",
+      "banana": "Banana",
+      "rice": "Rice",
+      "burger": "Burger",
+      "sushi": "Sushi",
+      "mushrooms": "Mushrooms",
+      "spinach": "Spinach",
+      "cauliflower": "Cauliflower",
+      "tomatoes": "Tomatoes",
+      "fish": "Fish",
+      "broccoli": "Broccoli"
+    },
+    "event": {
+      "school": "School",
+      "pediatrician": "Paediatrician Dr Weber",
+      "football": "Football practice",
+      "mathHomework": "Maths homework",
+      "checkup": "{{name}}'s check-up",
+      "swimming": "Swimming lessons",
+      "reading": "Reading practice",
+      "grandmaBirthday": "Grandma's birthday",
+      "englishTest": "English test",
+      "mathPractice": "Maths practice",
+      "familyDinner": "Family dinner",
+      "dentist": "{{name}}'s dentist appointment"
+    },
+    "location": {
+      "practice": "Surgery, Hauptstraße 12",
+      "sportsField": "South sports field",
+      "grandma": "At Grandma's"
+    }
   }
 }
