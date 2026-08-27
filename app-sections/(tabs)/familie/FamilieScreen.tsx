@@ -37,6 +37,17 @@ export function FamilieScreen() {
   const regenerate = useRegenerateInvitation();
   const revoke = useRevokeInvitation();
 
+  // The three mutations below share one error banner, and TanStack keeps
+  // `isError` set until a mutation runs again or is reset. Clearing all three
+  // when an action starts is what makes the banner show *this* action's outcome:
+  // otherwise a failed revoke would keep the banner after a later regenerate
+  // failed differently — or, worse, after one succeeded.
+  function clearActionErrors() {
+    invite.reset();
+    regenerate.reset();
+    revoke.reset();
+  }
+
   async function handleRevoke(token: string) {
     if (!familyId) return;
     const confirmed = await confirmDestructive({
@@ -46,11 +57,13 @@ export function FamilieScreen() {
       cancel: t("action.cancel"),
     });
     if (!confirmed) return;
+    clearActionErrors();
     revoke.mutate({ familyId, token });
   }
 
   async function handleRegenerate(token: string) {
     if (!familyId) return;
+    clearActionErrors();
     // Rotating a link nobody has seen would be pointless, so the new token goes
     // straight into the share sheet.
     const freshToken = await regenerate.mutateAsync({ familyId, token });
@@ -73,6 +86,8 @@ export function FamilieScreen() {
 
   const sub = `${t("familie.childrenCount", { count: children.length })} · ${t("familie.parentsCount", { n: parents.length })}`;
 
+  // At most one of the three can be in error at a time (see clearActionErrors),
+  // so this chain reports the last action's outcome regardless of its order.
   const errorMessage = invite.errorKey
     ? t(invite.errorKey)
     : revoke.isError
@@ -180,7 +195,12 @@ export function FamilieScreen() {
           block
           loading={invite.isPending}
           disabled={!invite.canSend}
-          onPress={() => softShare(() => invite.send())}
+          onPress={() =>
+            softShare(() => {
+              clearActionErrors();
+              return invite.send();
+            })
+          }
         />
       </View>
     </Screen>
