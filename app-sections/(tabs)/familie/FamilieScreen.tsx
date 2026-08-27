@@ -17,6 +17,7 @@ import {
   useFamilyParents,
   useFamilyPendingInvitations,
   useInvitePartner,
+  useRegenerateInvitation,
   useRevokeInvitation,
 } from "@/features/auth";
 import { ageFromBirthday } from "@/features/children";
@@ -33,6 +34,7 @@ export function FamilieScreen() {
   const parentsQ = useFamilyParents(familyId);
   const pendingQ = useFamilyPendingInvitations(familyId);
   const invite = useInvitePartner(familyId);
+  const regenerate = useRegenerateInvitation();
   const revoke = useRevokeInvitation();
 
   async function handleRevoke(token: string) {
@@ -47,9 +49,18 @@ export function FamilieScreen() {
     revoke.mutate({ familyId, token });
   }
 
-  // Share-sheet dismissal rejects the promise; treat as a soft no-op.
-  function handleShare(force?: boolean) {
-    void invite.send({ force }).catch(() => {});
+  async function handleRegenerate(token: string) {
+    if (!familyId) return;
+    // Rotating a link nobody has seen would be pointless, so the new token goes
+    // straight into the share sheet.
+    const freshToken = await regenerate.mutateAsync({ familyId, token });
+    await invite.shareToken(freshToken);
+  }
+
+  // Share-sheet dismissal rejects the promise; treat as a soft no-op — the
+  // invitation itself was created (or rotated) either way.
+  function softShare(run: () => Promise<unknown>) {
+    void run().catch(() => {});
   }
 
   const children = childrenQ.data ?? [];
@@ -64,7 +75,7 @@ export function FamilieScreen() {
 
   const errorMessage = invite.errorKey
     ? t(invite.errorKey)
-    : revoke.isError
+    : revoke.isError || regenerate.isError
       ? t("familie.inviteRevokeError")
       : null;
 
@@ -98,9 +109,10 @@ export function FamilieScreen() {
               <PendingInviteCard
                 key={inv.token}
                 invitation={inv}
-                onRegenerate={() => handleShare(true)}
+                onShare={() => softShare(() => invite.shareToken(inv.token))}
+                onRegenerate={() => softShare(() => handleRegenerate(inv.token))}
                 onRevoke={() => void handleRevoke(inv.token)}
-                isRegenerating={invite.isPending}
+                isRegenerating={regenerate.isPending}
                 isRevoking={revoke.isPending}
               />
             ))}
@@ -158,15 +170,15 @@ export function FamilieScreen() {
           onPress={() => router.push("/child/new")}
         />
         <Button
-          // A pending invite makes this button re-share the existing link
-          // rather than mint one, so say that instead of "Partner einladen".
-          label={hasPendingInvite ? t("familie.inviteReshare") : t("familie.invitePartner")}
+          // Always mints a new invitation. Once one is already open, say so —
+          // "Partner einladen" would read like it re-opens the pending one.
+          label={hasPendingInvite ? t("familie.inviteAnother") : t("familie.invitePartner")}
           variant="soft"
           tone="primary"
           block
           loading={invite.isPending}
           disabled={!invite.canSend}
-          onPress={() => handleShare()}
+          onPress={() => softShare(() => invite.send())}
         />
       </View>
     </Screen>

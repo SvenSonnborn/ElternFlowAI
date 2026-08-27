@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { Icon, Pill } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
@@ -8,6 +8,7 @@ import { inviteExpiry, type InvitationRow } from "@/features/auth";
 
 interface PendingInviteCardProps {
   invitation: InvitationRow;
+  onShare: () => void;
   onRegenerate: () => void;
   onRevoke: () => void;
   isRegenerating: boolean;
@@ -15,9 +16,9 @@ interface PendingInviteCardProps {
 }
 
 /**
- * One open partner invitation, rendered next to the parent cards it will one
- * day become. Shows how much life the link has left and offers the two ways out
- * of a stuck invite: rotate the token, or withdraw it.
+ * One open partner invitation, rendered next to the parent cards these become.
+ * A token is single-use, so each card stands for exactly one person: share this
+ * link with them, rotate it if it went astray, or withdraw it.
  *
  * The card carries no email — `family_invitations` has no such column, and the
  * link travels via the native share sheet rather than a mail we send. Showing a
@@ -25,6 +26,7 @@ interface PendingInviteCardProps {
  */
 export function PendingInviteCard({
   invitation,
+  onShare,
   onRegenerate,
   onRevoke,
   isRegenerating,
@@ -61,35 +63,51 @@ export function PendingInviteCard({
           <Text variant="listTitle" tone="inkSecondary">
             {t("familie.invitePending")}
           </Text>
-          {daysLeft > 0 ? (
-            <Text variant="caption" tone="inkSecondary">
-              {t("familie.inviteExpiresIn", { count: daysLeft })}
-            </Text>
-          ) : null}
         </View>
+        {/* Revoke sits here as an icon so the action row below keeps two full
+            labels — three German labels ("Erneut teilen", "Neu generieren",
+            "Widerrufen") do not survive a 360px screen at larger font scales. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("familie.inviteRevoke")}
+          disabled={busy}
+          onPress={onRevoke}
+          className={`h-11 w-11 items-center justify-center rounded-full ${
+            busy ? "opacity-50" : "active:opacity-80"
+          }`}
+        >
+          <Icon name="trash" size={18} color={theme.danger} />
+        </Pressable>
+      </View>
+
+      <View className="flex-row items-center gap-2">
         <Pill label={status.label} tone={status.tone} />
+        {daysLeft > 0 ? (
+          <Text variant="caption" tone="inkSecondary">
+            {t("familie.inviteExpiresIn", { count: daysLeft })}
+          </Text>
+        ) : null}
       </View>
 
       <View className="flex-row gap-2">
         <Button
-          label={t("familie.inviteRegenerate")}
+          label={t("familie.inviteReshare")}
           variant="soft"
           tone="primary"
+          size="md"
+          className="flex-1"
+          disabled={busy}
+          onPress={onShare}
+        />
+        <Button
+          label={t("familie.inviteRegenerate")}
+          variant="ghost"
+          tone="neutral"
           size="md"
           className="flex-1"
           loading={isRegenerating}
           disabled={busy}
           onPress={onRegenerate}
-        />
-        <Button
-          label={t("familie.inviteRevoke")}
-          variant="ghost"
-          tone="danger"
-          size="md"
-          className="flex-1"
-          loading={isRevoking}
-          disabled={busy}
-          onPress={onRevoke}
         />
       </View>
     </Card>

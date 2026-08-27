@@ -34,6 +34,7 @@ export {
   useUpdateChild,
   useDeleteChild,
   useCreateInvitation,
+  useRegenerateInvitation,
   useRevokeInvitation,
 } from "./onboardingMutations";
 export {
