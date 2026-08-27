@@ -37,17 +37,20 @@ export function PendingInviteCard({
 
   const { daysLeft, isUrgent } = inviteExpiry(invitation.expires_at, new Date().toISOString());
   const busy = isRegenerating || isRevoking;
+  // `daysLeft === 0` is expired *or* unparseable. Either way `accept_invitation`
+  // would reject the token, so sharing it only wastes the recipient's time —
+  // rotating or withdrawing it stays open, those are the ways out.
+  const isDead = daysLeft === 0;
 
   // `isUrgent` covers both "nearly gone" and "already gone", so the pill has to
   // split them again — otherwise an expired invite reads "Läuft bald ab".
   // Expired is only reachable from a stale cache (the query filters it out),
   // but a card that contradicts itself is worse than a branch that rarely runs.
-  const status =
-    daysLeft === 0
-      ? { label: t("familie.inviteExpired"), tone: "danger" as const }
-      : isUrgent
-        ? { label: t("familie.inviteExpiringSoon"), tone: "warn" as const }
-        : { label: t("familie.invitedPill"), tone: "mint" as const };
+  const status = isDead
+    ? { label: t("familie.inviteExpired"), tone: "danger" as const }
+    : isUrgent
+      ? { label: t("familie.inviteExpiringSoon"), tone: "warn" as const }
+      : { label: t("familie.invitedPill"), tone: "mint" as const };
 
   return (
     <Card className="gap-3">
@@ -82,7 +85,7 @@ export function PendingInviteCard({
 
       <View className="flex-row items-center gap-2">
         <Pill label={status.label} tone={status.tone} />
-        {daysLeft > 0 ? (
+        {!isDead ? (
           <Text variant="caption" tone="inkSecondary">
             {t("familie.inviteExpiresIn", { count: daysLeft })}
           </Text>
@@ -96,7 +99,7 @@ export function PendingInviteCard({
           tone="primary"
           size="md"
           className="flex-1"
-          disabled={busy}
+          disabled={busy || isDead}
           onPress={onShare}
         />
         <Button

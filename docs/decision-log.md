@@ -742,7 +742,7 @@ Zugleich war das bestehende statische `Eingeladen`-Pill als „Status" wertlos �
 
 ### Status
 
-Accepted. Supersedes parts of [ADR-021](#adr-021--offene-einladungen-zeigen-ihre-restlaufzeit-nicht-eine-empfänger-e-mail-2026-08-27) — konkret Decision 4 (`force`-Flag auf `useCreateInvitation`), Decision 6 (Label „Einladung erneut teilen" am unteren Button) und die Consequence „Die ‚Liste' ist per DB-Invariante höchstens ein Eintrag". Decisions 1, 2, 3, 5 und 7 aus ADR-021 gelten unverändert weiter — insbesondere bleibt es bei **keiner** `email`-Spalte.
+Accepted. Supersedes parts of [ADR-021](#adr-021--offene-einladungen-zeigen-ihre-restlaufzeit-nicht-eine-empfänger-e-mail-2026-08-27) — konkret Decision 4 (`force`-Flag auf `useCreateInvitation`), Decision 6 (Label „Einladung erneut teilen" am unteren Button) und die Consequence „Die ‚Liste' ist per DB-Invariante höchstens ein Eintrag". Decisions 1, 2, 5 und 7 aus ADR-021 gelten unverändert weiter — insbesondere bleibt es bei **keiner** `email`-Spalte. **Decision 3 gilt nur noch im Ergebnis**, nicht in der Begründung: abgelaufene Einladungen werden weiterhin nicht mitgeladen, aber das Argument dafür — „`useCreateInvitation` räumt abgelaufene Zeilen beim nächsten Anlegen ohnehin weg" — ist mit Decision 2 hinfällig; dieses Aufräumen gibt es nicht mehr (siehe Consequences).
 
 ### Context
 
@@ -777,4 +777,4 @@ Sichtbar wurde das erst durch ADR-021 Decision 6: solange der untere Button „P
 - **Abgelaufene Einladungen werden nicht mehr aufgeräumt.** Der alte Create-Pfad löschte sie, weil der Index den Slot sonst blockiert hätte; ohne Index gibt es keinen Zwang mehr, und „alle unbenutzten löschen" wäre jetzt aktiv falsch. Die Zeilen sind unsichtbar (die Query filtert sie), sammeln sich aber an — als Follow-up für einen pg_cron-Job in `docs/TODO.md` notiert.
 - **Onboarding Step 3 legt jetzt bei jedem Tap eine Einladung an** statt die bestehende erneut zu teilen. Folgenlos, weil der Screen bei Erfolg sofort zu Step 4 navigiert und der Button währenddessen über `canSend` gesperrt ist.
 - **Der Familie-Tab kann eine echte Liste zeigen.** Der Screen rendert schon vorher über `.map()`, es war also nur die DB, die ihn auf einen Eintrag beschränkt hat.
-- **Kein Typen-Regenerat nötig.** Ein Index ist in `database.types.ts` nicht abgebildet.
+- **Der Index-Drop allein hätte kein Typen-Regenerat gebraucht** — ein Index ist in `database.types.ts` nicht abgebildet. Die RPC aus Decision 4 dagegen schon: `regenerate_invitation` steht dort unter `Functions` und wird in [onboardingMutations.ts](../features/auth/onboardingMutations.ts) typisiert aufgerufen.

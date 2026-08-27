@@ -513,6 +513,7 @@
     "inviteRevokeBody": "The shared link will stop working. You can invite again any time.",
     "inviteRevokeConfirm": "Revoke",
     "inviteRevokeError": "Couldn't revoke the invitation.",
+    "inviteRegenerateError": "Couldn't regenerate the invitation.",
     "yearsOld_one": "{{count}} year",
     "yearsOld_other": "{{count}} years",
     "empty": "No child yet. Create the first profile.",
