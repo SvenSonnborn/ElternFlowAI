@@ -22,6 +22,14 @@
     "manage": "Verwalten",
     "retry": "Erneut versuchen"
   },
+  "color": {
+    "mint": "Mint",
+    "orange": "Orange",
+    "violet": "Violett",
+    "pink": "Pink",
+    "blue": "Blau",
+    "ochre": "Ocker"
+  },
   "auth": {
     "signIn": "Anmelden",
     "signUp": "Konto erstellen",

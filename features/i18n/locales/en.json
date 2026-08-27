@@ -22,6 +22,14 @@
     "manage": "Manage",
     "retry": "Try again"
   },
+  "color": {
+    "mint": "Mint",
+    "orange": "Orange",
+    "violet": "Violet",
+    "pink": "Pink",
+    "blue": "Blue",
+    "ochre": "Ochre"
+  },
   "auth": {
     "signIn": "Sign in",
     "signUp": "Create account",
