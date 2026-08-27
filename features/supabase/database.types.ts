@@ -711,6 +711,12 @@ export type Database = {
         Returns: string;
       };
       current_family_id: { Args: never; Returns: string };
+      regenerate_invitation: {
+        Args: {
+          p_token: string;
+        };
+        Returns: string;
+      };
     };
     Enums: {
       event_exception_action_enum: "cancelled" | "modified";

@@ -11,7 +11,7 @@ export interface InviteExpiry {
 /**
  * Turns a `family_invitations.expires_at` timestamp into the two values the
  * Familie card renders. Pure, so the "läuft in n Tagen ab" copy is testable
- * without a clock or a DB — same rationale as {@link pickReusableInvite}.
+ * without a clock or a DB.
  *
  * Days round *up*: 4 days and 23 hours reads as "5 days", never as "4", so the
  * label never undersells the time a partner actually has. An unparseable or

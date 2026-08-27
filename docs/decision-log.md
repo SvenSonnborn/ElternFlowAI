@@ -735,3 +735,45 @@ Zugleich war das bestehende statische `Eingeladen`-Pill als „Status" wertlos �
 - **Das Delete lehnt sich an eine RLS-Policy, die es schon gab** (`invitations: delete own family`) — plus `.eq("family_id", …)` als Gürtel-und-Hosenträger, wie bei `useDeleteChild`.
 - **Der Tag-Zähler kann um Stunden veralten**, wenn der Tab lange offen bleibt: er rechnet beim Rendern gegen `new Date()` und hat keinen eigenen Timer. Bei sieben Tagen Laufzeit ist das folgenlos; ein `useToday`-Trigger wäre Maschinerie für ein Label, das niemand minutengenau liest.
 - **Wer später doch adressierte Einladungen will**, braucht drei Dinge zusammen: eine `email`-Spalte, ein Feld im Invite-Flow und einen echten Versandweg (Edge Function oder `mailto:`) — sonst kehrt genau das Zustellbestätigungs-Missverständnis aus dem Context zurück. Als Follow-up in `docs/TODO.md` notiert.
+
+---
+
+## ADR-022 — Mehrere offene Einladungen gleichzeitig: der „eine pro Familie"-Index fällt (2026-08-27)
+
+### Status
+
+Accepted. Supersedes parts of [ADR-021](#adr-021--offene-einladungen-zeigen-ihre-restlaufzeit-nicht-eine-empfänger-e-mail-2026-08-27) — konkret Decision 4 (`force`-Flag auf `useCreateInvitation`), Decision 6 (Label „Einladung erneut teilen" am unteren Button) und die Consequence „Die ‚Liste' ist per DB-Invariante höchstens ein Eintrag". Decisions 1, 2, 3, 5 und 7 aus ADR-021 gelten unverändert weiter — insbesondere bleibt es bei **keiner** `email`-Spalte.
+
+### Context
+
+ADR-021 hat die „eine offene Einladung pro Familie"-Invariante aus [20260611140000](../supabase/migrations/20260611140000_invitations_one_pending_per_family.sql) als gegeben hingenommen und nur ihre Konsequenz notiert. Beim Benutzen fiel auf, dass sie ein Produktproblem ist, kein Detail:
+
+- **`parents` hat nie ein Limit gehabt.** Kein Count-Constraint, `family_id` ist ein gewöhnlicher FK; einzig `auth_user_id` ist unique (ein Parent-Row pro Account). Eine Familie darf beliebig viele Erwachsene führen.
+- **Ein Token gilt für genau eine Person.** `accept_invitation` selektiert `used_at is null` und stempelt beim Beitritt ([20260529091002](../supabase/migrations/20260529091002_onboarding_rpcs.sql)).
+- **Der Index koppelte beides zu einer Warteschlange.** Einladen → annehmen lassen → nächste einladen. Großeltern oder Babysitter waren damit nicht parallel erreichbar, obwohl das Schema sie problemlos trägt.
+
+Sichtbar wurde das erst durch ADR-021 Decision 6: solange der untere Button „Partner einladen" hieß, sah es aus, als ginge eine zweite Einladung — der Tap teilte in Wahrheit denselben Link erneut. Das ehrliche Label „Einladung erneut teilen" hat die Lücke offengelegt, nicht verursacht.
+
+### Decisions
+
+1. **Der partielle Unique-Index fällt** ([20260827120000](../supabase/migrations/20260827120000_invitations_allow_multiple_pending.sql)). Nichts sonst hat die Invariante getragen: `accept_invitation` prüft ein Token auf eigene Merkmale (unbenutzt, nicht abgelaufen, `for update` gesperrt) und hat nie angenommen, dass es nur eines gibt.
+
+2. **`useCreateInvitation` legt immer an.** Die Reuse-Abkürzung entfällt ersatzlos — sie war die Antwort auf „jeder Tap erzeugt einen neuen Link", und diese Antwort gibt jetzt die UI: Erneut-Teilen ist eine eigene Aktion auf der Karte, Anlegen heißt ausdrücklich „eine weitere Person einladen". Damit ist auch die `23505`-Race-Behandlung gegenstandslos.
+
+3. **`pickReusableInvite` und `features/auth/inviteSelection.ts` sind gelöscht**, samt Testdatei. Einziger Aufrufer war die entfallene Abkürzung. Gleiche Linie wie bei `features/sample-data/calendar.ts` in [ADR-020](#adr-020--sample-daten-lesen-ihre-copy-aus-sample-und-bekommen-translate-injiziert-statt-das-globale-t-zu-greifen-2026-08-25): toter Code wird entfernt, nicht aufbewahrt.
+
+4. **„Neu generieren" wird eine eigene Mutation statt eines Flags — und läuft über eine RPC.** Das ADR-021-`force`-Flag konnte die Aufgabe nicht mehr leisten: es hätte „alle unbenutzten löschen" bedeutet und damit fremde, lebende Einladungen mitgerissen. Rotieren ist aber zwei Schreibvorgänge (alten Token zurückziehen, neuen anlegen), und die gehören in **eine** Transaktion: ein Client, der zwischen erfolgreichem Delete und fehlgeschlagenem Insert die Verbindung verliert, ließe die Familie sonst mit einer Einladung weniger zurück, ohne etwas, wogegen sich ein Retry richten könnte. Deshalb `regenerate_invitation(p_token)` als `security definer`-Funktion — dieselbe Bauart wie `accept_invitation`, das aus demselben Grund Insert und Update bündelt. Sie gibt den neuen Token zurück (uuid, wie die beiden bestehenden RPCs), nicht die Zeile: mehr braucht der Aufrufer nicht, denn zum Teilen genügt der Token und die Liste zieht sich über die Invalidierung ohnehin neu. Delete-then-insert statt Update, weil `token` der Primärschlüssel ist. **Die Familien-Zuordnung prüft die Funktion selbst** gegen `current_family_id()`, weil `security definer` an RLS vorbeiführt (CodeRabbit-Finding).
+
+5. **`useInvitePartner` trennt Anlegen und Teilen.** `send()` erzeugt und teilt, `shareToken(token)` teilt einen bestehenden Link ohne Mutation. Vorher konnte der Hook nur „erzeugen und teilen" — für eine Liste, in der jede Zeile ihren eigenen Link hat, reicht das nicht.
+
+6. **Widerrufen wird zum Icon-Button in der Kartenkopfzeile**, die Aktionszeile behält zwei volle Labels. Drei deutsche Labels nebeneinander („Erneut teilen", „Neu generieren", „Widerrufen") überleben 360 px bei größeren Schriftskalierungen nicht. Der Icon-Button ist 44 × 44, trägt ein `accessibilityLabel` und liegt weiterhin hinter `confirmDestructive` — die Bestätigung ist der Schutz, nicht das Label.
+
+### Consequences
+
+- **Die Migration muss auf dem Supabase-Projekt ausgeführt werden, bevor das Feature trägt** — sie enthält beides, den Index-Drop und `regenerate_invitation`. Bis dahin scheitert die zweite Einladung einer Familie am alten Index mit `23505` (die Race-Behandlung, die das früher abgefangen hat, ist mit Decision 2 entfallen), und „Neu generieren" läuft in einen Fehler „function does not exist".
+- **Der Index-Drop ist ein gewöhnlicher `drop index`, kein `concurrently`.** `DROP INDEX CONCURRENTLY` darf nicht in einem Transaktionsblock laufen, und der Migrations-Runner umschließt jede Datei mit genau einem. Der `ACCESS EXCLUSIVE`-Lock liegt auf einer Tabelle mit einer Handvoll Zeilen pro Familie — das Fenster ist keins. (CodeRabbit hat `concurrently` vorgeschlagen; hier bewusst abgelehnt statt still übergangen.)
+- **`database.types.ts` trägt den RPC-Eintrag von Hand**, bis der Generator wieder gegen das Projekt läuft. `Args: { p_token: string }` / `Returns: string` ist exakt das, was er für eine `uuid`-Funktion emittiert — der nächste Generat-Lauf sollte diffs-frei durchgehen.
+- **Abgelaufene Einladungen werden nicht mehr aufgeräumt.** Der alte Create-Pfad löschte sie, weil der Index den Slot sonst blockiert hätte; ohne Index gibt es keinen Zwang mehr, und „alle unbenutzten löschen" wäre jetzt aktiv falsch. Die Zeilen sind unsichtbar (die Query filtert sie), sammeln sich aber an — als Follow-up für einen pg_cron-Job in `docs/TODO.md` notiert.
+- **Onboarding Step 3 legt jetzt bei jedem Tap eine Einladung an** statt die bestehende erneut zu teilen. Folgenlos, weil der Screen bei Erfolg sofort zu Step 4 navigiert und der Button währenddessen über `canSend` gesperrt ist.
+- **Der Familie-Tab kann eine echte Liste zeigen.** Der Screen rendert schon vorher über `.map()`, es war also nur die DB, die ihn auf einen Eintrag beschränkt hat.
+- **Kein Typen-Regenerat nötig.** Ein Index ist in `database.types.ts` nicht abgebildet.

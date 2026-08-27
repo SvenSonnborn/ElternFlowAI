@@ -4,7 +4,6 @@ import type { Database } from "@/features/supabase/database.types";
 
 import { supabase } from "@/features/supabase";
 
-import { pickReusableInvite } from "./inviteSelection";
 import { useSession } from "./session";
 import { currentParentKey } from "./useCurrentParent";
 
@@ -60,15 +59,14 @@ interface DeleteChildVars {
 
 interface CreateInvitationVars {
   familyId: string;
-  /** Mint a brand-new token even if a usable one exists — the "neu generieren"
-   *  path, for a link that leaked or that the partner never received. */
-  force?: boolean;
 }
 
 interface RevokeInvitationVars {
   familyId: string;
   token: string;
 }
+
+type RegenerateInvitationVars = RevokeInvitationVars;
 
 export function useCreateFamily() {
   const qc = useQueryClient();
@@ -187,69 +185,51 @@ export function useDeleteChild() {
   });
 }
 
-async function fetchUnusedInvitations(familyId: string): Promise<InvitationRow[]> {
-  const { data, error } = await supabase
-    .from("family_invitations")
-    .select("*")
-    .eq("family_id", familyId)
-    .is("used_at", null)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data ?? [];
-}
-
 /**
- * Creates a partner invitation — or reuses the family's existing pending one.
+ * Creates a partner invitation: one row, one single-use token, one person.
  *
- * A family needs at most one live invite link at a time, so this is idempotent:
- * if a non-expired unused invite already exists we re-share it instead of
- * minting a new row. Without this, every tap of "Partner einladen" spawned a
- * fresh invitation (see docs/TODO.md history). The DB also enforces the
- * invariant via a partial unique index (one unused invite per family), so the
- * insert below can lose a race — we recover by re-reading the winner's row.
- *
- * Pass `force` to bypass the reuse shortcut and rotate the token instead.
+ * Every call inserts — there is no reuse shortcut. That shortcut existed while
+ * a partial unique index allowed only one open invitation per family; dropping
+ * it (20260827120000) made "invite one more person" a thing the UI can express,
+ * and re-sharing an existing link is now the card's own action rather than a
+ * side effect of tapping create.
  */
 export function useCreateInvitation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ familyId, force }: CreateInvitationVars): Promise<InvitationRow> => {
-      const unused = await fetchUnusedInvitations(familyId);
-      if (!force) {
-        const reusable = pickReusableInvite(unused, new Date().toISOString());
-        if (reusable) return reusable;
-      }
-
-      // Clear the remaining unused invites so the partial unique index doesn't
-      // block the fresh insert. Without `force` these are all expired; with it
-      // we retire the live one too — that retirement *is* the regeneration.
-      const staleTokens = unused.map((i) => i.token);
-      if (staleTokens.length > 0) {
-        const { error: delError } = await supabase
-          .from("family_invitations")
-          .delete()
-          .in("token", staleTokens);
-        if (delError) throw delError;
-      }
-
+    mutationFn: async ({ familyId }: CreateInvitationVars): Promise<InvitationRow> => {
       const { data, error } = await supabase
         .from("family_invitations")
         .insert({ family_id: familyId })
         .select()
         .single();
-      if (error) {
-        // 23505 = a concurrent caller inserted first; reuse their invite. That
-        // also satisfies `force`: the winner's row is itself a fresh token.
-        if (error.code === "23505") {
-          const raced = pickReusableInvite(
-            await fetchUnusedInvitations(familyId),
-            new Date().toISOString(),
-          );
-          if (raced) return raced;
-        }
-        throw error;
-      }
+      if (error) throw error;
       return data;
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: ["family", vars.familyId, "invitations"] });
+    },
+  });
+}
+
+/**
+ * Rotates one invitation: the old token is retired and a fresh one takes its
+ * place, for a link that leaked or that never reached the person it was meant
+ * for. Returns the new token so the caller can share it right away.
+ *
+ * Goes through the `regenerate_invitation` RPC rather than a delete followed by
+ * an insert, so the two writes cannot come apart: a client that dies between
+ * them would otherwise leave the family one invitation short, with nothing left
+ * to retry against. The RPC scopes to `current_family_id()` itself, since
+ * SECURITY DEFINER puts it past RLS.
+ */
+export function useRegenerateInvitation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ token }: RegenerateInvitationVars): Promise<string> => {
+      const { data, error } = await supabase.rpc("regenerate_invitation", { p_token: token });
+      if (error) throw error;
+      return data; // the fresh token
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: ["family", vars.familyId, "invitations"] });
