@@ -19,3 +19,18 @@ export function deriveShort(name: string): string {
   }
   return (words[0][0] + words[1][0]).toUpperCase();
 }
+
+/** Longest `short` the avatar chip renders without crowding. */
+export const SHORT_MAX_LENGTH = 3;
+
+/**
+ * Turns whatever the user typed into the avatar chip's `short` into a value the
+ * NOT NULL column will accept: trimmed, uppercased, at most three characters.
+ *
+ * An emptied field is not an error — it means "go back to the default", so it
+ * falls through to `deriveShort(name)` rather than blocking the save.
+ */
+export function normalizeShort(input: string, name: string): string {
+  const cleaned = input.trim().toUpperCase().slice(0, SHORT_MAX_LENGTH);
+  return cleaned.length > 0 ? cleaned : deriveShort(name);
+}

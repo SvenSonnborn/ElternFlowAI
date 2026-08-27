@@ -1,11 +1,12 @@
 export { AuthGate } from "./AuthGate";
-export { AVATAR_COLORS, deriveShort } from "./avatarColor";
+export { AVATAR_COLORS, deriveShort, normalizeShort, SHORT_MAX_LENGTH } from "./avatarColor";
 export {
   useChild,
   useFamily,
   useFamilyChildren,
   useFamilyParents,
   useFamilyPendingInvitations,
+  useParent,
   type ChildRow,
   type FamilyRow,
   type InvitationRow,
@@ -33,6 +34,7 @@ export {
   useCreateChild,
   useUpdateChild,
   useDeleteChild,
+  useUpdateParent,
   useCreateInvitation,
   useRegenerateInvitation,
   useRevokeInvitation,

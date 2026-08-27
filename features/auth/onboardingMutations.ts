@@ -9,6 +9,7 @@ import { currentParentKey } from "./useCurrentParent";
 
 type ChildInsert = Database["public"]["Tables"]["children"]["Insert"];
 type ChildUpdate = Database["public"]["Tables"]["children"]["Update"];
+type ParentUpdate = Database["public"]["Tables"]["parents"]["Update"];
 type InvitationRow = Database["public"]["Tables"]["family_invitations"]["Row"];
 
 interface CreateFamilyVars {
@@ -50,6 +51,13 @@ interface UpdateChildVars {
   allergies: string[];
   likes: string[];
   dislikes: string[];
+}
+
+interface UpdateParentVars {
+  id: string;
+  name: string;
+  short: string;
+  color: string;
 }
 
 interface DeleteChildVars {
@@ -162,6 +170,46 @@ export function useUpdateChild() {
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: ["family", vars.familyId, "children"] });
       void qc.invalidateQueries({ queryKey: ["child", vars.id] });
+    },
+  });
+}
+
+/**
+ * Edits the signed-in parent's own row — the only `parents` row RLS lets a
+ * client write ("parents: update self").
+ *
+ * `family_id` is deliberately absent from the update: the policy's `with check`
+ * pins it to `current_family_id()`, so sending it could only ever be a no-op or
+ * a rejection. Switching families is an invitation flow, not a profile edit.
+ */
+export function useUpdateParent() {
+  const qc = useQueryClient();
+  const { userId } = useSession();
+  return useMutation({
+    mutationFn: async (vars: UpdateParentVars) => {
+      const update: ParentUpdate = {
+        name: vars.name,
+        short: vars.short,
+        color: vars.color,
+        updated_at: new Date().toISOString(),
+      };
+      // auth_user_id scope is belt-and-suspenders on top of the RLS update policy.
+      const { data, error } = await supabase
+        .from("parents")
+        .update(update)
+        .eq("id", vars.id)
+        .eq("auth_user_id", userId as string)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      // The row shows up under three different keys: as "me" (dashboard,
+      // settings), in the family roster, and on its own profile route.
+      void qc.invalidateQueries({ queryKey: currentParentKey(userId) });
+      void qc.invalidateQueries({ queryKey: ["family", data.family_id, "parents"] });
+      void qc.invalidateQueries({ queryKey: ["parent", data.id] });
     },
   });
 }
