@@ -8,10 +8,10 @@ import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
 import {
   AVATAR_COLORS,
+  capShort,
   deriveShort,
   mapAuthError,
   normalizeShort,
-  SHORT_MAX_LENGTH,
   useCurrentParent,
   useParent,
   useSession,
@@ -128,27 +128,31 @@ export function ParentProfileScreen() {
               size="xl"
             />
             {isSelf ? (
-              // py-2 gives the swatches' hitSlop room to reach 44px: React Native
-              // clips touch areas at the parent's bounds, and without it this row
-              // is exactly as tall as a 28px swatch.
-              <View className="mt-3 flex-row gap-2 py-2">
+              // Each swatch sits centred in its own 44x44 box, and the boxes tile
+              // edge to edge. The earlier `hitSlop={8}` on a 28px swatch also
+              // measured 44, but the slop of neighbouring swatches met inside the
+              // 8px gap: a tap just right of one swatch landed on the next.
+              <View className="mt-3 flex-row">
                 {AVATAR_COLORS.map((c) => (
                   <Pressable
                     key={c}
                     onPress={() => setColor(c)}
-                    hitSlop={8}
                     accessibilityRole="button"
                     accessibilityLabel={t("parent.colorOption")}
                     accessibilityState={{ selected: color === c }}
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 14,
-                      backgroundColor: c,
-                      borderWidth: 2,
-                      borderColor: color === c ? theme.ink : "transparent",
-                    }}
-                  />
+                    className="h-11 w-11 items-center justify-center"
+                  >
+                    <View
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 14,
+                        backgroundColor: c,
+                        borderWidth: 2,
+                        borderColor: color === c ? theme.ink : "transparent",
+                      }}
+                    />
+                  </Pressable>
                 ))}
               </View>
             ) : null}
@@ -187,7 +191,7 @@ export function ParentProfileScreen() {
               <Field
                 label={t("parent.short")}
                 value={short}
-                onChangeText={isSelf ? (v) => setShort(v.slice(0, SHORT_MAX_LENGTH)) : undefined}
+                onChangeText={isSelf ? (v) => setShort(capShort(v)) : undefined}
                 editable={isSelf}
                 placeholder={deriveShort(trimmedName)}
                 autoCapitalize="characters"
