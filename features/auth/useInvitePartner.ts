@@ -15,6 +15,10 @@ interface UseInvitePartner {
   isPending: boolean;
   errorKey: AuthErrorKey | null;
   canSend: boolean;
+  /** Clears a previous create failure. `isError` on a TanStack mutation stays
+   *  set until it runs again or is reset, so a screen that funnels several
+   *  mutations into one banner has to clear the others itself. */
+  reset: () => void;
 }
 
 /**
@@ -53,5 +57,12 @@ export function useInvitePartner(familyId: string | undefined): UseInvitePartner
     return true;
   }
 
-  return { send, shareToken, isPending: createInvitation.isPending, errorKey, canSend };
+  return {
+    send,
+    shareToken,
+    isPending: createInvitation.isPending,
+    errorKey,
+    canSend,
+    reset: createInvitation.reset,
+  };
 }
