@@ -75,9 +75,11 @@ export function FamilieScreen() {
 
   const errorMessage = invite.errorKey
     ? t(invite.errorKey)
-    : revoke.isError || regenerate.isError
+    : revoke.isError
       ? t("familie.inviteRevokeError")
-      : null;
+      : regenerate.isError
+        ? t("familie.inviteRegenerateError")
+        : null;
 
   return (
     <Screen scroll>

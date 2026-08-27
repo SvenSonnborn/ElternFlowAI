@@ -513,6 +513,7 @@
     "inviteRevokeBody": "Der geteilte Link funktioniert danach nicht mehr. Du kannst jederzeit neu einladen.",
     "inviteRevokeConfirm": "Widerrufen",
     "inviteRevokeError": "Einladung konnte nicht widerrufen werden.",
+    "inviteRegenerateError": "Einladung konnte nicht neu erzeugt werden.",
     "yearsOld_one": "{{count}} Jahr",
     "yearsOld_other": "{{count}} Jahre",
     "empty": "Noch kein Kind angelegt. Leg das erste Profil an.",
