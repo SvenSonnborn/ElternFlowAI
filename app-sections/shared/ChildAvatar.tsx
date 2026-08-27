@@ -7,6 +7,12 @@ type Size = "sm" | "md" | "lg" | "xl";
 interface ChildAvatarProps {
   name: string;
   color: string;
+  /**
+   * Overrides the initials derived from `name`. Parents carry a stored `short`
+   * they can edit themselves, so their chip must not silently re-derive one.
+   * Children have no such column and keep passing `name` only.
+   */
+  short?: string;
   size?: Size;
   className?: string;
 }
@@ -27,15 +33,16 @@ function initials(name: string): string {
     .join("");
 }
 
-export function ChildAvatar({ name, color, size = "md", className }: ChildAvatarProps) {
+export function ChildAvatar({ name, color, short, size = "md", className }: ChildAvatarProps) {
   const px = sizePx[size];
+  const label = short?.trim() || initials(name);
   return (
     <View
       className={`items-center justify-center rounded-pill ${className ?? ""}`.trim()}
       style={{ width: px, height: px, backgroundColor: color }}
     >
       <Text variant={textVariant[size]} tone="white">
-        {initials(name)}
+        {label}
       </Text>
     </View>
   );
