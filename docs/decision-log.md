@@ -691,3 +691,47 @@ Ein Detail hat den Zuschnitt bestimmt und war vorher nirgends notiert: **i18next
 - **Eine Abweichung vom Deck wurde nebenbei repariert:** der Code führte Leos Schule als „Gymnasium Goethe", `docs/COPY.md` als „Goethe-Gymnasium". Das Deck gewinnt.
 - **`getSampleOccurrences()` ohne Argumente kompiliert nicht mehr.** Aufrufer gab es keine; künftige müssen ein `t` reichen.
 - **Ein Katalog-Gate ist dabei abgefallen** ([features/i18n/catalogs.test.ts](../features/i18n/catalogs.test.ts)), und zwar aus einem Fehlschlag heraus: der erste Anlauf prüfte „kein Key bleibt unaufgelöst" durch ein `t` — was einen **fehlenden EN-Key nicht sieht**, weil `fallbackLng: "de"` ihn still auf Deutsch rendert. Ein absichtlich gelöschter EN-Key ist genau so durch die Tests gerutscht. Die vier Assertions vergleichen deshalb die JSON-Dateien **strukturell** statt über i18next: gleiche Key-Menge in beiden Sprachen, kein leerer Wert, dieselben `{{platzhalter}}` je Key, und `sample.*` in beiden vorhanden. Sie gelten für alle 456 Keys, nicht nur die 38 neuen — beim Schreiben war der Katalog bereits paritätisch, das Gate hält den Zustand jetzt fest. Jede Assertion ist gegen einen eingebauten Defekt geprüft worden, nicht nur gegen den grünen Ist-Zustand — was sich gelohnt hat: die Leer-Prüfung verglich zuerst `{ ...deFlat, ...enFlat }`, wo Englisch jeden gemeinsamen Key überschreibt und damit einen leeren **deutschen** Wert hinter einem gefüllten englischen versteckt. Sie läuft jetzt pro Sprache getrennt (CodeRabbit-Finding). Aus demselben Lauf stammt, dass [features/calendar/sample.test.ts](../features/calendar/sample.test.ts) die Titel-Listen vollständig festnagelt statt drei Stück zu stichproben — ein Seed, der auf einen falschen, aber existierenden `titleKey` zeigt, löst sauber auf und wäre sonst durchgerutscht.
+
+---
+
+## ADR-021 — Offene Einladungen zeigen ihre Restlaufzeit, nicht eine Empfänger-E-Mail (2026-08-27)
+
+### Status
+
+Accepted. Keine Supersession. Baut auf der Invite-Iteration auf, die `family_invitations` und die „eine offene Einladung pro Familie"-Invariante ([20260611140000_invitations_one_pending_per_family.sql](../supabase/migrations/20260611140000_invitations_one_pending_per_family.sql)) eingeführt hat.
+
+### Context
+
+Die Aufgabenstellung für die Familien-Übersicht lautete wörtlich „Liste der offenen Einladungen mit **E-Mail** + Status". Beim Umsetzen kollidierte das mit zwei Fakten, die vorher nirgends zusammen notiert waren:
+
+1. **`family_invitations` hat keine `email`-Spalte.** Die Tabelle führt `token`, `family_id`, `created_by`, `expires_at`, `used_at`, `created_at` — mehr nicht ([20260529091002_onboarding_rpcs.sql](../supabase/migrations/20260529091002_onboarding_rpcs.sql)).
+2. **Die App verschickt keine Mail.** `useInvitePartner` erzeugt einen Token, baut `elternflow://invite/{token}` und übergibt an das native Share-Sheet. Welcher Kanal und welcher Empfänger daraus werden, entscheidet der User im Share-Sheet — die App erfährt es nie.
+
+Eine `email`-Spalte wäre also eine reine Notiz gewesen: ein Feld, in das der User eine Adresse tippt, an die _er selbst_ danach in einer anderen App die Nachricht schickt. In der Liste hätte sie ausgesehen wie eine Zustellbestätigung für etwas, das nie zugestellt wurde.
+
+Zugleich war das bestehende statische `Eingeladen`-Pill als „Status" wertlos — es hatte genau einen möglichen Wert, weil die Query ohnehin nur annehmbare Einladungen liefert.
+
+### Decisions
+
+1. **Keine `email`-Spalte, keine Migration.** Die Karte identifiziert die Einladung über das, was die App tatsächlich weiß: dass eine offene existiert und wie lange sie noch gilt.
+
+2. **Status wird aus `expires_at` abgeleitet, nicht gespeichert.** Neu ist [features/auth/inviteStatus.ts](../features/auth/inviteStatus.ts) mit `inviteExpiry(expiresAt, nowIso) → { daysLeft, isUrgent }` — rein, damit die „läuft in n Tagen ab"-Copy ohne Uhr und ohne DB testbar ist, gleiche Bauart wie `pickReusableInvite` in [inviteSelection.ts](../features/auth/inviteSelection.ts). **Tage runden auf:** 4 Tage und 23 Stunden lesen sich als „5 Tage", nie als „4" — das Label soll die verbleibende Zeit nie kleiner darstellen, als sie ist. Ein unparsebarer oder vergangener Zeitstempel fällt auf `0` zurück statt `NaN` in die UI zu lassen.
+
+3. **Die Query-Prädikate bleiben unverändert** (`used_at is null and expires_at > now()`), es kommt nur ein `order by created_at desc` dazu. Verworfen wurde, abgelaufene Einladungen mitzuladen, um dem Status mehr Werte zu geben: `useCreateInvitation` räumt abgelaufene Zeilen beim nächsten Anlegen ohnehin weg, eine „Abgelaufen"-Karte mit „Neu generieren"-Button hätte also nur dupliziert, was der „Partner einladen"-Button schon tut.
+
+4. **„Neu generieren" ist ein `force`-Flag auf `useCreateInvitation`, keine zweite Mutation.** Ohne `force` bleibt die Reuse-Abkürzung; mit `force` fällt die bestehende Zeile in denselben Delete, den der Code für abgelaufene Zeilen schon hatte — dieses Zurückziehen **ist** die Regeneration. Ein eigener Hook hätte die Race-Behandlung (`23505`) und die Index-Vorarbeit dupliziert. Regenerieren öffnet immer das Share-Sheet: ein rotierter Link, den niemand gesehen hat, wäre nutzlos.
+
+5. **Widerrufen löscht die Zeile, statt `used_at` zu stempeln.** Ein widerrufener Token ist kein eingelöster. Löschen gibt den partiellen Unique-Index sofort frei, sodass die Familie unmittelbar neu einladen kann; ein `used_at`-Stempel hätte den Slot dauerhaft belegt und `accept_invitation` eine Einlösung vorgespielt, die nie stattfand.
+
+6. **Der untere Button heißt „Einladung erneut teilen", solange eine offene Einladung existiert.** Er tat das schon vorher — `useCreateInvitation` gibt die bestehende Einladung zurück, statt eine neue anzulegen —, nannte es aber „Partner einladen". Nur das Label folgt jetzt dem Verhalten; es kommt keine vierte Aktion dazu.
+
+7. **Die neuen `familie.*`-Keys stehen nicht in [docs/COPY.md](./COPY.md).** Dasselbe Muster wie bei `familie.invitePending` und `familie.invitedPill`, die dort ebenfalls fehlen, während der Rest des `familie`-Blocks gelistet ist. Das Deck gehört dem Designer und ist für uns off-limits; die Keys sind zum Nachtragen in `docs/TODO.md` vermerkt.
+
+### Consequences
+
+- **Die „Liste" ist per DB-Invariante höchstens ein Eintrag.** Der partielle Unique-Index lässt genau eine unbenutzte Einladung pro Familie zu. Der Code rendert trotzdem über `.map()`, damit ein späteres Aufheben der Invariante (mehrere Eingeladene, etwa Großeltern) nur die Migration kostet und nicht den Screen.
+- **Die Einladungskarte ist eine eigene Datei** ([app-sections/(tabs)/familie/PendingInviteCard.tsx](<../app-sections/(tabs)/familie/PendingInviteCard.tsx>)). `FamilieScreen` rendert damit weiter Sektionen und hält die Handler, statt Karten-Innenleben zu tragen.
+- **Beide Aktionen brauchen keinen manuellen Refresh.** `useCreateInvitation` und `useRevokeInvitation` invalidieren beide `["family", familyId, "invitations"]`; die Liste zieht sich selbst nach.
+- **Das Delete lehnt sich an eine RLS-Policy, die es schon gab** (`invitations: delete own family`) — plus `.eq("family_id", …)` als Gürtel-und-Hosenträger, wie bei `useDeleteChild`.
+- **Der Tag-Zähler kann um Stunden veralten**, wenn der Tab lange offen bleibt: er rechnet beim Rendern gegen `new Date()` und hat keinen eigenen Timer. Bei sieben Tagen Laufzeit ist das folgenlos; ein `useToday`-Trigger wäre Maschinerie für ein Label, das niemand minutengenau liest.
+- **Wer später doch adressierte Einladungen will**, braucht drei Dinge zusammen: eine `email`-Spalte, ein Feld im Invite-Flow und einen echten Versandweg (Edge Function oder `mailto:`) — sonst kehrt genau das Zustellbestätigungs-Missverständnis aus dem Context zurück. Als Follow-up in `docs/TODO.md` notiert.

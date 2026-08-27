@@ -85,7 +85,8 @@ export function useFamilyPendingInvitations(
         .select("*")
         .eq("family_id", familyId as string)
         .is("used_at", null)
-        .gt("expires_at", new Date().toISOString());
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },

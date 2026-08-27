@@ -2,7 +2,13 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, View } from "react-native";
 
-import { ChildAvatar, Icon, SectionHeader, TopBar } from "@/app-sections/shared";
+import {
+  ChildAvatar,
+  confirmDestructive,
+  Icon,
+  SectionHeader,
+  TopBar,
+} from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
 import {
@@ -11,8 +17,11 @@ import {
   useFamilyParents,
   useFamilyPendingInvitations,
   useInvitePartner,
+  useRevokeInvitation,
 } from "@/features/auth";
 import { ageFromBirthday } from "@/features/children";
+
+import { PendingInviteCard } from "./PendingInviteCard";
 
 export function FamilieScreen() {
   const { t } = useTranslation();
@@ -24,15 +33,40 @@ export function FamilieScreen() {
   const parentsQ = useFamilyParents(familyId);
   const pendingQ = useFamilyPendingInvitations(familyId);
   const invite = useInvitePartner(familyId);
+  const revoke = useRevokeInvitation();
+
+  async function handleRevoke(token: string) {
+    if (!familyId) return;
+    const confirmed = await confirmDestructive({
+      title: t("familie.inviteRevokeTitle"),
+      body: t("familie.inviteRevokeBody"),
+      confirm: t("familie.inviteRevokeConfirm"),
+      cancel: t("action.cancel"),
+    });
+    if (!confirmed) return;
+    revoke.mutate({ familyId, token });
+  }
+
+  // Share-sheet dismissal rejects the promise; treat as a soft no-op.
+  function handleShare(force?: boolean) {
+    void invite.send({ force }).catch(() => {});
+  }
 
   const children = childrenQ.data ?? [];
   const parents = parentsQ.data ?? [];
   const pendingInvites = pendingQ.data ?? [];
+  const hasPendingInvite = pendingInvites.length > 0;
   const isLoading =
     parent.isLoading || childrenQ.isLoading || parentsQ.isLoading || pendingQ.isLoading;
   const isError = parent.isError || childrenQ.isError || parentsQ.isError || pendingQ.isError;
 
   const sub = `${t("familie.childrenCount", { count: children.length })} · ${t("familie.parentsCount", { n: parents.length })}`;
+
+  const errorMessage = invite.errorKey
+    ? t(invite.errorKey)
+    : revoke.isError
+      ? t("familie.inviteRevokeError")
+      : null;
 
   return (
     <Screen scroll>
@@ -61,25 +95,14 @@ export function FamilieScreen() {
               </Card>
             ))}
             {pendingInvites.map((inv) => (
-              <Card key={inv.token} className="flex-row items-center gap-3">
-                <View
-                  className="h-11 w-11 items-center justify-center rounded-full bg-primary-soft"
-                  accessibilityElementsHidden
-                  importantForAccessibility="no-hide-descendants"
-                >
-                  <Icon name="mail" size={18} color={theme.primaryStrong} />
-                </View>
-                <View className="flex-1">
-                  <Text variant="listTitle" tone="inkSecondary">
-                    {t("familie.invitePending")}
-                  </Text>
-                </View>
-                <View className="rounded-full bg-primary-soft px-3 py-1">
-                  <Text variant="caption" tone="primaryStrong">
-                    {t("familie.invitedPill")}
-                  </Text>
-                </View>
-              </Card>
+              <PendingInviteCard
+                key={inv.token}
+                invitation={inv}
+                onRegenerate={() => handleShare(true)}
+                onRevoke={() => void handleRevoke(inv.token)}
+                isRegenerating={invite.isPending}
+                isRevoking={revoke.isPending}
+              />
             ))}
           </View>
 
@@ -116,13 +139,13 @@ export function FamilieScreen() {
         </>
       )}
 
-      {invite.errorKey ? (
+      {errorMessage ? (
         <View
           className="mt-6 rounded-xl border border-danger bg-danger-soft p-3"
           accessibilityRole="alert"
         >
           <Text variant="body" tone="danger">
-            {t(invite.errorKey)}
+            {errorMessage}
           </Text>
         </View>
       ) : null}
@@ -135,16 +158,15 @@ export function FamilieScreen() {
           onPress={() => router.push("/child/new")}
         />
         <Button
-          label={t("familie.invitePartner")}
+          // A pending invite makes this button re-share the existing link
+          // rather than mint one, so say that instead of "Partner einladen".
+          label={hasPendingInvite ? t("familie.inviteReshare") : t("familie.invitePartner")}
           variant="soft"
           tone="primary"
           block
           loading={invite.isPending}
           disabled={!invite.canSend}
-          onPress={() => {
-            // Share-sheet dismissal rejects the promise; treat as a soft no-op.
-            void invite.send().catch(() => {});
-          }}
+          onPress={() => handleShare()}
         />
       </View>
     </Screen>
