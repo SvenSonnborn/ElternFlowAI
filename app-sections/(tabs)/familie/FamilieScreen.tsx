@@ -37,11 +37,17 @@ export function FamilieScreen() {
   const regenerate = useRegenerateInvitation();
   const revoke = useRevokeInvitation();
 
-  // The three mutations below share one error banner, and TanStack keeps
-  // `isError` set until a mutation runs again or is reset. Clearing all three
-  // when an action starts is what makes the banner show *this* action's outcome:
-  // otherwise a failed revoke would keep the banner after a later regenerate
-  // failed differently — or, worse, after one succeeded.
+  // Every invite action goes through one error banner, so only one may run at a
+  // time. Without this the bottom button stayed live during a card action (and
+  // vice versa): the second action's `clearActionErrors` would wipe the first
+  // while it was still in flight, and the first could then report its failure
+  // after the second had already finished.
+  const actionInFlight = invite.isPending || regenerate.isPending || revoke.isPending;
+
+  // TanStack keeps `isError` set until a mutation runs again or is reset.
+  // Clearing all three when an action starts is what makes the banner show
+  // *this* action's outcome: otherwise a failed revoke would keep the banner
+  // after a later regenerate failed differently — or, worse, after one succeeded.
   function clearActionErrors() {
     invite.reset();
     regenerate.reset();
@@ -126,11 +132,18 @@ export function FamilieScreen() {
               <PendingInviteCard
                 key={inv.token}
                 invitation={inv}
-                onShare={() => softShare(() => invite.shareToken(inv.token))}
+                onShare={() =>
+                  softShare(() => {
+                    clearActionErrors();
+                    return invite.shareToken(inv.token);
+                  })
+                }
                 onRegenerate={() => softShare(() => handleRegenerate(inv.token))}
                 onRevoke={() => void handleRevoke(inv.token)}
-                isRegenerating={regenerate.isPending}
-                isRevoking={revoke.isPending}
+                // One mutation instance serves every card, so scope the
+                // spinner to the token actually being rotated.
+                isRegenerating={regenerate.isPending && regenerate.variables?.token === inv.token}
+                isBusy={actionInFlight}
               />
             ))}
           </View>
@@ -194,7 +207,7 @@ export function FamilieScreen() {
           tone="primary"
           block
           loading={invite.isPending}
-          disabled={!invite.canSend}
+          disabled={!invite.canSend || actionInFlight}
           onPress={() =>
             softShare(() => {
               clearActionErrors();
