@@ -190,7 +190,7 @@ export function useDeleteChild() {
  *
  * Every call inserts — there is no reuse shortcut. That shortcut existed while
  * a partial unique index allowed only one open invitation per family; dropping
- * it (20260827120000) made "invite one more person" a thing the UI can express,
+ * it (20260827080254) made "invite one more person" a thing the UI can express,
  * and re-sharing an existing link is now the card's own action rather than a
  * side effect of tapping create.
  */
