@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { AVATAR_COLORS, capShort, deriveShort, normalizeShort } from "./avatarColor";
+import {
+  AVATAR_COLORS,
+  capShort,
+  deriveShort,
+  normalizeShort,
+  SHORT_MAX_LENGTH,
+} from "./avatarColor";
 
 describe("deriveShort", () => {
   test("first two letters uppercase", () => {
@@ -79,5 +85,30 @@ describe("deriveShort — astral input", () => {
   });
   test("doubles a single-code-point name", () => {
     expect(deriveShort("😀")).toBe("😀😀");
+  });
+});
+
+describe("deriveShort — Großschreibung, die den String verlängert", () => {
+  // toUpperCase() is not length-preserving: "ß" becomes "SS", the ligature "ﬃ"
+  // becomes "FFI". Capping before the uppercase would not help — the expansion
+  // happens after — so the cap has to sit on the final result.
+  test("keeps ß within SHORT_MAX_LENGTH", () => {
+    expect(Array.from(deriveShort("ß")).length).toBeLessThanOrEqual(SHORT_MAX_LENGTH);
+    expect(deriveShort("ß")).toBe("SSS");
+  });
+  test("keeps ligatures within SHORT_MAX_LENGTH", () => {
+    expect(deriveShort("ﬃ")).toBe("FFI");
+    expect(deriveShort("ﬃ X")).toBe("FFI");
+  });
+  test("the fallback path inherits the cap", () => {
+    // Onboarding writes deriveShort() straight to the DB, so the guard cannot
+    // live in normalizeShort alone.
+    expect(Array.from(normalizeShort("", "ﬃ")).length).toBeLessThanOrEqual(SHORT_MAX_LENGTH);
+  });
+  test("leaves ordinary names untouched", () => {
+    expect(deriveShort("Anna Becker")).toBe("AB");
+    expect(deriveShort("Straße")).toBe("ST");
+    expect(deriveShort("X")).toBe("XX");
+    expect(deriveShort("")).toBe("??");
   });
 });
