@@ -60,6 +60,14 @@ interface DeleteChildVars {
 
 interface CreateInvitationVars {
   familyId: string;
+  /** Mint a brand-new token even if a usable one exists — the "neu generieren"
+   *  path, for a link that leaked or that the partner never received. */
+  force?: boolean;
+}
+
+interface RevokeInvitationVars {
+  familyId: string;
+  token: string;
 }
 
 export function useCreateFamily() {
@@ -199,17 +207,22 @@ async function fetchUnusedInvitations(familyId: string): Promise<InvitationRow[]
  * fresh invitation (see docs/TODO.md history). The DB also enforces the
  * invariant via a partial unique index (one unused invite per family), so the
  * insert below can lose a race — we recover by re-reading the winner's row.
+ *
+ * Pass `force` to bypass the reuse shortcut and rotate the token instead.
  */
 export function useCreateInvitation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ familyId }: CreateInvitationVars): Promise<InvitationRow> => {
+    mutationFn: async ({ familyId, force }: CreateInvitationVars): Promise<InvitationRow> => {
       const unused = await fetchUnusedInvitations(familyId);
-      const reusable = pickReusableInvite(unused, new Date().toISOString());
-      if (reusable) return reusable;
+      if (!force) {
+        const reusable = pickReusableInvite(unused, new Date().toISOString());
+        if (reusable) return reusable;
+      }
 
-      // Every remaining unused invite is expired — clear them so the partial
-      // unique index doesn't block the fresh insert.
+      // Clear the remaining unused invites so the partial unique index doesn't
+      // block the fresh insert. Without `force` these are all expired; with it
+      // we retire the live one too — that retirement *is* the regeneration.
       const staleTokens = unused.map((i) => i.token);
       if (staleTokens.length > 0) {
         const { error: delError } = await supabase
@@ -225,7 +238,8 @@ export function useCreateInvitation() {
         .select()
         .single();
       if (error) {
-        // 23505 = a concurrent caller inserted first; reuse their invite.
+        // 23505 = a concurrent caller inserted first; reuse their invite. That
+        // also satisfies `force`: the winner's row is itself a fresh token.
         if (error.code === "23505") {
           const raced = pickReusableInvite(
             await fetchUnusedInvitations(familyId),
@@ -236,6 +250,30 @@ export function useCreateInvitation() {
         throw error;
       }
       return data;
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: ["family", vars.familyId, "invitations"] });
+    },
+  });
+}
+
+/**
+ * Withdraws a pending invitation: the row is deleted, so its deep link stops
+ * resolving in `accept_invitation`. Deleting rather than stamping `used_at`
+ * keeps the partial unique index free for the next invite — a revoked token is
+ * not a used one, and the family should be able to invite again right away.
+ */
+export function useRevokeInvitation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ familyId, token }: RevokeInvitationVars) => {
+      // family_id scope is belt-and-suspenders on top of the RLS delete policy.
+      const { error } = await supabase
+        .from("family_invitations")
+        .delete()
+        .eq("token", token)
+        .eq("family_id", familyId);
+      if (error) throw error;
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: ["family", vars.familyId, "invitations"] });

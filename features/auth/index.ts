@@ -24,6 +24,7 @@ export {
   type ParsedDeepLink,
 } from "./deepLinkHandler";
 export { mapAuthError, type AuthErrorKey } from "./errors";
+export { inviteExpiry, type InviteExpiry } from "./inviteStatus";
 export { useSignUp, useSignIn, useSignOut, useResetPassword, useUpdatePassword } from "./mutations";
 export { passwordStrength, type PasswordStrength, type StrengthLabel } from "./passwordStrength";
 export {
@@ -33,6 +34,7 @@ export {
   useUpdateChild,
   useDeleteChild,
   useCreateInvitation,
+  useRevokeInvitation,
 } from "./onboardingMutations";
 export {
   selectStatus,
