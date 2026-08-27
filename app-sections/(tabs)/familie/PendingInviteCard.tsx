@@ -11,8 +11,13 @@ interface PendingInviteCardProps {
   onShare: () => void;
   onRegenerate: () => void;
   onRevoke: () => void;
+  /** Drives this card's regenerate spinner. */
   isRegenerating: boolean;
-  isRevoking: boolean;
+  /** Any invite action anywhere on the screen is in flight. Disabling is
+   *  screen-wide, not per-card: the three mutations share one error banner, so
+   *  letting a second action start while one is running lets the loser of the
+   *  race report its outcome after the winner already did. */
+  isBusy: boolean;
 }
 
 /**
@@ -30,13 +35,12 @@ export function PendingInviteCard({
   onRegenerate,
   onRevoke,
   isRegenerating,
-  isRevoking,
+  isBusy,
 }: PendingInviteCardProps) {
   const { t } = useTranslation();
   const { theme } = useTheme();
 
   const { daysLeft, isUrgent } = inviteExpiry(invitation.expires_at, new Date().toISOString());
-  const busy = isRegenerating || isRevoking;
   // `daysLeft === 0` is expired *or* unparseable. Either way `accept_invitation`
   // would reject the token, so sharing it only wastes the recipient's time —
   // rotating or withdrawing it stays open, those are the ways out.
@@ -73,10 +77,10 @@ export function PendingInviteCard({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t("familie.inviteRevoke")}
-          disabled={busy}
+          disabled={isBusy}
           onPress={onRevoke}
           className={`h-11 w-11 items-center justify-center rounded-full ${
-            busy ? "opacity-50" : "active:opacity-80"
+            isBusy ? "opacity-50" : "active:opacity-80"
           }`}
         >
           <Icon name="trash" size={18} color={theme.danger} />
@@ -99,7 +103,7 @@ export function PendingInviteCard({
           tone="primary"
           size="md"
           className="flex-1"
-          disabled={busy || isDead}
+          disabled={isBusy || isDead}
           onPress={onShare}
         />
         <Button
@@ -109,7 +113,7 @@ export function PendingInviteCard({
           size="md"
           className="flex-1"
           loading={isRegenerating}
-          disabled={busy}
+          disabled={isBusy}
           onPress={onRegenerate}
         />
       </View>
