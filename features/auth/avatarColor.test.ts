@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { AVATAR_COLORS, deriveShort, normalizeShort } from "./avatarColor";
+import { AVATAR_COLORS, capShort, deriveShort, normalizeShort } from "./avatarColor";
 
 describe("deriveShort", () => {
   test("first two letters uppercase", () => {
@@ -44,5 +44,40 @@ describe("normalizeShort", () => {
   test("keeps the ?? floor when there is no name either", () => {
     // The column is NOT NULL, so something has to come out of here.
     expect(normalizeShort("", "")).toBe("??");
+  });
+});
+
+// A lone surrogate is not merely ugly: it is invalid UTF-8, so Postgres rejects
+// it on the way into `parents.short`.
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+describe("capShort", () => {
+  test("counts code points, not UTF-16 units", () => {
+    expect(capShort("😀😀")).toBe("😀😀");
+    expect(capShort("😀😀😀😀")).toBe("😀😀😀");
+  });
+  test("never cuts a surrogate pair in half", () => {
+    expect(LONE_SURROGATE.test(capShort("😀😀"))).toBe(false);
+  });
+  test("caps plain text at three characters", () => {
+    expect(capShort("ANNA")).toBe("ANN");
+  });
+});
+
+describe("normalizeShort — astral input", () => {
+  test("keeps emoji whole instead of leaving a lone surrogate", () => {
+    const result = normalizeShort("😀😀", "Anna Becker");
+    expect(result).toBe("😀😀");
+    expect(LONE_SURROGATE.test(result)).toBe(false);
+  });
+});
+
+describe("deriveShort — astral input", () => {
+  test("takes whole code points from each word", () => {
+    expect(deriveShort("😀 Becker")).toBe("😀B");
+    expect(LONE_SURROGATE.test(deriveShort("😀 Becker"))).toBe(false);
+  });
+  test("doubles a single-code-point name", () => {
+    expect(deriveShort("😀")).toBe("😀😀");
   });
 });

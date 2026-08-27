@@ -1,5 +1,11 @@
 export { AuthGate } from "./AuthGate";
-export { AVATAR_COLORS, deriveShort, normalizeShort, SHORT_MAX_LENGTH } from "./avatarColor";
+export {
+  AVATAR_COLORS,
+  capShort,
+  deriveShort,
+  normalizeShort,
+  SHORT_MAX_LENGTH,
+} from "./avatarColor";
 export {
   useChild,
   useFamily,
