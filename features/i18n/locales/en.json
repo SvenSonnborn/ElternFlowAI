@@ -548,6 +548,21 @@
     "deleteConfirmTitle": "Delete child?",
     "deleteConfirmMsg": "This profile will be permanently removed. This can't be undone."
   },
+  "parent": {
+    "editTitle": "Edit {{name}}",
+    "editSub": "Your profile",
+    "viewSub": "Parent profile",
+    "name": "Name",
+    "namePlaceholder": "Anna",
+    "short": "Initials",
+    "shortHint": "Up to three characters for your avatar. Leave it empty and we derive it from the name.",
+    "color": "Colour",
+    "colorOption": "Choose colour",
+    "email": "Email",
+    "emailHint": "Your sign-in address. Not editable here yet.",
+    "notFound": "Profile not found.",
+    "nameRequired": "Please enter a name."
+  },
   "recipe": {
     "servings_one": "{{count}} serving",
     "servings_other": "{{count}} servings",

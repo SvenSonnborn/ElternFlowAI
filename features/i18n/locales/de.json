@@ -548,6 +548,21 @@
     "deleteConfirmTitle": "Kind löschen?",
     "deleteConfirmMsg": "Das Profil wird dauerhaft entfernt. Das lässt sich nicht rückgängig machen."
   },
+  "parent": {
+    "editTitle": "{{name}} bearbeiten",
+    "editSub": "Dein Profil",
+    "viewSub": "Eltern-Profil",
+    "name": "Name",
+    "namePlaceholder": "Anna",
+    "short": "Kürzel",
+    "shortHint": "Bis zu drei Zeichen für deinen Avatar. Lässt du das Feld leer, bilden wir es aus dem Namen.",
+    "color": "Farbe",
+    "colorOption": "Farbe wählen",
+    "email": "E-Mail",
+    "emailHint": "Deine Anmelde-Adresse. Lässt sich hier noch nicht ändern.",
+    "notFound": "Profil nicht gefunden.",
+    "nameRequired": "Bitte gib einen Namen ein."
+  },
   "recipe": {
     "servings_one": "{{count}} Portion",
     "servings_other": "{{count}} Portionen",

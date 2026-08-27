@@ -121,12 +121,19 @@ export function FamilieScreen() {
           <SectionHeader title={t("familie.parents")} />
           <View className="gap-2">
             {parents.map((p) => (
-              <Card key={p.id} className="flex-row items-center gap-3">
-                <ChildAvatar name={p.name} color={p.color} size="lg" />
-                <View className="flex-1">
-                  <Text variant="listTitle">{p.name}</Text>
-                </View>
-              </Card>
+              <Pressable
+                key={p.id}
+                onPress={() => router.push(`/parent/${p.id}`)}
+                className="active:opacity-80"
+              >
+                <Card className="flex-row items-center gap-3">
+                  <ChildAvatar name={p.name} short={p.short} color={p.color} size="lg" />
+                  <View className="flex-1">
+                    <Text variant="listTitle">{p.name}</Text>
+                  </View>
+                  <Icon name="chevron-right" size={16} color={theme.inkTertiary} />
+                </Card>
+              </Pressable>
             ))}
             {pendingInvites.map((inv) => (
               <PendingInviteCard
