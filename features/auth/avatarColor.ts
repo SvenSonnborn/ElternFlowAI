@@ -8,6 +8,22 @@ export const AVATAR_COLORS = [
 ] as const;
 
 /**
+ * i18n key per chip, so a screen reader can tell the six swatches apart.
+ *
+ * The name is the accessible *label* ("Mint"); the screens pass "Farbe wählen"
+ * as the `accessibilityHint` alongside it — what the control is, then what
+ * activating it does.
+ */
+export const AVATAR_COLOR_NAMES: Record<(typeof AVATAR_COLORS)[number], string> = {
+  "#7DB6A8": "color.mint",
+  "#E8A56A": "color.orange",
+  "#A78BFA": "color.violet",
+  "#F47AA8": "color.pink",
+  "#5BB0E0": "color.blue",
+  "#C4B45D": "color.ochre",
+};
+
+/**
  * Splits by code point instead of UTF-16 unit.
  *
  * `.slice()` and `[0]` count units, so anything outside the BMP — an emoji, say

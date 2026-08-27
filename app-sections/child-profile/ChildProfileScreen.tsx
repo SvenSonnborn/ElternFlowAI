@@ -9,6 +9,7 @@ import { ChildAvatar, Field, Icon, Pill, TopBar } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
 import {
+  AVATAR_COLOR_NAMES,
   AVATAR_COLORS,
   mapAuthError,
   useChild,
@@ -261,7 +262,11 @@ export function ChildProfileScreen() {
                   onPress={() => setColor(c)}
                   hitSlop={8}
                   accessibilityRole="button"
-                  accessibilityLabel={t("child.colorOption")}
+                  // Label says which control this is, hint says what tapping
+                  // does. All six sharing "Farbe wählen" as the label left a
+                  // screen reader with six identical buttons.
+                  accessibilityLabel={t(AVATAR_COLOR_NAMES[c])}
+                  accessibilityHint={t("child.colorOption")}
                   accessibilityState={{ selected: color === c }}
                   style={{
                     width: 28,
