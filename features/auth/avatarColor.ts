@@ -23,6 +23,16 @@ function codePoints(value: string): string[] {
   return Array.from(value);
 }
 
+/**
+ * Two initials from a name, uppercased.
+ *
+ * Every return runs through `capShort`, because `toUpperCase()` does not
+ * preserve length: "ß" becomes "SS" and the ligature "ﬃ" becomes "FFI", so two
+ * code points in can be four or six out. Capping earlier would not help — the
+ * expansion happens at the uppercase. Onboarding writes this value straight into
+ * `parents.short` via `create_family`, so the guard has to live here rather than
+ * in `normalizeShort` alone.
+ */
 export function deriveShort(name: string): string {
   const trimmed = name.trim();
   if (trimmed.length === 0) return "??";
@@ -30,10 +40,10 @@ export function deriveShort(name: string): string {
   if (words.length === 0) return "??";
   if (words.length === 1) {
     const cp = codePoints(words[0]);
-    if (cp.length === 1) return (words[0] + words[0]).toUpperCase();
-    return cp.slice(0, 2).join("").toUpperCase();
+    if (cp.length === 1) return capShort((words[0] + words[0]).toUpperCase());
+    return capShort(cp.slice(0, 2).join("").toUpperCase());
   }
-  return (codePoints(words[0])[0] + codePoints(words[1])[0]).toUpperCase();
+  return capShort((codePoints(words[0])[0] + codePoints(words[1])[0]).toUpperCase());
 }
 
 /** Longest `short` the avatar chip renders without crowding. */
