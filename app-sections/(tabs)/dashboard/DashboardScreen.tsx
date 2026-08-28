@@ -28,6 +28,22 @@ import { OnboardingResumeCard } from "./OnboardingResumeCard";
 import { PrepRow } from "./PrepRow";
 import { buildTomorrowPrep } from "./tomorrowPrep";
 
+/**
+ * Der populated Dashboard aus [patterns/dashboard.md](../../../patterns/dashboard.md),
+ * Variante V1: Avatar-Reihe · Heute · Meal-Hero · Morgen vorbereiten.
+ *
+ * Zwei Eigenheiten, die man dem Code sonst als Zufall ansieht:
+ *
+ * - **Keine eigenen Query-Fenster.** `useFamilyEvents(today)`, `useFamilyTasks`
+ *   und `useTodaysMeal` treffen dieselben Query-Keys wie Kalender-, Aufgaben-
+ *   und Essen-Tab. „Morgen" liegt im selben Monatsfenster wie „Heute", kostet
+ *   also keinen zweiten Roundtrip.
+ * - **Schweigen statt Behaupten.** Solange eine Query lädt oder gescheitert
+ *   ist, rendert die betroffene Sektion gar nichts — „alles ruhig" ist eine
+ *   Aussage über den Tag, und die lässt sich ohne Daten nicht belegen
+ *   (ADR-018, ADR-019). Dieselbe Zurückhaltung trägt die Fortsetzen-Karte
+ *   (ADR-023), nur über den Zustand des Accounts statt über den Tag.
+ */
 export function DashboardScreen() {
   const { t, i18n } = useTranslation();
   const { theme } = useTheme();

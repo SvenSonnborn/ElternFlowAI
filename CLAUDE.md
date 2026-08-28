@@ -208,6 +208,16 @@ When you change code that's documented, update the doc in the same commit:
 
 When in doubt, the **handoff bundle wins**. CLAUDE.md and decision-log.md adapt around it.
 
+### Docstrings
+
+**Jede neue oder umgeschriebene exportierte Funktion, Komponente, Hook und jedes neue Modul bekommt einen JSDoc-Block — im selben Commit, nicht als Nacharbeit.** Der Block wird beim Schreiben mitgeliefert; ihn später „noch nachzuziehen" heißt, ihn ohne den Kontext zu schreiben, in dem die Entscheidung gefallen ist.
+
+Was hineingehört, ist das **Nicht-Offensichtliche**: warum es so gebaut ist, welcher Grenzfall die Form bestimmt hat, welcher ADR oder welches Pattern-Doc dahintersteht. Was der Name schon sagt, wird nicht wiederholt — `/** Lädt die Kinder der Familie. */` über `useFamilyChildren` ist Füllmaterial, kein Docstring. Vorbilder im Bestand: [onboardingResume.ts](features/auth/onboardingResume.ts), [decideRoute.ts](features/auth/decideRoute.ts), [MealHeroEmptyCard.tsx](<app-sections/(tabs)/dashboard/MealHeroEmptyCard.tsx>).
+
+Ausgenommen sind lokale Helfer, die eine Datei nicht verlässt — insbesondere die `input()`/`parent()`-Fabriken in Testdateien.
+
+Das ist eine **Konvention, kein Gate**: CodeRabbits Docstring-Coverage-Prüfung steht bewusst auf `threshold: 0` (siehe [Code review](#code-review-coderabbit)), weil sie alle vom Diff berührten Funktionen zählt und damit fremde Altlasten als eigenes Finding zurückspielt. Die Disziplin trägt diese Regel hier, nicht die Prüfung.
+
 ## CI/CD (GitHub Actions)
 
 Sechs PR-getriggerte Workflows liegen in [.github/workflows/](.github/workflows/) (kein `push`-Trigger auf `main` — die PR-Gates davor genügen). Auf **jedem** Pull Request laufen vier davon als Gate — `ci.yml`, `native-build.yml`, `pr-labeler.yml`, `dependency-review.yml` („Gate" meint hier: läuft **unbedingt**, im Gegensatz zu den beiden bedingten unten — **nicht**, dass es den Merge blockiert; bislang ist keiner der sechs ein Required Check, die Branch-Protection ist noch offen, siehe [docs/TODO.md](docs/TODO.md)); die anderen beiden laufen bedingt: `renovate-validate.yml` nur, wenn die Renovate-Config oder ihr eigener Workflow im Diff liegt, `expo-sdk-sync.yml` nur auf Renovates Expo-SDK-PR — und ist dabei kein Gate, sondern ein mutierender Workflow, der Commits in den PR-Branch pusht:
@@ -241,7 +251,7 @@ local review without spending a new one.
 This catches bugs, security issues, and CLAUDE.md/handoff violations **before** the PR exists, so the PR opens clean. The CodeRabbit GitHub bot then does the team-level review on the PR itself.
 
 - Review config lives in [.coderabbit.yaml](.coderabbit.yaml) — `path_instructions` are mapped to the non-negotiables above (handoff bundle off-limits, i18n enforced, touch targets, Du-Form, routing convention, RLS). Reviews are in German. Update this file when conventions change.
-- **Die Docstring-Coverage-Pre-Merge-Prüfung steht auf `threshold: 0`** ([.coderabbit.yaml](.coderabbit.yaml) — `reviews.pre_merge_checks.docstrings`): sie läuft und meldet ihre Zahl, kann aber nicht fehlschlagen. Gezählt werden alle vom Diff **berührten** Funktionen, nicht nur die neuen — zwei eingefügte Zeilen in einem bestehenden Screen erben dessen fehlenden Docstring als eigenes Finding. Begründung samt Alternativen (`mode: "off"` / `mode: "error"`) steht als Kommentar an der Einstellung.
+- **Die Docstring-Coverage-Pre-Merge-Prüfung steht auf `threshold: 0`** ([.coderabbit.yaml](.coderabbit.yaml) — `reviews.pre_merge_checks.docstrings`): sie läuft und meldet ihre Zahl, kann aber nicht fehlschlagen. Gezählt werden alle vom Diff **berührten** Funktionen, nicht nur die neuen — zwei eingefügte Zeilen in einem bestehenden Screen erben dessen fehlenden Docstring als eigenes Finding. Begründung samt Alternativen (`mode: "off"` / `mode: "error"`) steht als Kommentar an der Einstellung. Dass die Prüfung nicht mehr blockt, heißt **nicht**, dass Docstrings optional sind — die Regel steht unter [Documentation discipline → Docstrings](#docstrings) und gilt unabhängig von ihr.
 - To re-trigger the bot's PR review after pushing fixes, comment `@coderabbitai review` on the PR.
 - A **pre-push hook** ([scripts/coderabbit-prepush.sh](scripts/coderabbit-prepush.sh), wired via `simple-git-hooks`) can run this review automatically before each `git push` of a feature branch — **warn-only**, never blocks. **Currently disabled** (early `exit 0` at the top of the script) because we rely on the CodeRabbit GitHub bot's PR reviews instead; re-enable by deleting the two disable lines. When active it skips on `main` and when there are no new commits vs `main`; bypass a single push with `git push --no-verify`. A commented BLOCK variant is in the script if you ever want it to fail the push on findings.
 - Keep it lightweight — don't loop reviews needlessly. Rate limits differ by interface: the CLI allows about 3 reviews/hour, and the GitHub PR bot about 1 review per developer/hour on a rolling window.
