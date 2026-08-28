@@ -45,7 +45,8 @@ type LucideAlias =
   | "doctor"
   | "ball"
   | "sparkles"
-  | "fire";
+  | "fire"
+  | "x";
 
 const featherMap: Partial<Record<LucideAlias, FeatherName>> = {
   home: "home",
@@ -80,6 +81,7 @@ const featherMap: Partial<Record<LucideAlias, FeatherName>> = {
   shield: "shield",
   globe: "globe",
   moon: "moon",
+  x: "x",
 };
 
 const mciMap: Partial<Record<LucideAlias, MCIName>> = {

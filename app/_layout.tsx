@@ -8,6 +8,7 @@ import { useEffect, useMemo } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { ToastProvider } from "@/app-sections/shared";
 import { ThemeProvider, useTheme } from "@/design-system/ThemeProvider";
 import { AuthGate, initDeepLinkHandler, useInitSession } from "@/features/auth";
 
@@ -17,93 +18,100 @@ function ThemedStack() {
   useEffect(() => initDeepLinkHandler(), []);
   return (
     <AuthGate>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(onboarding)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="recipe/[id]" options={{ presentation: "modal", headerShown: false }} />
-        <Stack.Screen
-          name="event/[id]"
-          options={{
-            presentation: "formSheet",
-            headerShown: false,
-            gestureEnabled: true,
-            sheetAllowedDetents: [0.72],
-            sheetCornerRadius: 26,
-            sheetGrabberVisible: true,
-            sheetExpandsWhenScrolledToEdge: false,
-            contentStyle: { flex: 1, backgroundColor: theme.card },
-          }}
-        />
-        <Stack.Screen
-          name="event/edit/[id]"
-          options={{
-            presentation: "formSheet",
-            headerShown: false,
-            gestureEnabled: true,
-            sheetAllowedDetents: [0.85],
-            sheetCornerRadius: 26,
-            sheetGrabberVisible: true,
-            sheetExpandsWhenScrolledToEdge: false,
-            contentStyle: { flex: 1, backgroundColor: theme.card },
-          }}
-        />
-        <Stack.Screen
-          name="event/new"
-          options={{
-            presentation: "formSheet",
-            headerShown: false,
-            gestureEnabled: true,
-            sheetAllowedDetents: [0.9],
-            sheetCornerRadius: 26,
-            sheetGrabberVisible: true,
-            sheetExpandsWhenScrolledToEdge: false,
-            contentStyle: { flex: 1, backgroundColor: theme.card },
-          }}
-        />
-        <Stack.Screen
-          name="task/new"
-          options={{
-            presentation: "formSheet",
-            headerShown: false,
-            gestureEnabled: true,
-            sheetAllowedDetents: [0.9],
-            sheetCornerRadius: 26,
-            sheetGrabberVisible: true,
-            sheetExpandsWhenScrolledToEdge: false,
-            contentStyle: { flex: 1, backgroundColor: theme.card },
-          }}
-        />
-        <Stack.Screen
-          name="task/edit/[id]"
-          options={{
-            presentation: "formSheet",
-            headerShown: false,
-            gestureEnabled: true,
-            sheetAllowedDetents: [0.85],
-            sheetCornerRadius: 26,
-            sheetGrabberVisible: true,
-            sheetExpandsWhenScrolledToEdge: false,
-            contentStyle: { flex: 1, backgroundColor: theme.card },
-          }}
-        />
-        <Stack.Screen name="child/[id]" options={{ presentation: "card", headerShown: false }} />
-        <Stack.Screen name="child/new" options={{ presentation: "card", headerShown: false }} />
-        <Stack.Screen
-          name="settings"
-          options={{
-            presentation: "formSheet",
-            headerShown: false,
-            gestureEnabled: true,
-            sheetAllowedDetents: [0.82],
-            sheetCornerRadius: 26,
-            sheetGrabberVisible: true,
-            sheetExpandsWhenScrolledToEdge: false,
-            contentStyle: { flex: 1, backgroundColor: theme.bg },
-          }}
-        />
-        <Stack.Screen name="+not-found" options={{ presentation: "modal" }} />
-      </Stack>
+      {/* Über dem Navigator, damit ein Toast den Screenwechsel überlebt, der
+          ihn ausgelöst hat. */}
+      <ToastProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(onboarding)" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen
+            name="recipe/[id]"
+            options={{ presentation: "modal", headerShown: false }}
+          />
+          <Stack.Screen
+            name="event/[id]"
+            options={{
+              presentation: "formSheet",
+              headerShown: false,
+              gestureEnabled: true,
+              sheetAllowedDetents: [0.72],
+              sheetCornerRadius: 26,
+              sheetGrabberVisible: true,
+              sheetExpandsWhenScrolledToEdge: false,
+              contentStyle: { flex: 1, backgroundColor: theme.card },
+            }}
+          />
+          <Stack.Screen
+            name="event/edit/[id]"
+            options={{
+              presentation: "formSheet",
+              headerShown: false,
+              gestureEnabled: true,
+              sheetAllowedDetents: [0.85],
+              sheetCornerRadius: 26,
+              sheetGrabberVisible: true,
+              sheetExpandsWhenScrolledToEdge: false,
+              contentStyle: { flex: 1, backgroundColor: theme.card },
+            }}
+          />
+          <Stack.Screen
+            name="event/new"
+            options={{
+              presentation: "formSheet",
+              headerShown: false,
+              gestureEnabled: true,
+              sheetAllowedDetents: [0.9],
+              sheetCornerRadius: 26,
+              sheetGrabberVisible: true,
+              sheetExpandsWhenScrolledToEdge: false,
+              contentStyle: { flex: 1, backgroundColor: theme.card },
+            }}
+          />
+          <Stack.Screen
+            name="task/new"
+            options={{
+              presentation: "formSheet",
+              headerShown: false,
+              gestureEnabled: true,
+              sheetAllowedDetents: [0.9],
+              sheetCornerRadius: 26,
+              sheetGrabberVisible: true,
+              sheetExpandsWhenScrolledToEdge: false,
+              contentStyle: { flex: 1, backgroundColor: theme.card },
+            }}
+          />
+          <Stack.Screen
+            name="task/edit/[id]"
+            options={{
+              presentation: "formSheet",
+              headerShown: false,
+              gestureEnabled: true,
+              sheetAllowedDetents: [0.85],
+              sheetCornerRadius: 26,
+              sheetGrabberVisible: true,
+              sheetExpandsWhenScrolledToEdge: false,
+              contentStyle: { flex: 1, backgroundColor: theme.card },
+            }}
+          />
+          <Stack.Screen name="child/[id]" options={{ presentation: "card", headerShown: false }} />
+          <Stack.Screen name="child/new" options={{ presentation: "card", headerShown: false }} />
+          <Stack.Screen
+            name="settings"
+            options={{
+              presentation: "formSheet",
+              headerShown: false,
+              gestureEnabled: true,
+              sheetAllowedDetents: [0.82],
+              sheetCornerRadius: 26,
+              sheetGrabberVisible: true,
+              sheetExpandsWhenScrolledToEdge: false,
+              contentStyle: { flex: 1, backgroundColor: theme.bg },
+            }}
+          />
+          <Stack.Screen name="+not-found" options={{ presentation: "modal" }} />
+        </Stack>
+      </ToastProvider>
     </AuthGate>
   );
 }

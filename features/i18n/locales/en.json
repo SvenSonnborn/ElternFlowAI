@@ -20,7 +20,8 @@
     "on": "On",
     "off": "Off",
     "manage": "Manage",
-    "retry": "Try again"
+    "retry": "Try again",
+    "close": "Close"
   },
   "color": {
     "mint": "Mint",
