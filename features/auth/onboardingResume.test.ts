@@ -46,9 +46,11 @@ describe("onboardingResumeStep", () => {
     expect(onboardingResumeStep(input({ pendingInviteCount: undefined }))).toBeNull();
   });
 
-  test("an empty parents list is not a loaded family — no partner is claimed", () => {
-    // Kann nur passieren, wenn RLS die Zeilen wegfiltert; dann ist die eigene
-    // Zeile nicht dabei und `hasPartner` bleibt falsch.
-    expect(onboardingResumeStep(input({ parents: [] }))).toBe(3);
+  test("stays silent when the own row is missing from the family list", () => {
+    // Kann nicht legitim vorkommen — die RLS-Policy auf `parents` hängt an
+    // genau dieser Zeile. Wenn doch, beschreiben Parent- und Familien-Antwort
+    // verschiedene Familien, und daraus lässt sich nichts schließen.
+    expect(onboardingResumeStep(input({ parents: [] }))).toBeNull();
+    expect(onboardingResumeStep(input({ parents: [{ id: "someone-else" }] }))).toBeNull();
   });
 });
