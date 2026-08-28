@@ -73,11 +73,16 @@ reviews:
     # --- ROUTING: app/ sind thin re-exports ---
     - path: "app/**/*.{ts,tsx}"
       instructions: >-
-        Dateien in app/ sind ausschließlich thin re-export-Wrapper (URL-Surface).
-        Sie sollen nur den Screen aus app-sections/ re-exportieren, z.B.
+        Route-Dateien in app/ sind thin re-export-Wrapper (URL-Surface). Sie
+        sollen nur den Screen aus app-sections/ re-exportieren, z.B.
         `export { XScreen as default } from "@/app-sections/...";`. Flagge echte
         Implementierungslogik (JSX, Hooks, State) in app/ als Konvention-Verstoß
-        — die gehört nach app-sections/.
+        — die gehört nach app-sections/. AUSGENOMMEN sind die `_layout.tsx`:
+        Layouts tragen die Navigator- und Provider-Komposition selbst, so
+        beschreibt CLAUDE.md sie ausdrücklich („Root stack + providers" für
+        app/_layout.tsx, „Bottom tab navigator + Voice FAB overlay" für
+        app/(tabs)/_layout.tsx). Ein Provider oder Navigator dort ist die
+        Konvention, kein Verstoß.
 
     # --- SCREENS: i18n, Touch-Targets, Du-Form ---
     - path: "app-sections/**/*.tsx"
