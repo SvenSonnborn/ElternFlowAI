@@ -118,6 +118,26 @@ reviews:
         kaputten Verweis im Original stehen lassen. Flagge solche Edits nur,
         wenn sie Entscheidung, Begründung oder Konsequenzen verändern.
 
+  # Pre-Merge-Checks (Pro-Tier). Nur die Docstring-Coverage ist hier abweichend
+  # eingestellt — der Rest bleibt auf den Defaults.
+  #
+  # `threshold: 0` heißt: die Prüfung läuft weiter und meldet ihre Zahl, kann
+  # aber nicht mehr fehlschlagen. Grund ist ihr Zuschnitt: gezählt werden alle
+  # Funktionen, die der Diff *berührt*, nicht nur die neuen. Wer zwei Zeilen in
+  # einen bestehenden Screen einfügt, erbt dessen fehlenden Docstring als
+  # eigenes Finding — im Resume-PR reichten drei dokumentierte von fünf
+  # Funktionen für 60 % gegen eine Vorgabe von 80 %, obwohl jedes neue Modul
+  # einen JSDoc-Block trug. Das Repo dokumentiert bewusst das Nicht-
+  # Offensichtliche (Warum, Grenzfall, Verweis auf ADR/Pattern) und nicht jede
+  # React-Komponente, deren Name plus Pattern-Doc die Sache schon sagt.
+  #
+  # Die Alternativen, falls das je anders gewollt ist: `mode: "off"` nimmt die
+  # Prüfung ganz aus dem Bericht, `mode: "error"` würde sie zusammen mit
+  # `request_changes_workflow: true` zum echten Merge-Blocker machen.
+  pre_merge_checks:
+    docstrings:
+      threshold: 0
+
   tools:
     eslint:
       enabled: true
