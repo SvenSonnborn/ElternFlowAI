@@ -185,8 +185,10 @@ export function Toast({ entry, onDismiss }: ToastProps) {
             accessibilityRole="button"
             // Sichtbar bleiben die 28 px aus dem Design, tastbar sind 44:
             // `hitSlop` scheidet aus, weil `Pressable` es auf react-native-web
-            // ignoriert (dieselbe Begründung wie in `SectionHeader`).
-            style={{ alignSelf: "flex-start", paddingVertical: 8, marginTop: 1 }}
+            // ignoriert (dieselbe Begründung wie in `SectionHeader`). Die Höhe
+            // tragen die 28 + 2×8; die Breite braucht `minWidth`, weil ein
+            // kurzes Label wie „OK" sonst auf ~37 px zusammenfällt.
+            style={{ alignSelf: "flex-start", minWidth: 44, paddingVertical: 8, marginTop: 1 }}
           >
             <View
               style={{
