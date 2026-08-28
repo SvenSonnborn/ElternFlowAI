@@ -815,3 +815,38 @@ Nur Step 2 committet (ADR-005, Approach C): `rpc("create_family")` legt Familie 
 - **Wer über die Karte bei Step 3 einsteigt und weiterläuft, sieht in Step 4 „Dein erstes Kind", auch wenn schon Kinder existieren.** Das ist der bestehende Flow — Step 5 verlinkt mit „Weiteres Kind anlegen" auf denselben Screen —, keine neue Eigenart. Ein zustandsabhängiger Titel wäre eine Copy-Änderung im Deck des Designers.
 - **Eine vierte Query auf dem Dashboard.** `useFamilyPendingInvitations` teilt Key und Cache mit dem Familie-Tab; auf dem Dashboard wird davon nur `length` gelesen.
 - **Die Karte spricht von „Einrichtung", nicht von „Onboarding".** Das Wort kommt in keiner Nutzer-Copy der App vor (`onb.*` sagt „Lass uns deine Familie einrichten"), und die Marken-Stimme ist warm und deutsch. Die Button-Labels sind bewusst die bestehenden `dash.empty.addChild` / `dash.empty.invite` — dieselben zwei Aktionen wie im Empty-State, und zwei Übersetzungen für denselben Satz driften auseinander.
+
+## ADR-024 — Toast aus dem Design-Kanvas importiert: Spezifikation und Pattern jetzt, Implementierung später (2026-08-28)
+
+### Status
+
+Accepted. Ergänzt das Handoff-Bundle um eine Komponente, die es dort bisher nicht gab; berührt keinen bestehenden ADR.
+
+### Context
+
+Der Design-Kanvas („familyflow ai", Sektion **10 · Toast-Komponente") führt eine Toast-Komponente, die im Repo fehlte: `screens/toasts.jsx` mit Spezimen und drei In-Kontext-Artboards, die CSS-Regeln in `styles.css`, und ein fertiger `toast`-Block in der dortigen `design-system/components.ts`. Alle übrigen Screens der Sektion sind hier bereits gebaut — der Toast war das einzige offene Stück.
+
+Übernommen wurde deshalb genau dieser eine Baustein, und zwar als **Handoff**, nicht als Code: Spezifikation und Pattern-Doc, wie sie für jeden anderen Screen auch vorliegen. Die React-Komponenten folgen in einer eigenen Iteration.
+
+### Decisions
+
+1. **Der `toast`-Block wandert unverändert in [design-system/components.ts](../design-system/components.ts)** — an dieselbe Stelle wie im Design-Projekt (zwischen `mealHero` und `statusBar`), mit denselben Feldern: `base`, `icon`, `title`, `message`, `action`, `close`, `progressBar`, `variants`, `solid`, `stack`, `timing`, `a11y`. Die Datei gehört zum Handoff-Bundle; sie wird hier auf ausdrückliche Anforderung erweitert, nicht umgeschrieben.
+
+2. **Zwei Radius-Referenzen sind beim Import korrigiert worden.** Der Quell-Block schrieb `radius: radius.lg` mit dem Kommentar `// 18` und `radius: radius.sm` mit `// 10`. Beides trifft nicht zu: die TS-Skala führt `lg = 12`, `sm = 8`, und 18 bzw. 10 heißen dort `"2xl"` und `md`. Ursache ist eine Namenskollision mit der Prototyp-CSS, die `--r-lg: 18px` definiert — die CSS-Variable und der TS-Token teilen den Namen, nicht den Wert. Maßgeblich ist der Pixelwert, den Kommentar **und** `styles.css` (`border-radius:var(--r-lg)` bzw. `10px`) übereinstimmend belegen; übernommen wurden daher `radius["2xl"]` und `radius.md`. Ein Kommentar an der Stelle hält den Grund fest, damit die Korrektur beim nächsten Abgleich nicht als Abweichung zurückgedreht wird.
+
+3. **Die drei Farbrollen sind auf unsere Theme-Namen gezogen.** Der Quell-Block nannte `var(--success-100)` / `var(--danger-100)` / `var(--mint-100)` — die Palettenstufen der Prototyp-CSS. Unsere Themes führen dieselben Flächen als semantische Rollen (`--success-soft`, `--danger-soft`, `--primary-soft`), und die Tailwind-Klassen lesen genau die. Ebenso `--ink-3` → `--ink-tertiary`. Das ist eine Übersetzung, keine Entscheidung gegen das Design: die Werte sind dieselben, nur unter dem Namen, den ein Implementierer hier tatsächlich verwenden kann.
+
+4. **`stack.zIndex` ist ergänzt.** Der Quell-Block beschrieb die Stapel-Geometrie (`insetX`, `top`, `bottom`, `gap`, `max`), ließ die Ebene aber offen; die Prototyp-CSS setzt `z-index:30`, was in unserer Skala nichts bedeutet. `zIndex.toast` (70) existiert in [spacing.ts](../design-system/spacing.ts) seit jeher ungenutzt und sagt genau das Richtige: über Tab-Bar (10) und Mic-FAB (20), unter dem Voice-Overlay (80).
+
+5. **[patterns/toast.md](../patterns/toast.md) ist neu geschrieben, nicht importiert.** Das Design-Projekt hat für den Toast kein Pattern-Doc — die anderen neun Sektionen haben eines. Der Inhalt stammt vollständig aus Spezimen, CSS und Spec-Block; die Form folgt den bestehenden Pattern-Docs (Goal · Anatomy · Variants · States · Accessibility).
+
+6. **Die Touch-Target-Abweichung ist im Pattern benannt, nicht stillschweigend übernommen.** Das Design zeichnet den Schließen-Knopf mit 24×24 und den Aktions-Button mit 28 px Höhe; Non-Negotiable 4 in [CLAUDE.md](../CLAUDE.md) verlangt 44×44. Aufgelöst wird das wie überall sonst in der App — sichtbare Größe behalten, Trefferfläche auf 44 wachsen lassen, wie `SectionHeader` es vormacht (und ausdrücklich **nicht** über `hitSlop`, das `Pressable` auf react-native-web ignoriert). Das Pattern schreibt beides hin, damit die Umsetzung nicht zwischen Design und Non-Negotiable wählen muss.
+
+7. **Kein `toast.*`-i18n-Namespace.** Toast-Copy gehört der Funktion, die den Toast auslöst, und liegt damit in `cal.*`, `meals.*`, `auth.*` und so weiter. Die Copy im Spezimen ist Anschauungsmaterial, keine App-Copy — sie wandert nicht in die Kataloge und nicht in [docs/COPY.md](./COPY.md).
+
+### Consequences
+
+- **Es gibt noch keinen Toast in der App.** `DS.components.toast` ist über den Barrel (`export * from "./components"`) sofort lesbar, aber `Toast` und `ToastStack` existieren nicht — bewusst so bestellt. Als Follow-up in [docs/TODO.md](./TODO.md) notiert, zusammen mit der offenen Frage, ob der Stack pro Screen montiert wird (wie im Pattern beschrieben) oder als Provider im Root-Layout.
+- **[docs/ICONS.md](./ICONS.md) führt jetzt `x`.** Der Schließen-Knopf ist das erste Element im Bundle, das ein Kreuz braucht; Feather liefert es unter demselben Namen. Der Alias fehlt noch im `LucideAlias`-Union von [Icon.tsx](../app-sections/shared/Icon.tsx) — er kommt mit der Implementierung, damit kein Alias ohne Verbraucher im Typ steht.
+- **Die drei Icon-Glyphen des Toasts sind schon da.** `check`, `warning` (→ `alert-triangle`) und `sparkle` (→ `sparkles`) stehen in ICONS.md und im Alias-Union; der Import fügt dem Vokabular nichts hinzu außer dem Kreuz.
+- **Das `error`-Timing ist eine Verhaltenszusage, kein Styling.** `autoDismissMs.error: null` heißt: Fehler-Toasts verschwinden nie von selbst. Wer den Vertrag später in eine Komponente gießt, darf daraus keinen Default-Timeout machen — der Toast trägt die Aktion, die den Fehler behebt.

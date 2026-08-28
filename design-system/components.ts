@@ -3,7 +3,7 @@
 // they describe the visual contract each component must honour. Implementers
 // map them to their framework (React/RN, Vue, SwiftUI, Compose).
 
-import { radius, shadow, space, touchTarget, screen } from "./spacing";
+import { radius, shadow, space, touchTarget, screen, zIndex } from "./spacing";
 import { textStyles } from "./typography";
 
 // ─────────────────────────── BUTTON ───────────────────────────
@@ -257,6 +257,87 @@ export const mealHero = {
   reason: { color: "rgba(255,255,255,0.9)", fontSize: 12.5 },
   // Reason must always state 3 facts: child preference · constraint · time
   // Example DE: "Ben liebt Nudeln · keine Allergien · 20 Min."
+};
+
+// ─────────────────────────── TOAST ───────────────────────────
+//
+//   <Toast variant title msg action onAction onClose solid progress />
+//
+// variant: success | error | info
+// Placement: ToastStack, absolutely positioned inside the screen —
+// `top` (below status bar) is the default; `bottom` sits above the tab bar.
+// One toast at a time is the rule; a stack of 2 is the hard maximum.
+//
+export const toast = {
+  base: {
+    minHeight: 56,
+    paddingY: 13,
+    paddingX: space[3.5], // 14
+    // 18 — the design prototype's CSS says `--r-lg`, but that variable is 18px
+    // while the token `radius.lg` is 12. The pixel value is what carries over.
+    radius: radius["2xl"],
+    gap: space[3], // 12
+    bg: "var(--card)",
+    shadow: `${shadow.lg}, ${shadow.ring}`,
+    // 4px accent rail on the leading edge, rounded on the inner corners only
+    rail: { width: 4, radius: 3 },
+  },
+  icon: {
+    size: 30,
+    radius: 11,
+    glyphSize: 17, // stroke icon inside the tinted square
+  },
+  title: { ...textStyles.listTitle, fontSize: 13.5 },
+  message: { ...textStyles.meta, fontSize: 12.5, marginTop: 2 },
+  action: {
+    marginTop: 9,
+    height: 28,
+    paddingX: 11,
+    radius: radius.md, // 10 — same CSS-vs-token naming note as base.radius
+    fontSize: 12,
+    fontWeight: 600,
+    // bg = variant tint, fg = variant accent
+  },
+  close: { size: 24, radius: 8, glyphSize: 13, color: "var(--ink-tertiary)" },
+  // Optional countdown rail along the bottom edge; scaleX 1 → 0.
+  progressBar: { height: 2.5, opacity: 0.35 },
+
+  variants: {
+    success: { accent: "var(--success)", tint: "var(--success-soft)", icon: "check" },
+    error: { accent: "var(--danger)", tint: "var(--danger-soft)", icon: "warning" },
+    info: { accent: "var(--primary-strong)", tint: "var(--primary-soft)", icon: "sparkle" },
+  },
+
+  // `solid` fills the whole surface with the accent — reserve it for
+  // blocking / safety-critical errors (e.g. an allergy conflict), never
+  // for routine confirmations.
+  solid: {
+    bg: "variant.accent",
+    fg: "#FFFFFF",
+    messageOpacity: 0.85,
+    iconBg: "rgba(255,255,255,.20)",
+    rail: null,
+  },
+
+  stack: {
+    insetX: space[3.5], // 14
+    top: 52, // clears the status bar
+    bottom: 96, // clears the tab bar
+    gap: 9,
+    max: 2,
+    zIndex: zIndex.toast,
+  },
+
+  // Behaviour contract
+  timing: {
+    autoDismissMs: { success: 3200, info: 4500, error: null }, // errors are manual
+    enter: "140ms ease-out, translateY(-8px → 0) + fade",
+    exit: "120ms ease-in, fade + height collapse",
+  },
+  a11y: {
+    role: { success: "status", info: "status", error: "alert" },
+    live: { success: "polite", info: "polite", error: "assertive" },
+  },
 };
 
 // ─────────────────────────── STATUS BAR ───────────────────────────

@@ -51,6 +51,7 @@ All icons are stroke-based, Lucide-style (https://lucide.dev) at stroke 2, round
 | `globe`    | `globe`           | Language switcher                                         |
 | `moon`     | `moon`            | Dark mode toggle                                          |
 | `warning`  | `alert-triangle`  | Allergy warning, login error, danger states               |
+| `x`        | `x`               | Toast close, sheet dismiss                                |
 
 ## Brand glyphs (filled / multicoloured)
 
