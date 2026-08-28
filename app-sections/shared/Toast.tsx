@@ -23,9 +23,16 @@ const VARIANT: Record<ToastVariant, { accent: keyof Theme; tint: keyof Theme; ic
   info: { accent: "primaryStrong", tint: "primarySoft", icon: "sparkles" },
 };
 
-/** `true`, wenn das System „Bewegung reduzieren" gesetzt hat. */
-function useReduceMotion(): boolean {
-  const [reduce, setReduce] = useState(false);
+/**
+ * `true`, wenn das System „Bewegung reduzieren" gesetzt hat — `null`, solange
+ * es noch nicht geantwortet hat.
+ *
+ * Der Unterschied ist nicht kosmetisch: mit `false` als Startwert liefe die
+ * Einblend-Animation für genau die Nutzer einmal voll durch, die sie
+ * abbestellt haben, weil die Abfrage asynchron ist.
+ */
+function useReduceMotion(): boolean | null {
+  const [reduce, setReduce] = useState<boolean | null>(null);
   useEffect(() => {
     let active = true;
     void AccessibilityInfo.isReduceMotionEnabled().then((value) => {
@@ -69,6 +76,9 @@ export function Toast({ entry, onDismiss }: ToastProps) {
   const [progress] = useState(() => new Animated.Value(0));
   // Ein einmal gestartetes Ausblenden darf der Timer nicht erneut anstoßen.
   const leaving = useRef(false);
+  // Die Einblend-Animation läuft einmal, nicht bei jeder Änderung der
+  // Bewegungs-Einstellung.
+  const entered = useRef(false);
 
   const enterFrom = entry.position === "top" ? -8 : 8;
 
@@ -77,13 +87,20 @@ export function Toast({ entry, onDismiss }: ToastProps) {
     leaving.current = true;
     Animated.timing(progress, {
       toValue: 0,
-      duration: reduceMotion ? 0 : 120,
+      duration: reduceMotion === true ? 0 : 120,
       easing: Easing.in(Easing.quad),
       useNativeDriver: true,
     }).start(() => onDismiss(entry.id));
   }, [progress, reduceMotion, onDismiss, entry.id]);
 
+  // Genau einmal pro Toast, und erst wenn die Bewegungs-Einstellung bekannt
+  // ist. Ohne die Sperre würde jedes spätere `reduceMotionChanged` das Effect
+  // erneut ausführen — fiele das in das Ausblenden, stünde der Toast wieder
+  // auf `toValue: 1`, während `leaving` schon gesetzt ist, und ließe sich nie
+  // mehr schließen.
   useEffect(() => {
+    if (reduceMotion === null || entered.current) return;
+    entered.current = true;
     Animated.timing(progress, {
       toValue: 1,
       duration: reduceMotion ? 0 : 140,
@@ -97,6 +114,18 @@ export function Toast({ entry, onDismiss }: ToastProps) {
     const timer = setTimeout(close, entry.durationMs);
     return () => clearTimeout(timer);
   }, [entry.durationMs, close]);
+
+  // `accessibilityLiveRegion` ist in React Native Android-only; auf iOS meldet
+  // VoiceOver eine frisch eingehängte View von sich aus nicht. Ohne diese
+  // Ansage wäre der Toast dort stumm — und ein Toast, den niemand hört, ist
+  // für Screenreader-Nutzer gar kein Toast. Auf Android bleibt es bei der
+  // Live-Region, sonst käme die Meldung doppelt.
+  useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    AccessibilityInfo.announceForAccessibility(
+      entry.message ? `${entry.title}. ${entry.message}` : entry.title,
+    );
+  }, [entry.title, entry.message]);
 
   const isError = entry.variant === "error";
 
