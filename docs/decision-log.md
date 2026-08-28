@@ -850,3 +850,39 @@ Der Design-Kanvas („familyflow ai", Sektion **10 · Toast-Komponente") führt 
 - **[docs/ICONS.md](./ICONS.md) führt jetzt `x`.** Der Schließen-Knopf ist das erste Element im Bundle, das ein Kreuz braucht; Feather liefert es unter demselben Namen. Der Alias fehlt noch im `LucideAlias`-Union von [Icon.tsx](../app-sections/shared/Icon.tsx) — er kommt mit der Implementierung, damit kein Alias ohne Verbraucher im Typ steht.
 - **Die drei Icon-Glyphen des Toasts sind schon da.** `check`, `warning` (→ `alert-triangle`) und `sparkle` (→ `sparkles`) stehen in ICONS.md und im Alias-Union; der Import fügt dem Vokabular nichts hinzu außer dem Kreuz.
 - **Das `error`-Timing ist eine Verhaltenszusage, kein Styling.** `autoDismissMs.error: null` heißt: Fehler-Toasts verschwinden nie von selbst. Wer den Vertrag später in eine Komponente gießt, darf daraus keinen Default-Timeout machen — der Toast trägt die Aktion, die den Fehler behebt.
+
+## ADR-025 — Toast: ein Wirt im Root-Layout, ein Store ohne Context, Ort nach Icon-Abhängigkeit (2026-08-28)
+
+### Status
+
+Accepted. Setzt die Spezifikation aus [ADR-024](#adr-024--toast-aus-dem-design-kanvas-importiert-spezifikation-und-pattern-jetzt-implementierung-später-2026-08-28) um und beantwortet die dort offen gelassene Trägerfrage. Weicht in einem Punkt bewusst von [patterns/toast.md](../patterns/toast.md) ab (Decision 2).
+
+### Context
+
+Seit ADR-024 liegen `DS.components.toast` und das Pattern vor, Komponenten nicht. Der Auftrag: eine zentrale Toast-Komponente mit Provider, `useToast()`, den drei Varianten, beiden Positionen und Auto-Dismiss.
+
+### Decisions
+
+1. **Die Dateien liegen in `app-sections/shared/`, nicht in `design-system/ui/`.** Der Toast braucht vier Glyphen, und `Icon` wohnt in `app-sections/shared/`. `design-system/` importiert nirgends aus `app-sections/` — diese Richtung wäre eine Umkehrung der Schichtung. Das Repo hat den Fall längst entschieden, nur nie aufgeschrieben: `Pill`, `Field` und `TopBar` haben ebenfalls einen Spec-Block im Bundle und liegen trotzdem in `app-sections/shared/`, weil sie Icons brauchen. In `design-system/ui/` sitzt genau das, was ohne Icon auskommt (`Button`, `Card`, `Screen`, `Text`). Der Auftrag nannte `components/Toast.tsx` — ein Verzeichnis, das es hier nicht gibt und das mit `design-system/components.ts` kollidieren würde (siehe Namenskollisions-Notiz in CLAUDE.md).
+
+2. **Ein Wirt im Root-Layout statt eines Stapels pro Screen.** Das Pattern beschreibt `ToastStack` als _innerhalb_ des Screens positioniert. Umgesetzt ist ein einzelner `ToastProvider` über dem Navigator, weil ein Toast den Screenwechsel überleben muss, der ihn ausgelöst hat: „Termin gespeichert" erscheint, während der Nutzer schon zurücknavigiert. Ein Stapel pro Screen ginge mit dem Screen verloren — genau in dem Moment, für den der Toast gedacht ist. Die Geometrie aus dem Pattern bleibt unverändert, sie misst nur gegen das Fenster statt gegen den Screen. **Preis:** native `formSheet`-Screens hostet react-native-screens in einem eigenen ViewController, ein von dort ausgelöster Toast landet darunter (als Follow-up notiert; derselbe Mechanismus zwingt `ThemeProvider` zu seinen `nativeVars`).
+
+3. **Kein React-Context — der Store liegt auf Modulebene.** `useToast()` liest direkt aus dem Zustand-Store, wie `useThemeStore`/`ThemeProvider` es vormachen. Folge: der Hook funktioniert auch in Bäumen, die der Provider nicht umschließt, und ein vergessener Provider führt zu unsichtbaren Toasts statt zu einem geworfenen Fehler. Das ist hier die richtige Richtung — ein Toast ist Beiwerk; eine Fehlermeldung, die den Screen zum Absturz bringt, weil die Fehlermeldung nicht angezeigt werden kann, wäre grotesk.
+
+4. **Die Entscheidungslogik ist rein und getestet, der Store ist die dünne Hülle.** `resolveDuration`, `enqueue` und `buildToast` sind Funktionen ohne React und ohne `react-native`-Import — damit laufen sie unter Bun ohne die Mocks aus `bun.test.preload.ts`. Dieselbe Aufteilung wie `selectStatus`/`useSessionStore` in [features/auth/session.ts](../features/auth/session.ts).
+
+5. **Ein Toast mit Aktion läuft nie ab — unabhängig von der Variante.** Das Pattern sagt das für Fehler; `resolveDuration` zieht die Regel eine Ebene höher, weil die Begründung nicht an der Variante hängt: der Countdown nähme dem Nutzer genau den Knopf weg, wegen dem der Toast da ist. Ein ausdrücklich übergebenes `durationMs` gewinnt weiterhin über beides.
+
+6. **Der Stapel verdrängt den ältesten, nicht den neuesten.** Bei `max: 2` fällt der dritte Toast nicht weg, sondern schiebt den ersten hinaus. Das jüngste Ereignis ist das, auf das der Nutzer gerade reagiert.
+
+7. **Die Trefferflächen sind 44, die Optik bleibt beim Design.** Schließen-Knopf und Aktions-Button tragen ihre gezeichnete Größe (24 bzw. 28) in einer 44er-`Pressable`; beim Schließer holt ein negativer Rand von 10 die Optik zurück an die Design-Position, ohne die Fläche zu beschneiden — das Padding von 13 trägt sie. Kein `hitSlop`, aus dem Grund, den `SectionHeader` schon nennt: `Pressable` ignoriert es auf react-native-web.
+
+8. **`Animated` aus React Native, nicht Reanimated.** Ein Opazitäts- und Versatz-Übergang über `useNativeDriver` braucht keine Worklets; Reanimated ist zwar im Stack, hat aber bis heute keinen Aufrufer im Repo, und der erste sollte ein Fall sein, der es wirklich braucht. Der Wert entsteht über ein lazy `useState` statt `useRef`, weil `react-hooks/refs` den `.current`-Zugriff während des Renderns verbietet — und der Wert fließt in den Style.
+
+### Consequences
+
+- **Auf Web sichtbar geprüft, nicht auf Simulatoren.** Ein temporärer Auslöser im Login-Screen (dem einzigen Screen ohne Session-Zwang) hat beide Positionen, alle drei Varianten, Aktion, Schließer und Auto-Dismiss in Light **und** Dark gezeigt; der Auslöser und die dafür umgestellte Theme-Vorgabe sind zurückgenommen, beide Dateien stehen wieder exakt auf `main`. Native Simulatoren blieben außen vor: ohne Aufrufer im Produktcode gäbe es dort nichts zu sehen, und ein iOS-Build kostet rund eine halbe Stunde für dieselbe Aussage. Die drei Metro-Bundles (web, ios, android) laufen als Gegenprobe durch.
+- **Ein neuer i18n-Key: `action.close`.** Der Schließer ist ein Glyph ohne Text und braucht ein Label. Er steht bei den geteilten Aktions-Labels, nicht in einem `toast.*`-Namespace — den gibt es bewusst nicht (ADR-024, Decision 7).
+- **`x` ist jetzt im `LucideAlias`-Union** von [Icon.tsx](../app-sections/shared/Icon.tsx) und hat mit dem Schließer seinen Verbraucher — die Bedingung, unter der ADR-024 den Alias aufgeschoben hatte.
+- **`solid` und der Timer-Balken fehlen weiterhin.** Beide stehen in der Spezifikation, waren aber nicht Auftragsumfang; als Follow-up notiert. `solid` hat ohnehin nur einen vorgesehenen Anlass, und den gibt es noch nicht.
+- **Noch ruft niemand `useToast()`.** Die Komponente steht bereit, die erste echte Verwendung ist eine eigene Iteration mit eigener Copy.
