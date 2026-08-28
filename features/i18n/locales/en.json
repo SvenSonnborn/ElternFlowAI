@@ -233,6 +233,11 @@
         "sub": "Let's set up your family"
       }
     },
+    "resume": {
+      "title": "Finish setting up",
+      "invite": "Invite your partner — then you share the calendar, tasks and meal plan.",
+      "child": "Add the first child profile — events, tasks and allergies all hang off it."
+    },
     "tomorrow": {
       "empty": "Nothing to prep for tomorrow.",
       "more": "+{{count}} more"

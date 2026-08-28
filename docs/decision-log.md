@@ -778,3 +778,40 @@ Sichtbar wurde das erst durch ADR-021 Decision 6: solange der untere Button „P
 - **Onboarding Step 3 legt jetzt bei jedem Tap eine Einladung an** statt die bestehende erneut zu teilen. Folgenlos, weil der Screen bei Erfolg sofort zu Step 4 navigiert und der Button währenddessen über `canSend` gesperrt ist.
 - **Der Familie-Tab kann eine echte Liste zeigen.** Der Screen rendert schon vorher über `.map()`, es war also nur die DB, die ihn auf einen Eintrag beschränkt hat.
 - **Der Index-Drop allein hätte kein Typen-Regenerat gebraucht** — ein Index ist in `database.types.ts` nicht abgebildet. Die RPC aus Decision 4 dagegen schon: `regenerate_invitation` steht dort unter `Functions` und wird in [onboardingMutations.ts](../features/auth/onboardingMutations.ts) typisiert aufgerufen.
+
+## ADR-023 — Onboarding-Resume ist eine Karte auf dem Dashboard, kein Redirect (2026-08-28)
+
+### Status
+
+Accepted. Löst die Consequence „Resume-nach-Abbruch-CTA auf Dashboard wurde bewusst nicht V1" aus [ADR-005](#adr-005--supabase-auth--onboarding-approach-c-2026-06-01) ein; alles andere aus ADR-005 gilt unverändert, insbesondere Approach C und die AuthGate-Regel, dass nur Step 5 die Onboarding-Gruppe verlässt.
+
+### Context
+
+Nur Step 2 committet (ADR-005, Approach C): `rpc("create_family")` legt Familie und `parents`-Zeile an, Step 3 (Partner einladen) und Step 4 (erstes Kind) sind optionale INSERTs. Wer die App dazwischen schließt, hat damit alles, was [decideRoute](../features/auth/decideRoute.ts) prüft — `hasParent` ist wahr —, und landet beim nächsten Start auf `(tabs)`.
+
+`patterns/onboarding.md` und [patterns/dashboard-empty.md](../patterns/dashboard-empty.md) fangen diesen Fall auf dem Papier mit dem Willkommens-Screen ab. Im Code trägt das nicht: `app/(tabs)/index.tsx` rendert seit den Live-Daten immer `DashboardScreen`, [DashboardEmptyScreen](<../app-sections/(tabs)/dashboard/DashboardEmptyScreen.tsx>) ist von keiner Route gemountet, und seine beiden CTAs hatten nicht einmal einen `onPress`. Der abgebrochene User sah also drei Leer-Karten („Tagsüber alles ruhig", „Noch nichts geplant", „Für morgen ist nichts vorzubereiten") und nirgends einen Hinweis, dass die Einrichtung offen ist.
+
+### Decisions
+
+1. **Eine Karte auf dem Dashboard, kein Redirect zurück in den Flow.** Der naheliegende Griff wäre gewesen, `decideRoute` um „hat Familie, aber kein Kind → `/(onboarding)/4`" zu erweitern. Das hätte den User bei jedem App-Start zurück in einen Flow gezwungen, den er zweimal aktiv verlassen hat — Step 3 und Step 4 haben beide ein „Überspringen" —, und die Skips damit zu Fragen gemacht, die nie aufhören. Die Karte bietet den Rest an, statt ihn einzufordern.
+
+2. **Die Entscheidung liegt in einer reinen Funktion** ([onboardingResume.ts](../features/auth/onboardingResume.ts) — `onboardingResumeStep`), neben `decideRoute` und nach demselben Muster: Eingaben rein, Schritt oder `null` raus, Tests ohne React. Sie liegt in `features/auth/` und nicht im Dashboard-Ordner, weil sie den Onboarding-Zustand der Familie beschreibt und nicht das Layout eines Screens — der Familie-Tab könnte dieselbe Frage stellen.
+
+3. **Step 3 hat Vorrang vor Step 4.** Der frühere offene Schritt gewinnt, weil das die Richtung des Flows ist: wer bei 3 einsteigt, läuft über „Später einladen" ohnehin nach 4 weiter. Der umgekehrte Einstieg (erst das wertvollere Kinderprofil) würde Step 3 dauerhaft überspringen, denn aus Step 4 führt kein Weg zurück.
+
+4. **Eine offene Einladung zählt als erledigter Step 3.** Geprüft wird `parents`-Zweitzeile **oder** offene Einladung, nicht nur der beigetretene Partner. Sonst hätte die Karte einen User, der eingeladen hat und auf die Antwort wartet, unbegrenzt weiter zum Einladen aufgefordert — der offene Schritt liegt dort beim Eingeladenen. Der Zähler kommt aus `useFamilyPendingInvitations`, das schon auf unbenutzt + nicht abgelaufen filtert, teilt sich also Query-Key und Prädikat mit dem Familie-Tab.
+
+5. **Kein Wort, solange eine der vier Quellen nicht geantwortet hat.** `parentId`, `parents`, `childCount` und `pendingInviteCount` sind alle nullable; fehlt eines, ist das Ergebnis `null`. Dieselbe Zurückhaltung wie bei den Leer-Karten des Dashboards (ADR-019): „Du bist noch nicht fertig" ist eine Behauptung über die Familie, und ein Aufblitzen bei jedem Start wäre für eine vollständig eingerichtete Familie schlicht falsch. Weil ein Query-Fehler `data` ebenfalls `undefined` lässt, deckt dieselbe Prüfung beide Fälle ab.
+
+6. **Kein Wegklicken.** Die Karte verschwindet, sobald der Schritt erledigt ist — und wer sie nicht will, kann sie ignorieren. Ein Dismiss bräuchte einen persistierten Zustand (Spalte oder lokaler Store) für eine Karte, die es maximal zweimal im Leben eines Accounts gibt.
+
+7. **Die Karte steht über der ersten Sektion, nicht in ihr.** Die Leer-Karten von „Heute", Meal-Hero und „Morgen vorbereiten" beschreiben einen Tag, die Fortsetzen-Karte den Zustand des Accounts. Sie bleiben deshalb alle stehen — `patterns/dashboard.md` verlangt ausdrücklich „Don't hide sections; replace content" —, und die Kollision wird über die Rangordnung aufgelöst: die Fortsetzen-Karte ist die einzige `variant="solid"`-CTA in Sicht, der Meal-Hero trägt `soft`.
+
+8. **`DashboardEmptyScreen` bleibt liegen, seine CTAs zeigen aber auf dieselben Ziele.** Beide Oberflächen beschreiben denselben Zustand; zwei verschiedene Antworten auf „wo geht die Einrichtung weiter?" wären ein Widerspruch, der erst auffiele, wenn der Screen wieder gemountet wird. Gelöscht wird er nicht — er ist die Implementierung eines Handoff-Patterns, und ob das Pattern künftig die Karte beschreibt oder der Screen eine Route bekommt, entscheidet der Designer (als Follow-up in [docs/TODO.md](./TODO.md) notiert).
+
+### Consequences
+
+- **Der Push in die Onboarding-Gruppe ist unkritisch.** `decideRoute` gibt für `hasParent: true` + `currentGroup: "onboarding"` bereits `null` zurück — die Carve-out aus ADR-005 wirkt hier in die andere Richtung und verhindert, dass der AuthGate den User sofort wieder auf `(tabs)` schiebt. Der Zurück-Pfeil der `OnboardingShell` führt über `router.back()` aufs Dashboard, Step 5 schließt mit `router.replace("/(tabs)")` ab.
+- **Wer über die Karte bei Step 3 einsteigt und weiterläuft, sieht in Step 4 „Dein erstes Kind", auch wenn schon Kinder existieren.** Das ist der bestehende Flow — Step 5 verlinkt mit „Weiteres Kind anlegen" auf denselben Screen —, keine neue Eigenart. Ein zustandsabhängiger Titel wäre eine Copy-Änderung im Deck des Designers.
+- **Eine vierte Query auf dem Dashboard.** `useFamilyPendingInvitations` teilt Key und Cache mit dem Familie-Tab; auf dem Dashboard wird davon nur `length` gelesen.
+- **Die Karte spricht von „Einrichtung", nicht von „Onboarding".** Das Wort kommt in keiner Nutzer-Copy der App vor (`onb.*` sagt „Lass uns deine Familie einrichten"), und die Marken-Stimme ist warm und deutsch. Die Button-Labels sind bewusst die bestehenden `dash.empty.addChild` / `dash.empty.invite` — dieselben zwei Aktionen wie im Empty-State, und zwei Übersetzungen für denselben Satz driften auseinander.

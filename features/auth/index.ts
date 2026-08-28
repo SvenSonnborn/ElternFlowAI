@@ -33,6 +33,12 @@ export {
 export { mapAuthError, type AuthErrorKey } from "./errors";
 export { inviteExpiry, type InviteExpiry } from "./inviteStatus";
 export { useSignUp, useSignIn, useSignOut, useResetPassword, useUpdatePassword } from "./mutations";
+export {
+  onboardingResumeStep,
+  ONBOARDING_RESUME_HREF,
+  type OnboardingResumeInput,
+  type OnboardingResumeStep,
+} from "./onboardingResume";
 export { passwordStrength, type PasswordStrength, type StrengthLabel } from "./passwordStrength";
 export {
   useCreateFamily,

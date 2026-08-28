@@ -233,6 +233,11 @@
         "sub": "Lass uns deine Familie einrichten"
       }
     },
+    "resume": {
+      "title": "Einrichtung fortsetzen",
+      "invite": "Lade deinen Partner ein — dann teilt ihr Kalender, Aufgaben und Essensplan.",
+      "child": "Lege das erste Kinderprofil an — Termine, Aufgaben und Allergien hängen daran."
+    },
     "tomorrow": {
       "empty": "Für morgen ist nichts vorzubereiten.",
       "more": "+{{count}} weitere"

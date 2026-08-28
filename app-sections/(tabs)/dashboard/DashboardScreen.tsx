@@ -8,7 +8,13 @@ import { Pressable, View } from "react-native";
 import { ChildAvatar, EventRow, Icon, SectionHeader, TopBar } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Card, Screen, Text } from "@/design-system/ui";
-import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
+import {
+  onboardingResumeStep,
+  useCurrentParent,
+  useFamilyChildren,
+  useFamilyParents,
+  useFamilyPendingInvitations,
+} from "@/features/auth";
 import { segmentsForDay, segmentTimeLabel, useFamilyEvents } from "@/features/calendar";
 import { useMealAlternative, useRecipeJudge, useTodaysMeal } from "@/features/meals";
 import { getSampleFamilyName } from "@/features/sample-data";
@@ -18,6 +24,7 @@ import { useFamilyTasks } from "@/features/tasks";
 import { buildAvatarRow } from "./avatarRow";
 import { MealHeroCard } from "./MealHeroCard";
 import { MealHeroEmptyCard } from "./MealHeroEmptyCard";
+import { OnboardingResumeCard } from "./OnboardingResumeCard";
 import { PrepRow } from "./PrepRow";
 import { buildTomorrowPrep } from "./tomorrowPrep";
 
@@ -51,6 +58,19 @@ export function DashboardScreen() {
   const parent = useCurrentParent();
   const familyChildren = useFamilyChildren(parent.data?.family_id);
   const familyParents = useFamilyParents(parent.data?.family_id);
+  // Teilt den Query-Key mit dem Familie-Tab; auf dem Dashboard ist die Liste
+  // nur ein Zähler — eine offene Einladung heißt „Step 3 ist erledigt".
+  const pendingInvitations = useFamilyPendingInvitations(parent.data?.family_id);
+
+  // Wer das Onboarding nach Step 2 verlassen hat, hat eine `parents`-Zeile und
+  // landet deshalb hier statt im Flow (ADR-005, Approach C). `null`, solange
+  // eine der vier Quellen nicht geantwortet hat.
+  const resumeStep = onboardingResumeStep({
+    parentId: parent.data?.id,
+    parents: familyParents.data,
+    childCount: familyChildren.data?.length,
+    pendingInviteCount: pendingInvitations.data?.length,
+  });
 
   const greeting = t("dash.greeting.morning", { name: parent.data?.short ?? "" });
   const subtitle = t("dash.subtitle", {
@@ -148,6 +168,8 @@ export function DashboardScreen() {
           <Icon name="plus" size={14} color={theme.inkTertiary} />
         </Pressable>
       </View>
+
+      {resumeStep ? <OnboardingResumeCard step={resumeStep} /> : null}
 
       <SectionHeader
         title={t("dash.section.today")}
