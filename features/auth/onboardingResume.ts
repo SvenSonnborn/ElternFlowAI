@@ -39,6 +39,14 @@ export function onboardingResumeStep(input: OnboardingResumeInput): OnboardingRe
     return null;
   }
 
+  // Die eigene Zeile muss in der Liste stehen. Die RLS-Policy auf `parents` ist
+  // `family_id = current_family_id()`, und `current_family_id()` liest genau
+  // diese Zeile — sie kann also nicht legitim fehlen. Fehlt sie doch (etwa
+  // weil `useCurrentParent` nach einem Familienwechsel noch die alte Zeile
+  // hält), passen Parent- und Familien-Antwort nicht zusammen, und „kein
+  // Partner" wäre dann aus zwei Antworten über zwei Familien geschlossen.
+  if (!parents.some((p) => p.id === parentId)) return null;
+
   // „Partner fehlt" heißt: keine zweite Eltern-Zeile UND keine offene
   // Einladung. Eine verschickte Einladung zählt als erledigt — der Schritt
   // liegt dann beim Eingeladenen, nicht mehr bei uns.
