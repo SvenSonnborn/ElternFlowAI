@@ -19,6 +19,7 @@ import {
 } from "@/features/auth";
 import {
   buildCalendarTheme,
+  isOptimisticEventId,
   segmentsForDay,
   segmentTimeLabel,
   setCalendarLocale,
@@ -158,12 +159,18 @@ export function KalenderScreen() {
             return (
               <Pressable
                 key={`${occ.eventId}-${occ.occurrenceDate}-${seg.date}`}
-                onPress={() =>
+                onPress={() => {
+                  // Ein optimistischer Termin trägt eine synthetische Id, die es
+                  // serverseitig nicht gibt: `fetchEventById` schickte sie gegen
+                  // eine `uuid`-Spalte und der Detail-Screen zeigte einen rohen
+                  // PostgREST-Fehler. Lieber tut der Tap für die ein, zwei
+                  // Sekunden bis zum Refetch nichts.
+                  if (isOptimisticEventId(occ.eventId)) return;
                   router.push({
                     pathname: "/event/[id]",
                     params: { id: occ.eventId, occ: occ.occurrenceDate },
-                  })
-                }
+                  });
+                }}
                 accessibilityRole="button"
                 accessibilityLabel={
                   isSpan

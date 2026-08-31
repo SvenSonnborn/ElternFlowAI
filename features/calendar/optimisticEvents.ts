@@ -138,6 +138,32 @@ export type OptimisticEvent =
   ({ id: string } & OptimisticCreate) | ({ id: string } & OptimisticUpdate);
 
 /**
+ * Präfix der **synthetischen Event-Id**, die ein optimistischer Create trägt.
+ *
+ * Als Konstante statt als Literal, weil zwei Stellen darauf angewiesen sind:
+ * `optimisticEventRow` in [createMutation.ts](./createMutation.ts) prägt sie,
+ * und `isOptimisticEventId` erkennt sie wieder. Fielen die beiden auseinander,
+ * wäre der Guard in den Listen still wirkungslos.
+ */
+export const OPTIMISTIC_EVENT_ID_PREFIX = "optimistic-";
+
+/**
+ * Ob diese Event-Id zu einem Termin gehört, den der Server noch nicht kennt.
+ *
+ * Gebraucht von `KalenderScreen` und `DashboardScreen`: Beide machen jede
+ * Occurrence zu einem `Pressable`, der `/event/[id]` mit `occ.eventId` öffnet.
+ * Für einen optimistischen Create ist das `"optimistic-7"` — `fetchEventById`
+ * schickte das gegen eine `uuid`-Spalte, PostgREST antwortete `22P02 invalid
+ * input syntax for type uuid`, und der Detail-Screen zeigte einen englischen
+ * Datenbankfehler in einer deutschen Oberfläche. Das Fenster ist bei Mobilfunk
+ * gern zwei Sekunden lang, und der Nutzer schaut in genau diesem Moment
+ * dorthin, weil sein Termin gerade erschienen ist.
+ */
+export function isOptimisticEventId(eventId: string): boolean {
+  return eventId.startsWith(OPTIMISTIC_EVENT_ID_PREFIX);
+}
+
+/**
  * Wie lange ein optimistischer Eintrag höchstens stehen bleibt, wenn die
  * Mutation ihn nicht selbst abräumt.
  *

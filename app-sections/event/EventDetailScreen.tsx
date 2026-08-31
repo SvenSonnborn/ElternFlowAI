@@ -199,7 +199,13 @@ export function EventDetailScreen() {
             {t("cal.detail.title")}
           </Text>
           <Text variant="caption" tone="inkSecondary">
-            {error instanceof Error ? error.message : "—"}
+            {/* Nie die rohe Meldung: PostgREST antwortet englisch („invalid
+                input syntax for type uuid") und stünde so in einer deutschen
+                Oberfläche. `mapEventError` klassifiziert die Ursache, der
+                Screen wählt den Titel darüber — wie in den Toasts seit ADR-026.
+                Ohne Fehler ist die Zeile schlicht nicht da: das ist der
+                „nicht gefunden"-Zweig. */}
+            {t(error ? mapEventError(error) : "cal.error.eventGone")}
           </Text>
           <View className="mt-4">
             <Button label={t("cal.detail.close")} variant="soft" onPress={() => router.back()} />

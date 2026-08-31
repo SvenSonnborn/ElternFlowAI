@@ -1,10 +1,12 @@
 export {
   applyOptimisticChanges,
+  isOptimisticEventId,
   patchesOccurrence,
   useOptimisticEvents,
   useOptimisticEventsStore,
   visibleOccurrences,
   withOptimistic,
+  OPTIMISTIC_EVENT_ID_PREFIX,
   OPTIMISTIC_TIMEOUT_MS,
   type OptimisticCreate,
   type OptimisticEvent,
