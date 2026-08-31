@@ -1,5 +1,6 @@
 export {
   applyOptimisticChanges,
+  canApplyOptimistically,
   isOptimisticEventId,
   patchesOccurrence,
   useOptimisticEvents,

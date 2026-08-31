@@ -5,7 +5,7 @@ import type { Database } from "@/features/supabase/database.types";
 import { supabase } from "@/features/supabase";
 
 import { EventNotFoundError } from "./errors";
-import { useOptimisticEventsStore } from "./optimisticEvents";
+import { canApplyOptimistically, useOptimisticEventsStore } from "./optimisticEvents";
 import { calendarKeys, fetchEventById } from "./queries";
 import {
   applyDeleteScope,
@@ -95,21 +95,23 @@ export function useDeleteEvent() {
 }
 
 /**
- * Bearbeitet einen Termin und zeigt die Änderungen sofort im Kalender, statt auf die
- * Server-Antwort zu warten. `onMutate` schreibt bei Erfolg einen Overlay-Eintrag
- * (`kind: "update"`) in den Store, der die geänderten Felder anwendet.
- * `onSettled` invalidiert die Kalender-Queries **nur bei Erfolg** und gibt den
- * Store-Eintrag erst danach frei: andersherum blitzte der optimistische Stand für
- * einen Frame durch, bevor der Refetch ihn ersetzt — dieselbe Lehre, die
- * `useDeleteEvent` in ADR-026 gezogen hat. Warum der Fehlerfall nicht
- * invalidiert, steht am `if` selbst.
+ * Bearbeitet einen Termin und zeigt die Änderungen sofort im Kalender, statt auf
+ * die Server-Antwort zu warten. `onMutate` schreibt einen Overlay-Eintrag
+ * (`kind: "update"`) in den Store, der die geänderten Felder anwendet — es sei
+ * denn, `canApplyOptimistically` verneint (siehe dort). `onSettled` invalidiert
+ * die Kalender-Queries **nur bei Erfolg** und gibt den Store-Eintrag erst danach
+ * frei: andersherum blitzte der optimistische Stand für einen Frame durch, bevor
+ * der Refetch ihn ersetzt — dieselbe Lehre, die `useDeleteEvent` in ADR-026
+ * gezogen hat. Warum der Fehlerfall nicht invalidiert, steht am `if` selbst.
  *
- * **Grenze:** `vars.recurrence` (eine Änderung der Wiederholungsregel) wird
- * **nicht** optimistisch abgebildet. Ändert der Nutzer den Rhythmus einer Serie,
- * verschieben sich die Occurrence-Termine selbst — das vorherzusagen hieße, die
- * RRULE-Expansion für eine ungespeicherte Regel zu fahren. Der Refetch bringt es
- * eine Sekunde später; bis dahin zeigt der Kalender die alten Termine mit den
- * neuen Feldern.
+ * **Zwei Grenzen.** `all`/`forward` **mit geändertem Datum** bekommt gar keinen
+ * Eintrag, weil das Overlay dort die Nicht-Änderung zeigte — die Begründung
+ * steht bei `canApplyOptimistically`. Und `vars.recurrence` (eine Änderung der
+ * Wiederholungsregel) wird nicht optimistisch abgebildet: Ändert der Nutzer den
+ * Rhythmus einer Serie, verschieben sich die Occurrence-Termine selbst, das
+ * vorherzusagen hieße, die RRULE-Expansion für eine ungespeicherte Regel zu
+ * fahren. Dieser Fall bekommt weiterhin einen Eintrag — er patcht die Felder,
+ * lässt die Termine aber stehen; der Refetch bringt sie eine Sekunde später.
  */
 export function useUpdateEvent() {
   const qc = useQueryClient();
@@ -121,14 +123,18 @@ export function useUpdateEvent() {
       const ops = createSupabaseEventOps(supabase);
       await updateEvent(vars, { fetchMaster: fetchEventById, ops });
     },
-    onMutate: (vars) =>
-      add({
+    onMutate: (vars) => {
+      // Lieber gar nichts zeigen als die Nicht-Änderung dessen, was der Nutzer
+      // gerade geändert hat — siehe `canApplyOptimistically`.
+      if (!canApplyOptimistically(vars)) return undefined;
+      return add({
         kind: "update",
         eventId: vars.eventId,
         occurrenceDate: vars.occurrenceDate,
         scope: vars.scope,
         changes: vars.changes,
-      }),
+      });
+    },
     onError: (_err, _vars, id) => {
       if (id) remove(id);
     },
