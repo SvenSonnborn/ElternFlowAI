@@ -152,9 +152,24 @@ Erfunden wird nur die `id` der Zeile (Präfix `optimistic-`, damit sie in Logs e
 
 **Decision 8 — Zwei Overlays, nicht eins.** Pending-Deletes und optimistische Änderungen operieren auf demselben Strom und haben verwandte Form; sie zu vereinen wäre der sauberere Zug. Bewusst nicht jetzt: Der Pending-Delete-Store ist gerade durch eine vollständige Review-Runde gegangen, und Löschen steht nicht zur Disposition. Als TODO festgehalten, fällig beim dritten Overlay.
 
-**Decision 9 — Erst patchen, dann filtern.** Eine Löschung gewinnt gegen eine gleichzeitige Bearbeitung.
+**Decision 9 — Erst filtern, dann patchen.** Eine Löschung gewinnt gegen eine gleichzeitige Bearbeitung.
 
-**Nachtrag aus der Umsetzung:** Die ursprüngliche Begründung dieser Entscheidung war zu stark. Sie behauptete, andersherum bliebe ein gelöschter Termin sichtbar, weil der Patch ihn wieder einführte. Das trifft für ein **Update** nicht zu: `withOptimistic` bildet im Patch-Zweig nur ab (`.map`) und fügt nie hinzu, kann eine herausgefilterte Occurrence also gar nicht zurückholen — beide Reihenfolgen liefern dasselbe. Ein Unterschied entstünde allein bei einem **Create**, dessen Occurrences im einen Fall vom Löschfilter erfasst würden und im anderen nicht; praktisch unerreichbar, weil ein optimistischer Create eine synthetische Id trägt, die keine Löschung adressiert. Die Reihenfolge bleibt trotzdem so — sie ist als Verteidigung in der Tiefe richtig herum und kostet nichts —, aber sie ist **keine Semantik, auf die sich etwas verlassen darf**.
+**Zweimal korrigiert, und das zweite Mal in der Sache.** Die erste Fassung schrieb die umgekehrte Reihenfolge vor
+(erst patchen, dann filtern) und begründete sie damit, andersherum bliebe ein gelöschter Termin sichtbar, weil der
+Patch ihn wieder einführte. Diese Begründung war falsch — `withOptimistic` bildet im Patch-Zweig nur ab (`.map`) und
+fügt nie hinzu. Die Reihenfolge selbst war es ebenfalls: Ein Update mit Scope `this`, das einen Termin auf ein
+anderes Datum verschiebt, schreibt `occurrenceDate` neu. Läuft der Patch **vor** dem Filter, vergleicht
+`hidesOccurrence` das **neue** Datum gegen das **alte**, das die offene Löschung trägt — der Vergleich schlägt fehl,
+und die gelöschte Occurrence taucht verschoben wieder auf. Genau das, was die Entscheidung verhindern wollte.
+
+Deshalb: **erst `withoutPendingDeletes`, dann `withOptimistic`.** Dann trifft der Löschfilter die Occurrence noch
+unter ihrer ursprünglichen Identität. Der einzige denkbare Nachteil der neuen Reihenfolge — die Occurrences eines
+optimistischen Creates umgehen den Löschfilter — ist unerreichbar, weil ein optimistischer Create eine synthetische
+Id trägt, die keine Löschung adressiert.
+
+Der Fall ist schmal (derselbe Nutzer braucht auf demselben Gerät gleichzeitig eine offene Löschung und eine offene
+Bearbeitung derselben Occurrence, erreichbar per Deep Link ins Bearbeiten-Sheet während des Undo-Fensters), aber die
+richtige Reihenfolge kostet nichts. Ein Test hält den Fall fest.
 
 ---
 
