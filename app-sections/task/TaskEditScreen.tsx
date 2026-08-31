@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { TaskFormState } from "@/features/tasks";
 
-import { confirmDestructive, showAlert } from "@/app-sections/shared";
+import { confirmDestructive, useUndoableDelete } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren } from "@/features/auth";
@@ -38,6 +38,7 @@ export function TaskEditScreen() {
   const { data: children } = useFamilyChildren(parent?.family_id);
   const updateMutation = useUpdateTask();
   const deleteMutation = useDeleteTask();
+  const undoableDelete = useUndoableDelete();
 
   const [state, setState] = useState<TaskFormState>(() => emptyTaskForm(new Date()));
   const [hydrated, setHydrated] = useState(false);
@@ -61,11 +62,7 @@ export function TaskEditScreen() {
   const { typeItems, childOptions } = useTaskFormOptions(types.data, children);
 
   const errors = validateTaskForm(state);
-  const canSave =
-    hydrated &&
-    !hasTaskFormErrors(errors) &&
-    !updateMutation.isPending &&
-    !deleteMutation.isPending;
+  const canSave = hydrated && !hasTaskFormErrors(errors) && !updateMutation.isPending;
 
   // No history to fall back to on a cold-start deep link straight to
   // `/task/edit/[id]` — `router.back()` alone would strand the sheet with no
@@ -77,12 +74,12 @@ export function TaskEditScreen() {
 
   function onSave() {
     const changes = toTaskChanges(state);
-    if (!changes || !taskId || updateMutation.isPending || deleteMutation.isPending) return;
+    if (!changes || !taskId || updateMutation.isPending) return;
     updateMutation.mutate({ taskId, changes }, { onSuccess: goBackOrToTasks });
   }
 
   async function onDelete() {
-    if (!taskId || deleteMutation.isPending) return;
+    if (!taskId || !task) return;
     const confirmed = await confirmDestructive({
       title: t("hw.delete.confirmTitle"),
       body: t("hw.delete.confirmBody"),
@@ -90,13 +87,19 @@ export function TaskEditScreen() {
       cancel: t("action.cancel"),
     });
     if (!confirmed) return;
-    deleteMutation.mutate(
-      { taskId },
-      {
-        onSuccess: goBackOrToTasks,
-        onError: (err) => showAlert({ title: t("hw.delete.error"), body: t(mapTaskError(err)) }),
-      },
-    );
+    // Erst planen, dann navigieren: der Toast überlebt den Screenwechsel, weil
+    // der Store auf Modulebene liegt. Der Screen ist weg, bevor die Mutation
+    // feuert — deshalb `mutateAsync` ohne Per-Call-Callbacks.
+    undoableDelete({
+      kind: "task",
+      target: { taskId },
+      title: t("hw.delete.undoTitle"),
+      message: task.title,
+      run: () => deleteMutation.mutateAsync({ taskId }),
+      errorTitle: t("hw.delete.error"),
+      formatError: (err) => t(mapTaskError(err)),
+    });
+    goBackOrToTasks();
   }
 
   return (
@@ -203,10 +206,8 @@ export function TaskEditScreen() {
                 block
                 variant="soft"
                 tone="danger"
-                label={
-                  deleteMutation.isPending ? t("hw.delete.deleting") : t("hw.delete.confirmOk")
-                }
-                disabled={deleteMutation.isPending || updateMutation.isPending}
+                label={t("hw.delete.confirmOk")}
+                disabled={updateMutation.isPending}
                 onPress={() => void onDelete()}
               />
             </View>

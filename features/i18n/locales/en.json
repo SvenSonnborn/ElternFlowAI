@@ -475,7 +475,6 @@
       "confirmTitle": "Delete task?",
       "confirmBody": "You can undo this right afterwards.",
       "confirmOk": "Delete",
-      "deleting": "Deleting…",
       "error": "Delete failed",
       "undoTitle": "Task deleted"
     },

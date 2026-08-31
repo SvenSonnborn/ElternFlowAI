@@ -475,7 +475,6 @@
       "confirmTitle": "Aufgabe löschen?",
       "confirmBody": "Du kannst das direkt danach rückgängig machen.",
       "confirmOk": "Löschen",
-      "deleting": "Lösche…",
       "error": "Löschen fehlgeschlagen",
       "undoTitle": "Aufgabe gelöscht"
     },
