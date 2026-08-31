@@ -84,7 +84,10 @@ export function useDeleteEvent() {
       await deleteEvent(vars, { fetchMaster: fetchEventById, ops });
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: calendarKeys.all });
+      // Zurückgegeben statt `void`: der Pending-Delete-Store gibt das Item erst
+      // frei, wenn `mutateAsync` durch ist. Ohne das Warten blitzte es für einen
+      // Frame zurück, bevor der Refetch es erneut entfernt.
+      return qc.invalidateQueries({ queryKey: calendarKeys.all });
     },
   });
 }
