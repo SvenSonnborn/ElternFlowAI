@@ -1163,7 +1163,7 @@ Inhaltlich müssen die neun Decisions aus Abschnitt 3 der Spec darin stehen, jed
 6. Keine visuelle Sonderbehandlung der optimistischen Occurrence; die `saving`-Keys entfallen.
 7. `useEvent` bekommt kein Overlay.
 8. Zwei Overlays, nicht eins — und warum die Vereinigung wartet.
-9. Erst patchen, dann filtern — **aber ohne die Reihenfolge zur Semantik zu erklären**. Die Spec hat ihre ursprüngliche Begründung in einem Nachtrag zurückgenommen: Bei einem Update ist die Reihenfolge folgenlos, weil `withOptimistic` im Patch-Zweig nur abbildet und nie hinzufügt; ein Unterschied entstünde allein bei einem Create, und der ist praktisch unerreichbar. Schreib es so in den ADR — als richtig herum gewählte Verteidigung in der Tiefe, nicht als Garantie.
+9. **Erst filtern, dann patchen** — und warum die Spec das zweimal korrigiert hat. Die erste Fassung hatte die umgekehrte Reihenfolge mit einer unwahren Begründung; die zweite Korrektur betraf die Reihenfolge selbst: Ein `this`-Scope-Update, das einen Termin verschiebt, schreibt `occurrenceDate` neu, und ein danach laufender Löschfilter vergleicht das neue Datum gegen das alte der offenen Löschung — die Löschung greift dann nicht mehr. Schreib beides in den ADR, samt dem Grund, warum die neue Reihenfolge keinen Nachteil hat.
 
 Als eigener Punkt oder als Consequence dazu: **der `description`-Fund.** `expandEvents` liest das Feld immer von der Master-Zeile, `applyOverride` kennt es nicht — eine per Exception geänderte Beschreibung erreicht die Anzeige nie. Das Overlay bildet deshalb die Anzeige ab, nicht den Schreibvorgang.
 
