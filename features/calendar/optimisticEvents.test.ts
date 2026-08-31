@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 
 import { lightTheme } from "@/design-system";
 
@@ -241,31 +241,51 @@ describe("withOptimistic", () => {
     expect(out.map((o) => o.occurrenceDate)).toEqual(["2026-10-01", "2026-10-08"]);
   });
 
-  test("mehrere Update-Einträge wirken kumulativ", () => {
+  test("mehrere Update-Einträge wirken nacheinander: spätere können Matches von früheren treffen", () => {
+    // Eine Serie, wenn o1 sie auf allen Vorkommen ändert, verschiebt `occurrenceDate`
+    // nicht — es behält das Datum jeder Occurrence. Bei einem Einzeltermin mit
+    // `scope: "this"` aber ändert sich `occurrenceDate` ins neue Datum.
+    //
+    // Deshalb: o1 verschiebt den Einzeltermin vom 10.09. auf den 24.09., o2 mit
+    // `occurrenceDate: "2026-09-24"` matcht die verschobene Occurrence und ändert
+    // den Titel. Ein falsches „nur den letzten anwenden" findet o2 nicht, weil die
+    // ursprüngliche Occurrence noch am 10.09. liegt.
+    const single = occ({
+      isRecurring: false,
+      rrule: { freq: null, interval: 1, byweekday: null, count: null, until: null },
+    });
     const out = withOptimistic(
-      [occ()],
+      [single],
       [
         {
           id: "o1",
           kind: "update",
           eventId: "e1",
           occurrenceDate: "2026-09-10",
-          scope: "all",
-          changes: changes({ title: "Erst" }),
+          scope: "this",
+          changes: changes({
+            title: "Teste nach o1",
+            start_at: new Date("2026-09-24T18:00:00").toISOString(),
+            end_at: new Date("2026-09-24T19:30:00").toISOString(),
+          }),
         },
         {
           id: "o2",
           kind: "update",
           eventId: "e1",
-          occurrenceDate: "2026-09-10",
-          scope: "all",
-          changes: changes({ title: "Dann", location: "Halle" }),
+          occurrenceDate: "2026-09-24",
+          scope: "this",
+          changes: changes({ title: "o2 hat gematcht" }),
         },
       ],
       expandStub,
     );
-    expect(out[0].title).toBe("Dann");
-    expect(out[0].location).toBe("Halle");
+    // Wenn sequenziell: o1 setzt Titel auf "Teste nach o1", o2 findet und ändert
+    // auf "o2 hat gematcht", occurrenceDate wird "2026-09-24".
+    // Wenn nur o2: o2 findet die Occurrence nicht (sie ist noch am 10.09.), Titel
+    // bleibt "Fußballtraining", occurrenceDate bleibt "2026-09-10".
+    const found = out.find((o) => o.eventId === "e1");
+    expect(found?.title).toBe("o2 hat gematcht");
   });
 });
 
@@ -299,8 +319,13 @@ describe("withOptimistic mit dem echten expandEvents", () => {
 
 describe("Reihenfolge der beiden Overlays", () => {
   test("eine zugleich bearbeitete und gelöschte Occurrence ist weg", () => {
-    // Erst patchen, dann filtern (Decision 9 der Spec). Andersherum bliebe der
-    // gelöschte Termin sichtbar, weil der Patch ihn wieder einführte.
+    // Ein Update kann eine bereits gefilterte Occurrence nicht zurückbringen,
+    // weil der Patch-Zweig von `withOptimistic` nur per `.map()` über die
+    // bestehende Liste arbeitet und nie Einträge hinzufügt. Daher ist die
+    // Reihenfolge (Patch vor Delete oder umgekehrt) folgenlos — das Ergebnis
+    // ist in beiden Fällen leer. Wir halten diesen Test trotzdem, weil die
+    // Aussage („eine Löschung gewinnt gegen eine gleichzeitige Bearbeitung")
+    // richtig ist und diese Eigenschaft wert, festgehalten zu werden.
     const patched = withOptimistic(
       [occ()],
       [
@@ -324,6 +349,8 @@ describe("Reihenfolge der beiden Overlays", () => {
 });
 
 describe("useOptimisticEventsStore", () => {
+  afterEach(() => useOptimisticEventsStore.setState({ entries: [] }));
+
   test("add gibt eine Id zurück, remove nimmt den Eintrag wieder heraus", () => {
     const store = () => useOptimisticEventsStore.getState();
     const id = store().add({

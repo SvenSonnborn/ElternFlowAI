@@ -110,6 +110,10 @@ export interface OptimisticCreate {
   row: EventWithRelations;
 }
 
+/**
+ * Ein Update einer bereits expandierten Occurrence — der Eintrag beschreibt
+ * eine Änderung, die der Store puffert, bis der Server antwortet.
+ */
 export interface OptimisticUpdate {
   kind: "update";
   eventId: string;
@@ -118,6 +122,15 @@ export interface OptimisticUpdate {
   changes: EventChanges;
 }
 
+/**
+ * Ein Eintrag aus dem Optimistic-Store — entweder ein neu angelegter Serientermin
+ * (Create) oder eine Änderung an einer bestehenden Occurrence (Update).
+ *
+ * Die `id` wird vom Store verwaltet und kommt dort von außen nicht rein — daher
+ * die Intersection-Struktur statt eines Feldes in den Basistypen. Sie wird
+ * benötigt, um den Eintrag später aus dem Store zu entfernen (Callback in
+ * `onSuccess`).
+ */
 export type OptimisticEvent =
   ({ id: string } & OptimisticCreate) | ({ id: string } & OptimisticUpdate);
 
