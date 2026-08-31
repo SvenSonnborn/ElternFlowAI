@@ -791,8 +791,10 @@ export function hidesOccurrence(
  * Filtert die offenen Löschungen aus einer expandierten Liste.
  *
  * Gibt im Normalfall — nichts offen — die Eingabe **unverändert** zurück, statt
- * eine Kopie: `useFamilyEvents` reicht das Ergebnis an `toDaySegments` weiter,
- * und ein bei jedem Render neues Array machte dessen `useMemo` wertlos.
+ * eine Kopie. Das spart im weitaus häufigsten Fall einen Durchlauf und eine
+ * Allokation; für die Referenzstabilität von `useFamilyEvents.data` tut es
+ * nichts, denn der Aufruf steht innerhalb desselben `useMemo`, und
+ * `expandEvents` baut ohnehin bei jedem Lauf ein frisches Array.
  */
 export function withoutPendingDeletes(
   occurrences: CalendarOccurrence[],
@@ -1049,6 +1051,7 @@ In `action` ergänzen:
       "confirmTitle": "Termin löschen?",
       "confirmBody": "Du kannst das direkt danach rückgängig machen.",
       "confirmOk": "Löschen",
+      "deleting": "Lösche…",
       "error": "Löschen fehlgeschlagen",
       "undoTitle": "Termin gelöscht",
       "undoScopeForward": "ab {{date}}",
@@ -1063,6 +1066,7 @@ In `action` ergänzen:
       "confirmTitle": "Aufgabe löschen?",
       "confirmBody": "Du kannst das direkt danach rückgängig machen.",
       "confirmOk": "Löschen",
+      "deleting": "Lösche…",
       "error": "Löschen fehlgeschlagen",
       "undoTitle": "Aufgabe gelöscht"
     }
@@ -1083,6 +1087,7 @@ In `action` ergänzen:
       "confirmTitle": "Delete event?",
       "confirmBody": "You can undo this right afterwards.",
       "confirmOk": "Delete",
+      "deleting": "Deleting…",
       "error": "Delete failed",
       "undoTitle": "Event deleted",
       "undoScopeForward": "from {{date}}",
@@ -1097,6 +1102,7 @@ In `action` ergänzen:
       "confirmTitle": "Delete task?",
       "confirmBody": "You can undo this right afterwards.",
       "confirmOk": "Delete",
+      "deleting": "Deleting…",
       "error": "Delete failed",
       "undoTitle": "Task deleted"
     }
