@@ -1,3 +1,13 @@
+export {
+  applyOptimisticChanges,
+  patchesOccurrence,
+  useOptimisticEvents,
+  useOptimisticEventsStore,
+  withOptimistic,
+  type OptimisticCreate,
+  type OptimisticEvent,
+  type OptimisticUpdate,
+} from "./optimisticEvents";
 export { EventNotFoundError, mapEventError, type CalendarErrorKey } from "./errors";
 export { setCalendarLocale } from "./locale";
 export { useFamilyEvents, useEvent, useEventTypes, useMarkedDates } from "./hooks";

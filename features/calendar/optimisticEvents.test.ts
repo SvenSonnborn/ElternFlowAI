@@ -1,9 +1,19 @@
 import { describe, expect, test } from "bun:test";
 
+import { lightTheme } from "@/design-system";
+
+import type { EventWithRelations } from "./expand";
 import type { EventChanges } from "./recurrence";
 import type { CalendarOccurrence } from "./types";
 
-import { applyOptimisticChanges, patchesOccurrence } from "./optimisticEvents";
+import { expandEvents } from "./expand";
+import {
+  applyOptimisticChanges,
+  patchesOccurrence,
+  useOptimisticEventsStore,
+  withOptimistic,
+} from "./optimisticEvents";
+import { withoutPendingDeletes } from "./pendingDeletes";
 
 function occ(partial: Partial<CalendarOccurrence> = {}): CalendarOccurrence {
   return {
@@ -151,5 +161,204 @@ describe("applyOptimisticChanges · Einzeltermin", () => {
   test("patcht die Beschreibung — es gibt keine Exception", () => {
     const out = applyOptimisticChanges(single, "this", changes({ description: "Neue Notiz" }));
     expect(out.description).toBe("Neue Notiz");
+  });
+});
+
+/** Eine minimale Master-Zeile in der Form, die `fetchEventsInRange` liefert. */
+function row(partial: Partial<EventWithRelations> = {}): EventWithRelations {
+  return {
+    id: "e9",
+    family_id: "f1",
+    type_id: "t1",
+    child_id: null,
+    parent_id: null,
+    title: "Elternabend",
+    description: null,
+    location: null,
+    start_at: new Date("2026-10-01T19:00:00").toISOString(),
+    end_at: new Date("2026-10-01T20:30:00").toISOString(),
+    all_day: false,
+    rrule_freq: "weekly",
+    rrule_interval: 1,
+    // Bewusst `null`: Die Tests prüfen die Overlay-Komposition, nicht die
+    // Wochentags-Konvention der Spalte (`rrule.ts` rechnet sie mit `n - 1`
+    // um). Ohne Einschränkung wiederholt sich die Regel schlicht ab dem
+    // Startdatum — 01.10. und 08.10., unabhängig davon.
+    rrule_byweekday: null,
+    rrule_count: 2,
+    rrule_until: null,
+    created_by: null,
+    created_at: new Date("2026-09-01T00:00:00").toISOString(),
+    updated_at: new Date("2026-09-01T00:00:00").toISOString(),
+    event_types: null,
+    event_exceptions: [],
+    ...partial,
+  };
+}
+
+/**
+ * Ein Stub statt des echten `expandEvents`: Diese Tests prüfen, dass die
+ * synthetische Zeile **durch** den Expander geht — nicht, was er daraus macht.
+ * Der Test darunter benutzt dafür den echten.
+ */
+function expandStub(rows: EventWithRelations[]): CalendarOccurrence[] {
+  return rows.flatMap((r) => [
+    occ({ eventId: r.id, occurrenceDate: "2026-10-01" }),
+    occ({ eventId: r.id, occurrenceDate: "2026-10-08" }),
+  ]);
+}
+
+describe("withOptimistic", () => {
+  test("gibt bei leerer Liste dieselbe Referenz zurück", () => {
+    const input = [occ()];
+    expect(withOptimistic(input, [], expandStub)).toBe(input);
+  });
+
+  test("patcht eine betroffene Occurrence und lässt die übrigen unberührt", () => {
+    const a = occ({ occurrenceDate: "2026-09-10" });
+    const b = occ({ eventId: "e2", occurrenceDate: "2026-09-10" });
+    const out = withOptimistic(
+      [a, b],
+      [
+        {
+          id: "o1",
+          kind: "update",
+          eventId: "e1",
+          occurrenceDate: "2026-09-10",
+          scope: "this",
+          changes: changes({ title: "Geändert" }),
+        },
+      ],
+      expandStub,
+    );
+    expect(out[0].title).toBe("Geändert");
+    expect(out[1]).toBe(b);
+  });
+
+  test("schickt eine Create-Zeile durch den Expander", () => {
+    const out = withOptimistic([], [{ id: "o1", kind: "create", row: row() }], expandStub);
+    expect(out).toHaveLength(2);
+    expect(out.map((o) => o.occurrenceDate)).toEqual(["2026-10-01", "2026-10-08"]);
+  });
+
+  test("mehrere Update-Einträge wirken kumulativ", () => {
+    const out = withOptimistic(
+      [occ()],
+      [
+        {
+          id: "o1",
+          kind: "update",
+          eventId: "e1",
+          occurrenceDate: "2026-09-10",
+          scope: "all",
+          changes: changes({ title: "Erst" }),
+        },
+        {
+          id: "o2",
+          kind: "update",
+          eventId: "e1",
+          occurrenceDate: "2026-09-10",
+          scope: "all",
+          changes: changes({ title: "Dann", location: "Halle" }),
+        },
+      ],
+      expandStub,
+    );
+    expect(out[0].title).toBe("Dann");
+    expect(out[0].location).toBe("Halle");
+  });
+});
+
+describe("withOptimistic mit dem echten expandEvents", () => {
+  const theme = lightTheme;
+
+  test("ein neu angelegter Serientermin erscheint mit allen Occurrences im Fenster", () => {
+    // Trüge der Eintrag eine fertige Occurrence, erschiene die Serie nur mit
+    // ihrer ersten, und der Rest poppte beim Refetch nach — genau das Flackern,
+    // gegen das dieses Feature antritt.
+    const start = new Date("2026-09-25T00:00:00");
+    const end = new Date("2026-10-31T00:00:00");
+    const out = withOptimistic([], [{ id: "o1", kind: "create", row: row() }], (rows) =>
+      expandEvents(rows, start, end, theme),
+    );
+    // rrule_count: 2 → zwei wöchentliche Termine ab dem 01.10.
+    expect(out.map((o) => o.occurrenceDate)).toEqual(["2026-10-01", "2026-10-08"]);
+  });
+
+  test("ein Termin außerhalb des Fensters erscheint nicht", () => {
+    // Die Range-Grenze fällt aus `expandEvents` ab; der Test hält sie fest,
+    // damit eine spätere Umstellung sie nicht verliert.
+    const start = new Date("2026-11-01T00:00:00");
+    const end = new Date("2026-11-30T00:00:00");
+    const out = withOptimistic([], [{ id: "o1", kind: "create", row: row() }], (rows) =>
+      expandEvents(rows, start, end, theme),
+    );
+    expect(out).toHaveLength(0);
+  });
+});
+
+describe("Reihenfolge der beiden Overlays", () => {
+  test("eine zugleich bearbeitete und gelöschte Occurrence ist weg", () => {
+    // Erst patchen, dann filtern (Decision 9 der Spec). Andersherum bliebe der
+    // gelöschte Termin sichtbar, weil der Patch ihn wieder einführte.
+    const patched = withOptimistic(
+      [occ()],
+      [
+        {
+          id: "o1",
+          kind: "update",
+          eventId: "e1",
+          occurrenceDate: "2026-09-10",
+          scope: "all",
+          changes: changes({ title: "Geändert" }),
+        },
+      ],
+      expandStub,
+    );
+    expect(patched).toHaveLength(1);
+    const out = withoutPendingDeletes(patched, [
+      { eventId: "e1", occurrenceDate: "2026-09-10", scope: "all" },
+    ]);
+    expect(out).toHaveLength(0);
+  });
+});
+
+describe("useOptimisticEventsStore", () => {
+  test("add gibt eine Id zurück, remove nimmt den Eintrag wieder heraus", () => {
+    const store = () => useOptimisticEventsStore.getState();
+    const id = store().add({
+      kind: "update",
+      eventId: "e1",
+      occurrenceDate: "2026-09-10",
+      scope: "all",
+      changes: changes(),
+    });
+    expect(store().entries).toHaveLength(1);
+    expect(store().entries[0]).toMatchObject({ id, kind: "update", eventId: "e1" });
+    store().remove(id);
+    expect(store().entries).toHaveLength(0);
+  });
+
+  test("zwei Einträge stören einander nicht", () => {
+    const store = () => useOptimisticEventsStore.getState();
+    const first = store().add({
+      kind: "update",
+      eventId: "e1",
+      occurrenceDate: "2026-09-10",
+      scope: "all",
+      changes: changes(),
+    });
+    const second = store().add({
+      kind: "update",
+      eventId: "e2",
+      occurrenceDate: "2026-09-10",
+      scope: "all",
+      changes: changes(),
+    });
+    expect(first).not.toBe(second);
+    store().remove(first);
+    expect(store().entries).toHaveLength(1);
+    expect(store().entries[0].id).toBe(second);
+    store().remove(second);
   });
 });
