@@ -22,7 +22,10 @@
     "manage": "Manage",
     "retry": "Try again",
     "close": "Close",
-    "undo": "Undo"
+    "undo": "Undo",
+    "a11y": {
+      "toastAction": "Action available: {{label}}"
+    }
   },
   "color": {
     "mint": "Mint",
