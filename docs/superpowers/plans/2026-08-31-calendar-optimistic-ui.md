@@ -842,11 +842,12 @@ import type { Database } from "@/features/supabase/database.types";
 
 import type { EventWithRelations } from "./expand";
 
-import { useEventTypes } from "./hooks";
 import { useOptimisticEventsStore } from "./optimisticEvents";
 
 type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
 ```
+
+**Ausdrücklich kein Import aus `./hooks`.** Dort liegt zwar `useEventTypes`, aber `hooks.ts` zieht über `useTheme` das `nativewind`-Runtime herein, und das lässt sich unter `bun test` nicht laden — jede Testdatei, die `createMutation.ts` importiert, stürbe am Modul-Laden. Der Wert kommt stattdessen direkt aus dem Query-Cache (siehe Step 2); ein Abonnement braucht `onMutate` ohnehin nicht, nur den aktuellen Stand.
 
 Die Feldliste ist vollständig: `events.Row` in `features/supabase/database.types.ts` hat genau diese 19 Spalten. Sollte der Typecheck trotzdem etwas anmahnen, ergänze das Feld mit dem Wert, den der Server nach dem Insert hätte — und **leg keinen `as`-Cast darüber**, um eine Lücke zu überdecken.
 
@@ -855,17 +856,22 @@ Die Feldliste ist vollständig: `events.Row` in `features/supabase/database.type
 ```ts
 export function useCreateEvent() {
   const qc = useQueryClient();
-  const types = useEventTypes();
   const add = useOptimisticEventsStore((state) => state.add);
   const remove = useOptimisticEventsStore((state) => state.remove);
 
   return useMutation({
     mutationFn: createEvent,
     onMutate: (vars) => {
+      // Der Typ kommt aus dem Cache statt aus `useEventTypes()`: `onMutate`
+      // braucht kein Abonnement, nur den aktuellen Stand — und ein Import aus
+      // `./hooks` zöge über `useTheme` das nativewind-Runtime herein, das sich
+      // unter `bun test` nicht laden lässt. Der Anlegen-Screen ruft
+      // `useEventTypes()` ohnehin, der Eintrag ist beim Absenden also warm.
+      const types = qc.getQueryData<EventTypeRow[]>(calendarKeys.types);
       // Ohne die Typ-Zeile wäre die Occurrence unvollständig (Farbe, Icon,
       // Beschriftung). Dann lieber nicht optimistisch als falsch: Der Termin
       // erscheint eben erst mit dem Refetch.
-      const type = types.data?.find((row) => row.id === vars.typeId);
+      const type = types?.find((row) => row.id === vars.typeId);
       if (!type) return undefined;
       return add({ kind: "create", row: optimisticEventRow(vars, type) });
     },
@@ -1171,12 +1177,13 @@ Consequences: Beide Sheets schließen sofort statt einen Ladezustand zu zeigen; 
 
 - [ ] **Step 2: `docs/TODO.md` abgleichen**
 
-| Eintrag                                                                        | Aktion                                                                                                                                                                                                                                                                                                                                                                                          |
-| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| „**Optimistic UI** in den Calendar-Mutations (aktuell invalidate-and-refetch)" | **Zeile löschen** — eingelöst; die Ausnahme für `useDeleteEvent` steht im ADR                                                                                                                                                                                                                                                                                                                   |
-| neu                                                                            | **Vereinigung der beiden Occurrence-Overlays**: `pendingDeletes` und `optimisticEvents` operieren auf demselben Strom und haben verwandte Form. Nennt beide Dateien und den Grund für das Warten (der Pending-Delete-Store ist frisch reviewt, Löschen stand nicht zur Disposition), plus das Fälligkeitskriterium: beim dritten Overlay.                                                       |
-| neu                                                                            | **`applyOverride` kennt `description` nicht**: Der Server schreibt eine per Occurrence geänderte Beschreibung ins Override-JSON, `expandEvents` liest sie aber immer von der Master-Zeile — sie erreicht die Anzeige also nie. Nennt `features/calendar/expand.ts` und `recurrence.ts`. Ein Fix müsste den Override-Vertrag erweitern; verwandt mit dem bestehenden Eintrag zum `all_day`-Flag. |
-| neu                                                                            | **Eine Regeländerung wird nicht optimistisch abgebildet**: `vars.recurrence` verschiebt die Occurrence-Termine selbst; das vorherzusagen hieße, die RRULE-Expansion für eine ungespeicherte Regel zu fahren. Nennt `features/calendar/mutations.ts`.                                                                                                                                            |
+| Eintrag                                                                        | Aktion                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| „**Optimistic UI** in den Calendar-Mutations (aktuell invalidate-and-refetch)" | **Zeile löschen** — eingelöst; die Ausnahme für `useDeleteEvent` steht im ADR                                                                                                                                                                                                                                                                                                                                          |
+| neu                                                                            | **Vereinigung der beiden Occurrence-Overlays**: `pendingDeletes` und `optimisticEvents` operieren auf demselben Strom und haben verwandte Form. Nennt beide Dateien und den Grund für das Warten (der Pending-Delete-Store ist frisch reviewt, Löschen stand nicht zur Disposition), plus das Fälligkeitskriterium: beim dritten Overlay.                                                                              |
+| neu                                                                            | **`applyOverride` kennt `description` nicht**: Der Server schreibt eine per Occurrence geänderte Beschreibung ins Override-JSON, `expandEvents` liest sie aber immer von der Master-Zeile — sie erreicht die Anzeige also nie. Nennt `features/calendar/expand.ts` und `recurrence.ts`. Ein Fix müsste den Override-Vertrag erweitern; verwandt mit dem bestehenden Eintrag zum `all_day`-Flag.                        |
+| neu                                                                            | **`features/calendar/hooks.ts` ist unter `bun test` nicht ladbar**: Es zieht über `useTheme` das `nativewind`-Runtime herein, dessen `react-native-css-interop` beim Modul-Laden unter Bun scheitert. Jede Datei in `features/calendar`, die aus `./hooks` importiert, wird damit für Tests unerreichbar — der Grund, warum `useCreateEvent` den Event-Typ aus dem Query-Cache liest statt `useEventTypes()` zu rufen. |
+| neu                                                                            | **Eine Regeländerung wird nicht optimistisch abgebildet**: `vars.recurrence` verschiebt die Occurrence-Termine selbst; das vorherzusagen hieße, die RRULE-Expansion für eine ungespeicherte Regel zu fahren. Nennt `features/calendar/mutations.ts`.                                                                                                                                                                   |
 
 - [ ] **Step 3: `CLAUDE.md` nachziehen**
 
