@@ -330,13 +330,13 @@
       "fieldLocation": "Location",
       "fieldNotes": "Notes",
       "save": "Save",
-      "saving": "Saving…",
       "recurrenceAppliesToAll": "Changes to the repeat apply to every event in the series.",
       "error": {
         "titleRequired": "Title cannot be empty",
         "invalidTimeRange": "End time must be after start time",
         "invalidDateRange": "End date cannot be before the start date",
-        "network": "Save failed"
+        "network": "Save failed",
+        "saveFailed": "Couldn't save changes"
       }
     },
     "delete": {

@@ -6,13 +6,14 @@ import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { DateTimePickerSheet, Field } from "@/app-sections/shared";
+import { DateTimePickerSheet, Field, useToast } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import {
   applyRangePick,
   isDateRangeInvalid,
   isTimeRangeInvalid,
+  mapEventError,
   parseRecurrenceCount,
   rangeFieldLabelKey,
   toAllDayRange,
@@ -39,6 +40,7 @@ export function EventEditScreen() {
   const dateLocale = lang === "de" ? deLocale : enLocale;
 
   const { data: occurrence, isLoading } = useEvent(id ?? "", occ);
+  const { show } = useToast();
   const updateMutation = useUpdateEvent();
 
   const initial = useMemo(() => {
@@ -105,8 +107,7 @@ export function EventEditScreen() {
     !dateError && isTimeRangeInvalid(range, allDay) ? t("cal.edit.error.invalidTimeRange") : "";
   const parsedCount = recurrence === "none" ? null : parseRecurrenceCount(countText);
   const countError = parsedCount === "invalid" ? t("cal.create.error.invalidCount") : "";
-  const canSave =
-    hydrated && !titleError && !dateError && !timeError && !countError && !updateMutation.isPending;
+  const canSave = hydrated && !titleError && !dateError && !timeError && !countError;
 
   /**
    * The series rule, rebuilt from the radio. `null` when the user left the
@@ -134,6 +135,37 @@ export function EventEditScreen() {
     };
   }
 
+  /**
+   * Schickt die Mutation und meldet einen Fehlschlag selbst.
+   *
+   * Bewusst `mutateAsync` mit eigenem `catch` statt eines Per-Call-`onError`:
+   * Das Sheet ist unmontiert, bevor der Server antwortet, und TanStack Query
+   * ruft Per-Call-Callbacks dann nicht mehr — festgehalten in
+   * `features/tasks/mutateAsyncSurvivesUnmount.test.ts`. Die Retry-Aktion
+   * schickt dieselben `vars` erneut, damit der Rollback dem Nutzer nicht die
+   * Eingaben nimmt.
+   *
+   * Eine Funktionsdeklaration statt `useCallback`, damit sie sich in der
+   * Retry-Aktion selbst aufrufen kann — und weil der Screen seine übrigen
+   * Handler (`onSave`) genauso deklariert.
+   */
+  function save(vars: Parameters<typeof updateMutation.mutateAsync>[0]) {
+    updateMutation.mutateAsync(vars).catch((err: unknown) => {
+      show({
+        title: t("cal.edit.error.saveFailed"),
+        message: t(mapEventError(err)),
+        variant: "error",
+        position: "bottom",
+        action: {
+          label: t("action.retry"),
+          onPress: () => {
+            save(vars);
+          },
+        },
+      });
+    });
+  }
+
   async function onSave() {
     if (!occurrence || !canSave) return;
     const isRecurring = occurrence.isRecurring;
@@ -156,25 +188,23 @@ export function EventEditScreen() {
     // Re-snap rather than trust the state: the date pickers can move an all-day
     // event across days, and its times must stay 00:00 → 23:59.
     const final = allDay ? toAllDayRange(range) : range;
-    updateMutation.mutate(
-      {
-        scope,
-        eventId: occurrence.eventId,
-        occurrenceDate: occurrence.occurrenceDate,
-        isRecurring,
-        changes: {
-          title: title.trim(),
-          start_at: final.startAt.toISOString(),
-          end_at: final.endAt.toISOString(),
-          location: location.trim() || null,
-          description: notes.trim() || null,
-        },
-        recurrence: recurrenceChanges,
+    const vars = {
+      scope,
+      eventId: occurrence.eventId,
+      occurrenceDate: occurrence.occurrenceDate,
+      isRecurring,
+      changes: {
+        title: title.trim(),
+        start_at: final.startAt.toISOString(),
+        end_at: final.endAt.toISOString(),
+        location: location.trim() || null,
+        description: notes.trim() || null,
       },
-      {
-        onSuccess: () => router.back(),
-      },
-    );
+      recurrence: recurrenceChanges,
+    };
+    // Sofort schließen: Die Änderung steht dank `onMutate` schon im Kalender.
+    router.back();
+    void save(vars);
   }
 
   // The sheet is range-agnostic now: which end of the range is being edited is
@@ -345,7 +375,7 @@ export function EventEditScreen() {
             >
               <Button
                 block
-                label={updateMutation.isPending ? t("cal.edit.saving") : t("cal.edit.save")}
+                label={t("cal.edit.save")}
                 tone="primary"
                 disabled={!canSave}
                 onPress={() => void onSave()}
