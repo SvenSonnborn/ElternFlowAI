@@ -17,8 +17,8 @@ import type { DaySegment } from "./spans";
 import type { CalendarOccurrence, MarkedDates } from "./types";
 
 import { expandEvents } from "./expand";
-import { useOptimisticEvents, withOptimistic } from "./optimisticEvents";
-import { usePendingEventDeletes, withoutPendingDeletes } from "./pendingDeletes";
+import { useOptimisticEvents, visibleOccurrences } from "./optimisticEvents";
+import { usePendingEventDeletes } from "./pendingDeletes";
 import { calendarKeys, fetchEventById, fetchEventsInRange, fetchEventTypes } from "./queries";
 import { toDayMarkings, toDaySegments } from "./spans";
 
@@ -67,14 +67,13 @@ export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
   const data = useMemo(() => {
     if (!query.data) return NO_OCCURRENCES;
     const expanded = expandEvents(query.data, rangeStart, rangeEnd, theme);
-    // Erst filtern, dann patchen: Eine Löschung gewinnt gegen eine gleichzeitige
-    // Bearbeitung. Andersherum verfehlte sie ihr Ziel — ein `this`-Scope-Update,
-    // das den Termin verschiebt, schreibt `occurrenceDate` neu, und der Filter
-    // vergliche danach das neue Datum gegen das alte der offenen Löschung.
-    const visible = withoutPendingDeletes(expanded, pending);
-    return withOptimistic(visible, optimistic, (rows) =>
-      expandEvents(rows, rangeStart, rangeEnd, theme),
-    );
+    // Siehe `visibleOccurrences`: Reihenfolge Filter → Patch.
+    return visibleOccurrences({
+      expanded,
+      pending,
+      optimistic,
+      expand: (rows) => expandEvents(rows, rangeStart, rangeEnd, theme),
+    });
   }, [query.data, rangeStart, rangeEnd, theme, optimistic, pending]);
 
   const segments = useMemo(
