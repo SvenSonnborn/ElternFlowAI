@@ -274,6 +274,12 @@
     "sub": "Family calendar",
     "today": "Today",
     "empty": "No events on this day",
+    "error": {
+      "notAuthenticated": "Please sign in again.",
+      "eventGone": "This event no longer exists.",
+      "network": "Connection failed. Please try again later.",
+      "generic": "Something went wrong. Please try again later."
+    },
     "duration": {
       "hourShort": "hr",
       "minuteShort": "min"

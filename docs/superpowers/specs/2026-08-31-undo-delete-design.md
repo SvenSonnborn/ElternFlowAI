@@ -85,8 +85,12 @@ interface PendingDeleteState {
   ) => string;
   /** Timer abbrechen, Eintrag entfernen — das Item ist im nächsten Render zurück. */
   undo: (id: string) => void;
-  /** Alle offenen Löschungen sofort ausführen. Ruft der AppState-Hook. */
-  flush: () => void;
+  /**
+   * Alle offenen Löschungen sofort ausführen — auch die, die schon laufen.
+   * Ruft der AppState-Hook (ohne zu warten) und `useSignOut` (wartend, damit
+   * das DELETE noch angemeldet durchgeht).
+   */
+  flush: () => Promise<void>;
 }
 
 export const UNDO_WINDOW_MS = 5000;

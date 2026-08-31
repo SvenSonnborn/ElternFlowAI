@@ -11,6 +11,7 @@ import { Button, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
 import {
   isMultiDay,
+  mapEventError,
   REMINDER_OFFSET_1H,
   REMINDER_OFFSET_24H,
   undoDeleteMessage,
@@ -163,7 +164,11 @@ export function EventDetailScreen() {
                   isRecurring,
                 }),
               errorTitle: t("cal.delete.error"),
-              formatError: (err) => (err instanceof Error ? err.message : ""),
+              // Nicht `err.message`: der Fehler-Toast läuft nie ab, eine rohe
+              // PostgREST-Meldung stünde also unbegrenzt englisch in einer
+              // deutschen Oberfläche. `mapEventError` klassifiziert wie
+              // `mapTaskError` bei den Aufgaben.
+              formatError: (err) => t(mapEventError(err)),
             });
             router.back();
           })();

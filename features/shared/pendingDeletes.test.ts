@@ -212,6 +212,48 @@ describe("flush", () => {
     expect(done.sort()).toEqual(["a", "b"]);
   });
 
+  test("wartet auch auf eine Löschung, die der Timer schon gestartet hat", async () => {
+    // Das Loch, das die erste Fassung offen ließ: `commit` kehrte für eine
+    // laufende Id sofort um, `flush()` galt als durch, und `signOut` konnte der
+    // fliegenden Mutation die Session wegziehen.
+    let release = () => {};
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let started = false;
+    let finished = false;
+    store().schedule(
+      "task",
+      { taskId: "a" },
+      async () => {
+        started = true;
+        await blocked;
+        finished = true;
+      },
+      10,
+    );
+
+    await until("run gestartet", () => started);
+
+    let flushed = false;
+    const flushing = store()
+      .flush()
+      .then(() => {
+        flushed = true;
+      });
+
+    // Nichts kann `flushed` wahr machen, solange `release()` aussteht — die
+    // Wartezeit hier prüft eine Negativaussage und ist deshalb nicht flaky.
+    await new Promise((r) => setTimeout(r, 25));
+    expect(flushed).toBe(false);
+    expect(finished).toBe(false);
+
+    release();
+    await flushing;
+    expect(finished).toBe(true);
+    expect(store().entries).toHaveLength(0);
+  });
+
   test("das zurückgegebene Promise settelt erst, wenn die Löschungen durch sind", async () => {
     // Das ist die Zusage, auf die sich `useSignOut` verlässt: erst löschen,
     // dann abmelden. Ohne sie könnte die Session vor dem DELETE verschwinden.

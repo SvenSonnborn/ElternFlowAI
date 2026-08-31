@@ -274,6 +274,12 @@
     "sub": "Familien-Kalender",
     "today": "Heute",
     "empty": "Keine Termine an diesem Tag",
+    "error": {
+      "notAuthenticated": "Bitte erneut anmelden.",
+      "eventGone": "Der Termin existiert nicht mehr.",
+      "network": "Verbindung fehlgeschlagen. Bitte später erneut versuchen.",
+      "generic": "Etwas ist schiefgelaufen. Bitte später erneut versuchen."
+    },
     "duration": {
       "hourShort": "Std.",
       "minuteShort": "Min."
