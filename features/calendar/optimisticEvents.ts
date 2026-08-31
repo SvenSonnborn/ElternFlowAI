@@ -1,5 +1,7 @@
 import { format } from "date-fns";
+import { create } from "zustand";
 
+import type { EventWithRelations } from "./expand";
 import type { EditScope, EventChanges } from "./recurrence";
 import type { CalendarOccurrence } from "./types";
 
@@ -95,4 +97,96 @@ export function applyOptimisticChanges(
     occurrenceDate: format(startAt, "yyyy-MM-dd"),
     isException: viaException ? true : occurrence.isException,
   };
+}
+
+export interface OptimisticCreate {
+  kind: "create";
+  /**
+   * Eine **synthetische** Master-Zeile in der Form, die `fetchEventsInRange`
+   * liefert. Sie geht durch dasselbe `expandEvents` wie die echten Zeilen —
+   * Wiederverwendung statt Nachbildung, und ein neu angelegter Serientermin
+   * erscheint dadurch mit allen seinen Occurrences statt nur der ersten.
+   */
+  row: EventWithRelations;
+}
+
+export interface OptimisticUpdate {
+  kind: "update";
+  eventId: string;
+  occurrenceDate: string;
+  scope: EditScope;
+  changes: EventChanges;
+}
+
+export type OptimisticEvent =
+  ({ id: string } & OptimisticCreate) | ({ id: string } & OptimisticUpdate);
+
+interface OptimisticEventsState {
+  entries: OptimisticEvent[];
+  /** Legt einen Eintrag an und gibt seine Id zurück — `onMutate` reicht sie als Kontext weiter. */
+  add: (payload: OptimisticCreate | OptimisticUpdate) => string;
+  remove: (id: string) => void;
+}
+
+// Laufende Nummer statt Zufalls-Id: Der Eintrag lebt Sekundenbruchteile, eine
+// Kollision über einen App-Lauf hinweg gibt es nicht, und Tests bleiben lesbar.
+let sequence = 0;
+
+export const useOptimisticEventsStore = create<OptimisticEventsState>((set) => ({
+  entries: [],
+  add: (payload) => {
+    sequence += 1;
+    const id = `optimistic-${sequence}`;
+    set((state) => ({ entries: [...state.entries, { id, ...payload }] }));
+    return id;
+  },
+  remove: (id) => set((state) => ({ entries: state.entries.filter((entry) => entry.id !== id) })),
+}));
+
+/** Die offenen optimistischen Änderungen. Referenzstabil, solange sich nichts ändert. */
+export function useOptimisticEvents(): OptimisticEvent[] {
+  return useOptimisticEventsStore((state) => state.entries);
+}
+
+/**
+ * Legt die optimistischen Änderungen auf den expandierten Occurrence-Strom.
+ *
+ * `expand` wird **injiziert** statt importiert: `expandEvents` braucht
+ * `rangeStart`, `rangeEnd` und `theme`, die alle im Hook liegen. So bleibt diese
+ * Funktion rein und ein Test kann sie mit einem Stub bedienen. Die Range-Grenze
+ * für neu angelegte Termine fällt dabei gratis ab — `expandEvents` wendet sie
+ * ohnehin an.
+ *
+ * Gibt bei leerer Liste die Eingabe **unverändert** zurück. Das spart im
+ * Normalfall einen Durchlauf und eine Allokation; für die Referenzstabilität des
+ * Aufrufers tut es nichts, denn der Aufruf steht innerhalb desselben `useMemo`.
+ */
+export function withOptimistic(
+  occurrences: CalendarOccurrence[],
+  entries: readonly OptimisticEvent[],
+  expand: (rows: EventWithRelations[]) => CalendarOccurrence[],
+): CalendarOccurrence[] {
+  if (entries.length === 0) return occurrences;
+
+  const updates = entries.filter(
+    (entry): entry is { id: string } & OptimisticUpdate => entry.kind === "update",
+  );
+  const patched =
+    updates.length === 0
+      ? occurrences
+      : occurrences.map((occurrence) => {
+          let next = occurrence;
+          for (const update of updates) {
+            if (patchesOccurrence(update, next)) {
+              next = applyOptimisticChanges(next, update.scope, update.changes);
+            }
+          }
+          return next;
+        });
+
+  const created = entries
+    .filter((entry): entry is { id: string } & OptimisticCreate => entry.kind === "create")
+    .map((entry) => entry.row);
+  if (created.length === 0) return patched;
+  return [...patched, ...expand(created)];
 }
