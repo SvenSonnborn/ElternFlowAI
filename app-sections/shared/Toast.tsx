@@ -123,12 +123,19 @@ export function Toast({ entry, onDismiss }: ToastProps) {
   useEffect(() => {
     if (entry.durationMs == null || reduceMotion !== false) return;
     countdown.setValue(1);
-    Animated.timing(countdown, {
+    const animation = Animated.timing(countdown, {
       toValue: 0,
       duration: entry.durationMs,
       easing: Easing.linear,
       useNativeDriver: true,
-    }).start();
+    });
+    animation.start();
+    // Ohne `stop()` liefe eine ältere Instanz nach einem erneuten
+    // reduceMotion-Wechsel im Hintergrund weiter und träfe irgendwann ihr
+    // eigenes Ziel (`scaleX: 0`) — und überschriebe damit den Stand der neu
+    // gestarteten Animation mit einem sichtbaren Sprung. `setValue(1)` oben
+    // deckt nur den Reset-Moment ab, nicht das Nachwirken der alten Instanz.
+    return () => animation.stop();
   }, [countdown, entry.durationMs, reduceMotion]);
 
   // `accessibilityLiveRegion` ist in React Native Android-only; auf iOS meldet
