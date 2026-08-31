@@ -45,6 +45,46 @@ export function patchesOccurrence(
   }
 }
 
+/**
+ * Ob eine Änderung überhaupt optimistisch angezeigt werden **darf**.
+ *
+ * Der Grenzfall ist `all`/`forward` mit geändertem **Datumsanteil**. Dort
+ * schreibt der Server `changes.start_at` per `updateMaster` in `events.start_at`
+ * — und das ist `dtstart` der RRULE, die ganze Serie wandert also mit. Das
+ * Overlay dagegen kann nur die Tageszeit neu verankern (siehe
+ * `applyOptimisticChanges`) und lässt jedes Occurrence-Datum stehen.
+ * Nachgerechnet an einer monatlichen Serie am 5., verschoben auf den 7.10.:
+ * Das Overlay zeigt `[09-05, 10-05, 11-05]`, der Refetch liefert
+ * `[10-07, 11-07, 12-07]`.
+ *
+ * Das ist nicht mehr die Näherung aus Decision 3 des ADR — ein sichtbares
+ * Zurechtrücken —, sondern die Anzeige der **Nicht-Änderung genau der
+ * Eigenschaft, die der Nutzer gerade geändert hat**: Er verschiebt den
+ * Elternabend auf den 7., der Kalender zeigt alles unverändert, er hält das
+ * Speichern für fehlgeschlagen, und eine Sekunde später springt die ganze
+ * Serie. Lieber gar kein optimistischer Eintrag — dieselbe Enthaltsamkeit, die
+ * `useUpdateEvent` bei `vars.recurrence` übt.
+ *
+ * Eine eigene reine Funktion statt einer Bedingung im Hook, damit die
+ * Fallunterscheidung ohne React testbar ist.
+ *
+ * Der Vergleich läuft gegen `occurrenceDate` statt gegen die alte Startzeit,
+ * weil genau dieser Wert die Identität der bearbeiteten Occurrence trägt und
+ * `EventEditScreen` ihn unverändert aus `useEvent` durchreicht.
+ */
+export function canApplyOptimistically(args: {
+  scope: EditScope;
+  isRecurring: boolean;
+  occurrenceDate: string;
+  changes: EventChanges;
+}): boolean {
+  // Einzeltermin und `this` auf einer Serie schreiben Literalzeiten — dort
+  // verschiebt eine Datumsänderung den Termin tatsächlich, und das Overlay
+  // bildet sie korrekt ab.
+  if (!args.isRecurring || args.scope === "this") return true;
+  return format(new Date(args.changes.start_at), "yyyy-MM-dd") === args.occurrenceDate;
+}
+
 /** Nimmt das Datum von `day` und die Uhrzeit von `time`. */
 function withTimeOfDay(day: Date, time: Date): Date {
   const out = new Date(day);

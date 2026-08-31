@@ -9,6 +9,7 @@ import type { CalendarOccurrence } from "./types";
 import { expandEvents } from "./expand";
 import {
   applyOptimisticChanges,
+  canApplyOptimistically,
   isOptimisticEventId,
   patchesOccurrence,
   useOptimisticEventsStore,
@@ -458,6 +459,45 @@ describe("useOptimisticEventsStore", () => {
     expect(store().entries).toHaveLength(1);
     expect(store().entries[0].id).toBe(second);
     store().remove(second);
+  });
+});
+
+describe("canApplyOptimistically", () => {
+  const base = { isRecurring: true, occurrenceDate: "2026-10-05" };
+
+  test("`all` mit geändertem Datum bekommt keinen Eintrag", () => {
+    // Der Server schreibt `changes.start_at` als neues `dtstart` — die ganze
+    // Serie wandert. Das Overlay könnte nur die Tageszeit neu verankern und
+    // zeigte damit die Nicht-Änderung genau der Eigenschaft, die der Nutzer
+    // gerade geändert hat.
+    const moved = changes({
+      start_at: new Date("2026-10-07T19:00:00").toISOString(),
+      end_at: new Date("2026-10-07T20:30:00").toISOString(),
+    });
+    expect(canApplyOptimistically({ ...base, scope: "all", changes: moved })).toBe(false);
+    expect(canApplyOptimistically({ ...base, scope: "forward", changes: moved })).toBe(false);
+  });
+
+  test("`all` mit reiner Uhrzeit-Änderung bleibt optimistisch", () => {
+    const retimed = changes({
+      start_at: new Date("2026-10-05T20:00:00").toISOString(),
+      end_at: new Date("2026-10-05T21:30:00").toISOString(),
+    });
+    expect(canApplyOptimistically({ ...base, scope: "all", changes: retimed })).toBe(true);
+    expect(canApplyOptimistically({ ...base, scope: "forward", changes: retimed })).toBe(true);
+  });
+
+  test("`this` und Einzeltermin dürfen auch das Datum verschieben", () => {
+    // Beide schreiben Literalzeiten — die Exception bzw. die Master-Zeile —,
+    // `applyOptimisticChanges` bildet die Verschiebung dort korrekt ab.
+    const moved = changes({
+      start_at: new Date("2026-10-07T19:00:00").toISOString(),
+      end_at: new Date("2026-10-07T20:30:00").toISOString(),
+    });
+    expect(canApplyOptimistically({ ...base, scope: "this", changes: moved })).toBe(true);
+    expect(
+      canApplyOptimistically({ ...base, isRecurring: false, scope: "all", changes: moved }),
+    ).toBe(true);
   });
 });
 
