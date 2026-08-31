@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 
 import { lightTheme } from "@/design-system";
 
@@ -417,7 +417,9 @@ describe("Reihenfolge der beiden Overlays", () => {
 });
 
 describe("useOptimisticEventsStore", () => {
-  afterEach(() => useOptimisticEventsStore.setState({ entries: [] }));
+  // Über `clear()` statt `setState`: das räumt auch die Watchdog-Timer ab, die
+  // sonst als offene Handles im Testlauf stehen blieben.
+  afterEach(() => useOptimisticEventsStore.getState().clear());
 
   test("add gibt eine Id zurück, remove nimmt den Eintrag wieder heraus", () => {
     const store = () => useOptimisticEventsStore.getState();
@@ -455,5 +457,83 @@ describe("useOptimisticEventsStore", () => {
     expect(store().entries).toHaveLength(1);
     expect(store().entries[0].id).toBe(second);
     store().remove(second);
+  });
+});
+
+describe("Watchdog", () => {
+  afterEach(() => useOptimisticEventsStore.getState().clear());
+
+  test("ein Eintrag, den niemand abräumt, verfällt von selbst", async () => {
+    // Der Ausgang, den `onSettled` nicht abdeckt: Hinter einem Captive Portal
+    // settelt der POST weder, noch lehnt er ab — `remove(id)` liefe nie, und der
+    // nie gespeicherte Termin stünde für den Rest der Sitzung im Kalender.
+    const spy = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      useOptimisticEventsStore.getState().add(
+        {
+          kind: "update",
+          eventId: "e1",
+          occurrenceDate: "2026-09-10",
+          scope: "all",
+          changes: changes(),
+        },
+        5,
+      );
+      expect(useOptimisticEventsStore.getState().entries).toHaveLength(1);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(useOptimisticEventsStore.getState().entries).toHaveLength(0);
+      expect(spy).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("`remove` räumt den Timer mit ab — kein Log im Normalfall", async () => {
+    const spy = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const id = useOptimisticEventsStore.getState().add(
+        {
+          kind: "update",
+          eventId: "e1",
+          occurrenceDate: "2026-09-10",
+          scope: "all",
+          changes: changes(),
+        },
+        5,
+      );
+      useOptimisticEventsStore.getState().remove(id);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("`clear` leert den Store und lässt keinen Timer zurück", async () => {
+    // Das ist der Abmelde-Pfad: `useSignOut` räumt Query-Cache, Pending-Deletes
+    // und diesen Store, damit der Termin des Vorgängers nicht im Kalender des
+    // nächsten Familienmitglieds steht.
+    const spy = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const store = useOptimisticEventsStore.getState();
+      store.add({ kind: "create", row: row() }, 5);
+      store.add(
+        {
+          kind: "update",
+          eventId: "e1",
+          occurrenceDate: "2026-09-10",
+          scope: "all",
+          changes: changes(),
+        },
+        5,
+      );
+      expect(useOptimisticEventsStore.getState().entries).toHaveLength(2);
+      useOptimisticEventsStore.getState().clear();
+      expect(useOptimisticEventsStore.getState().entries).toHaveLength(0);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

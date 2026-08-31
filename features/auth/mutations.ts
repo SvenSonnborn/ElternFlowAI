@@ -1,5 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+// Direkt aus dem Modul statt aus `@/features/calendar`: Das Barrel re-exportiert
+// `./hooks`, das über `useTheme` das nativewind-Runtime hereinzieht und unter
+// `bun test` beim Modul-Laden scheitert (siehe docs/TODO.md). Die
+// Abhängigkeitsrichtung stimmt — `features/auth` darf aus `features/calendar`
+// lesen, umgekehrt nicht; `features/calendar` importiert nichts aus
+// `features/auth`, es entsteht also kein Zyklus.
+import { useOptimisticEventsStore } from "@/features/calendar/optimisticEvents";
 import { usePendingDeleteStore } from "@/features/shared";
 import { supabase } from "@/features/supabase";
 
@@ -59,7 +66,8 @@ export function useSignIn() {
  * abgeräumt hat — vollständig stumm.
  *
  * `qc.clear()` in `onSettled` räumt aus demselben Grund den Query-Cache; der
- * Pending-Store ist der zweite Modul-Store, den ein Abmelden erreichen muss.
+ * Pending-Store ist der zweite Modul-Store, den ein Abmelden erreichen muss,
+ * der Optimistic-Store aus [ADR-027](../../docs/decision-log.md) der dritte.
  */
 export function useSignOut() {
   const qc = useQueryClient();
@@ -77,6 +85,11 @@ export function useSignOut() {
       // Always clear cached server-state — even on partial signOut errors —
       // to prevent the previous user's family data leaking on next render.
       qc.clear();
+      // Dasselbe für das Optimistic-Overlay: Es liegt **über** den Query-Daten,
+      // `qc.clear()` erreicht es also nicht. Ein noch offener Eintrag stünde
+      // sonst im Kalender des nächsten Familienmitglieds, das sich auf demselben
+      // Gerät anmeldet — mit Titel, Ort und Kind-Zuordnung.
+      useOptimisticEventsStore.getState().clear();
     },
   });
 }

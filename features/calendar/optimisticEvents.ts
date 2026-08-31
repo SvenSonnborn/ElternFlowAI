@@ -137,26 +137,109 @@ export interface OptimisticUpdate {
 export type OptimisticEvent =
   ({ id: string } & OptimisticCreate) | ({ id: string } & OptimisticUpdate);
 
+/**
+ * Wie lange ein optimistischer Eintrag höchstens stehen bleibt, wenn die
+ * Mutation ihn nicht selbst abräumt.
+ *
+ * Die Spec begründete den fehlenden Watchdog damit, der Eintrag lebe „genau so
+ * lange wie die Mutation". Genau diese Annahme hat
+ * [ADR-026](../../docs/decision-log.md) für den Pending-Delete-Store bereits
+ * geprüft und verworfen (siehe `COMMIT_TIMEOUT_MS` in
+ * [pendingDeletes.ts](../shared/pendingDeletes.ts)): [client.ts](../supabase/client.ts)
+ * setzt dem `fetch` kein Timeout, hinter einem Captive Portal settelt eine
+ * Anfrage weder, noch lehnt sie ab. Hier kommt erschwerend hinzu, dass
+ * `onSettled` zusätzlich auf den Refetch wartet.
+ *
+ * Ohne Obergrenze liefe `onSettled` nie, `remove(id)` liefe nie, und ein nie
+ * gespeicherter Termin stünde für den Rest der Sitzung im Kalender **und** im
+ * Dashboard — ohne Toast, ohne Log. Der Nutzer verließe sich auf einen Termin,
+ * den es nicht gibt.
+ *
+ * Dieselben 30 Sekunden wie beim Löschen, aus demselben Grund.
+ */
+export const OPTIMISTIC_TIMEOUT_MS = 30_000;
+
 interface OptimisticEventsState {
   entries: OptimisticEvent[];
-  /** Legt einen Eintrag an und gibt seine Id zurück — `onMutate` reicht sie als Kontext weiter. */
-  add: (payload: OptimisticCreate | OptimisticUpdate) => string;
+  /**
+   * Legt einen Eintrag an und gibt seine Id zurück — `onMutate` reicht sie als
+   * Kontext weiter. `timeoutMs` liegt am Aufruf statt an einer festen Konstante,
+   * damit Tests den Watchdog kurz stellen können; wie `timeoutMs` am
+   * Pending-Delete-Eintrag.
+   */
+  add: (payload: OptimisticCreate | OptimisticUpdate, timeoutMs?: number) => string;
   remove: (id: string) => void;
+  /**
+   * Verwirft alle offenen Einträge samt ihrer Watchdogs. Für das Abmelden:
+   * `useSignOut` räumt bereits den Query-Cache und die Pending-Deletes ab; ohne
+   * diesen dritten Store stünde der optimistische Termin des Vorgängers im
+   * Kalender des nächsten Familienmitglieds, das sich auf demselben Gerät
+   * anmeldet — mit Titel, Ort und Kind-Zuordnung.
+   */
+  clear: () => void;
+}
+
+// Timer gehören nicht in den Store — genau wie bei den Pending-Deletes: Sie
+// lösen kein Rendern aus, und ein `setTimeout`-Handle im State schlüge bei
+// jedem Abonnenten als Änderung durch.
+const timers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function clearTimer(id: string): void {
+  const handle = timers.get(id);
+  if (handle !== undefined) {
+    clearTimeout(handle);
+    timers.delete(id);
+  }
 }
 
 // Laufende Nummer statt Zufalls-Id: Der Eintrag lebt Sekundenbruchteile, eine
 // Kollision über einen App-Lauf hinweg gibt es nicht, und Tests bleiben lesbar.
 let sequence = 0;
 
+/**
+ * Der Store der offenen optimistischen Einträge.
+ *
+ * Kalender-eigen statt in `features/shared`: Aufgaben brauchen ihn nicht, und
+ * dadurch entfällt der `target: unknown`-Kniff samt Cast, den der geteilte
+ * Pending-Delete-Store braucht — hier ist alles durchtypisiert.
+ *
+ * Ein Modul-Store, kein React-State: Beide Listen (`KalenderScreen`,
+ * `DashboardScreen`) lesen ihn über denselben `useFamilyEvents`-Hook, und der
+ * Eintrag muss den Unmount des Sheets überleben, das ihn angelegt hat — die
+ * Screens navigieren weg, bevor die Mutation settlet.
+ *
+ * Jeder Eintrag bekommt beim Anlegen einen **Watchdog** (siehe
+ * `OPTIMISTIC_TIMEOUT_MS`), den `remove` im Normalfall wieder abräumt. Die
+ * Mutation wird dabei ausdrücklich nicht abgebrochen.
+ */
 export const useOptimisticEventsStore = create<OptimisticEventsState>((set) => ({
   entries: [],
-  add: (payload) => {
+  add: (payload, timeoutMs = OPTIMISTIC_TIMEOUT_MS) => {
     sequence += 1;
     const id = `optimistic-${sequence}`;
     set((state) => ({ entries: [...state.entries, { id, ...payload }] }));
+    timers.set(
+      id,
+      setTimeout(() => {
+        // Die Mutation wird **nicht** abgebrochen — sie darf ruhig noch
+        // ankommen; wir hören nur auf, auf sie zu warten. Danach bestimmen
+        // wieder die Serverdaten, was der Kalender zeigt: sichtbar und
+        // selbstheilend statt unsichtbar falsch bis zum App-Neustart. Geloggt
+        // wie in `pendingDeletes.commit`, damit der Fall nicht spurlos bleibt.
+        console.error("[optimisticEvents] Eintrag abgelaufen", { id, timeoutMs });
+        useOptimisticEventsStore.getState().remove(id);
+      }, timeoutMs),
+    );
     return id;
   },
-  remove: (id) => set((state) => ({ entries: state.entries.filter((entry) => entry.id !== id) })),
+  remove: (id) => {
+    clearTimer(id);
+    set((state) => ({ entries: state.entries.filter((entry) => entry.id !== id) }));
+  },
+  clear: () => {
+    for (const id of [...timers.keys()]) clearTimer(id);
+    set({ entries: [] });
+  },
 }));
 
 /** Die offenen optimistischen Änderungen. Referenzstabil, solange sich nichts ändert. */
