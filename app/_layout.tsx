@@ -11,11 +11,14 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ToastProvider } from "@/app-sections/shared";
 import { ThemeProvider, useTheme } from "@/design-system/ThemeProvider";
 import { AuthGate, initDeepLinkHandler, useInitSession } from "@/features/auth";
+import { useFlushPendingDeletes } from "@/features/shared";
 
 function ThemedStack() {
   const { theme } = useTheme();
   useInitSession();
   useEffect(() => initDeepLinkHandler(), []);
+  // Offene Undo-Fenster schließen, wenn die App in den Hintergrund geht.
+  useFlushPendingDeletes();
   return (
     <AuthGate>
       {/* Über dem Navigator, damit ein Toast den Screenwechsel überlebt, der

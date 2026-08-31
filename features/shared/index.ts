@@ -6,5 +6,6 @@ export {
   type PendingDelete,
   type PendingDeleteKind,
 } from "./pendingDeletes";
+export { useFlushPendingDeletes } from "./useFlushPendingDeletes";
 export { useToday } from "./useToday";
 export type { Translate } from "./translate";
