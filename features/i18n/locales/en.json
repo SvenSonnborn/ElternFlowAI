@@ -21,7 +21,8 @@
     "off": "Off",
     "manage": "Manage",
     "retry": "Try again",
-    "close": "Close"
+    "close": "Close",
+    "undo": "Undo"
   },
   "color": {
     "mint": "Mint",
@@ -331,10 +332,13 @@
     },
     "delete": {
       "confirmTitle": "Delete event?",
-      "confirmBody": "This cannot be undone.",
+      "confirmBody": "You can undo this right afterwards.",
       "confirmOk": "Delete",
       "deleting": "Deleting…",
-      "error": "Delete failed"
+      "error": "Delete failed",
+      "undoTitle": "Event deleted",
+      "undoScopeForward": "from {{date}}",
+      "undoScopeAll": "entire series"
     },
     "scope": {
       "title": "Which events?",
@@ -469,10 +473,11 @@
     },
     "delete": {
       "confirmTitle": "Delete task?",
-      "confirmBody": "This cannot be undone.",
+      "confirmBody": "You can undo this right afterwards.",
       "confirmOk": "Delete",
       "deleting": "Deleting…",
-      "error": "Delete failed"
+      "error": "Delete failed",
+      "undoTitle": "Task deleted"
     },
     "type": {
       "hausaufgaben": "Homework",

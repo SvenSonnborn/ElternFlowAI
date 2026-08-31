@@ -21,7 +21,8 @@
     "off": "Aus",
     "manage": "Verwalten",
     "retry": "Erneut versuchen",
-    "close": "Schließen"
+    "close": "Schließen",
+    "undo": "Rückgängig"
   },
   "color": {
     "mint": "Mint",
@@ -331,10 +332,13 @@
     },
     "delete": {
       "confirmTitle": "Termin löschen?",
-      "confirmBody": "Diese Aktion kann nicht rückgängig gemacht werden.",
+      "confirmBody": "Du kannst das direkt danach rückgängig machen.",
       "confirmOk": "Löschen",
       "deleting": "Lösche…",
-      "error": "Löschen fehlgeschlagen"
+      "error": "Löschen fehlgeschlagen",
+      "undoTitle": "Termin gelöscht",
+      "undoScopeForward": "ab {{date}}",
+      "undoScopeAll": "ganze Serie"
     },
     "scope": {
       "title": "Welche Termine?",
@@ -469,10 +473,11 @@
     },
     "delete": {
       "confirmTitle": "Aufgabe löschen?",
-      "confirmBody": "Diese Aktion kann nicht rückgängig gemacht werden.",
+      "confirmBody": "Du kannst das direkt danach rückgängig machen.",
       "confirmOk": "Löschen",
       "deleting": "Lösche…",
-      "error": "Löschen fehlgeschlagen"
+      "error": "Löschen fehlgeschlagen",
+      "undoTitle": "Aufgabe gelöscht"
     },
     "type": {
       "hausaufgaben": "Hausaufgaben",
