@@ -6,7 +6,7 @@ import { supabase } from "@/features/supabase";
 
 import type { EventWithRelations } from "./expand";
 
-import { useOptimisticEventsStore } from "./optimisticEvents";
+import { OPTIMISTIC_EVENT_ID_PREFIX, useOptimisticEventsStore } from "./optimisticEvents";
 import { calendarKeys } from "./queries";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
@@ -156,7 +156,7 @@ export function optimisticEventRow(vars: CreateEventVars, type: EventTypeRow): E
   const now = new Date().toISOString();
   sequence += 1;
   return {
-    id: `optimistic-${sequence}`,
+    id: `${OPTIMISTIC_EVENT_ID_PREFIX}${sequence}`,
     family_id: vars.familyId,
     type_id: vars.typeId,
     child_id: vars.childId,

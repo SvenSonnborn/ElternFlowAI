@@ -15,7 +15,12 @@ import {
   useFamilyParents,
   useFamilyPendingInvitations,
 } from "@/features/auth";
-import { segmentsForDay, segmentTimeLabel, useFamilyEvents } from "@/features/calendar";
+import {
+  isOptimisticEventId,
+  segmentsForDay,
+  segmentTimeLabel,
+  useFamilyEvents,
+} from "@/features/calendar";
 import { useMealAlternative, useRecipeJudge, useTodaysMeal } from "@/features/meals";
 import { getSampleFamilyName } from "@/features/sample-data";
 import { useToday } from "@/features/shared";
@@ -234,12 +239,17 @@ export function DashboardScreen() {
                       })
                     : t("cal.a11y.event", { title: occ.title, time: timeLabel })
                 }
-                onPress={() =>
+                onPress={() => {
+                  // Siehe `isOptimisticEventId`: Die synthetische Id eines noch
+                  // nicht gespeicherten Termins führte im Detail-Screen in einen
+                  // rohen `22P02`-Datenbankfehler. Derselbe Guard steht in
+                  // `KalenderScreen`.
+                  if (isOptimisticEventId(occ.eventId)) return;
                   router.push({
                     pathname: "/event/[id]",
                     params: { id: occ.eventId, occ: occ.occurrenceDate },
-                  })
-                }
+                  });
+                }}
               />
             );
           })}

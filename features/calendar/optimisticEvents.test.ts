@@ -9,6 +9,7 @@ import type { CalendarOccurrence } from "./types";
 import { expandEvents } from "./expand";
 import {
   applyOptimisticChanges,
+  isOptimisticEventId,
   patchesOccurrence,
   useOptimisticEventsStore,
   visibleOccurrences,
@@ -457,6 +458,13 @@ describe("useOptimisticEventsStore", () => {
     expect(store().entries).toHaveLength(1);
     expect(store().entries[0].id).toBe(second);
     store().remove(second);
+  });
+});
+
+describe("isOptimisticEventId", () => {
+  test("erkennt die synthetische Id eines Creates und keine echte", () => {
+    expect(isOptimisticEventId("optimistic-7")).toBe(true);
+    expect(isOptimisticEventId("6f1c0f0e-6b1a-4c2f-9d1a-9a1b2c3d4e5f")).toBe(false);
   });
 });
 
