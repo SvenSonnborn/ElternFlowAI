@@ -78,12 +78,15 @@ function remove(id: string): void {
  * `running` schützt vor Doppelausführung: `flush()` darf mehrfach kommen (zwei
  * schnelle App-Wechsel), während `run` noch läuft.
  *
- * Der `catch` fängt `run` still ab: in der Praxis behandelt der Aufrufer
- * seine Fehler selbst (Toast statt Alert, siehe Decision 12 der Spec) — dieser
- * Fang ist nur das Netz für den Fall, dass er es nicht tut. Beide Aufrufer von
- * `commit` (`schedule`s Timer, `flush`) rufen mit `void` auf; ohne den `catch`
- * würde eine abgelehnte `run`-Promise zu einem unhandled rejection statt zu
- * einem einfach entfernten Eintrag.
+ * Der `catch` fängt `run` ab und loggt: beide Aufrufer von `commit`
+ * (`schedule`s Timer, `flush`) rufen mit `void` auf, niemand hängt sich an die
+ * zurückgegebene Promise — ohne den `catch` würde eine abgelehnte
+ * `run`-Promise zu einem unhandled rejection statt zu einem sauber entfernten
+ * Eintrag. Der geloggte Fall ist der *unerwartete* Fehler (ein Bug in `run`),
+ * nicht der erwartete Netzwerkfehler — den fängt der Aufrufer selbst ab und
+ * meldet ihn per Toast, bevor er den Store überhaupt erreicht. Wie
+ * `mapTaskError`/`mapAuthError` und `deepLinkHandler` loggt dieses Modul einen
+ * solchen Fall statt ihn spurlos zu schlucken.
  */
 async function commit(id: string): Promise<void> {
   if (running.has(id)) return;
@@ -94,8 +97,8 @@ async function commit(id: string): Promise<void> {
   running.add(id);
   try {
     await entry.run();
-  } catch {
-    // Bewusst leer — siehe Docstring oben.
+  } catch (error) {
+    console.error("[pendingDeletes] commit failed", { id, error });
   } finally {
     running.delete(id);
     remove(id);
