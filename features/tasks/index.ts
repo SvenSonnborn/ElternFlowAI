@@ -21,7 +21,11 @@ export {
   type UpdateTaskVars,
 } from "./mutations";
 export { applyDelete, applyToggle, applyUpdate, type TaskChanges } from "./optimistic";
-export { usePendingTaskIds, type PendingTaskDelete } from "./pendingDeletes";
+export {
+  usePendingTaskIds,
+  withoutPendingTaskDeletes,
+  type PendingTaskDelete,
+} from "./pendingDeletes";
 export {
   emptyTaskForm,
   hasTaskFormErrors,
