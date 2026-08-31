@@ -13,6 +13,7 @@ import {
   isMultiDay,
   REMINDER_OFFSET_1H,
   REMINDER_OFFSET_24H,
+  undoDeleteMessage,
   useDeleteEvent,
   useEvent,
   useEventReminders,
@@ -105,22 +106,6 @@ export function EventDetailScreen() {
     });
   };
 
-  /**
-   * Was der Toast unter dem Titel zeigt: der Termin-Titel, bei einer Serie mit
-   * dem Umfang der Löschung. Ohne diese Angabe wäre der Toast Dekoration — bei
-   * „ganze Serie" ist der Unterschied zu „nur dieser Termin" genau das, was der
-   * Nutzer prüfen können muss, bevor das Fenster zugeht.
-   */
-  function undoMessage(title: string, scope: EditScope, occurrenceDate: string): string {
-    if (scope === "all") return `${title} · ${t("cal.delete.undoScopeAll")}`;
-    if (scope === "forward") {
-      // Dasselbe Format wie die Datumszeile des Screens weiter unten.
-      const date = format(parseISO(occurrenceDate), "d. MMM", { locale: dateLocale });
-      return `${title} · ${t("cal.delete.undoScopeForward", { date })}`;
-    }
-    return title;
-  }
-
   const onDeletePress = () => {
     if (!data) return;
     Alert.alert(t("cal.delete.confirmTitle"), t("cal.delete.confirmBody"), [
@@ -144,12 +129,18 @@ export function EventDetailScreen() {
               if (!chosen) return;
               scope = chosen;
             }
-            // Bei einem Einzeltermin ist `scope` immer "all" (der Dialog kommt
-            // gar nicht) — dort trägt der Toast nur den Titel, kein Serien-
-            // Zusatz, weil es keine Serie gibt.
-            const message = isRecurring
-              ? undoMessage(data.title, scope, data.occurrenceDate)
-              : data.title;
+            const message = undoDeleteMessage({
+              title: data.title,
+              scope,
+              occurrenceDate: data.occurrenceDate,
+              isRecurring,
+              t,
+              // Gleiches Datums-Muster wie die Datumszeilen weiter unten
+              // ("E, d. MMM" bzw. "EEEE, d. MMMM"), nur ohne Wochentag, damit
+              // der Toast kompakt bleibt.
+              formatDate: (occurrenceDate) =>
+                format(parseISO(occurrenceDate), "d. MMM", { locale: dateLocale }),
+            });
 
             undoableDelete({
               kind: "event",

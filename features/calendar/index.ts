@@ -48,3 +48,4 @@ export {
   withoutPendingDeletes,
   type PendingEventDelete,
 } from "./pendingDeletes";
+export { undoDeleteMessage } from "./undoDeleteMessage";
