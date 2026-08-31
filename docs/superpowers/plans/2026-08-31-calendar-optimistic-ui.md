@@ -383,7 +383,11 @@ function row(partial: Partial<EventWithRelations> = {}): EventWithRelations {
     all_day: false,
     rrule_freq: "weekly",
     rrule_interval: 1,
-    rrule_byweekday: [3],
+    // Bewusst `null`: Die Tests prüfen die Overlay-Komposition, nicht die
+    // Wochentags-Konvention der Spalte (`rrule.ts` rechnet sie mit `n - 1`
+    // um). Ohne Einschränkung wiederholt sich die Regel schlicht ab dem
+    // Startdatum — 01.10. und 08.10., unabhängig davon.
+    rrule_byweekday: null,
     rrule_count: 2,
     rrule_until: null,
     created_by: null,
@@ -584,7 +588,6 @@ Expected: FAIL — `withOptimistic is not a function` bzw. `useOptimisticEventsS
 An `features/calendar/optimisticEvents.ts` anhängen:
 
 ```ts
-import { useMemo } from "react";
 import { create } from "zustand";
 
 import type { EventWithRelations } from "./expand";
@@ -681,8 +684,6 @@ export function withOptimistic(
   return [...patched, ...expand(created)];
 }
 ```
-
-Der `useMemo`-Import wird hier noch nicht gebraucht — lass ihn weg, wenn ESLint ihn als ungenutzt meldet.
 
 - [ ] **Step 4: Test laufen lassen und grün sehen**
 
