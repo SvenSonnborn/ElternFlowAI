@@ -135,11 +135,15 @@ export function EventDetailScreen() {
               occurrenceDate: data.occurrenceDate,
               isRecurring,
               t,
-              // Gleiches Datums-Muster wie die Datumszeilen weiter unten
-              // ("E, d. MMM" bzw. "EEEE, d. MMMM"), nur ohne Wochentag, damit
-              // der Toast kompakt bleibt.
+              // Das Muster hängt an der Sprache, nicht nur am Monatsnamen: der
+              // Punkt nach dem Tag ist deutsche Konvention, Englisch will den
+              // Monat davor. `docs/COPY.md` schreibt beide Formen fest
+              // (DE „Mi, 14. Mai", EN „Wed, May 14"); dieselbe Verzweigung wie
+              // in `TaskForm`s `dueDatePattern`.
               formatDate: (occurrenceDate) =>
-                format(parseISO(occurrenceDate), "d. MMM", { locale: dateLocale }),
+                format(parseISO(occurrenceDate), lang === "de" ? "E, d. MMM" : "E, MMM d", {
+                  locale: dateLocale,
+                }),
             });
 
             undoableDelete({

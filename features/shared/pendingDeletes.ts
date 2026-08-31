@@ -48,8 +48,9 @@ export interface PendingDelete {
   run: () => Promise<void>;
   /**
    * Obergrenze für das Warten auf `run` (siehe `COMMIT_TIMEOUT_MS`). Liegt am
-   * Eintrag statt an `commit`, damit `flush()` seine Signatur behält und die
-   * Tests den Watchdog genauso kurz stellen können wie `delayMs`.
+   * Eintrag statt an `commit`, damit `flush()` ohne eigenen Timeout-Parameter
+   * auskommt und die Tests den Watchdog genauso kurz stellen können wie
+   * `delayMs`.
    */
   timeoutMs: number;
 }
@@ -65,7 +66,19 @@ interface PendingDeleteState {
   ) => string;
   /** `true`, wenn der Eintrag noch aufzuhalten war — siehe `undo` unten. */
   undo: (id: string) => boolean;
-  flush: () => void;
+  /**
+   * Führt alle offenen Löschungen sofort aus. Das zurückgegebene Promise
+   * settelt, wenn sie durch sind — `useSignOut` wartet darauf, damit das
+   * DELETE noch angemeldet läuft; ohne das Warten könnte `signOut` die lokale
+   * Session entfernen, bevor die Mutation ihren Token aufgelöst hat, und das
+   * DELETE liefe unangemeldet gegen RLS.
+   *
+   * Das Warten ist begrenzt: jeder Commit hat seinen eigenen Watchdog.
+   * Bereits **laufende** Löschungen wartet `flush` dagegen nicht ab — `commit`
+   * kehrt für sie sofort um. Dieser Fall setzt voraus, dass der Timer schon
+   * gefeuert hat, das Undo-Fenster also ohnehin vorbei ist.
+   */
+  flush: () => Promise<void>;
 }
 
 // Timer und Laufmarker gehören nicht in den Store: sie lösen kein Rendern aus,
@@ -187,10 +200,8 @@ export const usePendingDeleteStore = create<PendingDeleteState>((set, get) => ({
     return true;
   },
 
-  flush: () => {
-    for (const entry of get().entries) {
-      void commit(entry.id);
-    }
+  flush: async () => {
+    await Promise.all(get().entries.map((entry) => commit(entry.id)));
   },
 }));
 

@@ -37,7 +37,9 @@ export function useFlushPendingDeletes(): void {
     if (Platform.OS === "web") return;
     const subscription = AppState.addEventListener("change", (next) => {
       if (shouldFlushOnStateChange(next)) {
-        usePendingDeleteStore.getState().flush();
+        // Bewusst nicht abgewartet: der Listener kann nichts zurückhalten, die
+        // App geht ohnehin in den Hintergrund. `useSignOut` wartet dagegen.
+        void usePendingDeleteStore.getState().flush();
       }
     });
     return () => subscription.remove();
