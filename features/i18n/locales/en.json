@@ -364,13 +364,13 @@
       "recurrenceCountUnlimited": "Unlimited",
       "noMember": "Nobody",
       "save": "Add",
-      "saving": "Saving…",
       "conflict_one": "Conflicts with {{title}} · {{from}}–{{to}}",
       "conflict_other": "{{count}} conflicts — {{title}} · {{from}}–{{to}} and more",
       "error": {
         "typeRequired": "Pick a type",
         "invalidCount": "Enter a number of 1 or more, or leave it empty",
-        "noFamily": "Family not set up yet"
+        "noFamily": "Family not set up yet",
+        "saveFailed": "Couldn't create event"
       }
     },
     "recur": {
