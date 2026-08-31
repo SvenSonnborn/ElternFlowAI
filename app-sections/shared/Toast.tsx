@@ -56,10 +56,11 @@ interface ToastProps {
 /**
  * Eine Toast-Zeile nach [patterns/toast.md](../../patterns/toast.md).
  *
- * Die Komponente hält zwei Dinge selbst, die sonst niemand halten könnte:
- * ihren Auto-Dismiss-Timer und ihre Ausblend-Animation. Deshalb meldet sie das
- * Ende erst über `onDismiss` — wer statt dessen `useToast().dismiss(id)` ruft,
- * entfernt den Eintrag sofort aus dem Store und überspringt das Ausblenden.
+ * Die Komponente hält drei Dinge selbst, die sonst niemand halten könnte:
+ * ihren Auto-Dismiss-Timer, ihre Ausblend-Animation und ihren Countdown.
+ * Deshalb meldet sie das Ende erst über `onDismiss` — wer statt dessen
+ * `useToast().dismiss(id)` ruft, entfernt den Eintrag sofort aus dem Store und
+ * überspringt das Ausblenden.
  */
 export function Toast({ entry, onDismiss }: ToastProps) {
   const { t } = useTranslation();
@@ -143,12 +144,18 @@ export function Toast({ entry, onDismiss }: ToastProps) {
   // Ansage wäre der Toast dort stumm — und ein Toast, den niemand hört, ist
   // für Screenreader-Nutzer gar kein Toast. Auf Android bleibt es bei der
   // Live-Region, sonst käme die Meldung doppelt.
+  //
+  // Die Aktion gehört mit hinein: Sie ist der einzige Weg zu einem Knopf, der
+  // nach fünf nicht verlängerbaren Sekunden weg ist, auf einem Screen, der
+  // gerade gewechselt hat. Wird sie nicht angesagt, ist sie faktisch nicht da.
+  const actionLabel = entry.action?.label;
   useEffect(() => {
     if (Platform.OS !== "ios") return;
-    AccessibilityInfo.announceForAccessibility(
-      entry.message ? `${entry.title}. ${entry.message}` : entry.title,
-    );
-  }, [entry.title, entry.message]);
+    const parts = [entry.title];
+    if (entry.message) parts.push(entry.message);
+    if (actionLabel) parts.push(t("action.a11y.toastAction", { label: actionLabel }));
+    AccessibilityInfo.announceForAccessibility(parts.join(". "));
+  }, [t, entry.title, entry.message, actionLabel]);
 
   const isError = entry.variant === "error";
 

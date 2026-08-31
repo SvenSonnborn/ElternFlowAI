@@ -22,7 +22,10 @@
     "manage": "Verwalten",
     "retry": "Erneut versuchen",
     "close": "Schließen",
-    "undo": "Rückgängig"
+    "undo": "Rückgängig",
+    "a11y": {
+      "toastAction": "Aktion verfügbar: {{label}}"
+    }
   },
   "color": {
     "mint": "Mint",
