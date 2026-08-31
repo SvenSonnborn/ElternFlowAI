@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { usePendingDeleteStore } from "@/features/shared";
 import { supabase } from "@/features/supabase";
 
 interface SignUpVars {
@@ -44,10 +45,27 @@ export function useSignIn() {
   });
 }
 
+/**
+ * Meldet ab — und schließt vorher alle offenen Undo-Fenster.
+ *
+ * Das `flush()` steht **vor** dem `signOut`, weil eine verzögerte Löschung nur
+ * unter der Session gelingt, die sie ausgelöst hat: Der Toast steht direkt
+ * über der Tab-Bar, Einstellungen ist ein Tap — sich innerhalb der fünf
+ * Sekunden abzumelden ist erreichbar. Danach träfe das `DELETE` einer Aufgabe
+ * unter RLS null Zeilen und meldete dabei **keinen** Fehler; die Mutation
+ * „gelänge", gelöscht wäre nichts, und beim nächsten Login stünde die Aufgabe
+ * wieder da. Bei einem Termin wirft `fetchEventById` stattdessen, und der
+ * Fehler-Toast landete in einem `ToastProvider`, den `AuthGate` längst
+ * abgeräumt hat — vollständig stumm.
+ *
+ * `qc.clear()` in `onSettled` räumt aus demselben Grund den Query-Cache; der
+ * Pending-Store ist der zweite Modul-Store, den ein Abmelden erreichen muss.
+ */
 export function useSignOut() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
+      usePendingDeleteStore.getState().flush();
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     },
