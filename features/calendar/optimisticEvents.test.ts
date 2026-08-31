@@ -87,9 +87,19 @@ describe("applyOptimisticChanges · Serie mit Scope `all`", () => {
     expect(out.startAt.getDate()).toBe(17);
   });
 
-  test("erhält die Dauer", () => {
-    const out = applyOptimisticChanges(occ(), "all", changes());
+  test("erhält die Dauer und verankert endAt am Occurrence-Datum, nicht am changes-Datum", () => {
+    // Occurrence auf 2026-09-17, changes auf 2026-09-10 datiert.
+    // Eine falsche literale Übernahme würde endAt auf den 10. setzen — genau das,
+    // das diese Behauptung reißt. Der korrekte Weg: Tageszeit aus newEnd übernehmen,
+    // aber Datum von startAt bewahren.
+    const later = occ({
+      occurrenceDate: "2026-09-17",
+      startAt: new Date("2026-09-17T16:00:00"),
+      endAt: new Date("2026-09-17T17:30:00"),
+    });
+    const out = applyOptimisticChanges(later, "all", changes());
     expect(out.endAt.getTime() - out.startAt.getTime()).toBe(90 * 60 * 1000);
+    expect(out.endAt.getDate()).toBe(17);
   });
 
   test("patcht auch die Beschreibung — der Server schreibt sie auf den Master", () => {
