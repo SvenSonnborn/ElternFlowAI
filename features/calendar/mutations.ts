@@ -98,9 +98,11 @@ export function useDeleteEvent() {
  * Bearbeitet einen Termin und zeigt die Änderungen sofort im Kalender, statt auf die
  * Server-Antwort zu warten. `onMutate` schreibt bei Erfolg einen Overlay-Eintrag
  * (`kind: "update"`) in den Store, der die geänderten Felder anwendet.
- * `onSettled` invalidiert die Kalender-Queries und gibt den Store-Eintrag erst danach frei:
- * andersherum blitzte der optimistische Stand für einen Frame durch, bevor der
- * Refetch ihn ersetzt — dieselbe Lehre, die `useDeleteEvent` in ADR-026 gezogen hat.
+ * `onSettled` invalidiert die Kalender-Queries **nur bei Erfolg** und gibt den
+ * Store-Eintrag erst danach frei: andersherum blitzte der optimistische Stand für
+ * einen Frame durch, bevor der Refetch ihn ersetzt — dieselbe Lehre, die
+ * `useDeleteEvent` in ADR-026 gezogen hat. Warum der Fehlerfall nicht
+ * invalidiert, steht am `if` selbst.
  *
  * **Grenze:** `vars.recurrence` (eine Änderung der Wiederholungsregel) wird
  * **nicht** optimistisch abgebildet. Ändert der Nutzer den Rhythmus einer Serie,
@@ -130,10 +132,20 @@ export function useUpdateEvent() {
     onError: (_err, _vars, id) => {
       if (id) remove(id);
     },
-    onSettled: async (_data, _err, _vars, id) => {
-      // Erst invalidieren, **dann** freigeben — sonst blitzt der alte Stand für
-      // einen Frame durch.
-      await qc.invalidateQueries({ queryKey: calendarKeys.all });
+    onSettled: async (_data, error, _vars, id) => {
+      // **Nur bei Erfolg invalidieren.** Bei einem Fehler ist serverseitig nichts
+      // passiert, der Refetch brächte dieselben Daten zurück — und er kostet mehr
+      // als nichts: TanStack ruft `onError` → `await onSettled` → **dann erst**
+      // lehnt `mutateAsync` ab. Der Rollback (`remove`) läuft also sofort, der
+      // Fehler-Toast wartete aber hinter einem Refetch, der bei toter Verbindung
+      // mit `retry: 1` und Backoff ins Leere läuft. Im Funkloch sähe der Nutzer
+      // seine Änderung kommen und wieder gehen, ohne ein Wort dazu. Das `if` ist
+      // deshalb kein Sonderfall, den man „vereinfachen" darf.
+      if (!error) {
+        // Erst invalidieren, **dann** freigeben — sonst blitzt der alte Stand
+        // für einen Frame durch.
+        await qc.invalidateQueries({ queryKey: calendarKeys.all });
+      }
       if (id) remove(id);
     },
   });

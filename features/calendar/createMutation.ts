@@ -186,9 +186,10 @@ export function optimisticEventRow(vars: CreateEventVars, type: EventTypeRow): E
  * Master-Zeile (`optimisticEventRow`) in den Overlay-Store — vorausgesetzt der
  * Typ des Termins steht bereits im Cache, sonst bleibt der Termin unsichtbar
  * bis zum Refetch (siehe Kommentar dort). `onSettled` invalidiert die
- * Kalender-Queries und gibt den Store-Eintrag erst danach frei: andersherum
- * blitzte der optimistische Stand für einen Frame durch, bevor der Refetch ihn
- * ersetzt — dieselbe Lehre, die `useDeleteEvent` in ADR-026 gezogen hat.
+ * Kalender-Queries **nur bei Erfolg** und gibt den Store-Eintrag erst danach
+ * frei: andersherum blitzte der optimistische Stand für einen Frame durch, bevor
+ * der Refetch ihn ersetzt — dieselbe Lehre, die `useDeleteEvent` in ADR-026
+ * gezogen hat. Warum der Fehlerfall nicht invalidiert, steht am `if` selbst.
  */
 export function useCreateEvent() {
   const qc = useQueryClient();
@@ -214,11 +215,22 @@ export function useCreateEvent() {
     onError: (_err, _vars, id) => {
       if (id) remove(id);
     },
-    onSettled: async (_data, _err, _vars, id) => {
-      // Erst invalidieren, **dann** freigeben. Andersherum blitzt der alte Stand
-      // für einen Frame durch, bevor der Refetch landet — dieselbe Lehre, die
-      // `useDeleteEvent` in ADR-026 gezogen hat.
-      await qc.invalidateQueries({ queryKey: calendarKeys.all });
+    onSettled: async (_data, error, _vars, id) => {
+      // **Nur bei Erfolg invalidieren.** Bei einem Fehler ist serverseitig
+      // nichts passiert, der Refetch brächte dieselben Daten zurück — und er
+      // kostet mehr als nichts: TanStack ruft `onError` → `await onSettled` →
+      // **dann erst** lehnt `mutateAsync` ab. Der Rollback (`remove`) läuft also
+      // sofort, der Fehler-Toast wartete aber hinter einem Refetch, der bei
+      // toter Verbindung mit `retry: 1` und Backoff ins Leere läuft. Im
+      // Funkloch sähe der Nutzer seinen Termin kommen und wieder gehen, ohne
+      // ein Wort dazu. Das `if` ist deshalb kein Sonderfall, den man
+      // „vereinfachen" darf.
+      if (!error) {
+        // Erst invalidieren, **dann** freigeben. Andersherum blitzt der alte
+        // Stand für einen Frame durch, bevor der Refetch landet — dieselbe
+        // Lehre, die `useDeleteEvent` in ADR-026 gezogen hat.
+        await qc.invalidateQueries({ queryKey: calendarKeys.all });
+      }
       if (id) remove(id);
     },
   });
