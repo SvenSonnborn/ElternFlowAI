@@ -17,10 +17,14 @@ import type { DaySegment } from "./spans";
 import type { CalendarOccurrence, MarkedDates } from "./types";
 
 import { expandEvents } from "./expand";
+import { usePendingEventDeletes, withoutPendingDeletes } from "./pendingDeletes";
 import { calendarKeys, fetchEventById, fetchEventsInRange, fetchEventTypes } from "./queries";
 import { toDayMarkings, toDaySegments } from "./spans";
 
 type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
+
+/** Referenzstabil, damit `data` nicht bei jedem Render ein neues Array ist. */
+const NO_OCCURRENCES: CalendarOccurrence[] = [];
 
 interface UseFamilyEventsResult {
   data: CalendarOccurrence[];
@@ -30,6 +34,14 @@ interface UseFamilyEventsResult {
   error: unknown;
 }
 
+/**
+ * Alle Termine im sichtbaren Monat plus jeweils 7 Tage Puffer.
+ *
+ * Gibt die Menge **gefiltert nach Undo-Status** zurück: wenn ein Termin gerade
+ * gelöscht wird, steht er im Filter und ist **nicht** in `data` — obwohl die
+ * Query ihn nachgeladen hat. Das ist Absicht (Decision 1 der Spec): die Zeile
+ * bleibt im Cache, wird nur ausgeblendet, solange die Undo-Aktion möglich ist.
+ */
 export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
   const { theme } = useTheme();
 
@@ -44,10 +56,15 @@ export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
     queryFn: () => fetchEventsInRange(rangeStart, rangeEnd),
   });
 
+  const pending = usePendingEventDeletes();
+
   const data = useMemo(() => {
-    if (!query.data) return [];
-    return expandEvents(query.data, rangeStart, rangeEnd, theme);
-  }, [query.data, rangeStart, rangeEnd, theme]);
+    if (!query.data) return NO_OCCURRENCES;
+    // Nach dem Expandieren gefiltert, nicht davor: die offenen Löschungen sind
+    // pro Occurrence gedacht („nur dieser Termin"), die gecachten Zeilen sind
+    // Master-Zeilen (Decision 1 der Spec).
+    return withoutPendingDeletes(expandEvents(query.data, rangeStart, rangeEnd, theme), pending);
+  }, [query.data, rangeStart, rangeEnd, theme, pending]);
 
   const segments = useMemo(
     () => toDaySegments(data, rangeStart, rangeEnd),

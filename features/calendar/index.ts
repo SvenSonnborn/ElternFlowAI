@@ -42,3 +42,9 @@ export {
 export { toDaySegments, toDayMarkings, type DaySegment } from "./spans";
 export { segmentsForDay, segmentTimeLabel } from "./day";
 export type { CalendarOccurrence, MarkedDates, MarkedDot, OccurrenceRrule, SpanBar } from "./types";
+export {
+  hidesOccurrence,
+  usePendingEventDeletes,
+  withoutPendingDeletes,
+  type PendingEventDelete,
+} from "./pendingDeletes";
