@@ -9,9 +9,13 @@ import type { TaskGroup, TaskSections, TaskStats, TaskTypeRow, TaskWithType } fr
 
 import { filterTasks } from "./filter";
 import { useTaskFilter } from "./filterStore";
+import { usePendingTaskIds } from "./pendingDeletes";
 import { computeTaskStats, groupTasksByChild, groupTasksByDue } from "./stats";
 
 const SELECT = "*, task_types(*)";
+
+/** Referenzstabil, damit `data` nicht bei jedem Render ein neues Array ist. */
+const NO_TASKS: TaskWithType[] = [];
 
 /**
  * How far back completed tasks stay in the window. Long enough to feed
@@ -72,8 +76,20 @@ export function useFamilyTasks(): UseFamilyTasksResult {
     queryFn: () => fetchFamilyTasks(doneSince),
   });
 
+  const pendingIds = usePendingTaskIds();
+
+  const data = useMemo(() => {
+    const rows = query.data ?? NO_TASKS;
+    // Kein Cache-Eingriff: die Zeile ist noch da, sie wird nur nicht gezeigt,
+    // solange „Rückgängig" erreichbar ist (Decision 1 der Spec). Deshalb greift
+    // der Filter auch für `useTask` — der ist ein Selektor auf diese Liste, und
+    // der `hydrated`-Guard im Edit-Screen fängt das bereits ab.
+    if (pendingIds.size === 0) return rows;
+    return rows.filter((row) => !pendingIds.has(row.id));
+  }, [query.data, pendingIds]);
+
   return {
-    data: query.data ?? [],
+    data,
     isLoading: query.isLoading,
     isRefetching: query.isRefetching,
     error: query.error,
