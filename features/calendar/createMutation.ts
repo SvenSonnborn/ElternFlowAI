@@ -4,9 +4,13 @@ import type { Database } from "@/features/supabase/database.types";
 
 import { supabase } from "@/features/supabase";
 
+import type { EventWithRelations } from "./expand";
+
+import { useOptimisticEventsStore } from "./optimisticEvents";
 import { calendarKeys } from "./queries";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
+type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
 
 export type RecurrenceOption = "none" | "daily" | "weekdays" | "weekly" | "monthly";
 
@@ -124,12 +128,75 @@ export async function createEvent(vars: CreateEventVars): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Baut aus den Mutations-Variablen eine Master-Zeile in der Form, die
+ * `fetchEventsInRange` liefert — damit sie durch dasselbe `expandEvents` laufen
+ * kann wie die echten.
+ *
+ * Erfunden wird nur die `id` (Präfix `optimistic-`, damit sie in Logs erkennbar
+ * ist) und die beiden Zeitstempel; alles andere kommt aus dem Formular oder aus
+ * der bereits geladenen Typ-Zeile. Die Feldliste spiegelt bewusst den `insert`
+ * in `createEvent` direkt darüber: Weicht sie ab, zeigt der Kalender etwas
+ * anderes an, als gleich gespeichert wird.
+ */
+function optimisticEventRow(vars: CreateEventVars, type: EventTypeRow): EventWithRelations {
+  const rrule = recurrenceToRrule(vars.recurrence, new Date(vars.startAt));
+  const now = new Date().toISOString();
+  return {
+    id: `optimistic-${vars.startAt}-${vars.typeId}`,
+    family_id: vars.familyId,
+    type_id: vars.typeId,
+    child_id: vars.childId,
+    parent_id: vars.parentId,
+    title: vars.title,
+    description: vars.description,
+    location: vars.location,
+    start_at: vars.startAt,
+    end_at: vars.endAt,
+    all_day: vars.allDay,
+    rrule_freq: rrule.rrule_freq,
+    rrule_interval: rrule.rrule_interval,
+    rrule_byweekday: rrule.rrule_byweekday,
+    rrule_count: vars.recurrence === "none" ? null : vars.recurrenceCount,
+    rrule_until: null,
+    created_by: vars.createdBy,
+    created_at: now,
+    updated_at: now,
+    event_types: type,
+    event_exceptions: [],
+  };
+}
+
 export function useCreateEvent() {
   const qc = useQueryClient();
+  const add = useOptimisticEventsStore((state) => state.add);
+  const remove = useOptimisticEventsStore((state) => state.remove);
+
   return useMutation({
     mutationFn: createEvent,
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: calendarKeys.all });
+    onMutate: (vars) => {
+      // Der Typ kommt aus dem Cache statt aus `useEventTypes()`: `onMutate`
+      // braucht kein Abonnement, nur den aktuellen Stand — und ein Import aus
+      // `./hooks` zöge über `useTheme` das nativewind-Runtime herein, das sich
+      // unter `bun test` nicht laden lässt. Der Anlegen-Screen ruft
+      // `useEventTypes()` ohnehin, der Eintrag ist beim Absenden also warm.
+      const types = qc.getQueryData<EventTypeRow[]>(calendarKeys.types);
+      // Ohne die Typ-Zeile wäre die Occurrence unvollständig (Farbe, Icon,
+      // Beschriftung). Dann lieber nicht optimistisch als falsch: Der Termin
+      // erscheint eben erst mit dem Refetch.
+      const type = types?.find((row) => row.id === vars.typeId);
+      if (!type) return undefined;
+      return add({ kind: "create", row: optimisticEventRow(vars, type) });
+    },
+    onError: (_err, _vars, id) => {
+      if (id) remove(id);
+    },
+    onSettled: async (_data, _err, _vars, id) => {
+      // Erst invalidieren, **dann** freigeben. Andersherum blitzt der alte Stand
+      // für einen Frame durch, bevor der Refetch landet — dieselbe Lehre, die
+      // `useDeleteEvent` in ADR-026 gezogen hat.
+      await qc.invalidateQueries({ queryKey: calendarKeys.all });
+      if (id) remove(id);
     },
   });
 }
