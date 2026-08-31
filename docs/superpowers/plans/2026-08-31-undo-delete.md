@@ -820,7 +820,7 @@ export function usePendingEventDeletes(): PendingEventDelete[] {
 - [ ] **Step 4: Test laufen lassen und grün sehen**
 
 Run: `bun test features/calendar/pendingDeletes.test.ts`
-Expected: PASS, 9 Tests
+Expected: PASS, 8 Tests
 
 - [ ] **Step 5: Typecheck, Lint, Commit**
 
@@ -1068,7 +1068,7 @@ In `action` ergänzen:
     }
 ```
 
-`deleting` fällt in **beiden** weg — der Screen ist weg, bevor die Mutation startet (Abschnitt 5 der Spec).
+`deleting` bleibt in **beiden** vorerst stehen. Es hat noch Verwender — `hw.delete.deleting` in `TaskEditScreen.tsx:207`, `cal.delete.deleting` in `EventDetailScreen.tsx:313` —, und die i18n-Kataloge sind **nicht** typisiert (kein `CustomTypeOptions`): ein Commit, der den Key vor seiner Verwendung entfernt, scheitert nicht, sondern rendert still den Key-String. Jeder Key fällt deshalb im selben Commit wie seine letzte Verwendung — `hw.delete.deleting` in Task 8, `cal.delete.deleting` in Task 9.
 
 - [ ] **Step 2: Die englischen Keys spiegeln**
 
@@ -1121,7 +1121,7 @@ print("nur EN:", sorted(only_en))
 PY
 ```
 
-Expected: beide Listen leer. `cal.delete.deleting` und `hw.delete.deleting` dürfen in **keinem** der beiden mehr stehen.
+Expected: beide Listen leer. `cal.delete.deleting` und `hw.delete.deleting` stehen zu diesem Zeitpunkt noch in **beiden** Katalogen — sie fallen in Task 8 bzw. Task 9.
 
 - [ ] **Step 4: Den Verbindungs-Hook schreiben**
 
@@ -1297,7 +1297,19 @@ function onSave() {
 }
 ```
 
-Wird `deleteMutation` dadurch nur noch in `onDelete` benutzt, bleibt `const deleteMutation = useDeleteTask();` stehen. Suche zusätzlich nach `hw.delete.deleting` in dieser Datei und entferne die Stelle, falls vorhanden.
+Wird `deleteMutation` dadurch nur noch in `onDelete` benutzt, bleibt `const deleteMutation = useDeleteTask();` stehen.
+
+Dazu `TaskEditScreen.tsx:207` — der Lösch-Button trägt heute:
+
+```tsx
+deleteMutation.isPending ? t("hw.delete.deleting") : t("hw.delete.confirmOk");
+```
+
+Das wird zu `t("hw.delete.confirmOk")`. Damit fällt die letzte Verwendung des Keys — **entferne im selben Commit `hw.delete.deleting` aus `features/i18n/locales/de.json` und `en.json`.** Gegenprobe:
+
+```bash
+grep -rn "hw.delete.deleting" app-sections features   # muss leer sein
+```
 
 - [ ] **Step 4: Typecheck und Lint**
 
@@ -1320,7 +1332,7 @@ bun run web
 
 ```bash
 bun test
-git add app-sections/task/TaskEditScreen.tsx
+git add app-sections/task/TaskEditScreen.tsx features/i18n/locales/de.json features/i18n/locales/en.json
 git commit -m "feat(tasks): Aufgabe löschen mit Rückgängig-Fenster"
 ```
 
@@ -1416,7 +1428,9 @@ Das `target` entspricht exakt `PendingEventDelete` aus Task 4 — `eventId`, `oc
 Drei Stellen in dieser Datei:
 
 - Der Bearbeiten-`Pressable`: `disabled={deleteMutation.isPending}` und `style={{ opacity: deleteMutation.isPending ? 0.4 : 1 }}` streichen (`style` ganz weg, wenn nichts anderes drinsteht).
-- Der Lösch-`Button`: `label={deleteMutation.isPending ? t("cal.delete.deleting") : t("cal.detail.delete")}` wird zu `label={t("cal.detail.delete")}`, und `disabled={deleteMutation.isPending}` entfällt.
+- Der Lösch-`Button` (`EventDetailScreen.tsx:313`): `label={deleteMutation.isPending ? t("cal.delete.deleting") : t("cal.detail.delete")}` wird zu `label={t("cal.detail.delete")}`, und `disabled={deleteMutation.isPending}` entfällt.
+
+Damit fällt die letzte Verwendung von `cal.delete.deleting` — **entferne im selben Commit den Key aus `features/i18n/locales/de.json` und `en.json`.**
 
 - [ ] **Step 5: Typecheck und Lint**
 
@@ -1444,7 +1458,7 @@ bun run web
 
 ```bash
 bun test
-git add app-sections/event/EventDetailScreen.tsx
+git add app-sections/event/EventDetailScreen.tsx features/i18n/locales/de.json features/i18n/locales/en.json
 git commit -m "feat(calendar): Termin löschen mit Rückgängig-Fenster"
 ```
 
