@@ -209,7 +209,18 @@ export function useCreateEvent() {
       // Beschriftung). Dann lieber nicht optimistisch als falsch: Der Termin
       // erscheint eben erst mit dem Refetch.
       const type = types?.find((row) => row.id === vars.typeId);
-      if (!type) return undefined;
+      if (!type) {
+        // Nicht stumm degradieren. Beim ersten Absenden ist der Cache garantiert
+        // warm (`canSave` verlangt `typeId`), der **Retry** aus dem Fehler-Toast
+        // ist es aber nicht: Ein Fehler-Toast läuft nie ab, und nach `gcTime`
+        // (5 min) ist die Types-Query weg. Dann erscheint der Termin erst mit dem
+        // Refetch — sichtbar nur hier im Log.
+        console.warn("[useCreateEvent] Event-Typ nicht im Cache, kein optimistischer Eintrag", {
+          typeId: vars.typeId,
+          cached: types?.length ?? 0,
+        });
+        return undefined;
+      }
       return add({ kind: "create", row: optimisticEventRow(vars, type) });
     },
     onError: (_err, _vars, id) => {

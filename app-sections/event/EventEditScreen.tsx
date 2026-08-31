@@ -357,14 +357,6 @@ export function EventEditScreen() {
               </>
             ) : null}
 
-            {updateMutation.error ? (
-              <Text variant="caption" tone="danger">
-                {t("cal.edit.error.network")}
-                {": "}
-                {updateMutation.error instanceof Error ? updateMutation.error.message : ""}
-              </Text>
-            ) : null}
-
             <View
               style={{
                 marginTop: 12,

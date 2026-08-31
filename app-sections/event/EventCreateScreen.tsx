@@ -378,14 +378,6 @@ export function EventCreateScreen() {
           </Text>
         ) : null}
 
-        {createMutation.error ? (
-          <Text variant="caption" tone="danger">
-            {t("cal.edit.error.network")}
-            {": "}
-            {createMutation.error instanceof Error ? createMutation.error.message : ""}
-          </Text>
-        ) : null}
-
         <View
           style={{
             marginTop: 12,
