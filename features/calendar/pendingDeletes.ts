@@ -49,8 +49,10 @@ export function hidesOccurrence(
  * Filtert die offenen Löschungen aus einer expandierten Liste.
  *
  * Gibt im Normalfall — nichts offen — die Eingabe **unverändert** zurück, statt
- * eine Kopie: `useFamilyEvents` reicht das Ergebnis an `toDaySegments` weiter,
- * und ein bei jedem Render neues Array machte dessen `useMemo` wertlos.
+ * eine Kopie. Das spart im weitaus häufigsten Fall einen Durchlauf und eine
+ * Allokation; für die Referenzstabilität von `useFamilyEvents.data` tut es
+ * nichts, denn der Aufruf steht innerhalb desselben `useMemo`, und
+ * `expandEvents` baut ohnehin bei jedem Lauf ein frisches Array.
  */
 export function withoutPendingDeletes(
   occurrences: CalendarOccurrence[],
