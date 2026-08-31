@@ -12,6 +12,7 @@ import {
   Icon,
   MemberPicker,
   TypePicker,
+  useToast,
   type MemberOption,
   type SelectedMember,
   type TypePickerItem,
@@ -24,6 +25,7 @@ import {
   eventColorFor,
   isDateRangeInvalid,
   isTimeRangeInvalid,
+  mapEventError,
   parseRecurrenceCount,
   rangeFieldLabelKey,
   toAllDayRange,
@@ -31,6 +33,7 @@ import {
   useCreateEvent,
   useEventTypes,
   useFamilyEvents,
+  type CreateEventVars,
   type DateRange,
   type RangeField,
   type RecurrenceOption,
@@ -61,6 +64,7 @@ export function EventCreateScreen() {
   const familyChildren = useFamilyChildren(familyId ?? undefined);
   const familyParents = useFamilyParents(familyId ?? undefined);
   const eventTypes = useEventTypes();
+  const { show } = useToast();
   const createMutation = useCreateEvent();
 
   const [title, setTitle] = useState("");
@@ -108,39 +112,62 @@ export function EventCreateScreen() {
   const parsedCount = recurrence === "none" ? null : parseRecurrenceCount(countText);
   const countError = parsedCount === "invalid" ? t("cal.create.error.invalidCount") : "";
   const canSave =
-    !titleError &&
-    !dateError &&
-    !timeError &&
-    !typeError &&
-    !countError &&
-    !!familyId &&
-    !createMutation.isPending;
+    !titleError && !dateError && !timeError && !typeError && !countError && !!familyId;
+
+  /**
+   * Schickt die Mutation und meldet einen Fehlschlag selbst.
+   *
+   * Bewusst `mutateAsync` mit eigenem `catch` statt eines Per-Call-`onError`:
+   * Das Sheet ist unmontiert, bevor der Server antwortet, und TanStack Query
+   * ruft Per-Call-Callbacks dann nicht mehr — festgehalten in
+   * `features/tasks/mutateAsyncSurvivesUnmount.test.ts`. Die Retry-Aktion
+   * schickt dieselben `vars` erneut, damit der Rollback dem Nutzer nicht die
+   * Eingaben nimmt.
+   *
+   * Eine Funktionsdeklaration statt `useCallback`, damit sie sich in der
+   * Retry-Aktion selbst aufrufen kann — und weil der Screen seine übrigen
+   * Handler (`onSave`) genauso deklariert.
+   */
+  function save(vars: CreateEventVars) {
+    createMutation.mutateAsync(vars).catch((err: unknown) => {
+      show({
+        title: t("cal.create.error.saveFailed"),
+        message: t(mapEventError(err)),
+        variant: "error",
+        position: "bottom",
+        action: {
+          label: t("action.retry"),
+          onPress: () => {
+            save(vars);
+          },
+        },
+      });
+    });
+  }
 
   function onSave() {
     if (!canSave || !familyId || !typeId || parsedCount === "invalid") return;
     const final = allDay ? toAllDayRange(range) : range;
     const childId = member?.kind === "child" ? member.id : null;
     const parentId = member?.kind === "parent" ? member.id : null;
-    createMutation.mutate(
-      {
-        familyId,
-        typeId,
-        childId,
-        parentId,
-        title: title.trim(),
-        startAt: final.startAt.toISOString(),
-        endAt: final.endAt.toISOString(),
-        allDay,
-        location: location.trim() || null,
-        description: notes.trim() || null,
-        recurrence,
-        recurrenceCount: parsedCount,
-        createdBy: parent.data?.id ?? null,
-      },
-      {
-        onSuccess: () => router.back(),
-      },
-    );
+    const vars: CreateEventVars = {
+      familyId,
+      typeId,
+      childId,
+      parentId,
+      title: title.trim(),
+      startAt: final.startAt.toISOString(),
+      endAt: final.endAt.toISOString(),
+      allDay,
+      location: location.trim() || null,
+      description: notes.trim() || null,
+      recurrence,
+      recurrenceCount: parsedCount,
+      createdBy: parent.data?.id ?? null,
+    };
+    // Sofort schließen: Der Termin steht dank `onMutate` schon im Kalender.
+    router.back();
+    void save(vars);
   }
 
   const memberOptions: MemberOption[] = [
@@ -369,7 +396,7 @@ export function EventCreateScreen() {
         >
           <Button
             block
-            label={createMutation.isPending ? t("cal.create.saving") : t("cal.create.save")}
+            label={t("cal.create.save")}
             tone="primary"
             disabled={!canSave}
             onPress={onSave}
