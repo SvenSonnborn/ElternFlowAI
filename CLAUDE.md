@@ -106,7 +106,8 @@ app-sections/            Real screen implementations
 ├─ task/                 Anlegen/Bearbeiten von Aufgaben (Create · Edit · TaskForm)
 └─ shared/               Geteilte Bausteine inkl. Formular-Primitives
    (DateTimePickerSheet · TypePicker · MemberPicker · Field · confirmDialog
-   · AllergenBadge · recipeA11y · mealPlaceholder — von mehr als einem Tab benutzt)
+   · Toast · useUndoableDelete · AllergenBadge · recipeA11y · mealPlaceholder
+   — von mehr als einem Tab benutzt)
 
 design-system/           Handoff bundle + theming runtime
 ├─ colors.ts             Palette + brand aliases (HANDOFF — do not edit)
@@ -123,13 +124,14 @@ design-system/           Handoff bundle + theming runtime
 features/                Cross-cutting feature logic
 ├─ i18n/                 react-i18next init + de.json + en.json
 ├─ auth/                 Session-Store · AuthGate · DeepLinkHandler · Onboarding-Mutations
-├─ calendar/             Queries · Mutations · RRULE-Expansion · Reminder
-├─ tasks/                Queries · Mutations · Filter · Stats
+├─ calendar/             Queries · Mutations · RRULE-Expansion · Reminder · Pending-Deletes
+├─ tasks/                Queries · Mutations · Filter · Stats · Pending-Deletes
 ├─ children/             Kinderprofile
 ├─ meals/                Meal-Planner-Daten-Layer (Queries · JSONB-Normalisierung · Wochenlogik
 │                        · Ausweichgericht-Auswahl)
 │  └─ allergens/         EU-14-Vokabular · DE/EN-Begriffslisten · Zutaten-Klassifizierer · Urteil (ADR-014)
-├─ shared/               Feature-übergreifende Hooks + Typen (useToday · Translate)
+├─ shared/               Feature-übergreifende Hooks + Typen (useToday · Translate
+│                        · pendingDeletes — verzögerte Löschungen mit Undo-Fenster)
 ├─ sample-data/          Mock-Daten für noch nicht verdrahtete Screens (Copy aus `sample.*`)
 ├─ voice-assistant/      (placeholder)
 ├─ supabase/             client.ts (createClient + AsyncStorage session) + barrel
