@@ -1,6 +1,49 @@
 import { describe, expect, test } from "bun:test";
 
-import { parseRecurrenceCount, recurrenceToRrule, rruleToRecurrence } from "./createMutation";
+import type { Database } from "@/features/supabase/database.types";
+
+import type { CreateEventVars } from "./createMutation";
+
+import {
+  optimisticEventRow,
+  parseRecurrenceCount,
+  recurrenceToRrule,
+  rruleToRecurrence,
+} from "./createMutation";
+
+type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
+
+function vars(partial: Partial<CreateEventVars> = {}): CreateEventVars {
+  return {
+    familyId: "f1",
+    typeId: "t1",
+    childId: "c1",
+    parentId: null,
+    title: "Elternabend",
+    startAt: "2026-10-01T19:00:00.000Z",
+    endAt: "2026-10-01T20:30:00.000Z",
+    allDay: false,
+    location: "Schule",
+    description: "Raum 12",
+    recurrence: "weekly",
+    recurrenceCount: 5,
+    createdBy: "u1",
+    ...partial,
+  };
+}
+
+function type(partial: Partial<EventTypeRow> = {}): EventTypeRow {
+  return {
+    id: "t1",
+    family_id: "f1",
+    slug: "family",
+    color: "primary",
+    icon: "calendar",
+    label: { de: "Familie", en: "Family" },
+    created_at: "2026-01-01T00:00:00.000Z",
+    ...partial,
+  };
+}
 
 describe("recurrenceToRrule", () => {
   test("none → all-null rrule", () => {
@@ -117,5 +160,57 @@ describe("parseRecurrenceCount", () => {
     expect(parseRecurrenceCount("-3")).toBe("invalid");
     expect(parseRecurrenceCount("2.5")).toBe("invalid");
     expect(parseRecurrenceCount("abc")).toBe("invalid");
+  });
+});
+
+describe("optimisticEventRow", () => {
+  test("spiegelt alle 19 Spalten von events.Row plus event_types/event_exceptions", () => {
+    const v = vars();
+    const t = type();
+    const row = optimisticEventRow(v, t);
+
+    // Deckt alle 19 Spalten von events.Row ab (id/created_at/updated_at unten
+    // gesondert, weil sie nicht deterministisch sind) plus die beiden
+    // Relationsfelder aus EventWithRelations. Weicht eine Spalte hier vom
+    // `insert` in `createEvent` ab, zeigt der Kalender etwas anderes an, als
+    // gleich gespeichert wird — und dieser Test ist die einzige Stelle, die
+    // das merkt.
+    expect(row).toMatchObject({
+      family_id: v.familyId,
+      type_id: v.typeId,
+      child_id: v.childId,
+      parent_id: v.parentId,
+      title: v.title,
+      description: v.description,
+      location: v.location,
+      start_at: v.startAt,
+      end_at: v.endAt,
+      all_day: v.allDay,
+      rrule_freq: "weekly",
+      rrule_interval: 1,
+      // 2026-10-01 ist ein Donnerstag → ISO-Wochentag 4.
+      rrule_byweekday: [4],
+      rrule_count: v.recurrenceCount,
+      rrule_until: null,
+      created_by: v.createdBy,
+      event_types: t,
+      event_exceptions: [],
+    });
+    expect(row.id).toMatch(/^optimistic-\d+$/);
+    expect(typeof row.created_at).toBe("string");
+    expect(typeof row.updated_at).toBe("string");
+  });
+
+  test("liefert für zwei Aufrufe mit identischen vars unterschiedliche Ids", () => {
+    // Regressionsschutz für den Bug, den eine aus `startAt`+`typeId`
+    // abgeleitete Id hatte: Zwei Termine mit unveränderten Formularwerten
+    // (z. B. `EventCreateScreen`s Default aus `initialRange` + Default-Typ)
+    // erzeugten dieselbe Id, dasselbe `occurrenceDate` und kollidierten im
+    // React-Key von KalenderScreen/DashboardScreen.
+    const v = vars();
+    const t = type();
+    const first = optimisticEventRow(v, t);
+    const second = optimisticEventRow(v, t);
+    expect(first.id).not.toBe(second.id);
   });
 });

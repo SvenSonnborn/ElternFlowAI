@@ -128,6 +128,18 @@ export async function createEvent(vars: CreateEventVars): Promise<void> {
   if (error) throw error;
 }
 
+// Modul-Sequenz statt einer aus Formularwerten abgeleiteten Id: `startAt` und
+// `typeId` sind deterministisch und wiederholen sich, sobald zwei Termine
+// hintereinander ohne Zeit-/Typänderung angelegt werden — `EventCreateScreen`
+// setzt `startAt` bei jedem Öffnen auf 09:00 des Zieldatums und `typeId` auf
+// einen festen Default-Typ. Zwei optimistische Zeilen trügen dann dieselbe Id
+// und, weil `start_at` ebenfalls gleich ist, dasselbe `occurrenceDate` — der
+// React-Key `${eventId}-${occurrenceDate}-${date}` in KalenderScreen.tsx und
+// DashboardScreen.tsx kollidierte, eine der beiden Occurrences verschwände bis
+// zum nächsten Refetch. Eine Zeile lebt Sekundenbruchteile, eine Kollision über
+// einen App-Lauf hinweg gibt es nicht.
+let sequence = 0;
+
 /**
  * Baut aus den Mutations-Variablen eine Master-Zeile in der Form, die
  * `fetchEventsInRange` liefert — damit sie durch dasselbe `expandEvents` laufen
@@ -139,11 +151,12 @@ export async function createEvent(vars: CreateEventVars): Promise<void> {
  * in `createEvent` direkt darüber: Weicht sie ab, zeigt der Kalender etwas
  * anderes an, als gleich gespeichert wird.
  */
-function optimisticEventRow(vars: CreateEventVars, type: EventTypeRow): EventWithRelations {
+export function optimisticEventRow(vars: CreateEventVars, type: EventTypeRow): EventWithRelations {
   const rrule = recurrenceToRrule(vars.recurrence, new Date(vars.startAt));
   const now = new Date().toISOString();
+  sequence += 1;
   return {
-    id: `optimistic-${vars.startAt}-${vars.typeId}`,
+    id: `optimistic-${sequence}`,
     family_id: vars.familyId,
     type_id: vars.typeId,
     child_id: vars.childId,
@@ -167,6 +180,16 @@ function optimisticEventRow(vars: CreateEventVars, type: EventTypeRow): EventWit
   };
 }
 
+/**
+ * Legt einen Termin an und zeigt ihn sofort im Kalender, statt auf die
+ * Server-Antwort zu warten. `onMutate` schreibt bei Erfolg eine synthetische
+ * Master-Zeile (`optimisticEventRow`) in den Overlay-Store — vorausgesetzt der
+ * Typ des Termins steht bereits im Cache, sonst bleibt der Termin unsichtbar
+ * bis zum Refetch (siehe Kommentar dort). `onSettled` invalidiert die
+ * Kalender-Queries und gibt den Store-Eintrag erst danach frei: andersherum
+ * blitzte der optimistische Stand für einen Frame durch, bevor der Refetch ihn
+ * ersetzt — dieselbe Lehre, die `useDeleteEvent` in ADR-026 gezogen hat.
+ */
 export function useCreateEvent() {
   const qc = useQueryClient();
   const add = useOptimisticEventsStore((state) => state.add);
