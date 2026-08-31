@@ -369,6 +369,13 @@ export function withOptimistic(
  * verschiebt, schreibt `occurrenceDate` neu. Liefe der Filter danach, vergliche
  * er das neue Datum gegen das alte, das die offene Löschung trägt — die
  * Löschung griffe nicht mehr.
+ *
+ * **Was die Reihenfolge kostet:** Die Occurrences eines optimistischen
+ * **Creates** umgehen den Löschfilter strukturell — sie entstehen erst hinter
+ * ihm, `withOptimistic` hängt sie an. Folgenlos, weil eine synthetische
+ * `optimistic-`-Id keine Löschung adressieren kann (siehe
+ * `isOptimisticEventId`); der Fall ist damit unerreichbar, nicht bloß
+ * unwahrscheinlich. Der ADR sagt das, die Funktion sagte es bisher nicht.
  */
 export function visibleOccurrences(args: {
   expanded: CalendarOccurrence[];
