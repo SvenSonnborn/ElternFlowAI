@@ -334,7 +334,6 @@
       "confirmTitle": "Delete event?",
       "confirmBody": "You can undo this right afterwards.",
       "confirmOk": "Delete",
-      "deleting": "Deleting…",
       "error": "Delete failed",
       "undoTitle": "Event deleted",
       "undoScopeForward": "from {{date}}",

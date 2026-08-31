@@ -1,11 +1,11 @@
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Alert, Pressable, ScrollView, Switch, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ChildAvatar, Icon } from "@/app-sections/shared";
+import { ChildAvatar, Icon, useUndoableDelete } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
@@ -70,6 +70,7 @@ export function EventDetailScreen() {
   const familyParents = useFamilyParents(parent.data?.family_id);
 
   const deleteMutation = useDeleteEvent();
+  const undoableDelete = useUndoableDelete();
   const reminders = useEventReminders(id ?? "");
   const toggleReminder = useToggleReminder();
   const familyId = parent.data?.family_id ?? null;
@@ -104,6 +105,22 @@ export function EventDetailScreen() {
     });
   };
 
+  /**
+   * Was der Toast unter dem Titel zeigt: der Termin-Titel, bei einer Serie mit
+   * dem Umfang der Löschung. Ohne diese Angabe wäre der Toast Dekoration — bei
+   * „ganze Serie" ist der Unterschied zu „nur dieser Termin" genau das, was der
+   * Nutzer prüfen können muss, bevor das Fenster zugeht.
+   */
+  function undoMessage(title: string, scope: EditScope, occurrenceDate: string): string {
+    if (scope === "all") return `${title} · ${t("cal.delete.undoScopeAll")}`;
+    if (scope === "forward") {
+      // Dasselbe Format wie die Datumszeile des Screens weiter unten.
+      const date = format(parseISO(occurrenceDate), "d. MMM", { locale: dateLocale });
+      return `${title} · ${t("cal.delete.undoScopeForward", { date })}`;
+    }
+    return title;
+  }
+
   const onDeletePress = () => {
     if (!data) return;
     Alert.alert(t("cal.delete.confirmTitle"), t("cal.delete.confirmBody"), [
@@ -127,21 +144,33 @@ export function EventDetailScreen() {
               if (!chosen) return;
               scope = chosen;
             }
-            deleteMutation.mutate(
-              {
-                scope,
+            // Bei einem Einzeltermin ist `scope` immer "all" (der Dialog kommt
+            // gar nicht) — dort trägt der Toast nur den Titel, kein Serien-
+            // Zusatz, weil es keine Serie gibt.
+            const message = isRecurring
+              ? undoMessage(data.title, scope, data.occurrenceDate)
+              : data.title;
+
+            undoableDelete({
+              kind: "event",
+              target: {
                 eventId: data.eventId,
                 occurrenceDate: data.occurrenceDate,
-                isRecurring,
+                scope,
               },
-              {
-                onSuccess: () => router.back(),
-                onError: (err) => {
-                  const msg = err instanceof Error ? err.message : "";
-                  Alert.alert(t("cal.delete.error"), msg);
-                },
-              },
-            );
+              title: t("cal.delete.undoTitle"),
+              message,
+              run: () =>
+                deleteMutation.mutateAsync({
+                  scope,
+                  eventId: data.eventId,
+                  occurrenceDate: data.occurrenceDate,
+                  isRecurring,
+                }),
+              errorTitle: t("cal.delete.error"),
+              formatError: (err) => (err instanceof Error ? err.message : ""),
+            });
+            router.back();
           })();
         },
       },
@@ -205,10 +234,8 @@ export function EventDetailScreen() {
               accessibilityRole="button"
               accessibilityLabel={t("cal.detail.edit")}
               onPress={onEditPress}
-              disabled={deleteMutation.isPending}
               className="px-2 py-1 active:opacity-70"
               hitSlop={12}
-              style={{ opacity: deleteMutation.isPending ? 0.4 : 1 }}
             >
               <Text variant="bodyEmph" tone="primaryStrong">
                 {t("cal.detail.edit")}
@@ -310,11 +337,10 @@ export function EventDetailScreen() {
 
           <View className="mt-6">
             <Button
-              label={deleteMutation.isPending ? t("cal.delete.deleting") : t("cal.detail.delete")}
+              label={t("cal.detail.delete")}
               variant="soft"
               tone="danger"
               block
-              disabled={deleteMutation.isPending}
               onPress={onDeletePress}
             />
           </View>
