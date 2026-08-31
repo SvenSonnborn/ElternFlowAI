@@ -330,13 +330,13 @@
       "fieldLocation": "Ort",
       "fieldNotes": "Notizen",
       "save": "Speichern",
-      "saving": "Speichere…",
       "recurrenceAppliesToAll": "Änderungen an der Wiederholung gelten für alle Termine der Serie.",
       "error": {
         "titleRequired": "Titel darf nicht leer sein",
         "invalidTimeRange": "Endzeit muss nach Startzeit liegen",
         "invalidDateRange": "Enddatum darf nicht vor dem Startdatum liegen",
-        "network": "Speichern fehlgeschlagen"
+        "network": "Speichern fehlgeschlagen",
+        "saveFailed": "Änderung konnte nicht gespeichert werden"
       }
     },
     "delete": {
