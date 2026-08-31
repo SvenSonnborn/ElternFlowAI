@@ -5,6 +5,7 @@ export {
   useOptimisticEventsStore,
   visibleOccurrences,
   withOptimistic,
+  OPTIMISTIC_TIMEOUT_MS,
   type OptimisticCreate,
   type OptimisticEvent,
   type OptimisticUpdate,
