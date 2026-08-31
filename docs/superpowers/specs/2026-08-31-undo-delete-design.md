@@ -118,7 +118,7 @@ export interface PendingEventDelete {
 /** Ob diese offene Löschung die gegebene Occurrence verdeckt. */
 export function hidesOccurrence(
   pending: PendingEventDelete,
-  occurrence: { eventId: string; date: string },
+  occurrence: { eventId: string; occurrenceDate: string },
 ): boolean;
 ```
 
