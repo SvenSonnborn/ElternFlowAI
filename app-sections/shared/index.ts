@@ -36,4 +36,5 @@ export {
   type ToastVariant,
 } from "./toastStore";
 export { TypePicker, type TypePickerItem } from "./TypePicker";
+export { useUndoableDelete, type UndoableDeleteArgs } from "./useUndoableDelete";
 export { VoiceAssistantFAB } from "./VoiceAssistantFAB";
