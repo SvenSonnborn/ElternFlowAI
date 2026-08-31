@@ -74,6 +74,9 @@ export function Toast({ entry, onDismiss }: ToastProps) {
   // Wert wird im Style gelesen, und `react-hooks/refs` verbietet `.current`
   // während des Renderns — die State-Variante ist genauso stabil.
   const [progress] = useState(() => new Animated.Value(0));
+  // Der Countdown der Timer-Leiste, getrennt von `progress`: der eine ist das
+  // Ein-/Ausblenden, der andere läuft über die volle Standzeit.
+  const [countdown] = useState(() => new Animated.Value(1));
   // Ein einmal gestartetes Ausblenden darf der Timer nicht erneut anstoßen.
   const leaving = useRef(false);
   // Die Einblend-Animation läuft einmal, nicht bei jeder Änderung der
@@ -114,6 +117,19 @@ export function Toast({ entry, onDismiss }: ToastProps) {
     const timer = setTimeout(close, entry.durationMs);
     return () => clearTimeout(timer);
   }, [entry.durationMs, close]);
+
+  // Die Leiste läuft nur, wenn der Toast wirklich abläuft — und nicht bei
+  // „Bewegung reduzieren", wo sie ersatzlos entfällt statt zu springen.
+  useEffect(() => {
+    if (entry.durationMs == null || reduceMotion !== false) return;
+    countdown.setValue(1);
+    Animated.timing(countdown, {
+      toValue: 0,
+      duration: entry.durationMs,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    }).start();
+  }, [countdown, entry.durationMs, reduceMotion]);
 
   // `accessibilityLiveRegion` ist in React Native Android-only; auf iOS meldet
   // VoiceOver eine frisch eingehängte View von sich aus nicht. Ohne diese
@@ -210,7 +226,14 @@ export function Toast({ entry, onDismiss }: ToastProps) {
         ) : null}
         {entry.action ? (
           <Pressable
-            onPress={entry.action.onPress}
+            onPress={() => {
+              entry.action?.onPress();
+              // Nach einer Aktion hat der Toast seinen Zweck erfüllt. `close()`
+              // statt `dismiss()`, damit das Ausblenden läuft. Es gibt keine
+              // Aktion, nach der ein Stehenbleiben richtig wäre — deshalb
+              // Standardverhalten und kein Flag (Decision 8 der Spec).
+              close();
+            }}
             accessibilityRole="button"
             // Sichtbar bleiben die 28 px aus dem Design, tastbar sind 44:
             // `hitSlop` scheidet aus, weil `Pressable` es auf react-native-web
@@ -254,6 +277,30 @@ export function Toast({ entry, onDismiss }: ToastProps) {
       >
         <Icon name="x" size={spec.close.glyphSize} color={theme.inkTertiary} />
       </Pressable>
+
+      {entry.durationMs != null && reduceMotion === false ? (
+        <Animated.View
+          // Rein dekorativ: die Information steht schon in Titel und Aktion.
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: spec.progressBar.height,
+            backgroundColor: accent,
+            opacity: spec.progressBar.opacity,
+            // `scaleX` skaliert in React Native sonst um die Mitte — die
+            // Leiste liefe von beiden Seiten nach innen zu statt von rechts
+            // nach links leer. `transformOrigin` gibt es seit RN 0.74, das
+            // Repo steht auf 0.86 (Decision 9 der Spec).
+            transformOrigin: "left",
+            transform: [{ scaleX: countdown }],
+          }}
+        />
+      ) : null}
     </Animated.View>
   );
 }
