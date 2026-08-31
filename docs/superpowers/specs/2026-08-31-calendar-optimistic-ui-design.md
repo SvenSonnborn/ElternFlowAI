@@ -68,7 +68,17 @@ export type OptimisticEvent =
 
 Kalender-eigen, nicht in `features/shared/`: Aufgaben brauchen es nicht. Damit entfällt der `target: unknown`-Kniff samt Cast, den der Pending-Delete-Store braucht — hier ist alles durchtypisiert.
 
-Der Store hält `entries`, `add(entry) => id`, `remove(id)`. Keine Timer, kein Watchdog: Anders als beim Undo-Fenster gibt es hier keine Frist, die abläuft — der Eintrag lebt genau so lange wie die Mutation.
+Der Store hält `entries`, `add(entry) => id`, `remove(id)`.
+
+**Nachtrag aus der Umsetzung:** Hier stand ursprünglich der Zusatz, es gebe keinen Timer und keinen Watchdog, weil
+der Eintrag genau so lange lebe wie die Mutation. Das war falsch — und zwar auf dieselbe Weise, wie
+[ADR-026](../../decision-log.md) es für den Pending-Delete-Store schon einmal widerlegt hat:
+`features/supabase/client.ts` setzt dem `fetch` **kein** Timeout. Hinter einem Captive Portal settelt eine Anfrage
+weder, noch lehnt sie ab; dann läuft `onSettled` nie, der Eintrag wird nie entfernt, und ein nie gespeicherter
+Termin steht für den Rest der Sitzung im Kalender. Erschwerend wartet `onSettled` hier zusätzlich auf den Refetch —
+zwei Stellen zum Hängen statt einer. Der Store trägt deshalb einen Watchdog nach dem Muster von
+`COMMIT_TIMEOUT_MS`, und `useSignOut` leert ihn beim Abmelden mit: sonst stünde der Termin des Vorgängers im
+Kalender des nächsten Familienmitglieds, das sich auf demselben Gerät anmeldet.
 
 ### 2.2 Die Anwendung — reine Funktionen
 
