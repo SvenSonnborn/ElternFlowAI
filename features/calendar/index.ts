@@ -3,6 +3,7 @@ export {
   patchesOccurrence,
   useOptimisticEvents,
   useOptimisticEventsStore,
+  visibleOccurrences,
   withOptimistic,
   type OptimisticCreate,
   type OptimisticEvent,

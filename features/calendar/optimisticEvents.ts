@@ -2,8 +2,11 @@ import { format } from "date-fns";
 import { create } from "zustand";
 
 import type { EventWithRelations } from "./expand";
+import type { PendingEventDelete } from "./pendingDeletes";
 import type { EditScope, EventChanges } from "./recurrence";
 import type { CalendarOccurrence } from "./types";
+
+import { withoutPendingDeletes } from "./pendingDeletes";
 
 /**
  * Das Occurrence-Overlay für optimistische Kalender-Änderungen.
@@ -202,4 +205,31 @@ export function withOptimistic(
     .map((entry) => entry.row);
   if (created.length === 0) return patched;
   return [...patched, ...expand(created)];
+}
+
+/**
+ * Die Anzeige-Pipeline hinter `useFamilyEvents`: erst der Löschfilter, dann das
+ * optimistische Overlay.
+ *
+ * Als eigene Funktion, nicht inline im Hook — damit die **Reihenfolge** testbar
+ * ist. Stünde sie im Hook, könnte ein Test sie nur nachbauen, und ein
+ * nachgebauter Test bliebe grün, wenn jemand den Hook zurückdreht. Genau das
+ * ist bei der ersten Fassung passiert.
+ *
+ * Warum die Reihenfolge so herum: Ein Update mit Scope `this`, das den Termin
+ * verschiebt, schreibt `occurrenceDate` neu. Liefe der Filter danach, vergliche
+ * er das neue Datum gegen das alte, das die offene Löschung trägt — die
+ * Löschung griffe nicht mehr.
+ */
+export function visibleOccurrences(args: {
+  expanded: CalendarOccurrence[];
+  pending: readonly PendingEventDelete[];
+  optimistic: readonly OptimisticEvent[];
+  expand: (rows: EventWithRelations[]) => CalendarOccurrence[];
+}): CalendarOccurrence[] {
+  return withOptimistic(
+    withoutPendingDeletes(args.expanded, args.pending),
+    args.optimistic,
+    args.expand,
+  );
 }

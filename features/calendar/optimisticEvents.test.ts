@@ -11,6 +11,7 @@ import {
   applyOptimisticChanges,
   patchesOccurrence,
   useOptimisticEventsStore,
+  visibleOccurrences,
   withOptimistic,
 } from "./optimisticEvents";
 import { withoutPendingDeletes } from "./pendingDeletes";
@@ -354,33 +355,20 @@ describe("Reihenfolge der beiden Overlays", () => {
     // Ein `this`-Scope-Update auf einem Einzeltermin verschiebt `occurrenceDate`.
     // Die Löschung trägt die **alte** Date (2026-09-10).
     //
-    // FALSCHE Reihenfolge (Patch vor Filter):
-    //  - withOptimistic patcht die Occurrence und schreibt occurrenceDate -> "2026-09-20"
-    //  - withoutPendingDeletes vergleicht das neue Datum "2026-09-20" gegen die
-    //    alte Löschung "2026-09-10" — der String-Vergleich schlägt fehl
-    //  - Ergebnis: Die Occurrence ist sichtbar (verschoben auf den 20.)
-    //
-    // RICHTIGE Reihenfolge (Filter vor Patch):
-    //  - withoutPendingDeletes vergleicht das alte Datum "2026-09-10" gegen die
-    //    Löschung "2026-09-10" — Treffer!
-    //  - Ergebnis: Die Occurrence ist weg (gewinnt gegen das gleichzeitige Update)
+    // Diese Reihenfolge-Abhängigkeit wird durch `visibleOccurrences` erzwungen —
+    // der Test prüft sie direkt, nicht nachgebaut. Ein Flip der Reihenfolge in
+    // der Funktion selbst wird den Test red machen.
 
     const single = occ({
       isRecurring: false,
       rrule: { freq: null, interval: 1, byweekday: null, count: null, until: null },
     });
 
-    // Schritt 1: Filtern (korrekte Reihenfolge)
-    const afterFilter = withoutPendingDeletes(
-      [single],
-      [{ eventId: "e1", occurrenceDate: "2026-09-10", scope: "this" }],
-    );
-    expect(afterFilter).toHaveLength(0); // Gelöschte Occurrence ist weg
-
-    // Schritt 2: Dann patchen — aber auf der bereits gefilterten Liste
-    const correctOrder = withOptimistic(
-      afterFilter,
-      [
+    // KORREKTE Reihenfolge (Filter vor Patch) — über `visibleOccurrences`
+    const result = visibleOccurrences({
+      expanded: [single],
+      pending: [{ eventId: "e1", occurrenceDate: "2026-09-10", scope: "this" }],
+      optimistic: [
         {
           id: "o1",
           kind: "update",
@@ -393,12 +381,15 @@ describe("Reihenfolge der beiden Overlays", () => {
           }),
         },
       ],
-      expandStub,
-    );
-    expect(correctOrder).toHaveLength(0); // Bleibt weg
+      expand: expandStub,
+    });
+    // Die Löschung auf "2026-09-10" trifft, weil der Filter **vor** dem Patch läuft.
+    // Ergebnis: die Occurrence ist weg.
+    expect(result).toHaveLength(0);
 
-    // Kontrast: Falsche Reihenfolge (Patch vor Filter) — nur zum Dokumentieren
-    const patched = withOptimistic(
+    // KONTRAST: Falsche Reihenfolge (nur zum Dokumentieren, nicht vom Test getrieben)
+    // — zeigt, dass umgekehrte Reihenfolge das Update sichtbar ließe.
+    const falseOrder = withOptimistic(
       [single],
       [
         {
@@ -415,14 +406,13 @@ describe("Reihenfolge der beiden Overlays", () => {
       ],
       expandStub,
     );
-    expect(patched).toHaveLength(1); // Update patched es, aber Löschung trifft nicht
-    const wrongOrder = withoutPendingDeletes(patched, [
+    const falseOrderFiltered = withoutPendingDeletes(falseOrder, [
       { eventId: "e1", occurrenceDate: "2026-09-10", scope: "this" },
     ]);
-    // FALSCH: Die Löschung auf "2026-09-10" trifft nicht, weil occurrenceDate
-    // jetzt "2026-09-20" ist — der Termin wäre sichtbar und verschoben!
-    expect(wrongOrder).toHaveLength(1);
-    expect(wrongOrder[0]?.occurrenceDate).toBe("2026-09-20");
+    // Mit falscher Reihenfolge: occurrenceDate ist jetzt "2026-09-20", die Löschung
+    // auf "2026-09-10" trifft nicht — der Termin wäre sichtbar und verschoben.
+    expect(falseOrderFiltered).toHaveLength(1);
+    expect(falseOrderFiltered[0]?.occurrenceDate).toBe("2026-09-20");
   });
 });
 
