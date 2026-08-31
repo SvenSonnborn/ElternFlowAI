@@ -87,7 +87,7 @@ Deferred to later iterations (not yet wired): Auth-Flow + Realtime + Edge Functi
 
 ```
 app/                     Expo Router routes — THIN re-export files only
-├─ _layout.tsx           Root stack + providers (QueryClient · i18n · ThemeProvider · SafeArea · GestureHandler)
+├─ _layout.tsx           Root stack + providers (QueryClient · i18n · ThemeProvider · SafeArea · GestureHandler · ToastProvider) + useFlushPendingDeletes()
 ├─ (tabs)/_layout.tsx    Bottom tab navigator (5 tabs) + Voice FAB overlay
 ├─ (tabs)/index.tsx      → Dashboard
 ├─ (tabs)/kalender.tsx
