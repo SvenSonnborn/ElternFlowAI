@@ -73,10 +73,10 @@ interface PendingDeleteState {
    * Session entfernen, bevor die Mutation ihren Token aufgelöst hat, und das
    * DELETE liefe unangemeldet gegen RLS.
    *
-   * Das Warten ist begrenzt: jeder Commit hat seinen eigenen Watchdog.
-   * Bereits **laufende** Löschungen wartet `flush` dagegen nicht ab — `commit`
-   * kehrt für sie sofort um. Dieser Fall setzt voraus, dass der Timer schon
-   * gefeuert hat, das Undo-Fenster also ohnehin vorbei ist.
+   * Gewartet wird auch auf Löschungen, die schon **laufen** — etwa weil der
+   * Timer sie Millisekunden vorher selbst gestartet hat. Genau dort säße sonst
+   * dasselbe Loch nur um einen Wimpernschlag verschoben. Das Warten ist
+   * begrenzt: jeder Commit hat seinen eigenen Watchdog.
    */
   flush: () => Promise<void>;
 }
@@ -85,7 +85,11 @@ interface PendingDeleteState {
 // und ein `setTimeout`-Handle im State würde bei jedem Abonnenten als Änderung
 // durchschlagen.
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
-const running = new Set<string>();
+// Id → Promise des laufenden Commits. Eine `Map` statt eines `Set`, damit
+// `commit` einem zweiten Aufrufer das **laufende** Promise zurückgeben kann,
+// statt nur „läuft schon" zu melden — daran hängt, dass `flush()` auch auf
+// bereits gestartete Löschungen wartet.
+const running = new Map<string, Promise<void>>();
 
 let sequence = 0;
 
@@ -109,8 +113,11 @@ function remove(id: string): void {
  * würde das Item für den Rest der Sitzung unsichtbar halten, obwohl es auf dem
  * Server noch existiert.
  *
- * `running` schützt vor Doppelausführung: `flush()` darf mehrfach kommen (zwei
- * schnelle App-Wechsel), während `run` noch läuft.
+ * `running` schützt vor Doppelausführung und macht das Warten teilbar: Ein
+ * zweiter Aufruf bekommt das Promise des laufenden Commits zurück statt sofort
+ * umzukehren. `flush()` wartet damit auch auf eine Löschung, die der Timer
+ * gerade selbst gestartet hat — sonst könnte `useSignOut` die Session
+ * entfernen, während der authentifizierte DELETE noch fliegt.
  *
  * Der `catch` fängt `run` ab und loggt: beide Aufrufer von `commit`
  * (`schedule`s Timer, `flush`) rufen mit `void` auf, niemand hängt sich an die
@@ -130,14 +137,27 @@ function remove(id: string): void {
  * Löschung doch noch durchgeht, räumt der nächste Refetch es weg — sichtbar
  * und selbstheilend statt unsichtbar bis zum App-Neustart.
  */
-async function commit(id: string): Promise<void> {
-  if (running.has(id)) return;
+function commit(id: string): Promise<void> {
+  const inFlight = running.get(id);
+  if (inFlight) return inFlight;
+
   const entry = usePendingDeleteStore.getState().entries.find((e) => e.id === id);
-  if (!entry) return;
+  if (!entry) return Promise.resolve();
 
   clearTimer(id);
-  running.add(id);
+  // `running.set` steht nach dem Start, aber vor dem ersten `await` in
+  // `runCommit` — ein nebenläufiger `commit` kann frühestens im nächsten Tick
+  // kommen und findet den Eintrag dann vor.
+  const work = runCommit(id, entry).finally(() => {
+    running.delete(id);
+    remove(id);
+  });
+  running.set(id, work);
+  return work;
+}
 
+/** Der eigentliche Lauf; `commit` kümmert sich um Buchführung und Freigabe. */
+async function runCommit(id: string, entry: PendingDelete): Promise<void> {
   // Der `catch` hängt an `run` selbst, nicht am `race`: Lehnt die Mutation ab,
   // nachdem der Watchdog gewonnen hat, nimmt das `race` ihre Ablehnung nicht
   // mehr entgegen — aus dem Fehler würde ein unhandled rejection statt eines
@@ -166,9 +186,6 @@ async function commit(id: string): Promise<void> {
   if (timedOut) {
     console.error("[pendingDeletes] commit timed out", { id, timeoutMs: entry.timeoutMs });
   }
-
-  running.delete(id);
-  remove(id);
 }
 
 export const usePendingDeleteStore = create<PendingDeleteState>((set, get) => ({
@@ -201,7 +218,16 @@ export const usePendingDeleteStore = create<PendingDeleteState>((set, get) => ({
   },
 
   flush: async () => {
-    await Promise.all(get().entries.map((entry) => commit(entry.id)));
+    await Promise.all(
+      get().entries.map((entry) =>
+        // `commit` lehnt nie ab — der Fehler ist innen gefangen, der Watchdog
+        // begrenzt die Wartezeit. Der `catch` steht trotzdem: Ein Abmelden darf
+        // niemals daran scheitern, dass eine Löschung sich verschluckt.
+        commit(entry.id).catch((error: unknown) => {
+          console.error("[pendingDeletes] flush failed", { id: entry.id, error });
+        }),
+      ),
+    );
   },
 }));
 

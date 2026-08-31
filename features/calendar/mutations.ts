@@ -4,6 +4,7 @@ import type { Database } from "@/features/supabase/database.types";
 
 import { supabase } from "@/features/supabase";
 
+import { EventNotFoundError } from "./errors";
 import { calendarKeys, fetchEventById } from "./queries";
 import {
   applyDeleteScope,
@@ -47,7 +48,7 @@ export interface UpdateEventDeps {
 export async function updateEvent(vars: UpdateEventVars, deps: UpdateEventDeps): Promise<void> {
   const master = await deps.fetchMaster(vars.eventId);
   if (!master) {
-    throw new Error(`Event ${vars.eventId} not found`);
+    throw new EventNotFoundError(vars.eventId);
   }
   await applyEditScope({
     scope: vars.scope,
@@ -64,7 +65,7 @@ export async function updateEvent(vars: UpdateEventVars, deps: UpdateEventDeps):
 export async function deleteEvent(vars: DeleteEventVars, deps: UpdateEventDeps): Promise<void> {
   const master = await deps.fetchMaster(vars.eventId);
   if (!master) {
-    throw new Error(`Event ${vars.eventId} not found`);
+    throw new EventNotFoundError(vars.eventId);
   }
   await applyDeleteScope({
     scope: vars.scope,
