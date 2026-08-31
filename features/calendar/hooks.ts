@@ -17,6 +17,7 @@ import type { DaySegment } from "./spans";
 import type { CalendarOccurrence, MarkedDates } from "./types";
 
 import { expandEvents } from "./expand";
+import { useOptimisticEvents, withOptimistic } from "./optimisticEvents";
 import { usePendingEventDeletes, withoutPendingDeletes } from "./pendingDeletes";
 import { calendarKeys, fetchEventById, fetchEventsInRange, fetchEventTypes } from "./queries";
 import { toDayMarkings, toDaySegments } from "./spans";
@@ -41,6 +42,10 @@ interface UseFamilyEventsResult {
  * gelöscht wird, steht er im Filter und ist **nicht** in `data` — obwohl die
  * Query ihn nachgeladen hat. Das ist Absicht (Decision 1 der Spec): die Zeile
  * bleibt im Cache, wird nur ausgeblendet, solange die Undo-Aktion möglich ist.
+ *
+ * Die Menge enthält zusätzlich **optimistische Änderungen**, die der Server noch
+ * nicht bestätigt hat — inklusive Termine, deren Zeilen es serverseitig noch gar
+ * nicht gibt.
  */
 export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
   const { theme } = useTheme();
@@ -57,14 +62,19 @@ export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
   });
 
   const pending = usePendingEventDeletes();
+  const optimistic = useOptimisticEvents();
 
   const data = useMemo(() => {
     if (!query.data) return NO_OCCURRENCES;
-    // Nach dem Expandieren gefiltert, nicht davor: die offenen Löschungen sind
-    // pro Occurrence gedacht („nur dieser Termin"), die gecachten Zeilen sind
-    // Master-Zeilen (Decision 1 der Spec).
-    return withoutPendingDeletes(expandEvents(query.data, rangeStart, rangeEnd, theme), pending);
-  }, [query.data, rangeStart, rangeEnd, theme, pending]);
+    const expanded = expandEvents(query.data, rangeStart, rangeEnd, theme);
+    // Erst patchen, dann filtern: Eine Löschung gewinnt gegen eine gleichzeitige
+    // Bearbeitung (Decision 9 der Spec). Andersherum bliebe ein gelöschter
+    // Termin sichtbar, weil der Patch ihn wieder einführte.
+    const withOptimisticChanges = withOptimistic(expanded, optimistic, (rows) =>
+      expandEvents(rows, rangeStart, rangeEnd, theme),
+    );
+    return withoutPendingDeletes(withOptimisticChanges, pending);
+  }, [query.data, rangeStart, rangeEnd, theme, optimistic, pending]);
 
   const segments = useMemo(
     () => toDaySegments(data, rangeStart, rangeEnd),
