@@ -113,20 +113,35 @@ export function Toast({ entry, onDismiss }: ToastProps) {
     }).start();
   }, [progress, reduceMotion]);
 
+  // Eine Frist pro Toast, aus der beide Effekte ableiten. Der Dismiss-Timer
+  // läuft ab dem Einhängen, die Leiste startet erst, wenn die
+  // „Bewegung reduzieren"-Abfrage aufgelöst hat — ohne gemeinsame Deadline
+  // zeigte sie die volle Dauer statt der verbleibenden Frist. Und weil `close`
+  // an `reduceMotion` hängt, startete auch der Timer bei einem Wechsel der
+  // Systemeinstellung von vorn; ab jetzt rechnet er die Restzeit aus.
+  const [deadline] = useState(() =>
+    entry.durationMs == null ? null : Date.now() + entry.durationMs,
+  );
+
   useEffect(() => {
-    if (entry.durationMs == null) return;
-    const timer = setTimeout(close, entry.durationMs);
+    if (deadline == null) return;
+    const timer = setTimeout(close, Math.max(0, deadline - Date.now()));
     return () => clearTimeout(timer);
-  }, [entry.durationMs, close]);
+  }, [deadline, close]);
 
   // Die Leiste läuft nur, wenn der Toast wirklich abläuft — und nicht bei
   // „Bewegung reduzieren", wo sie ersatzlos entfällt statt zu springen.
   useEffect(() => {
-    if (entry.durationMs == null || reduceMotion !== false) return;
-    countdown.setValue(1);
+    const total = entry.durationMs;
+    if (total == null || deadline == null || reduceMotion !== false) return;
+    const remaining = Math.max(0, deadline - Date.now());
+    if (remaining === 0) return;
+    // Anteilig setzen statt bei 1 beginnen: die Leiste zeigt die Restfrist,
+    // nicht die Gesamtdauer.
+    countdown.setValue(remaining / total);
     const animation = Animated.timing(countdown, {
       toValue: 0,
-      duration: entry.durationMs,
+      duration: remaining,
       easing: Easing.linear,
       useNativeDriver: true,
     });
@@ -137,7 +152,7 @@ export function Toast({ entry, onDismiss }: ToastProps) {
     // gestarteten Animation mit einem sichtbaren Sprung. `setValue(1)` oben
     // deckt nur den Reset-Moment ab, nicht das Nachwirken der alten Instanz.
     return () => animation.stop();
-  }, [countdown, entry.durationMs, reduceMotion]);
+  }, [countdown, deadline, entry.durationMs, reduceMotion]);
 
   // `accessibilityLiveRegion` ist in React Native Android-only; auf iOS meldet
   // VoiceOver eine frisch eingehängte View von sich aus nicht. Ohne diese

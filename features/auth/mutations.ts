@@ -65,7 +65,11 @@ export function useSignOut() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      usePendingDeleteStore.getState().flush();
+      // Warten, nicht nur anstoßen: `signOut` entfernt die lokale Session, und
+      // ein DELETE, das seinen Token erst danach auflöst, liefe unangemeldet und
+      // schlüge unter RLS lautlos fehl — `error: null` bei null getroffenen Zeilen.
+      // Der Watchdog in `commit` begrenzt, wie lange das Abmelden dafür wartet.
+      await usePendingDeleteStore.getState().flush();
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     },

@@ -207,9 +207,39 @@ describe("flush", () => {
       },
       10_000,
     );
-    store().flush();
-    await until("beide committet", () => store().entries.length === 0);
+    await store().flush();
+    expect(store().entries).toHaveLength(0);
     expect(done.sort()).toEqual(["a", "b"]);
+  });
+
+  test("das zurückgegebene Promise settelt erst, wenn die Löschungen durch sind", async () => {
+    // Das ist die Zusage, auf die sich `useSignOut` verlässt: erst löschen,
+    // dann abmelden. Ohne sie könnte die Session vor dem DELETE verschwinden.
+    let release = () => {};
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let finished = false;
+    store().schedule(
+      "task",
+      { taskId: "a" },
+      async () => {
+        await blocked;
+        finished = true;
+      },
+      10_000,
+    );
+
+    const flushed = store()
+      .flush()
+      .then(() => {
+        expect(finished).toBe(true);
+      });
+
+    expect(finished).toBe(false);
+    release();
+    await flushed;
+    expect(store().entries).toHaveLength(0);
   });
 
   test("führt dieselbe Löschung auch bei doppeltem Aufruf nur einmal aus", async () => {
@@ -223,9 +253,11 @@ describe("flush", () => {
       },
       10_000,
     );
-    store().flush();
-    store().flush();
-    await until("committet", () => store().entries.length === 0);
+    // Beide Aufrufe starten, bevor einer settelt — nur so trifft der zweite auf
+    // den `running`-Guard. Nacheinander abgewartet fände er gar keinen Eintrag
+    // mehr vor und prüfte nichts.
+    await Promise.all([store().flush(), store().flush()]);
+    expect(store().entries).toHaveLength(0);
     expect(calls).toBe(1);
   });
 });
