@@ -9,7 +9,7 @@ import type { TaskGroup, TaskSections, TaskStats, TaskTypeRow, TaskWithType } fr
 
 import { filterTasks } from "./filter";
 import { useTaskFilter } from "./filterStore";
-import { usePendingTaskIds } from "./pendingDeletes";
+import { usePendingTaskIds, withoutPendingTaskDeletes } from "./pendingDeletes";
 import { computeTaskStats, groupTasksByChild, groupTasksByDue } from "./stats";
 
 const SELECT = "*, task_types(*)";
@@ -67,6 +67,17 @@ interface UseFamilyTasksResult {
   refetch: () => void;
 }
 
+/**
+ * Alle offenen Aufgaben plus alles Erledigte der letzten 7 Tage.
+ *
+ * Gibt die Menge **gefiltert nach Undo-Status** zurück: wenn eine Aufgabe
+ * gerade gelöscht wird, steht sie im Filter und ist **nicht** in `data` —
+ * obwohl die Query sie nachgeladen hat. Das ist Absicht (Decision 1 der Spec):
+ * die Zeile bleibt im Cache, wird nur ausgeblendet, solange die Undo-Aktion
+ * möglich ist. Deshalb greift der Filter auch für `useTask` (ein Selektor auf
+ * diese Liste); der `hydrated`-Guard im Edit-Screen fängt Deep-Links auf
+ * gelöschte Tasks ab.
+ */
 export function useFamilyTasks(): UseFamilyTasksResult {
   const today = useToday();
   const doneSince = useMemo(() => subDays(today, DONE_WINDOW_DAYS).toISOString(), [today]);
@@ -77,16 +88,10 @@ export function useFamilyTasks(): UseFamilyTasksResult {
   });
 
   const pendingIds = usePendingTaskIds();
-
-  const data = useMemo(() => {
-    const rows = query.data ?? NO_TASKS;
-    // Kein Cache-Eingriff: die Zeile ist noch da, sie wird nur nicht gezeigt,
-    // solange „Rückgängig" erreichbar ist (Decision 1 der Spec). Deshalb greift
-    // der Filter auch für `useTask` — der ist ein Selektor auf diese Liste, und
-    // der `hydrated`-Guard im Edit-Screen fängt das bereits ab.
-    if (pendingIds.size === 0) return rows;
-    return rows.filter((row) => !pendingIds.has(row.id));
-  }, [query.data, pendingIds]);
+  const data = useMemo(
+    () => withoutPendingTaskDeletes(query.data ?? NO_TASKS, pendingIds),
+    [query.data, pendingIds],
+  );
 
   return {
     data,
