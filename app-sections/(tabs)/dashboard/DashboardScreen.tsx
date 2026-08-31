@@ -311,14 +311,22 @@ export function DashboardScreen() {
                   entry.kind === "task" ? "dash.a11y.prepTask" : "dash.a11y.prepEvent",
                   { title: entry.title },
                 )}
-                onPress={() =>
-                  entry.kind === "task"
-                    ? router.push({ pathname: "/task/edit/[id]", params: { id: entry.id } })
-                    : router.push({
-                        pathname: "/event/[id]",
-                        params: { id: entry.id, occ: entry.occurrenceDate },
-                      })
-                }
+                onPress={() => {
+                  if (entry.kind === "task") {
+                    router.push({ pathname: "/task/edit/[id]", params: { id: entry.id } });
+                    return;
+                  }
+                  // Siehe `isOptimisticEventId`: Die synthetische Id eines noch
+                  // nicht gespeicherten Termins führte im Detail-Screen in einen
+                  // rohen `22P02`-Datenbankfehler. Derselbe Guard steht in der
+                  // Terminliste weiter oben in diesem Screen und in
+                  // `KalenderScreen`.
+                  if (isOptimisticEventId(entry.id)) return;
+                  router.push({
+                    pathname: "/event/[id]",
+                    params: { id: entry.id, occ: entry.occurrenceDate },
+                  });
+                }}
               />
             ))}
             {overflowTarget ? (
