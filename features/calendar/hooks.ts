@@ -67,13 +67,14 @@ export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
   const data = useMemo(() => {
     if (!query.data) return NO_OCCURRENCES;
     const expanded = expandEvents(query.data, rangeStart, rangeEnd, theme);
-    // Erst patchen, dann filtern: Eine Löschung gewinnt gegen eine gleichzeitige
-    // Bearbeitung (Decision 9 der Spec). Andersherum bliebe ein gelöschter
-    // Termin sichtbar, weil der Patch ihn wieder einführte.
-    const withOptimisticChanges = withOptimistic(expanded, optimistic, (rows) =>
+    // Erst filtern, dann patchen: Eine Löschung gewinnt gegen eine gleichzeitige
+    // Bearbeitung. Andersherum verfehlte sie ihr Ziel — ein `this`-Scope-Update,
+    // das den Termin verschiebt, schreibt `occurrenceDate` neu, und der Filter
+    // vergliche danach das neue Datum gegen das alte der offenen Löschung.
+    const visible = withoutPendingDeletes(expanded, pending);
+    return withOptimistic(visible, optimistic, (rows) =>
       expandEvents(rows, rangeStart, rangeEnd, theme),
     );
-    return withoutPendingDeletes(withOptimisticChanges, pending);
   }, [query.data, rangeStart, rangeEnd, theme, optimistic, pending]);
 
   const segments = useMemo(

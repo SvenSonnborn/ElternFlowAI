@@ -318,7 +318,7 @@ describe("withOptimistic mit dem echten expandEvents", () => {
 });
 
 describe("Reihenfolge der beiden Overlays", () => {
-  test("eine zugleich bearbeitete und gelöschte Occurrence ist weg", () => {
+  test("eine zugleich bearbeitete und gelöschte Occurrence ist weg (scope: all)", () => {
     // Ein Update kann eine bereits gefilterte Occurrence nicht zurückbringen,
     // weil der Patch-Zweig von `withOptimistic` nur per `.map()` über die
     // bestehende Liste arbeitet und nie Einträge hinzufügt. Daher ist die
@@ -326,6 +326,9 @@ describe("Reihenfolge der beiden Overlays", () => {
     // ist in beiden Fällen leer. Wir halten diesen Test trotzdem, weil die
     // Aussage („eine Löschung gewinnt gegen eine gleichzeitige Bearbeitung")
     // richtig ist und diese Eigenschaft wert, festgehalten zu werden.
+    //
+    // ABER: Bei `scope: "this"` auf einem Einzeltermin, der sich verschiebt,
+    // wird dieses Testen kritisch — siehe Test unten.
     const patched = withOptimistic(
       [occ()],
       [
@@ -345,6 +348,81 @@ describe("Reihenfolge der beiden Overlays", () => {
       { eventId: "e1", occurrenceDate: "2026-09-10", scope: "all" },
     ]);
     expect(out).toHaveLength(0);
+  });
+
+  test("eine verschobene und gleichzeitig gelöschte Occurrence: Filtern → Patchen ist korrekt", () => {
+    // Ein `this`-Scope-Update auf einem Einzeltermin verschiebt `occurrenceDate`.
+    // Die Löschung trägt die **alte** Date (2026-09-10).
+    //
+    // FALSCHE Reihenfolge (Patch vor Filter):
+    //  - withOptimistic patcht die Occurrence und schreibt occurrenceDate -> "2026-09-20"
+    //  - withoutPendingDeletes vergleicht das neue Datum "2026-09-20" gegen die
+    //    alte Löschung "2026-09-10" — der String-Vergleich schlägt fehl
+    //  - Ergebnis: Die Occurrence ist sichtbar (verschoben auf den 20.)
+    //
+    // RICHTIGE Reihenfolge (Filter vor Patch):
+    //  - withoutPendingDeletes vergleicht das alte Datum "2026-09-10" gegen die
+    //    Löschung "2026-09-10" — Treffer!
+    //  - Ergebnis: Die Occurrence ist weg (gewinnt gegen das gleichzeitige Update)
+
+    const single = occ({
+      isRecurring: false,
+      rrule: { freq: null, interval: 1, byweekday: null, count: null, until: null },
+    });
+
+    // Schritt 1: Filtern (korrekte Reihenfolge)
+    const afterFilter = withoutPendingDeletes(
+      [single],
+      [{ eventId: "e1", occurrenceDate: "2026-09-10", scope: "this" }],
+    );
+    expect(afterFilter).toHaveLength(0); // Gelöschte Occurrence ist weg
+
+    // Schritt 2: Dann patchen — aber auf der bereits gefilterten Liste
+    const correctOrder = withOptimistic(
+      afterFilter,
+      [
+        {
+          id: "o1",
+          kind: "update",
+          eventId: "e1",
+          occurrenceDate: "2026-09-10",
+          scope: "this",
+          changes: changes({
+            start_at: new Date("2026-09-20T18:00:00").toISOString(),
+            end_at: new Date("2026-09-20T19:30:00").toISOString(),
+          }),
+        },
+      ],
+      expandStub,
+    );
+    expect(correctOrder).toHaveLength(0); // Bleibt weg
+
+    // Kontrast: Falsche Reihenfolge (Patch vor Filter) — nur zum Dokumentieren
+    const patched = withOptimistic(
+      [single],
+      [
+        {
+          id: "o1",
+          kind: "update",
+          eventId: "e1",
+          occurrenceDate: "2026-09-10",
+          scope: "this",
+          changes: changes({
+            start_at: new Date("2026-09-20T18:00:00").toISOString(),
+            end_at: new Date("2026-09-20T19:30:00").toISOString(),
+          }),
+        },
+      ],
+      expandStub,
+    );
+    expect(patched).toHaveLength(1); // Update patched es, aber Löschung trifft nicht
+    const wrongOrder = withoutPendingDeletes(patched, [
+      { eventId: "e1", occurrenceDate: "2026-09-10", scope: "this" },
+    ]);
+    // FALSCH: Die Löschung auf "2026-09-10" trifft nicht, weil occurrenceDate
+    // jetzt "2026-09-20" ist — der Termin wäre sichtbar und verschoben!
+    expect(wrongOrder).toHaveLength(1);
+    expect(wrongOrder[0]?.occurrenceDate).toBe("2026-09-20");
   });
 });
 
