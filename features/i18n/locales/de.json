@@ -334,7 +334,6 @@
       "confirmTitle": "Termin löschen?",
       "confirmBody": "Du kannst das direkt danach rückgängig machen.",
       "confirmOk": "Löschen",
-      "deleting": "Lösche…",
       "error": "Löschen fehlgeschlagen",
       "undoTitle": "Termin gelöscht",
       "undoScopeForward": "ab {{date}}",
