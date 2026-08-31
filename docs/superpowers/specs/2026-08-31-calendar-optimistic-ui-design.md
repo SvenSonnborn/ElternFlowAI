@@ -152,7 +152,9 @@ Erfunden wird nur die `id` der Zeile (Präfix `optimistic-`, damit sie in Logs e
 
 **Decision 8 — Zwei Overlays, nicht eins.** Pending-Deletes und optimistische Änderungen operieren auf demselben Strom und haben verwandte Form; sie zu vereinen wäre der sauberere Zug. Bewusst nicht jetzt: Der Pending-Delete-Store ist gerade durch eine vollständige Review-Runde gegangen, und Löschen steht nicht zur Disposition. Als TODO festgehalten, fällig beim dritten Overlay.
 
-**Decision 9 — Die Reihenfolge der beiden Overlays ist Semantik.** Erst patchen, dann filtern: Eine Löschung gewinnt gegen eine gleichzeitige Bearbeitung. Andersherum bliebe ein gelöschter Termin sichtbar, weil der Patch ihn wieder einführte.
+**Decision 9 — Erst patchen, dann filtern.** Eine Löschung gewinnt gegen eine gleichzeitige Bearbeitung.
+
+**Nachtrag aus der Umsetzung:** Die ursprüngliche Begründung dieser Entscheidung war zu stark. Sie behauptete, andersherum bliebe ein gelöschter Termin sichtbar, weil der Patch ihn wieder einführte. Das trifft für ein **Update** nicht zu: `withOptimistic` bildet im Patch-Zweig nur ab (`.map`) und fügt nie hinzu, kann eine herausgefilterte Occurrence also gar nicht zurückholen — beide Reihenfolgen liefern dasselbe. Ein Unterschied entstünde allein bei einem **Create**, dessen Occurrences im einen Fall vom Löschfilter erfasst würden und im anderen nicht; praktisch unerreichbar, weil ein optimistischer Create eine synthetische Id trägt, die keine Löschung adressiert. Die Reihenfolge bleibt trotzdem so — sie ist als Verteidigung in der Tiefe richtig herum und kostet nichts —, aber sie ist **keine Semantik, auf die sich etwas verlassen darf**.
 
 ---
 

@@ -1163,7 +1163,7 @@ Inhaltlich müssen die neun Decisions aus Abschnitt 3 der Spec darin stehen, jed
 6. Keine visuelle Sonderbehandlung der optimistischen Occurrence; die `saving`-Keys entfallen.
 7. `useEvent` bekommt kein Overlay.
 8. Zwei Overlays, nicht eins — und warum die Vereinigung wartet.
-9. Die Reihenfolge der Overlays ist Semantik.
+9. Erst patchen, dann filtern — **aber ohne die Reihenfolge zur Semantik zu erklären**. Die Spec hat ihre ursprüngliche Begründung in einem Nachtrag zurückgenommen: Bei einem Update ist die Reihenfolge folgenlos, weil `withOptimistic` im Patch-Zweig nur abbildet und nie hinzufügt; ein Unterschied entstünde allein bei einem Create, und der ist praktisch unerreichbar. Schreib es so in den ADR — als richtig herum gewählte Verteidigung in der Tiefe, nicht als Garantie.
 
 Als eigener Punkt oder als Consequence dazu: **der `description`-Fund.** `expandEvents` liest das Feld immer von der Master-Zeile, `applyOverride` kennt es nicht — eine per Exception geänderte Beschreibung erreicht die Anzeige nie. Das Overlay bildet deshalb die Anzeige ab, nicht den Schreibvorgang.
 
