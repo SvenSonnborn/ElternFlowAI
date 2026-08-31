@@ -70,7 +70,16 @@ export function useUndoableDelete(): (args: UndoableDeleteArgs) => void {
         variant: "success",
         position: "bottom",
         durationMs: UNDO_WINDOW_MS,
-        action: { label: t("action.undo"), onPress: () => undo(pendingId) },
+        action: {
+          label: t("action.undo"),
+          // Der Rückgabewert (griff das Rückgängigmachen noch?) wird hier
+          // bewusst verworfen: `onPress` ist `() => void`, und der einzige
+          // Fall, in dem `undo` `false` meldet, ist der Tap im selben Frame,
+          // in dem die Löschung schon läuft — dann schließt der Toast ohnehin.
+          onPress: () => {
+            undo(pendingId);
+          },
+        },
       });
     },
     [t, show, dismiss, schedule, undo],
