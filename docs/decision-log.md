@@ -1032,3 +1032,38 @@ Umgesetzt wurde eine idempotente Migration (`20260901093000_realtime_calendar.sq
 - **`useCalendarRealtime` selbst ist ungetestet.** Nach dem Split ist er ein `useEffect` um `subscribeToCalendarChanges` plus eine Callback-Ref; alles Prüfenswerte liegt darunter. In `docs/TODO.md` festgehalten.
 - **Kein sichtbares Scheitern nach dauerhaftem Verbindungsverlust.** Der Realtime-Client bringt seinen eigenen Reconnect mit; was fehlt, ist eine Rückmeldung an den Nutzer, wenn er dauerhaft nicht durchkommt. Für den Debug-Screen genügt die Status-Pille; für #51 ist es eine offene Frage und steht in `docs/TODO.md`.
 - **Das Barrel `features/calendar/index.ts` exportiert das Modul mit**, Tests importieren aber weiter `./realtime` direkt — dieselbe Einschränkung, unter der `features/auth` schon `features/calendar/optimisticEvents` direkt importiert: Der Weg über das Barrel zöge `./hooks` und damit das nativewind-Runtime herein.
+
+## ADR-029 — Der PAT-Header aus ADR-009 steht jetzt wirklich in `.mcp.json` (2026-09-01)
+
+### Status
+
+Accepted. **Ersetzt [ADR-009](#adr-009--supabase-mcp-authentifiziert-per-personal-access-token-statt-oauth-2026-07-28) nicht** — der dortige Beschluss war richtig und bleibt unverändert gültig. Er war nur nie umgesetzt.
+
+### Context
+
+Der Supabase-MCP-Server fiel wiederholt auf „keine Verbindung" — nicht dauerhaft, sondern immer wieder. `docs/TODO.md` hielt seit dem Context7-Setup ([ADR-012](#adr-012--context7-mcp-im-projekt-scope-api-key-optional-2026-08-13)) fest, dass das Repo von ADR-009 abweicht, und ließ zwei Deutungen offen: Header nie committet, oder stiller Rückschwenk auf OAuth ohne Supersede.
+
+Die Diagnose beantwortet das eindeutig — **es war die erste Deutung, und sie ging tiefer als der TODO-Eintrag vermutete**. Beide Hälften von ADR-009 fehlten:
+
+1. `git log -p -- .mcp.json` zeigt über **alle** Commits hinweg keinen `headers`-Block für Supabase. Der einzige `Authorization`-Treffer in der Historie gehört Context7. Der Header wurde nie geschrieben, nicht entfernt.
+2. `.env.local` enthielt die Zeile `SUPABASE_ACCESS_TOKEN=` — vorhanden, aber **leer**. Selbst mit korrektem Header hätte nichts funktioniert.
+
+Ohne Header nutzt Claude Code den OAuth-Flow, und genau den beschreibt ADR-009 auf dieser Maschine als defekt (Records mit `clientId`/`clientSecret`, aber leerem `accessToken`, ohne `refreshToken`, ohne `expiresAt`). Ein Grant ohne Refresh-Token trägt bis zum Ablauf und stirbt dann — das erklärt das _wiederkehrende_, nicht dauerhafte Symptom. Während der Diagnose war der Server `✔ Connected` und ein `get_project_url` lieferte eine Antwort; „funktioniert gerade" ist hier also kein Gegenbeweis, sondern der Normalfall zwischen zwei Ausfällen.
+
+Nachgemessen statt angenommen (`POST … initialize` gegen `mcp.supabase.com`): ohne Header `401 {"message":"Unauthorized"}`, mit leerem Bearer `401 {"message":"Format is Authorization: Bearer [token]"}` — exakt das Fehlerbild, das ADR-009 seinerzeit protokollierte.
+
+### Decisions
+
+1. **Header nachtragen, ADR-009 nicht ablösen.** `.mcp.json` schickt `"Authorization": "Bearer ${SUPABASE_ACCESS_TOKEN}"`. Der TODO-Eintrag hatte den Entscheidungsbaum vorgezeichnet — „Header nachtragen **oder** ADR-009 ablösen" —, und die Klärung wählt den ersten Ast: Es gibt keine geänderte Entscheidung zu dokumentieren, nur eine unerledigte umzusetzen. Dieser ADR hält den Befund fest, damit die Lücke nicht ein drittes Mal als offene Frage auftaucht.
+
+2. **Kein `:-`-Default, bewusst.** `${SUPABASE_ACCESS_TOKEN}` steht ohne Fallback, wie [ADR-012](#adr-012--context7-mcp-im-projekt-scope-api-key-optional-2026-08-13) Decision 3 es für Supabase bereits vorschreibt (Pflicht-Token, kein anonymer Modus). Die dortige _Begründung_ stimmt allerdings nicht: Eine nicht gesetzte Variable lässt die Expansion **nicht** scheitern. Claude Code lädt den Server, meldet in `claude mcp list` eine Missing-Variable-Warnung für genau diesen Server und sendet den unexpandierten Text `${SUPABASE_ACCESS_TOKEN}` wörtlich. Das ist hier sogar das bessere Verhalten und der eigentliche Grund, den Default wegzulassen: Die Warnung **benennt die fehlende Variable**, während `:-` sie zu einem stummen `401` verschluckte. ADR-012 bleibt unangetastet — seine Entscheidung (`:-` für einen optionalen Key) ist unabhängig von der Fehldiagnose weiterhin richtig, und eine inhaltliche Aussage wird nicht hineinkorrigiert. Die Verhaltensbeschreibung in [CLAUDE.md](../CLAUDE.md) wurde dagegen richtiggestellt.
+
+3. **Der Header ist ab jetzt der einzige Auth-Weg — kein Netz darunter.** Laut Claude-Code-Doku hat ein konfiguriertes `headers.Authorization` Vorrang und schaltet den OAuth-Fallback ab: Weist der Server den Header zurück, wird die Verbindung als **failed** gemeldet, nicht als „braucht Authentifizierung", und es wird nicht auf OAuth zurückgefallen. ADR-009 Decision 4 hatte diesen Vorrang behauptet, ohne ihn je zu belegen — mangels Header. Er gilt, hat aber eine Konsequenz, die dort fehlte (siehe unten).
+
+### Consequences
+
+- **Ein leerer oder ungültiger PAT ist ab jetzt schlechter als vorher.** Bis zu diesem Commit fiel der Server auf OAuth zurück und lief zumindest zeitweise; jetzt schlägt er hart fehl. Wer den Header hat, **muss** einen Token haben — es gibt keinen Zwischenzustand mehr. Der Gegenwert: Der Token läuft nicht ab, das wiederkehrende Symptom verschwindet.
+- **Jeder Entwickler braucht einen eigenen Token** aus <https://supabase.com/dashboard/account/tokens> in `.env.local` (`.env.example` dokumentiert es). Unverändert gegenüber ADR-009, jetzt aber tatsächlich wirksam.
+- **`.env.local` ist gitignored** — dieser Commit kann den Token also nicht mitliefern, nur den Platzhalter. Ein frischer Clone ohne Token bekommt die benannte Warnung aus Decision 2 statt eines stummen Fehlschlags.
+- **Die kaputten OAuth-Records bleiben liegen**, wie ADR-009 Decision 4 es vorsah. Sie sind jetzt für Supabase wirkungslos (Header hat Vorrang); Stripe- und Expo-MCP hängen weiter am selben Defekt.
+- **`read_only=true` bleibt weiterhin nicht gesetzt**, aus dem in ADR-009 genannten Grund — es kostete `execute_sql`-Schreibzugriff und `apply_migration`. Der PAT behält damit Account-Reichweite.
