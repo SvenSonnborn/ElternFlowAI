@@ -74,5 +74,9 @@ selbst abonniert noch nicht (siehe [decision-log.md](./decision-log.md), ADR-028
 ## What's not here yet
 
 See [decision-log.md](./decision-log.md) for the full out-of-scope list. The
-short version: no Supabase, no Edamam, no Stripe, no real Voice/LLM, no auth,
-no onboarding, no settings screen.
+short version: no recipe-import worker (gustar.io), no Stripe, no real
+Voice/LLM, no Expo Notifications, no Edge Functions.
+
+Supabase, the auth flow, onboarding and the settings screen have all landed
+since this list was written (ADR-003, ADR-005, ADR-008); Realtime is wired as
+far as the section above describes.

@@ -142,9 +142,14 @@ function RealtimeDebugContent() {
               }`}
             >
               <Text variant="numeric" tone="inkTertiary">
-                {/* Ohne Locale-Argument: folgt dem Gerät, statt eine
-                    Sprache zu behaupten, die der Screen sonst nirgends kennt. */}
-                {new Date(change.receivedAt).toLocaleTimeString()}
+                {/* Locale vom Gerät (kein Argument), Stundenzyklus aber fest auf
+                    h23: Eine Ereignis-Liste will 14:07 lesen, nicht 2:07 PM —
+                    auf einem en-US-Gerät käme sonst 12-Stundenformat heraus. Die
+                    aktive App-Sprache dafür heranzuziehen hieße, i18n für einen
+                    Zeitstempel in einen Screen zu ziehen, der sonst keins hat. */}
+                {new Date(change.receivedAt).toLocaleTimeString(undefined, {
+                  hourCycle: "h23",
+                })}
               </Text>
               <View className="flex-1">
                 <Text variant="listTitle">{`${change.table} · ${change.type}`}</Text>
