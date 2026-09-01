@@ -4,7 +4,7 @@
 
 **Goal:** Ein angelegter oder geänderter Termin steht sofort im Kalender — bevor der Server geantwortet hat —, und verschwindet mit einer Retry-Möglichkeit wieder, falls das Speichern fehlschlägt.
 
-**Architecture:** Ein kalender-eigener Zustand-Store hält die optimistischen Änderungen als Occurrence-Overlay. `useFamilyEvents` legt es zwischen `expandEvents` und `withoutPendingDeletes`. Die Mutations-Hooks führen es über `onMutate`/`onError`/`onSettled`. Gepatcht wird die **Anzeige**, nicht die Speicherung: Ein Create trägt eine synthetische Master-Zeile, die durch dasselbe `expandEvents` läuft wie die echten.
+**Architecture:** Ein kalender-eigener Zustand-Store hält die optimistischen Änderungen als Occurrence-Overlay. `useFamilyEvents` legt es **hinter** `withoutPendingDeletes` (`expandEvents` → `withoutPendingDeletes` → `withOptimistic`). Die Mutations-Hooks führen es über `onMutate`/`onError`/`onSettled`. Gepatcht wird die **Anzeige**, nicht die Speicherung: Ein Create trägt eine synthetische Master-Zeile, die durch dasselbe `expandEvents` läuft wie die echten.
 
 **Tech Stack:** Zustand · TanStack Query · date-fns · react-i18next · `bun test`
 
