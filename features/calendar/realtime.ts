@@ -1,7 +1,14 @@
 import type {
   REALTIME_SUBSCRIBE_STATES,
   RealtimePostgresChangesPayload,
+  SupabaseClient,
 } from "@supabase/supabase-js";
+
+import { useEffect, useRef, useState } from "react";
+
+import type { Database } from "@/features/supabase/database.types";
+
+import { supabase } from "@/features/supabase";
 
 /**
  * Realtime-Kanal für den Kalender: ein Topic pro Familie, zwei
@@ -111,4 +118,95 @@ export function normalizeChange(
     type === "DELETE" ? null : table === "events" ? rowId : stringField(row, "event_id");
 
   return { table, type, rowId, eventId, receivedAt: now() };
+}
+
+export interface SubscribeToCalendarChangesArgs {
+  client: SupabaseClient<Database>;
+  familyId: string;
+  onChange: (change: CalendarChange) => void;
+  onStatus?: (status: CalendarRealtimeStatus) => void;
+  now?: () => number;
+}
+
+/**
+ * React-frei: Der Client kommt als Parameter, damit ein Test ihn ohne
+ * `mock.module` ersetzen kann.
+ *
+ * Rückgabewert ist die Abmeldung.
+ */
+export function subscribeToCalendarChanges({
+  client,
+  familyId,
+  onChange,
+  onStatus,
+  now,
+}: SubscribeToCalendarChangesArgs): () => void {
+  const channel = client.channel(calendarChannelTopic(familyId));
+
+  for (const binding of calendarBindings(familyId)) {
+    channel.on<Record<string, unknown>>("postgres_changes", binding, (payload) => {
+      // Die Tabelle kommt aus dem Binding, nicht aus `payload.table`: Das
+      // Binding ist typisiert, `payload.table` ist ein `string`, und die
+      // Zuweisung auf die Union bräuchte eine Behauptung, die nichts prüft.
+      onChange(normalizeChange(binding.table, payload, now));
+    });
+  }
+
+  onStatus?.("subscribing");
+  channel.subscribe((state) => {
+    onStatus?.(toRealtimeStatus(state));
+  });
+
+  return () => {
+    void client.removeChannel(channel);
+  };
+}
+
+/**
+ * `familyId` kommt als Parameter statt aus einem `useCurrentParent()` im Hook —
+ * das hält ihn frei von der Query-Abhängigkeit und komponierbar.
+ *
+ * Ein `supabase.realtime.setAuth()` ruft der Hook bewusst nicht: `supabase-js`
+ * schiebt den Zugriffstoken bei jedem Auth-Wechsel selbst an den Socket, und
+ * abonniert wird ohnehin erst, wenn `familyId` steht — was eine aufgelöste
+ * `parents`-Query und damit eine authentifizierte Sitzung voraussetzt.
+ */
+export function useCalendarRealtime(
+  familyId: string | null,
+  onChange: (change: CalendarChange) => void,
+): { status: CalendarRealtimeStatus } {
+  // Startwert `subscribing`: Steht beim ersten Render bereits ein `familyId`,
+  // ist genau das der Zustand — abonniert wird gleich, geantwortet hat noch
+  // niemand. Ohne `familyId` überschreibt die Ableitung unten den Wert ohnehin.
+  const [channelStatus, setChannelStatus] = useState<CalendarRealtimeStatus>("subscribing");
+
+  // Der Callback liegt in einer Ref, weil `react-hooks/exhaustive-deps` in
+  // diesem Repo auf `error` steht: stünde er in der Dependency-Liste, baute
+  // jeder Render mit frischer Closure die Subscription neu auf.
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    if (!familyId) return;
+    // Der Kanal wird hier frisch erzeugt und im Cleanup entsorgt, nie über
+    // Renders hinweg wiederverwendet: React hängt im StrictMode jeden Effekt
+    // einmal ab und wieder an, und ein zweites `subscribe()` auf demselben
+    // Kanal wirft „tried to subscribe multiple times".
+    return subscribeToCalendarChanges({
+      client: supabase,
+      familyId,
+      onChange: (change) => onChangeRef.current(change),
+      onStatus: setChannelStatus,
+    });
+  }, [familyId]);
+
+  // `idle` wird abgeleitet, nicht gespeichert. Ein `setStatus("idle")` im
+  // Effekt wäre eine kaskadierende Zustandsänderung
+  // (`react-hooks/set-state-in-effect`) — und sachlich falsch dazu: Ohne
+  // `familyId` gibt es keine Subscription, deren Zustand man halten müsste.
+  // `channelStatus` bleibt gespeichert, weil er vom Server kommt und sich nicht
+  // aus den Argumenten ableiten lässt.
+  return { status: familyId ? channelStatus : "idle" };
 }
