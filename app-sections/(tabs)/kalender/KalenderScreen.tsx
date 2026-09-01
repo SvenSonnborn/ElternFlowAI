@@ -156,22 +156,30 @@ export function KalenderScreen() {
                   ""
                 : formatDurationLabel(durationMin, t);
             const typeLabel = lang === "de" ? occ.type.labelDe : occ.type.labelEn;
+            // Ein optimistischer Termin trägt eine synthetische Id, die es
+            // serverseitig nicht gibt: `fetchEventById` schickte sie gegen eine
+            // `uuid`-Spalte und der Detail-Screen zeigte einen rohen
+            // PostgREST-Fehler. Lieber tut der Tap für die ein, zwei Sekunden
+            // bis zum Refetch nichts.
+            const isOptimistic = isOptimisticEventId(occ.eventId);
             return (
               <Pressable
                 key={`${occ.eventId}-${occ.occurrenceDate}-${seg.date}`}
                 onPress={() => {
-                  // Ein optimistischer Termin trägt eine synthetische Id, die es
-                  // serverseitig nicht gibt: `fetchEventById` schickte sie gegen
-                  // eine `uuid`-Spalte und der Detail-Screen zeigte einen rohen
-                  // PostgREST-Fehler. Lieber tut der Tap für die ein, zwei
-                  // Sekunden bis zum Refetch nichts.
-                  if (isOptimisticEventId(occ.eventId)) return;
+                  if (isOptimistic) return;
                   router.push({
                     pathname: "/event/[id]",
                     params: { id: occ.eventId, occ: occ.occurrenceDate },
                   });
                 }}
+                disabled={isOptimistic}
                 accessibilityRole="button"
+                // Kein visuelles Ausgrauen (Decision 6 der Optimistic-UI-Spec:
+                // die Occurrence soll echt aussehen) — nur assistive Technik
+                // soll die Zeile für die kurze Zeit bis zum Refetch als
+                // deaktiviert ankündigen, statt einen bedienbaren Knopf zu
+                // versprechen, der nichts tut.
+                accessibilityState={isOptimistic ? { disabled: true } : undefined}
                 accessibilityLabel={
                   isSpan
                     ? t("cal.a11y.eventSpan", {

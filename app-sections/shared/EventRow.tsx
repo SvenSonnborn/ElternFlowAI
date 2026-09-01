@@ -20,6 +20,14 @@ export interface EventRowProps {
   timeCompact?: boolean;
   accessibilityLabel?: string;
   onPress?: () => void;
+  /**
+   * Meldet die Zeile assistiver Technik als deaktiviert, ohne sie optisch zu
+   * verändern — für eine optimistische Occurrence, deren synthetische Id noch
+   * keine Navigation trägt (siehe `isOptimisticEventId` in
+   * `features/calendar`). Kein Ausgrauen: Decision 6 der Optimistic-UI-Spec
+   * verlangt, dass die Zeile echt aussieht, bis der Refetch etwas anderes sagt.
+   */
+  disabled?: boolean;
 }
 
 export function EventRow({
@@ -32,12 +40,15 @@ export function EventRow({
   timeCompact,
   accessibilityLabel,
   onPress,
+  disabled,
 }: EventRowProps) {
   const { theme } = useTheme();
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       accessibilityRole="button"
+      accessibilityState={disabled ? { disabled: true } : undefined}
       accessibilityLabel={accessibilityLabel}
       className={`flex-row items-center gap-3 px-4 py-3.5 ${isFirst ? "" : "border-t border-line"} active:opacity-70`}
     >
