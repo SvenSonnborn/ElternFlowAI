@@ -123,16 +123,18 @@ Konsequenz: **`all`/`forward` mit geändertem Datum bekommt gar keinen optimisti
 
 ### 2.4 Die Verdrahtung in den Hooks
 
-`onMutate` legt den Eintrag an und gibt seine Id als Kontext zurück; `onError` entfernt ihn; `onSettled` invalidiert und entfernt ihn **danach**:
+`onMutate` legt den Eintrag an und gibt seine Id als Kontext zurück; `onError` entfernt ihn; `onSettled` invalidiert **nur bei Erfolg** und gibt ihn erst **danach** frei:
 
 ```ts
-onSettled: async (_data, _err, _vars, id) => {
-  await qc.invalidateQueries({ queryKey: calendarKeys.all });
+onSettled: async (_data, error, _vars, id) => {
+  if (!error) await qc.invalidateQueries({ queryKey: calendarKeys.all });
   if (id) removeOptimistic(id);
 },
 ```
 
 Die Reihenfolge ist keine Kosmetik: Wird der Eintrag vor dem Refetch entfernt, blitzt der alte Stand für einen Frame durch — dieselbe Lehre, die `useDeleteEvent` in [ADR-026](../../decision-log.md) gezogen hat.
+
+**Der Fehlerfall invalidiert gar nicht.** Serverseitig ist nichts passiert, der Refetch brächte dieselben Daten — und er kostet mehr als nichts: TanStack ruft `onError` → `await onSettled` → **dann erst** lehnt `mutateAsync` ab. Der Rollback läuft also sofort, der Fehler-Toast wartete aber hinter einem Refetch, der bei toter Verbindung mit `retry: 1` und Backoff ins Leere läuft. Im Funkloch sähe der Nutzer seinen Termin kommen und wieder gehen, ohne ein Wort dazu.
 
 `useCreateEvent` schlägt `vars.typeId` dafür in `qc.getQueryData<EventTypeRow[]>(calendarKeys.types)` nach, nicht über
 `useEventTypes()` — `./hooks` zieht über `useTheme` das nativewind-Runtime herein, das sich unter `bun test` nicht
@@ -205,7 +207,7 @@ Entfallende Keys: `cal.create.saving`, `cal.edit.saving` (Decision 6).
 
 ## 5. Änderungen im Bestand
 
-- **[features/calendar/hooks.ts](../../../features/calendar/hooks.ts)** — `useFamilyEvents` legt das Overlay zwischen `expandEvents` und `withoutPendingDeletes`.
+- **[features/calendar/hooks.ts](../../../features/calendar/hooks.ts)** — `useFamilyEvents` legt das Overlay **hinter** `withoutPendingDeletes`: `expandEvents` → `withoutPendingDeletes` → `withOptimistic`, gebündelt in `visibleOccurrences`. Warum der Filter vor dem Patch laufen muss, steht in Abschnitt 3 (Entscheidung zur Reihenfolge).
 - **[features/calendar/createMutation.ts](../../../features/calendar/createMutation.ts)** und **[mutations.ts](../../../features/calendar/mutations.ts)** — `onMutate`/`onError`/`onSettled` in `useCreateEvent` und `useUpdateEvent`. `useUpdateEvent`s `onSuccess` (heute `void qc.invalidateQueries(…)`) geht dabei in `onSettled` auf und wird zurückgegeben.
 - **Beide Sheets** — schließen sofort statt auf `onSuccess` zu warten; `mutateAsync(vars).catch(…)` mit Fehler-Toast und Retry; die `isPending`-Beschriftungen fallen.
 
