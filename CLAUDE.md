@@ -68,9 +68,9 @@ The **JDK 17 pin is what makes the Android build work**: the Gradle wrapper (9.3
 - **react-i18next + expo-localization** — DE default, EN switch
 - **react-native-reanimated v4 + react-native-worklets** — last babel plugin must be `react-native-worklets/plugin`
 - **ESLint 9 (flat config)** + Prettier + jest-expo
-- **Supabase JS Client** (`@supabase/supabase-js` + AsyncStorage session) via [features/supabase/](features/supabase/). MCP via Supabases hosted HTTP-Server (`mcp.supabase.com`, project-scoped) — Konfig in `.mcp.json`, Auth per **Personal Access Token** statt OAuth (ADR-009): `.mcp.json` expandiert `${SUPABASE_ACCESS_TOKEN}` in den `Authorization`-Header, mise lädt die Variable aus dem gitignorierten `.env.local` (`[env] _.file`). App-ENV liegt im selben `.env.local` (siehe `.env.example`). Schema mit RLS-Policies in `supabase/migrations/`, TypeScript-Types in `features/supabase/database.types.ts` (generiert). Auth-Flow lebt seit ADR-005 (Email+Passwort, strict Confirm-Email, Reset-Password, 5-Step-Onboarding mit Share-Sheet-Invite, `features/auth/AuthGate`). Realtime + Edge Functions sind die nächsten Iterationen.
+- **Supabase JS Client** (`@supabase/supabase-js` + AsyncStorage session) via [features/supabase/](features/supabase/). MCP via Supabases hosted HTTP-Server (`mcp.supabase.com`, project-scoped) — Konfig in `.mcp.json`, Auth per **Personal Access Token** statt OAuth (ADR-009): `.mcp.json` expandiert `${SUPABASE_ACCESS_TOKEN}` in den `Authorization`-Header, mise lädt die Variable aus dem gitignorierten `.env.local` (`[env] _.file`). App-ENV liegt im selben `.env.local` (siehe `.env.example`). Schema mit RLS-Policies in `supabase/migrations/`, TypeScript-Types in `features/supabase/database.types.ts` (generiert). Auth-Flow lebt seit ADR-005 (Email+Passwort, strict Confirm-Email, Reset-Password, 5-Step-Onboarding mit Share-Sheet-Invite, `features/auth/AuthGate`). **Realtime** ist seit [ADR-028](docs/decision-log.md) als Fundament da — `events` und `event_exceptions` liegen in der Publikation `supabase_realtime`, [features/calendar/realtime.ts](features/calendar/realtime.ts) hält einen Kanal pro Familie, und ein Dev-Screen unter `/debug/realtime` zeigt den Strom. Der Kalender abonniert ihn noch **nicht** (Issue #51). Edge Functions sind die nächste Iteration.
 
-Deferred to later iterations (not yet wired): Auth-Flow + Realtime + Edge Functions, gustar.io Worker, Stripe, real STT + LLM, Expo Notifications.
+Deferred to later iterations (not yet wired): Edge Functions, gustar.io Worker, Stripe, real STT + LLM, Expo Notifications.
 
 ## MCP-Server
 
@@ -96,11 +96,13 @@ app/                     Expo Router routes — THIN re-export files only
 ├─ (tabs)/familie.tsx
 ├─ task/new.tsx           → TaskCreateScreen
 ├─ task/edit/[id].tsx     → TaskEditScreen
+├─ debug/realtime.tsx     → RealtimeDebugScreen (nur `__DEV__` verlinkt)
 └─ +not-found.tsx
 
 app-sections/            Real screen implementations
 ├─ (tabs)/<name>/<Name>Screen.tsx
 ├─ auth/                 (login & friends — to come)
+├─ debug/                Dev-Werkzeuge (Realtime-Debug) — Einstieg nur unter `__DEV__`
 ├─ onboarding/           (5-step flow — to come)
 ├─ modals/
 ├─ task/                 Anlegen/Bearbeiten von Aufgaben (Create · Edit · TaskForm)
@@ -125,6 +127,7 @@ features/                Cross-cutting feature logic
 ├─ i18n/                 react-i18next init + de.json + en.json
 ├─ auth/                 Session-Store · AuthGate · DeepLinkHandler · Onboarding-Mutations
 ├─ calendar/             Queries · Mutations · RRULE-Expansion · Reminder · Pending-Deletes · Optimistic-Overlay
+│                        · Realtime-Kanal (ein Topic pro Familie, ADR-028)
 ├─ tasks/                Queries · Mutations · Filter · Stats · Pending-Deletes
 ├─ children/             Kinderprofile
 ├─ meals/                Meal-Planner-Daten-Layer (Queries · JSONB-Normalisierung · Wochenlogik

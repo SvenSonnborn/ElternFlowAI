@@ -990,3 +990,45 @@ Umgesetzt wurde ein kalender-eigener Store (`features/calendar/optimisticEvents.
 - **Die toten Inline-Fehlerblöcke sind entfernt** (`EventCreateScreen.tsx`, `EventEditScreen.tsx`). Der Punkt darunter hielt sie als Follow-up fest; die Schluss-Review hat das zurückgenommen — beide Bedingungen konnten seit diesem Feature nicht mehr rendern und zeigten überdies `error.message` roh, dieselbe Klasse wie der Detail-Screen.
 - **Eine Regeländerung (`vars.recurrence`) wird nicht optimistisch abgebildet.** Ändert der Nutzer den Rhythmus einer Serie, verschieben sich die Occurrence-Termine selbst — das vorherzusagen hieße, die RRULE-Expansion für eine ungespeicherte Regel zu fahren. Der Refetch bringt es eine Sekunde später; bis dahin zeigt der Kalender die alten Termine mit den neuen Feldern.
 - **`features/calendar/hooks.ts` ist unter `bun test` nicht ladbar.** Es zieht über `useTheme` das `nativewind`-Runtime herein, dessen `react-native-css-interop` beim Modul-Laden unter Bun scheitert. `useCreateEvent` (`features/calendar/createMutation.ts`) liest den Event-Typ deshalb direkt aus dem Query-Cache (`qc.getQueryData`) statt `useEventTypes()` aus `./hooks` zu importieren — ein Import aus `./hooks` zöge das defekte Runtime in jede Testdatei, die `features/calendar/createMutation.ts` erreicht.
+
+## ADR-028 — Realtime für den Kalender: ein Kanal pro Familie, DELETE bleibt unzuordenbar (2026-09-01)
+
+### Status
+
+Accepted. Erste von drei Realtime-Iterationen (Issues #50 → #51 → #52). Keine Supersession; ergänzt ADR-004, das Realtime-Subscriptions ausdrücklich als not-MVP führte.
+
+### Context
+
+`events` und `event_exceptions` waren nicht Teil der Publikation `supabase_realtime`; Änderungen erreichten einen zweiten angemeldeten Client erst beim nächsten Refetch. Der Auftrag nannte drei Zutaten — Replikation aktivieren, Kanäle definieren, Test-Subscription in einem Debug-Screen.
+
+Zwei seiner Annahmen trafen so nicht zu. Realtime ist auf einem Supabase-Projekt bereits an; zu tun war, zwei Tabellen in eine bestehende Publikation aufzunehmen. Und zwei Tabellen brauchen keine zwei Kanäle: Ein Supabase-Kanal trägt beliebig viele `postgres_changes`-Bindings.
+
+Umgesetzt wurde eine idempotente Migration (`20260901093000_realtime_calendar.sql`), ein Modul `features/calendar/realtime.ts` mit reinen Funktionen, einer React-freien Kernfunktion und einem dünnen Hook, sowie ein Dev-Screen unter `app/debug/realtime.tsx`.
+
+### Decisions
+
+1. **Fundament, nicht Live-Sync.** `useFamilyEvents` bleibt unangetastet. Eine eingehende Invalidierung müsste sich mit zwei bestehenden Overlays vertragen — den offenen Löschungen aus [ADR-026](#adr-026--rückgängig-nach-dem-löschen-verzögern-statt-wiederherstellen-2026-08-31) und dem optimistischen Occurrence-Overlay aus [ADR-027](#adr-027--optimistische-kalender-updates-ein-occurrence-overlay-auf-der-anzeige-keine-cache-patches-2026-08-31). Ein Realtime-Refetch mitten im Undo-Fenster darf den gerade gelöschten Termin nicht zurückholen; das ist keine Zeile nebenbei, sondern Issue #51.
+
+2. **Ein Topic, zwei Bindings.** `calendar:<familyId>` trägt beide Tabellen. Zwei Topics kosteten zwei WebSocket-Abonnements pro Client und zwei Zustände für etwas, das nur gemeinsam gebraucht wird — getrennt abonnieren will sie niemand.
+
+3. **`family_id` wird nicht auf `event_exceptions` denormalisiert.** Der Reiz wäre Symmetrie: beide Bindings serverseitig gefiltert. Der Gewinn wäre allein Bandbreite — RLS filtert INSERT und UPDATE dort bereits über die `exists (… events … current_family_id())`-Policy —, und den einzigen wirklich unsauberen Fall (DELETE) löste die Spalte nicht mit, weil RLS dort gar nicht erst läuft. Dafür kostete sie eine Schema-Änderung an einer bestehenden Tabelle samt Backfill und Synchron-Trigger.
+
+4. **Die DELETE-Lücke steht im Typ, nicht in einem Kommentar.** Postgres Changes wendet RLS nicht auf DELETE an — eine gelöschte Zeile lässt sich nicht mehr gegen eine Policy prüfen —, und der Payload trägt nur den Primärschlüssel. Das heißt zweierlei: Ein Client sieht Lösch-Ereignisse **fremder** Familien (nur die Row-Id — keine Titel, keine Orte, keine Kind-Zuordnung), und er kann eine gelöschte Exception nicht ihrem Event zuordnen. `CalendarChange.eventId` ist deshalb `string | null` und bei DELETE immer `null`, sodass #51 die Fallunterscheidung nicht übersehen **kann**. Der Debug-Screen benennt sie zusätzlich sichtbar, damit ein leeres Feld nicht als Fehler des Screens gelesen wird.
+
+5. **Reine Kernfunktion, dünner Hook.** Nicht Stil, sondern die einzige Form, in der das Modul hier prüfbar ist: Es gibt im Repo keinen Pfad, auf dem React-Komponenten unter `bun test` rendern — `@testing-library/react-native` liegt als devDependency und wird von keiner Suite benutzt, und `features/calendar/hooks.ts` ist über `useTheme` → nativewind-Runtime nicht einmal ladbar. `subscribeToCalendarChanges` nimmt den Client deshalb als Parameter; ein Test ersetzt ihn ohne `mock.module`.
+
+6. **Kein `replica identity full`.** Bei aktivem RLS bleibt `payload.old` auf den Primärschlüssel beschränkt; die Einstellung erhöhte nur das WAL-Volumen. Im SQL kommentiert, damit #52 (Conflict-Detection) die Frage nicht ohne die Antwort neu stellt.
+
+7. **Der Debug-Screen bleibt im Repo.** #51 und #52 brauchen genau dieses Fenster in den Datenstrom. Der Preis ist eine dauerhafte Route — gedeckelt dadurch, dass ihr Einstieg unter `__DEV__` steht.
+
+8. **Keine `debug.*`-Keys in den i18n-Katalogen.** Die Kataloge tragen ausgelieferte Copy aus `docs/COPY.md`, einem nach Screens gegliederten Deck, das für ein Dev-Werkzeug keinen Eintrag hat und haben soll. Die Ausnahme steht als file-level `eslint-disable i18next/no-literal-string` mit Begründung sichtbar im Kopf der Datei, statt als Zeilen-Ausnahmen verteilt zu sein. Verwandt mit der `sample.*`-Abwägung aus ADR-020, dort mit umgekehrtem Ausgang: Fixtures brauchen übersetzbare Copy, ein Werkzeug nicht.
+
+9. **`idle` ist abgeleitet, nicht gespeichert.** Die Spezifikation sah einen einzigen Status-State vor, den der Effekt bei fehlendem `familyId` auf `"idle"` zurücksetzt. Das ist ein Lint-Fehler (`react-hooks/set-state-in-effect`, in dieser Konfiguration ein Error) — und die Regel hat sachlich recht: Ohne `familyId` gibt es keine Subscription, deren Zustand man halten müsste. `useCalendarRealtime` hält deshalb nur `channelStatus` — den vom Server gemeldeten, nicht ableitbaren Teil — und gibt `familyId ? channelStatus : "idle"` zurück. Der Startwert ist `"subscribing"`, weil das der zutreffende Zustand ist, sobald ein `familyId` vorliegt und die Antwort noch aussteht. Bewusst **nicht** gelöst wurde die Regel durch eine Ausnahme: Sie trifft genau den Teil des Zustands, der ableitbar ist, und lässt den nicht ableitbaren unangetastet.
+
+### Consequences
+
+- **Der grüne Status beweist die Socket-Verbindung, nicht die Replikation.** Ein fehlendes Publikations-Mitglied ist kein Verbindungsfehler: Der Kanal meldet `subscribed`, es kommt nur nie ein Event. Genau deshalb zeigt der Debug-Screen Ereignisse statt nur einen Status.
+- **Die Migration wurde in der Umsetzungssitzung nicht gefahren** — der Supabase-MCP-Server war dort nicht authentifiziert. Nach `apply_migration` greift der Versions-Abgleich aus `supabase/SETUP.md` §3: Der MCP-Server vergibt einen eigenen Timestamp und ignoriert den Dateinamen; bleibt die Divergenz stehen, hält die CLI die Migration für nicht angewendet und fährt bei `db push` die Basis-Migrationen erneut — die mit `drop table … cascade` beginnen.
+- **`useCalendarRealtime` selbst ist ungetestet.** Nach dem Split ist er ein `useEffect` um `subscribeToCalendarChanges` plus eine Callback-Ref; alles Prüfenswerte liegt darunter. In `docs/TODO.md` festgehalten.
+- **Kein sichtbares Scheitern nach dauerhaftem Verbindungsverlust.** Der Realtime-Client bringt seinen eigenen Reconnect mit; was fehlt, ist eine Rückmeldung an den Nutzer, wenn er dauerhaft nicht durchkommt. Für den Debug-Screen genügt die Status-Pille; für #51 ist es eine offene Frage und steht in `docs/TODO.md`.
+- **Das Barrel `features/calendar/index.ts` exportiert das Modul mit**, Tests importieren aber weiter `./realtime` direkt — dieselbe Einschränkung, unter der `features/auth` schon `features/calendar/optimisticEvents` direkt importiert: Der Weg über das Barrel zöge `./hooks` und damit das nativewind-Runtime herein.
