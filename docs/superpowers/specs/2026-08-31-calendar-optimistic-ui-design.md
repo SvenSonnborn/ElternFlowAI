@@ -47,8 +47,8 @@ Der Nutzer legt einen Termin an oder ändert einen: Das Sheet schließt sofort, 
         └───────────────┬──────────────────┘
                         │ nach expandEvents auflegen
                         ▼
-   fetchEventsInRange ──▶ expandEvents ──▶ withOptimistic ──▶ withoutPendingDeletes ──▶ data
-                                              (patchen)          (löschen gewinnt)
+   fetchEventsInRange ──▶ expandEvents ──▶ withoutPendingDeletes ──▶ withOptimistic ──▶ data
+                                           (löschen gewinnt)         (patchen)
 ```
 
 ### 2.1 Der Store — `features/calendar/optimisticEvents.ts`
