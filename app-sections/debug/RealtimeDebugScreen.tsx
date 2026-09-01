@@ -2,7 +2,7 @@
    unter `__DEV__` verlinkt und nie ausgeliefert. Die i18n-Kataloge tragen die
    Designer-Copy aus docs/COPY.md; ein Debug-Screen gehört dort nicht hinein
    (ADR-028, Decision 8). */
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 
@@ -38,11 +38,27 @@ interface LoggedChange extends CalendarChange {
 }
 
 /**
+ * Sperrt den Screen außerhalb von Entwicklungs-Builds.
+ *
+ * Der Guard sitzt hier und **nicht** am `<Stack.Screen>` in `app/_layout.tsx`:
+ * Expo Router registriert Routen aus dem Dateisystem, die Deklaration im Layout
+ * setzt nur Optionen. Ohne diesen Guard wäre `/debug/realtime` im Release-Build
+ * per Deep-Link (`elternflow://debug/realtime`) und im Web-Bundle per URL
+ * erreichbar — ein Screen ohne Design-Review, mit Entwickler-Copy und ohne
+ * i18n. Eigene Komponente statt eines frühen `return` im Screen selbst, damit
+ * die Hooks unterhalb unbedingt laufen (Rules of Hooks).
+ */
+export function RealtimeDebugScreen() {
+  if (!__DEV__) return <Redirect href="/" />;
+  return <RealtimeDebugContent />;
+}
+
+/**
  * Fenster in den Realtime-Strom, das die Übertragungsstrecke sichtbar macht,
  * bevor Issue #51 sie an `useFamilyEvents` hängt. Bewusst roh: Zeitstempel,
  * Tabelle, Typ, Ids — keine Aufbereitung, die einen Fehler verstecken könnte.
  */
-export function RealtimeDebugScreen() {
+function RealtimeDebugContent() {
   const { theme } = useTheme();
   const parentQuery = useCurrentParent();
   const familyId = parentQuery.data?.family_id ?? null;
@@ -126,7 +142,9 @@ export function RealtimeDebugScreen() {
               }`}
             >
               <Text variant="numeric" tone="inkTertiary">
-                {new Date(change.receivedAt).toLocaleTimeString("de-DE")}
+                {/* Ohne Locale-Argument: folgt dem Gerät, statt eine
+                    Sprache zu behaupten, die der Screen sonst nirgends kennt. */}
+                {new Date(change.receivedAt).toLocaleTimeString()}
               </Text>
               <View className="flex-1">
                 <Text variant="listTitle">{`${change.table} · ${change.type}`}</Text>
