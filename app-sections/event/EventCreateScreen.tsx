@@ -1,7 +1,7 @@
 import { addMinutes, format, parseISO, set } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, Switch, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -41,6 +41,7 @@ import {
 
 import { RecurrenceCountField } from "./RecurrenceCountField";
 import { RecurrenceRadio } from "./RecurrenceRadio";
+import { createSubmitLock } from "./submitLock";
 
 function rangesOverlap(a1: Date, a2: Date, b1: Date, b2: Date): boolean {
   return a1.getTime() < b2.getTime() && b1.getTime() < a2.getTime();
@@ -66,6 +67,11 @@ export function EventCreateScreen() {
   const eventTypes = useEventTypes();
   const { show } = useToast();
   const createMutation = useCreateEvent();
+  // Siehe `submitLock.ts`: sperrt einen zweiten Tap auf „Speichern" während
+  // der Schließanimation nach `router.back()`, in der der Button noch
+  // bedienbar bleibt. `useRef` statt `useState`, damit die Sperre synchron
+  // beim ersten Tap greift statt erst mit dem nächsten Render.
+  const submitLock = useRef(createSubmitLock()).current;
 
   const [title, setTitle] = useState("");
   const [range, setRange] = useState<DateRange>(() => initialRange(paramDate));
@@ -145,8 +151,22 @@ export function EventCreateScreen() {
     });
   }
 
+  // Kein Verlauf bei einem Kaltstart-Deep-Link direkt auf `/event/new` —
+  // `router.back()` allein täte dann nichts und das Sheet bliebe hängen.
+  // Dasselbe Muster wie `goBackOrToTasks` in `TaskEditScreen.tsx`, mit dem
+  // Kalender-Tab statt dem Aufgaben-Tab als Ziel.
+  function goBackOrToKalender() {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)/kalender");
+  }
+
   function onSave() {
     if (!canSave || !familyId || !typeId || parsedCount === "invalid") return;
+    // `createMutation.isPending` kommt hier zu spät (siehe `submitLock.ts`):
+    // Ein zweiter Tap während der Schließanimation hat real einen zweiten,
+    // identischen Termin angelegt. `tryLock()` prüft synchron, ob bereits ein
+    // Speichern läuft, und bricht in diesem Fall folgenlos ab.
+    if (!submitLock.tryLock()) return;
     const final = allDay ? toAllDayRange(range) : range;
     const childId = member?.kind === "child" ? member.id : null;
     const parentId = member?.kind === "parent" ? member.id : null;
@@ -166,7 +186,7 @@ export function EventCreateScreen() {
       createdBy: parent.data?.id ?? null,
     };
     // Sofort schließen: Der Termin steht dank `onMutate` schon im Kalender.
-    router.back();
+    goBackOrToKalender();
     void save(vars);
   }
 
@@ -229,7 +249,7 @@ export function EventCreateScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("action.cancel")}
-            onPress={() => router.back()}
+            onPress={goBackOrToKalender}
             className="px-2 py-1 active:opacity-70"
             hitSlop={12}
           >

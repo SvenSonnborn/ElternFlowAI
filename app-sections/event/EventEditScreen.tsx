@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -31,6 +31,7 @@ import {
 import { RecurrenceCountField } from "./RecurrenceCountField";
 import { RecurrenceRadio } from "./RecurrenceRadio";
 import { pickScope } from "./scopeDialog";
+import { createSubmitLock } from "./submitLock";
 
 export function EventEditScreen() {
   const { id, occ } = useLocalSearchParams<{ id?: string; occ?: string }>();
@@ -42,6 +43,11 @@ export function EventEditScreen() {
   const { data: occurrence, isLoading } = useEvent(id ?? "", occ);
   const { show } = useToast();
   const updateMutation = useUpdateEvent();
+  // Siehe `submitLock.ts`: sperrt einen zweiten Tap auf „Speichern" während
+  // der Schließanimation nach `router.back()`, in der der Button noch
+  // bedienbar bleibt. `useRef` statt `useState`, damit die Sperre synchron
+  // beim ersten Tap greift statt erst mit dem nächsten Render.
+  const submitLock = useRef(createSubmitLock()).current;
 
   const initial = useMemo(() => {
     if (!occurrence) return null;
@@ -166,8 +172,23 @@ export function EventEditScreen() {
     });
   }
 
+  // Kein Verlauf bei einem Kaltstart-Deep-Link direkt auf `/event/edit/[id]` —
+  // `router.back()` allein täte dann nichts und das Sheet bliebe hängen.
+  // Dasselbe Muster wie `goBackOrToTasks` in `TaskEditScreen.tsx`, mit dem
+  // Kalender-Tab statt dem Aufgaben-Tab als Ziel.
+  function goBackOrToKalender() {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)/kalender");
+  }
+
   async function onSave() {
     if (!occurrence || !canSave) return;
+    // `updateMutation.isPending` kommt hier zu spät (siehe `submitLock.ts`):
+    // Ein zweiter Tap während der Schließanimation hat real einen zweiten,
+    // identischen Termin angelegt (dort beim Anlegen — hier dasselbe Loch
+    // beim Bearbeiten). `tryLock()` prüft synchron, ob bereits ein Speichern
+    // läuft, und bricht in diesem Fall folgenlos ab.
+    if (!submitLock.tryLock()) return;
     const isRecurring = occurrence.isRecurring;
     const recurrenceChanges = buildRecurrenceChanges();
     let scope: EditScope = "all";
@@ -182,7 +203,14 @@ export function EventEditScreen() {
         cancel: t("action.cancel"),
       };
       const chosen = await pickScope(labels);
-      if (!chosen) return;
+      if (!chosen) {
+        // Abbruch **vor** dem eigentlichen Speichern: anders als beim
+        // Fehler-Retry im Toast (der das Sheet nie wieder erreicht) kann der
+        // Nutzer hier sofort erneut auf „Speichern" tippen, die Sperre muss
+        // also wieder frei sein.
+        submitLock.unlock();
+        return;
+      }
       scope = chosen;
     }
     // Re-snap rather than trust the state: the date pickers can move an all-day
@@ -203,7 +231,7 @@ export function EventEditScreen() {
       recurrence: recurrenceChanges,
     };
     // Sofort schließen: Die Änderung steht dank `onMutate` schon im Kalender.
-    router.back();
+    goBackOrToKalender();
     void save(vars);
   }
 
@@ -234,7 +262,7 @@ export function EventEditScreen() {
             {t("cal.edit.title")}
           </Text>
           <View className="mt-4">
-            <Button label={t("cal.detail.close")} variant="soft" onPress={() => router.back()} />
+            <Button label={t("cal.detail.close")} variant="soft" onPress={goBackOrToKalender} />
           </View>
         </View>
       ) : (
@@ -254,7 +282,7 @@ export function EventEditScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t("action.cancel")}
-                onPress={() => router.back()}
+                onPress={goBackOrToKalender}
                 className="px-2 py-1 active:opacity-70"
                 hitSlop={12}
               >
