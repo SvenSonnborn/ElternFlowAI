@@ -104,14 +104,17 @@ export function useDeleteEvent() {
  * der Refetch ihn ersetzt — dieselbe Lehre, die `useDeleteEvent` in ADR-026
  * gezogen hat. Warum der Fehlerfall nicht invalidiert, steht am `if` selbst.
  *
- * **Zwei Grenzen.** `all`/`forward` **mit geändertem Datum** bekommt gar keinen
- * Eintrag, weil das Overlay dort die Nicht-Änderung zeigte — die Begründung
- * steht bei `canApplyOptimistically`. Und `vars.recurrence` (eine Änderung der
- * Wiederholungsregel) wird nicht optimistisch abgebildet: Ändert der Nutzer den
- * Rhythmus einer Serie, verschieben sich die Occurrence-Termine selbst, das
- * vorherzusagen hieße, die RRULE-Expansion für eine ungespeicherte Regel zu
- * fahren. Dieser Fall bekommt weiterhin einen Eintrag — er patcht die Felder,
- * lässt die Termine aber stehen; der Refetch bringt sie eine Sekunde später.
+ * **Zwei Grenzen, dieselbe Konsequenz.** `all`/`forward` **mit geändertem
+ * Datum** bekommt gar keinen Eintrag, weil das Overlay dort die Nicht-Änderung
+ * zeigte — die Begründung steht bei `canApplyOptimistically`. Und eine
+ * mitgeschickte `vars.recurrence` (eine Änderung der Wiederholungsregel)
+ * bekommt seit derselben Prüfung ebenfalls **gar keinen** Eintrag: Ändert der
+ * Nutzer den Rhythmus einer Serie, ändert sich der gesamte Occurrence-Satz,
+ * das vorherzusagen hieße, die RRULE-Expansion für eine ungespeicherte Regel
+ * zu fahren. Ein Eintrag zeigte dann die alten Occurrence-Termine mit den
+ * neuen Feldern — derselbe Fehler wie bei der Datumsänderung, nur an der Regel
+ * statt am Datum. Der Refetch bringt eine Sekunde später die korrekten
+ * Termine.
  */
 export function useUpdateEvent() {
   const qc = useQueryClient();

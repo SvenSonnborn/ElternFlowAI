@@ -3,7 +3,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { lightTheme } from "@/design-system";
 
 import type { EventWithRelations } from "./expand";
-import type { EventChanges } from "./recurrence";
+import type { EventChanges, RecurrenceChanges } from "./recurrence";
 import type { CalendarOccurrence } from "./types";
 
 import { expandEvents } from "./expand";
@@ -51,6 +51,17 @@ function changes(partial: Partial<EventChanges> = {}): EventChanges {
     end_at: new Date("2026-09-10T19:30:00").toISOString(),
     location: "Sportplatz",
     description: "Trikot einpacken",
+    ...partial,
+  };
+}
+
+function recurrenceChanges(partial: Partial<RecurrenceChanges> = {}): RecurrenceChanges {
+  return {
+    rrule_freq: "weekly",
+    rrule_interval: 2,
+    rrule_byweekday: [3],
+    rrule_count: null,
+    rrule_until: null,
     ...partial,
   };
 }
@@ -497,6 +508,36 @@ describe("canApplyOptimistically", () => {
     expect(canApplyOptimistically({ ...base, scope: "this", changes: moved })).toBe(true);
     expect(
       canApplyOptimistically({ ...base, isRecurring: false, scope: "all", changes: moved }),
+    ).toBe(true);
+  });
+
+  test("eine mitgeschickte Regeländerung bekommt keinen Eintrag", () => {
+    // Der Server schreibt eine neue RRULE — welche Occurrences danach
+    // existieren, kann das Overlay nicht vorhersagen. Selbst wenn `changes`
+    // sonst harmlos ist (reine Uhrzeit, gleiches Datum), muss `recurrence`
+    // allein schon blocken.
+    const retimed = changes({
+      start_at: new Date("2026-10-05T20:00:00").toISOString(),
+      end_at: new Date("2026-10-05T21:30:00").toISOString(),
+    });
+    expect(
+      canApplyOptimistically({
+        ...base,
+        scope: "all",
+        changes: retimed,
+        recurrence: recurrenceChanges(),
+      }),
+    ).toBe(false);
+  });
+
+  test("fehlendes oder `null` `recurrence` blockt nicht", () => {
+    const retimed = changes({
+      start_at: new Date("2026-10-05T20:00:00").toISOString(),
+      end_at: new Date("2026-10-05T21:30:00").toISOString(),
+    });
+    expect(canApplyOptimistically({ ...base, scope: "all", changes: retimed })).toBe(true);
+    expect(
+      canApplyOptimistically({ ...base, scope: "all", changes: retimed, recurrence: null }),
     ).toBe(true);
   });
 });
