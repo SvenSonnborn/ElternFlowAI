@@ -257,6 +257,20 @@ export function SettingsScreen() {
             soon
           />
           <Row icon="mail" label={t("set.help")} soon />
+          {__DEV__ ? (
+            // Dev-Werkzeug für die Realtime-Reihe (Issues #50/#51/#52) — im
+            // Release-Build nicht gerendert, deshalb bewusst ohne i18n-Key.
+            <Row
+              icon="alert-triangle"
+              label="Realtime-Debug"
+              onPress={() => {
+                // Erst das Formsheet schließen, dann pushen — sonst hinge der
+                // Screen dahinter. Gleiches Muster wie die Zeile oben.
+                if (router.canGoBack()) router.back();
+                router.push("/debug/realtime");
+              }}
+            />
+          ) : null}
           <Row
             icon="lock"
             label={t("set.logout")}

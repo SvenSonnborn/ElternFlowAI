@@ -112,6 +112,10 @@ function ThemedStack() {
               contentStyle: { flex: 1, backgroundColor: theme.bg },
             }}
           />
+          <Stack.Screen
+            name="debug/realtime"
+            options={{ presentation: "card", headerShown: false }}
+          />
           <Stack.Screen name="+not-found" options={{ presentation: "modal" }} />
         </Stack>
       </ToastProvider>
