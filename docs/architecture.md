@@ -60,6 +60,17 @@ current theme.
 - **TanStack Query** — server state (Supabase reads, Edamam reads, etc.). Will
   be wired once Supabase is added.
 
+## Realtime
+
+`events` und `event_exceptions` liegen in der Postgres-Publikation
+`supabase_realtime`. [features/calendar/realtime.ts](../features/calendar/realtime.ts)
+öffnet daraus **einen** Kanal pro Familie (`calendar:<familyId>`) mit zwei
+`postgres_changes`-Bindings und normalisiert eingehende Payloads zu einem
+`CalendarChange`. RLS filtert pro Abonnent — außer bei DELETE, wo Postgres eine
+gelöschte Zeile nicht mehr prüfen kann; solche Ereignisse tragen nur die Row-Id.
+Konsument ist bislang allein der Dev-Screen `/debug/realtime`; der Kalender
+selbst abonniert noch nicht (siehe [decision-log.md](./decision-log.md), ADR-028).
+
 ## What's not here yet
 
 See [decision-log.md](./decision-log.md) for the full out-of-scope list. The
