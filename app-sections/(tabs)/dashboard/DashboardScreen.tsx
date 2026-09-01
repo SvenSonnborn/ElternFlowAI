@@ -220,6 +220,10 @@ export function DashboardScreen() {
             const isSpan = seg.total > 1;
             const timeLabel = segmentTimeLabel(seg, t);
             const typeLabel = lang === "de" ? occ.type.labelDe : occ.type.labelEn;
+            // Siehe `isOptimisticEventId`: Die synthetische Id eines noch nicht
+            // gespeicherten Termins führte im Detail-Screen in einen rohen
+            // `22P02`-Datenbankfehler. Derselbe Guard steht in `KalenderScreen`.
+            const isOptimistic = isOptimisticEventId(occ.eventId);
             return (
               <EventRow
                 key={`${occ.eventId}-${occ.occurrenceDate}-${seg.date}`}
@@ -230,6 +234,7 @@ export function DashboardScreen() {
                 iconName={occ.type.iconName}
                 tone={occ.type.color}
                 isFirst={i === 0}
+                disabled={isOptimistic}
                 accessibilityLabel={
                   isSpan
                     ? t("cal.a11y.eventSpan", {
@@ -240,11 +245,7 @@ export function DashboardScreen() {
                     : t("cal.a11y.event", { title: occ.title, time: timeLabel })
                 }
                 onPress={() => {
-                  // Siehe `isOptimisticEventId`: Die synthetische Id eines noch
-                  // nicht gespeicherten Termins führte im Detail-Screen in einen
-                  // rohen `22P02`-Datenbankfehler. Derselbe Guard steht in
-                  // `KalenderScreen`.
-                  if (isOptimisticEventId(occ.eventId)) return;
+                  if (isOptimistic) return;
                   router.push({
                     pathname: "/event/[id]",
                     params: { id: occ.eventId, occ: occ.occurrenceDate },
@@ -300,35 +301,39 @@ export function DashboardScreen() {
       ) : (
         <Card>
           <View className="gap-1">
-            {prep.visible.map((entry) => (
-              <PrepRow
-                key={entry.key}
-                title={entry.title}
-                meta={entry.meta}
-                iconName={entry.iconName}
-                color={entry.color}
-                accessibilityLabel={t(
-                  entry.kind === "task" ? "dash.a11y.prepTask" : "dash.a11y.prepEvent",
-                  { title: entry.title },
-                )}
-                onPress={() => {
-                  if (entry.kind === "task") {
-                    router.push({ pathname: "/task/edit/[id]", params: { id: entry.id } });
-                    return;
-                  }
-                  // Siehe `isOptimisticEventId`: Die synthetische Id eines noch
-                  // nicht gespeicherten Termins führte im Detail-Screen in einen
-                  // rohen `22P02`-Datenbankfehler. Derselbe Guard steht in der
-                  // Terminliste weiter oben in diesem Screen und in
-                  // `KalenderScreen`.
-                  if (isOptimisticEventId(entry.id)) return;
-                  router.push({
-                    pathname: "/event/[id]",
-                    params: { id: entry.id, occ: entry.occurrenceDate },
-                  });
-                }}
-              />
-            ))}
+            {prep.visible.map((entry) => {
+              // Siehe `isOptimisticEventId`: Die synthetische Id eines noch
+              // nicht gespeicherten Termins führte im Detail-Screen in einen
+              // rohen `22P02`-Datenbankfehler. Derselbe Guard steht in der
+              // Terminliste weiter oben in diesem Screen und in
+              // `KalenderScreen`. Aufgaben haben nie eine synthetische Id.
+              const isOptimistic = entry.kind === "event" && isOptimisticEventId(entry.id);
+              return (
+                <PrepRow
+                  key={entry.key}
+                  title={entry.title}
+                  meta={entry.meta}
+                  iconName={entry.iconName}
+                  color={entry.color}
+                  disabled={isOptimistic}
+                  accessibilityLabel={t(
+                    entry.kind === "task" ? "dash.a11y.prepTask" : "dash.a11y.prepEvent",
+                    { title: entry.title },
+                  )}
+                  onPress={() => {
+                    if (entry.kind === "task") {
+                      router.push({ pathname: "/task/edit/[id]", params: { id: entry.id } });
+                      return;
+                    }
+                    if (isOptimistic) return;
+                    router.push({
+                      pathname: "/event/[id]",
+                      params: { id: entry.id, occ: entry.occurrenceDate },
+                    });
+                  }}
+                />
+              );
+            })}
             {overflowTarget ? (
               <Pressable
                 onPress={() => router.push(overflowTarget)}

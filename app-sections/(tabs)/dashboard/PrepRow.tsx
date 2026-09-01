@@ -15,6 +15,14 @@ interface PrepRowProps {
   color: string;
   accessibilityLabel: string;
   onPress: () => void;
+  /**
+   * Meldet die Zeile assistiver Technik als deaktiviert, ohne sie optisch zu
+   * verändern — für eine optimistisch angezeigte Termin-Occurrence, deren
+   * synthetische Id noch keine Navigation trägt (siehe `isOptimisticEventId`
+   * in `features/calendar`). Kein Ausgrauen: Decision 6 der Optimistic-UI-Spec
+   * verlangt, dass die Zeile echt aussieht, bis der Refetch etwas anderes sagt.
+   */
+  disabled?: boolean;
 }
 
 /**
@@ -32,12 +40,15 @@ export function PrepRow({
   color,
   accessibilityLabel,
   onPress,
+  disabled,
 }: PrepRowProps) {
   const { theme } = useTheme();
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       accessibilityRole="button"
+      accessibilityState={disabled ? { disabled: true } : undefined}
       accessibilityLabel={accessibilityLabel}
       // `min-h-11` statt hitSlop: die Zeilen stehen dicht übereinander, ein
       // hitSlop ragte in den Nachbarn. Kachel (28) + Meta-Zeile bleiben
