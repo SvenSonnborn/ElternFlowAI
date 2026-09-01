@@ -65,8 +65,18 @@ export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
   const optimistic = useOptimisticEvents();
 
   const data = useMemo(() => {
-    if (!query.data) return NO_OCCURRENCES;
-    const expanded = expandEvents(query.data, rangeStart, rangeEnd, theme);
+    // Fehlende Serverdaten sind eine leere Expansion, kein Abbruch: Ein früher
+    // `return NO_OCCURRENCES` überspränge auch das optimistische Overlay —
+    // legt der Nutzer einen Termin an und wischt sofort in einen Monat ohne
+    // eigenen Query-Cache-Eintrag (neue Range-Query, Kaltstart), wäre der
+    // gerade angelegte Termin bis zum Fetch unsichtbar. `NO_OCCURRENCES` statt
+    // `[]`, damit die Referenz stabil bleibt, solange weder Serverdaten noch
+    // ein optimistischer Eintrag vorliegen — `withoutPendingDeletes` und
+    // `withOptimistic` geben ihre Eingabe unverändert zurück, solange ihre
+    // jeweilige Liste leer ist.
+    const expanded = query.data
+      ? expandEvents(query.data, rangeStart, rangeEnd, theme)
+      : NO_OCCURRENCES;
     // Siehe `visibleOccurrences`: Reihenfolge Filter → Patch.
     return visibleOccurrences({
       expanded,
