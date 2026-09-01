@@ -134,9 +134,12 @@ onSettled: async (_data, _err, _vars, id) => {
 
 Die Reihenfolge ist keine Kosmetik: Wird der Eintrag vor dem Refetch entfernt, blitzt der alte Stand für einen Frame durch — dieselbe Lehre, die `useDeleteEvent` in [ADR-026](../../decision-log.md) gezogen hat.
 
-`useCreateEvent` ruft dafür selbst `useEventTypes()` und schlägt `vars.typeId` nach. Es baut daraus eine
-**synthetische `EventWithRelations`-Zeile** — dieselbe Form, die `fetchEventsInRange` liefert —, und `withOptimistic`
-schickt sie durch **dasselbe `expandEvents`**, das auch die echten Zeilen expandiert.
+`useCreateEvent` schlägt `vars.typeId` dafür in `qc.getQueryData<EventTypeRow[]>(calendarKeys.types)` nach, nicht über
+`useEventTypes()` — `./hooks` zieht über `useTheme` das nativewind-Runtime herein, das sich unter `bun test` nicht
+laden lässt ([ADR-027](../../decision-log.md)). Der Anlegen-Screen ruft `useEventTypes()` ohnehin, der Cache-Eintrag
+ist beim Absenden also warm. Es baut daraus eine **synthetische `EventWithRelations`-Zeile** — dieselbe Form, die
+`fetchEventsInRange` liefert —, und `withOptimistic` schickt sie durch **dasselbe `expandEvents`**, das auch die
+echten Zeilen expandiert.
 
 Das ist der Unterschied zwischen Wiederverwendung und Nachbildung: Die Anzeige-Logik wird nicht ein zweites Mal
 geschrieben, sondern ein zweites Mal _aufgerufen_. Ein neu angelegter **Serientermin** erscheint dadurch mit allen
