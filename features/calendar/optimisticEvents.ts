@@ -3,7 +3,7 @@ import { create } from "zustand";
 
 import type { EventWithRelations } from "./expand";
 import type { PendingEventDelete } from "./pendingDeletes";
-import type { EditScope, EventChanges } from "./recurrence";
+import type { EditScope, EventChanges, RecurrenceChanges } from "./recurrence";
 import type { CalendarOccurrence } from "./types";
 
 import { withoutPendingDeletes } from "./pendingDeletes";
@@ -62,8 +62,18 @@ export function patchesOccurrence(
  * Eigenschaft, die der Nutzer gerade geändert hat**: Er verschiebt den
  * Elternabend auf den 7., der Kalender zeigt alles unverändert, er hält das
  * Speichern für fehlgeschlagen, und eine Sekunde später springt die ganze
- * Serie. Lieber gar kein optimistischer Eintrag — dieselbe Enthaltsamkeit, die
- * `useUpdateEvent` bei `vars.recurrence` übt.
+ * Serie. Lieber gar kein optimistischer Eintrag.
+ *
+ * Derselbe Fehler droht bei einer **Regeländerung** (`recurrence`, z. B.
+ * wöchentlich → zweiwöchentlich): Der Server schreibt die neue RRULE, das
+ * Overlay kann aber nur Felder auf dem **bestehenden** Occurrence-Satz patchen
+ * — welche Termine nach der neuen Regel überhaupt existieren, wüsste nur eine
+ * clientseitige RRULE-Expansion für eine noch ungespeicherte Regel. Bleibt der
+ * alte Satz stehen, zeigt der Kalender bis zum Refetch die **alten**
+ * Occurrence-Termine mit den **neuen** Feldern — der Nutzer ändert den
+ * Rhythmus, sieht aber weiterhin die alten Termine. Nur eine tatsächlich
+ * mitgeschickte Regeländerung blockt: `recurrence` ist optional und `null`
+ * bedeutet „Regel unverändert", beides muss weiterhin durchgehen.
  *
  * Eine eigene reine Funktion statt einer Bedingung im Hook, damit die
  * Fallunterscheidung ohne React testbar ist.
@@ -77,7 +87,11 @@ export function canApplyOptimistically(args: {
   isRecurring: boolean;
   occurrenceDate: string;
   changes: EventChanges;
+  recurrence?: RecurrenceChanges | null;
 }): boolean {
+  // Eine mitgeschickte Regeländerung redefiniert die Serie unabhängig vom
+  // Scope — siehe Docstring oben.
+  if (args.recurrence) return false;
   // Einzeltermin und `this` auf einer Serie schreiben Literalzeiten — dort
   // verschiebt eine Datumsänderung den Termin tatsächlich, und das Overlay
   // bildet sie korrekt ab.
