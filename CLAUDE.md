@@ -19,7 +19,7 @@ User-facing app name (`app.json`, i18n `app.name`) is just **"Eltern Flow"** —
 
 2. **Build screens from `patterns/<screen>.md`.** Every screen in `app-sections/` corresponds to a pattern doc. Read it first. Anatomy, variants, states, accessibility, and voice entry points are spec'd there.
 
-3. **All UI strings live in i18n catalogs.** Use the keys in `docs/COPY.md` — `nav.*`, `dash.*`, `voice.*`, `auth.*`, `onb.*`, `cal.*`, `meals.*`, `hw.*`, `child.*`, `set.*`. German in `de.json` is the canonical copy; English mirrors.
+3. **All UI strings live in i18n catalogs.** Use the keys in `docs/COPY.md` — `nav.*`, `dash.*`, `voice.*`, `auth.*`, `onb.*`, `cal.*`, `meals.*`, `hw.*`, `child.*`, `set.*`, `sync.*`. German in `de.json` is the canonical copy; English mirrors.
 
    `sample.*` is the one namespace that deliberately does **not** appear in `docs/COPY.md`: it holds QA fixture copy (sample family, sample event titles), which the deck keeps in two explicitly German-only sections rather than as a DE/EN pair. Fixtures read it through an injected `Translate` ([features/shared/translate.ts](features/shared/translate.ts)), never through i18next's module-level `t` — that global returns `undefined`, not the key and not `defaultValue`, until `i18n.init()` has run. See [ADR-020](docs/decision-log.md).
 
@@ -68,7 +68,7 @@ The **JDK 17 pin is what makes the Android build work**: the Gradle wrapper (9.3
 - **react-i18next + expo-localization** — DE default, EN switch
 - **react-native-reanimated v4 + react-native-worklets** — last babel plugin must be `react-native-worklets/plugin`
 - **ESLint 9 (flat config)** + Prettier + jest-expo
-- **Supabase JS Client** (`@supabase/supabase-js` + AsyncStorage session) via [features/supabase/](features/supabase/). MCP via den von Supabase gehosteten HTTP-Server (`mcp.supabase.com`, project-scoped) — Konfig in `.mcp.json`, Auth per **Personal Access Token** statt OAuth (ADR-009, seit [ADR-029](docs/decision-log.md) tatsächlich in `.mcp.json` umgesetzt — der Header fehlte bis dahin in jedem Commit): `.mcp.json` expandiert `${SUPABASE_ACCESS_TOKEN}` in den `Authorization`-Header, mise lädt die Variable aus dem gitignorierten `.env.local` (`[env] _.file`). **Ohne eigenen Token in `.env.local` bleibt der Server unverbunden** — der Header schaltet den OAuth-Fallback ab. App-ENV liegt im selben `.env.local` (siehe `.env.example`). Schema mit RLS-Policies in `supabase/migrations/`, TypeScript-Types in `features/supabase/database.types.ts` (generiert). Auth-Flow lebt seit ADR-005 (Email+Passwort, strict Confirm-Email, Reset-Password, 5-Step-Onboarding mit Share-Sheet-Invite, `features/auth/AuthGate`). **Realtime** ist seit [ADR-028](docs/decision-log.md) als Fundament da — `events` und `event_exceptions` liegen in der Publikation `supabase_realtime`, [features/calendar/realtime.ts](features/calendar/realtime.ts) hält einen Kanal pro Familie, und ein Dev-Screen unter `/debug/realtime` zeigt den Strom. Der Kalender abonniert ihn noch **nicht** (Issue #51). Edge Functions sind die nächste Iteration.
+- **Supabase JS Client** (`@supabase/supabase-js` + AsyncStorage session) via [features/supabase/](features/supabase/). MCP via den von Supabase gehosteten HTTP-Server (`mcp.supabase.com`, project-scoped) — Konfig in `.mcp.json`, Auth per **Personal Access Token** statt OAuth (ADR-009, seit [ADR-029](docs/decision-log.md) tatsächlich in `.mcp.json` umgesetzt — der Header fehlte bis dahin in jedem Commit): `.mcp.json` expandiert `${SUPABASE_ACCESS_TOKEN}` in den `Authorization`-Header, mise lädt die Variable aus dem gitignorierten `.env.local` (`[env] _.file`). **Ohne eigenen Token in `.env.local` bleibt der Server unverbunden** — der Header schaltet den OAuth-Fallback ab. App-ENV liegt im selben `.env.local` (siehe `.env.example`). Schema mit RLS-Policies in `supabase/migrations/`, TypeScript-Types in `features/supabase/database.types.ts` (generiert). Auth-Flow lebt seit ADR-005 (Email+Passwort, strict Confirm-Email, Reset-Password, 5-Step-Onboarding mit Share-Sheet-Invite, `features/auth/AuthGate`). **Realtime** liefert seit [ADR-030](docs/decision-log.md) echten Live-Sync für Termine (Issue #51 erledigt): Ein `after`-Trigger sendet Änderungen an `events` und `event_exceptions` per `realtime.broadcast_changes()` auf das private Topic `family:<familyId>` — **nicht** mehr über die Publikation `supabase_realtime` (ADR-028 ist in diesem Punkt abgelöst) —, autorisiert über eine RLS-Policy auf `realtime.messages`. Client-seitig hängt [features/realtime/](features/realtime/) als Sync-Schicht über den Features: ein Mountpunkt in `ThemedStack`, 300 ms Sammelfenster, gezielte Invalidierung; Kalender und Dashboard aktualisieren sich damit von selbst und zeigen nach zehn Sekunden ohne Kanal `<SyncNotice />`. Der Dev-Screen unter `/debug/realtime` liest denselben Strom mit. Edge Functions sind die nächste Iteration.
 
 Deferred to later iterations (not yet wired): Edge Functions, gustar.io Worker, Stripe, real STT + LLM, Expo Notifications.
 
@@ -110,7 +110,7 @@ app-sections/            Real screen implementations
 ├─ task/                 Anlegen/Bearbeiten von Aufgaben (Create · Edit · TaskForm)
 └─ shared/               Geteilte Bausteine inkl. Formular-Primitives
    (DateTimePickerSheet · TypePicker · MemberPicker · Field · confirmDialog
-   · Toast · useUndoableDelete · AllergenBadge · recipeA11y · mealPlaceholder
+   · Toast · useUndoableDelete · AllergenBadge · recipeA11y · mealPlaceholder · SyncNotice
    — von mehr als einem Tab benutzt)
 
 design-system/           Handoff bundle + theming runtime
@@ -129,7 +129,10 @@ features/                Cross-cutting feature logic
 ├─ i18n/                 react-i18next init + de.json + en.json
 ├─ auth/                 Session-Store · AuthGate · DeepLinkHandler · Onboarding-Mutations
 ├─ calendar/             Queries · Mutations · RRULE-Expansion · Reminder · Pending-Deletes · Optimistic-Overlay
-│                        · Realtime-Kanal (ein Topic pro Familie, ADR-028)
+│                        · realtimeKeys.ts (Änderung → Query-Keys, ADR-030)
+├─ realtime/             Sync-Schicht über den Features (ADR-030): Topic · Payload-Normalisierung
+│                        · Kanal (privat, ein Topic pro Familie) · Sammelfenster · Reconnect-Regeln
+│                        · Status-Store · dispatch (kennt die Feature-Mapper) · useFamilyRealtime
 ├─ tasks/                Queries · Mutations · Filter · Stats · Pending-Deletes
 ├─ children/             Kinderprofile
 ├─ meals/                Meal-Planner-Daten-Layer (Queries · JSONB-Normalisierung · Wochenlogik

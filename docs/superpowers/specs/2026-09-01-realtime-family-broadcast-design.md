@@ -98,6 +98,8 @@ Es gibt **keine** `insert`-Policy. Clients senden nicht auf diesen Kanal; alle N
 
 ### 3.3 Trigger
 
+> **Korrektur (2026-09-02, nach der Umsetzung).** Hier stand ursprünglich eine flach nach `TG_OP` verzweigte Fassung mit `case when TG_TABLE_NAME = 'events' then NEW.id else NEW.event_id end`, wie die Supabase-Doku sie nahelegt. Die ist in PL/pgSQL nicht lauffähig: Feldzugriffe auf `NEW`/`OLD` werden für die **gesamte** Expression gegen den tatsächlich gebundenen Record-Typ aufgelöst, unabhängig davon, welcher `when`-Zweig zur Laufzeit gälte — `events` hat keine Spalte `event_id`, `event_exceptions` keine `family_id`. Angewendet brach sie bei **jeder** Mutation mit `ERROR 42703: record "new" has no field "event_id"` ab, und weil der Trigger `after` läuft, scheiterte damit die Mutation selbst. Der Block unten ist deshalb durch die tatsächlich gebaute, nach Tabelle **und dann** nach `TG_OP` verschachtelte Fassung aus [20260902065203_realtime_family_broadcast.sql](../../../supabase/migrations/20260902065203_realtime_family_broadcast.sql) ersetzt — ein bekannt fehlerhafter Codeschnipsel in einem Designdokument ist eine Falle für den nächsten Leser. Begründung im Detail: [ADR-030](../../decision-log.md), Decision 4.
+
 ```sql
 create or replace function public.broadcast_family_change()
 returns trigger
@@ -109,25 +111,43 @@ declare
   fid uuid;
   eid uuid;
 begin
-  -- Bewusst KEIN `coalesce(NEW.x, OLD.x)`, obwohl die Supabase-Doku es so
-  -- zeigt: In einem Row-Trigger auf DELETE ist `NEW` nicht zugewiesen, und ein
-  -- Feldzugriff darauf kann mit „record \"new\" is not assigned yet" abbrechen —
+  -- Bewusst KEIN `coalesce(NEW.x, OLD.x)`, obwohl die Supabase-Doku es so zeigt:
+  -- In einem Row-Trigger auf DELETE ist `NEW` nicht zugewiesen, und ein
+  -- Feldzugriff darauf kann mit `record "new" is not assigned yet` abbrechen —
   -- ausgerechnet im Fall, für den dieser ganze Entwurf gebaut ist.
-  if TG_OP = 'DELETE' then
-    fid := case when TG_TABLE_NAME = 'events' then OLD.family_id end;
-    eid := case when TG_TABLE_NAME = 'events' then OLD.id else OLD.event_id end;
+  --
+  -- Ebenso bewusst KEIN `case when TG_TABLE_NAME = 'events' then NEW.family_id end`
+  -- in einer flachen Verzweigung nach TG_OP: PL/pgSQL löst Feldzugriffe auf
+  -- NEW/OLD für die gesamte Expression gegen den tatsächlich gebundenen
+  -- Record-Typ auf — unabhängig davon, welcher WHEN-Zweig zur Laufzeit
+  -- genommen würde. `events` hat keine Spalte `event_id`, `event_exceptions`
+  -- keine Spalte `family_id`; eine solche CASE-Expression wirft deshalb bei
+  -- jedem Aufruf mit "record ... has no field ...", ganz gleich welcher Zweig
+  -- inhaltlich gemeint war. Erst nach Tabelle, dann nach TG_OP verschachteln
+  -- stellt sicher, dass kein Ausdruck je ein Feld berührt, das der gebundene
+  -- Zeilentyp nicht hat.
+  if TG_TABLE_NAME = 'events' then
+    if TG_OP = 'DELETE' then
+      fid := OLD.family_id;
+      eid := OLD.id;
+    else
+      fid := NEW.family_id;
+      eid := NEW.id;
+    end if;
   else
-    fid := case when TG_TABLE_NAME = 'events' then NEW.family_id end;
-    eid := case when TG_TABLE_NAME = 'events' then NEW.id else NEW.event_id end;
-  end if;
-
-  if TG_TABLE_NAME <> 'events' then
+    -- `event_exceptions` trägt keine `family_id`; sie hängt am Event.
+    if TG_OP = 'DELETE' then
+      eid := OLD.event_id;
+    else
+      eid := NEW.event_id;
+    end if;
     select e.family_id into fid from public.events e where e.id = eid;
   end if;
 
   -- Kaskade: `on delete cascade` räumt die Exceptions NACH der Master-Zeile ab,
-  -- der Lookup läuft dann ins Leere. Das DELETE-Broadcast des Events deckt den
-  -- Fall bereits ab; ohne diesen Ausstieg entstünde das Topic `family:` ohne Id.
+  -- der Lookup läuft dann ins Leere. Das DELETE-Broadcast des Events selbst
+  -- deckt den Fall bereits ab; ohne diesen Ausstieg entstünde das Topic
+  -- `family:` ohne Id, das niemand abonniert.
   if fid is null then
     return null;
   end if;
@@ -138,17 +158,22 @@ begin
     TG_OP,                   -- operation
     TG_TABLE_NAME,           -- table
     TG_TABLE_SCHEMA,         -- schema
-    NEW,
-    OLD
+    NEW,                     -- new record
+    OLD                      -- old record
   );
   return null;
 end;
 $$;
 
+comment on function public.broadcast_family_change() is
+  'AFTER-Trigger für Realtime: sendet Zeilenänderungen auf das private Topic family:<family_id>. Eine Funktion für alle familiengebundenen Tabellen — Aufgaben und Essen anzuschließen heißt, den TG_TABLE_NAME-Zweig zu erweitern und einen Trigger zu setzen. Kosten: jede Mutation schreibt zusätzlich eine Zeile in realtime.messages (Supabase partitioniert tagesweise und löscht > 3 Tage selbst).';
+
+drop trigger if exists broadcast_events_changes on public.events;
 create trigger broadcast_events_changes
 after insert or update or delete on public.events
 for each row execute function public.broadcast_family_change();
 
+drop trigger if exists broadcast_event_exceptions_changes on public.event_exceptions;
 create trigger broadcast_event_exceptions_changes
 after insert or update or delete on public.event_exceptions
 for each row execute function public.broadcast_family_change();
