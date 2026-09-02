@@ -9,7 +9,7 @@
 
 ## 1. Context
 
-[ADR-028](../../decision-log.md) (Issue #50) hat das Fundament gelegt: `events` und `event_exceptions` liegen in der Publikation `supabase_realtime`, [features/calendar/realtime.ts](../../../features/calendar/realtime.ts) hält einen `postgres_changes`-Kanal pro Familie, ein Dev-Screen unter `/debug/realtime` zeigt den Strom. Der Kalender abonniert ihn nicht — das ist dieses Issue.
+[ADR-028](../../decision-log.md) (Issue #50) hat das Fundament gelegt: `events` und `event_exceptions` liegen in der Publikation `supabase_realtime`, [features/calendar/realtime.ts](../../decision-log.md#adr-028--realtime-für-den-kalender-ein-kanal-pro-familie-delete-bleibt-unzuordenbar-2026-09-01) hält einen `postgres_changes`-Kanal pro Familie, ein Dev-Screen unter `/debug/realtime` zeigt den Strom. Der Kalender abonniert ihn nicht — das ist dieses Issue.
 
 Der Auftrag nennt vier Zutaten: den Hook um `supabase.channel(...).on(...)` erweitern, bei INSERT/UPDATE/DELETE invalidieren, beim Unmount aufräumen, Race-Conditions abfangen. Vier seiner Annahmen tragen so nicht.
 
@@ -189,7 +189,7 @@ Weil der Trigger die **alte Zeile noch sieht**, trägt auch ein DELETE `family_i
 
 ## 4. Die Sync-Schicht — `features/realtime/`
 
-```
+```text
 features/realtime/
 ├─ topic.ts               familyTopic(familyId) → `family:<id>`
 ├─ normalize.ts           Broadcast-Payload → FamilyChange
@@ -204,7 +204,7 @@ features/realtime/
 
 `topic` · `normalize` · `subscribe` · `coalesce` · `reconnect` importieren **kein** Feature und bleiben damit unter `bun test` ladbar. Nur `dispatch.ts` kennt den Kalender.
 
-[features/calendar/realtime.ts](../../../features/calendar/realtime.ts) und sein Test entfallen; das Barrel `features/calendar/index.ts` verliert den Re-Export.
+[features/calendar/realtime.ts](../../decision-log.md#adr-028--realtime-für-den-kalender-ein-kanal-pro-familie-delete-bleibt-unzuordenbar-2026-09-01) und sein Test entfallen; das Barrel `features/calendar/index.ts` verliert den Re-Export.
 
 ### 4.1 Typen
 
