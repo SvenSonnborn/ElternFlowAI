@@ -14,6 +14,13 @@ describe("shouldRefetchAfterResubscribe", () => {
     expect(shouldRefetchAfterResubscribe("error", "subscribed")).toBe(true);
   });
 
+  test("subscribed → subscribed lädt nichts nach", () => {
+    // Kein Statuswechsel, kein Verlust dazwischen — derselbe Fall wie das
+    // erste Abonnieren, nur mit "subscribed" statt "idle"/"subscribing" als
+    // Vorzustand. War bislang nur empirisch am laufenden System geprüft.
+    expect(shouldRefetchAfterResubscribe("subscribed", "subscribed")).toBe(false);
+  });
+
   test("jeder Wechsel, der nicht auf subscribed endet, lädt nichts nach", () => {
     expect(shouldRefetchAfterResubscribe("subscribed", "closed")).toBe(false);
     expect(shouldRefetchAfterResubscribe("error", "timedOut")).toBe(false);
