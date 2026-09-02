@@ -18,8 +18,15 @@ type Handler = (message: unknown) => void;
  * Minimaler Doppelgänger des Supabase-Clients. Kein `mock.module`: Die
  * Kernfunktion nimmt den Client als Parameter, genau damit ein Test ihn
  * ersetzen kann.
+ *
+ * `staleChannel: true` legt einen Kanal mit demselben `subTopic` vor, den
+ * `client.getChannels()` schon findet, bevor `subscribeToFamilyChanges`
+ * überhaupt läuft — der Fall, den es beim erneuten Effekt-Lauf gegen den noch
+ * abmeldenden Vorgänger-Kanal abzusichern gilt (siehe Kommentar in
+ * `subscribe.ts`). Ohne die Option ist `getChannels()` leer, der reguläre
+ * Fall ohne Altkanal.
  */
-function fakeClient() {
+function fakeClient({ staleChannel = false }: { staleChannel?: boolean } = {}) {
   const handlers = new Map<string, Handler>();
   const calls = {
     setAuth: 0,
@@ -29,11 +36,14 @@ function fakeClient() {
     subscribeCallbacks: [] as ((state: string) => void)[],
     // Aufruf-Protokoll für die Reihenfolge-Assertion: Zählwerte und
     // Endzustände allein belegen nicht, dass `setAuth()` vor `channel()`
-    // lief — nur die Sequenz tut das.
+    // lief — nur die Sequenz tut das. `getChannels()` selbst taucht hier
+    // bewusst nicht auf: Es ist ein passives Nachschlagen, kein Schritt in
+    // der Sequenz, die diese Tests belegen sollen.
     order: [] as string[],
   };
 
   const channel = {
+    subTopic: familyTopic(FAMILY_ID),
     on(_type: "broadcast", filter: { event: string }, handler: Handler) {
       handlers.set(filter.event, handler);
       return channel;
@@ -44,6 +54,9 @@ function fakeClient() {
     },
   };
 
+  const stale = { subTopic: familyTopic(FAMILY_ID) };
+  let channels: { subTopic: string }[] = staleChannel ? [stale] : [];
+
   const client = {
     realtime: {
       setAuth: () => {
@@ -52,14 +65,18 @@ function fakeClient() {
         return Promise.resolve();
       },
     },
+    getChannels: () => channels,
     channel(topic: string, config?: unknown) {
       calls.topic = topic;
       calls.config = config;
       calls.order.push("channel");
+      channels = [channel];
       return channel;
     },
-    removeChannel: () => {
+    removeChannel: (removedChannel: { subTopic: string }) => {
       calls.removed += 1;
+      calls.order.push("removeChannel");
+      channels = channels.filter((c) => c !== removedChannel);
       return Promise.resolve("ok");
     },
   };
@@ -144,5 +161,26 @@ describe("subscribeToFamilyChanges", () => {
     expect(calls.removed).toBe(0);
     unsubscribe();
     expect(calls.removed).toBe(1);
+  });
+});
+
+describe("subscribeToFamilyChanges — Altkanal desselben Topics", () => {
+  // `client.channel(topic)` dedupliziert selbst nach Topic (siehe Kommentar in
+  // `subscribe.ts`): Läuft dieser Effekt neu, während der vorige Kanal noch im
+  // Zustand "leaving" ist, gäbe `client.channel(topic)` ohne diese Absicherung
+  // denselben, absterbenden Kanal zurück — `subscribe()` wäre darauf ein
+  // stiller No-Op. Die Aufrufsequenz, nicht nur ein Zählwert, belegt, dass der
+  // Altkanal vor dem neuen `channel()`-Aufruf entfernt **und** dessen Leave-Ack
+  // abgewartet wird.
+  test("mit Altkanal: entfernt ihn zuerst und wartet das Leave-Ack ab", async () => {
+    const { client, calls } = fakeClient({ staleChannel: true });
+    await subscribeToFamilyChanges({ client, familyId: FAMILY_ID, onChange: () => {} });
+    expect(calls.order).toEqual(["setAuth", "removeChannel", "channel"]);
+  });
+
+  test("ohne Altkanal: kein removeChannel-Aufruf vor dem neuen Kanal", async () => {
+    const { client, calls } = fakeClient({ staleChannel: false });
+    await subscribeToFamilyChanges({ client, familyId: FAMILY_ID, onChange: () => {} });
+    expect(calls.order).toEqual(["setAuth", "channel"]);
   });
 });
