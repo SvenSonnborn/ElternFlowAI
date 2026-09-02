@@ -60,7 +60,7 @@ Die Sync-Schicht sitzt **über** den Features, nicht neben ihnen: `features/real
 
 ## 3. Die Migration
 
-`supabase/migrations/20260901120000_realtime_family_broadcast.sql` — idempotent, drei Teile.
+`supabase/migrations/20260902065203_realtime_family_broadcast.sql` — idempotent, drei Teile.
 
 ### 3.1 Rücknahme der Publikation
 
