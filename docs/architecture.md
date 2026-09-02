@@ -28,6 +28,13 @@ In order, outermost to innermost:
 4. `ThemeProvider` (reads `themeStore`, exposes tokens + injects CSS vars)
 5. `Stack` (Expo Router)
 
+Innerhalb von `ThemedStack` — also zwischen `Stack` und den Providern darüber —
+laufen zusätzlich drei Hooks ohne eigenes Provider-Element: `useInitSession()`,
+`useFlushPendingDeletes()` und `useFamilyRealtime()`. Der Realtime-Hook steht
+dabei bewusst **vor** `<AuthGate>`: Der Gate rendert bei einem Redirect
+`<Redirect>` statt seiner Kinder, ein Abo darunter würde bei jedem
+Routenwechsel ab- und wieder aufgebaut (ADR-030).
+
 `features/i18n` is initialized as a side effect on module import.
 
 ## Theme system
@@ -62,14 +69,23 @@ current theme.
 
 ## Realtime
 
-`events` und `event_exceptions` liegen in der Postgres-Publikation
-`supabase_realtime`. [features/calendar/realtime.ts](../features/calendar/realtime.ts)
-öffnet daraus **einen** Kanal pro Familie (`calendar:<familyId>`) mit zwei
-`postgres_changes`-Bindings und normalisiert eingehende Payloads zu einem
-`CalendarChange`. RLS filtert pro Abonnent — außer bei DELETE, wo Postgres eine
-gelöschte Zeile nicht mehr prüfen kann; solche Ereignisse tragen nur die Row-Id.
-Konsument ist bislang allein der Dev-Screen `/debug/realtime`; der Kalender
-selbst abonniert noch nicht (siehe [decision-log.md](./decision-log.md), ADR-028).
+Änderungen an `events` und `event_exceptions` gehen **nicht** mehr über die
+Publikation `supabase_realtime`, sondern über _Broadcast from Database_: Ein
+`after`-Trigger ruft `realtime.broadcast_changes()` auf das private Topic
+`family:<familyId>`, autorisiert durch eine RLS-Policy auf `realtime.messages`
+gegen `current_family_id()`. Weil der Trigger die alte Zeile noch sieht, trägt
+auch ein DELETE seine `family_id` und `event_id` — und ein Client hört
+ausschließlich die eigene Familie (siehe [decision-log.md](./decision-log.md),
+ADR-030, löst ADR-028 teilweise ab).
+
+Client-seitig ist [features/realtime/](../features/realtime/) eine Sync-Schicht
+**über** den Features: `subscribe`/`normalize`/`coalesce`/`reconnect` kennen
+kein Feature, allein `dispatch.ts` bildet Änderungen auf Query-Keys ab.
+`useFamilyRealtime()` läuft **einmal** in `ThemedStack` — nicht in
+`useFamilyEvents`, der drei Aufrufer hat —, sammelt eingehende Änderungen 300 ms
+und invalidiert dann gebündelt. Nach einem Verbindungsverlust lädt es den
+Zustand nach (verpasste Broadcasts kommen nicht nach); hält der Verlust über
+zehn Sekunden an, zeigen Kalender und Dashboard `<SyncNotice />`.
 
 ## What's not here yet
 
@@ -79,4 +95,6 @@ Voice/LLM, no Expo Notifications, no Edge Functions.
 
 Supabase, the auth flow, onboarding and the settings screen have all landed
 since this list was written (ADR-003, ADR-005, ADR-008); Realtime is wired as
-far as the section above describes.
+far as the section above describes. Was dort noch fehlt, ist die
+Conflict-Detection: Zwei gleichzeitige Änderungen an derselben Zeile gewinnt
+weiterhin der letzte Schreiber (Issue #52).
