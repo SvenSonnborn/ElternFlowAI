@@ -5,7 +5,14 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, View } from "react-native";
 
-import { ChildAvatar, EventRow, Icon, SectionHeader, TopBar } from "@/app-sections/shared";
+import {
+  ChildAvatar,
+  EventRow,
+  Icon,
+  SectionHeader,
+  SyncNotice,
+  TopBar,
+} from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Card, Screen, Text } from "@/design-system/ui";
 import {
@@ -140,6 +147,7 @@ export function DashboardScreen() {
   return (
     <Screen scroll>
       <TopBar title={greeting} sub={subtitle} />
+      <SyncNotice />
 
       {/*
        * Jede Kachel ist echte 44x44 statt 32px + hitSlop: die Ziele liegen

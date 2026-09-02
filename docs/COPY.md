@@ -26,6 +26,16 @@ Conventions
 | `action.seeAll` | Alle ansehen | See all     |
 | `action.cancel` | Abbrechen    | Cancel      |
 
+## Sync (cross-screen)
+
+Shown on Calendar and Dashboard when the realtime channel has been down for more
+than 10 seconds. Not interactive — it states a fact, it does not ask for an action.
+
+| Key                  | DE                                                      | EN                                        |
+| -------------------- | ------------------------------------------------------- | ------------------------------------------ |
+| `sync.offline.title` | Keine Verbindung                                        | No connection                             |
+| `sync.offline.hint`  | Du siehst möglicherweise nicht die neuesten Änderungen. | You may not be seeing the latest changes. |
+
 ## Auth
 
 | Key                | DE                                                      | EN                                    |
