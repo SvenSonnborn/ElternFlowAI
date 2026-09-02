@@ -11,6 +11,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ToastProvider } from "@/app-sections/shared";
 import { ThemeProvider, useTheme } from "@/design-system/ThemeProvider";
 import { AuthGate, initDeepLinkHandler, useInitSession } from "@/features/auth";
+import { useFamilyRealtime } from "@/features/realtime";
 import { useFlushPendingDeletes } from "@/features/shared";
 
 function ThemedStack() {
@@ -19,6 +20,10 @@ function ThemedStack() {
   useEffect(() => initDeepLinkHandler(), []);
   // Offene Undo-Fenster schließen, wenn die App in den Hintergrund geht.
   useFlushPendingDeletes();
+  // Der eine Familien-Kanal. Steht bewusst hier und nicht in `useFamilyEvents`
+  // (drei Aufrufer, zwei dauerhaft gemountet) und nicht unter `<AuthGate>`
+  // (rendert bei Redirects seine Kinder nicht) — siehe ADR-030.
+  useFamilyRealtime();
   return (
     <AuthGate>
       {/* Über dem Navigator, damit ein Toast den Screenwechsel überlebt, der
