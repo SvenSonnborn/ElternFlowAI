@@ -46,8 +46,21 @@ export function useFamilyRealtime(): void {
       store.setStatus("idle");
       store.setDegraded(false);
       previousStatus.current = "idle";
+      // Nur unter __DEV__ befüllt (siehe onChange unten) — hier unter demselben
+      // Wächter geleert, sonst zeigt der Debug-Screen nach einem Logout oder
+      // Familienwechsel noch Row-Ids der vorigen Sitzung.
+      if (__DEV__) store.clearChanges();
       return;
     }
+
+    // Ein frischer Kanal darf keinen Verlaufszustand des alten erben: Meldet
+    // der neue Kanal als ersten Status genau den, den der alte zuletzt hatte
+    // (Fast Refresh, StrictMode, ein schneller Familienwechsel), wäre
+    // `status !== previous` in handleStatus sonst fälschlich `false` — der
+    // Degraded-Timer würde nie gestellt, und ein Kanal, der dann in
+    // `subscribing` hängt, zeigte nie den Offline-Hinweis.
+    previousStatus.current = "idle";
+    store.setDegraded(false);
 
     // Das `await` in `subscribeToFamilyChanges` (setAuth) kann nach dem Unmount
     // durchlaufen. Ohne diesen Marker bliebe der eben erzeugte Kanal verwaist
