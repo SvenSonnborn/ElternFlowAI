@@ -89,7 +89,7 @@ Deferred to later iterations (not yet wired): Edge Functions, gustar.io Worker, 
 
 ```
 app/                     Expo Router routes — THIN re-export files only
-├─ _layout.tsx           Root stack + providers (QueryClient · i18n · ThemeProvider · SafeArea · GestureHandler · ToastProvider) + useFlushPendingDeletes()
+├─ _layout.tsx           Root stack + providers (QueryClient · i18n · ThemeProvider · SafeArea · GestureHandler · ToastProvider) + useFlushPendingDeletes() + useFamilyRealtime()
 ├─ (tabs)/_layout.tsx    Bottom tab navigator (5 tabs) + Voice FAB overlay
 ├─ (tabs)/index.tsx      → Dashboard
 ├─ (tabs)/kalender.tsx
