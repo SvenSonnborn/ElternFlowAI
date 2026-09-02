@@ -115,6 +115,12 @@ export function useFamilyRealtime(): void {
         if (flushTimer.current === null) {
           flushTimer.current = setTimeout(flush, COALESCE_WINDOW_MS);
         }
+        // Grundlage für den Realtime-Debug-Screen: Der öffnet seit einer
+        // Korrektur in Task 6 keinen eigenen Kanal mehr — ein zweites Abo auf
+        // demselben Topic entsorgte den hier gehaltenen sofort wieder
+        // (`subscribeToFamilyChanges` räumt jeden Altkanal mit passendem
+        // `subTopic` ab). Er liest stattdessen aus diesem Ringpuffer mit.
+        if (__DEV__) useRealtimeStatusStore.getState().pushChange(change);
       },
       onStatus: handleStatus,
     }).then(
