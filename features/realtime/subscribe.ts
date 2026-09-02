@@ -56,11 +56,32 @@ export async function subscribeToFamilyChanges({
 }: SubscribeToFamilyChangesArgs): Promise<() => void> {
   await client.realtime.setAuth();
 
-  // Der Kanal wird bei jedem Aufruf frisch erzeugt und in der Abmeldung
-  // entsorgt, nie über Renders hinweg wiederverwendet: React hängt im
-  // StrictMode jeden Effekt einmal ab und wieder an, und ein zweites
-  // `subscribe()` auf demselben Kanal wirft „tried to subscribe multiple times".
-  const channel = client.channel(familyTopic(familyId), { config: { private: true } });
+  const topic = familyTopic(familyId);
+
+  // `client.channel(topic)` dedupliziert selbst nach Topic: `RealtimeClient.channel`
+  // durchsucht seine eigene Kanalliste und gibt bei einem Treffer denselben
+  // Kanal zurück, statt einen neuen anzulegen (realtime-js, `RealtimeClient.ts`).
+  // Ein Kanal verlässt diese Liste aber erst in seinem eigenen Leave-Ack
+  // (`RealtimeClient._remove`, an das `close`-Event des Kanals gebunden) — nicht
+  // schon beim Aufruf von `removeChannel()`, der genau darauf wartet. Läuft
+  // dieser Effekt neu, während der vorige Kanal noch im Zustand "leaving" steht
+  // (React StrictMode, Fast Refresh, ein schneller Familienwechsel), gäbe
+  // `client.channel(topic)` also denselben, absterbenden Kanal zurück —
+  // `subscribe()` joint aber nur aus dem Zustand "closed" heraus (vendored
+  // Phoenix, `Channel.leave()`/`isClosed()`-Guard) und wäre auf ihm ein
+  // stiller No-Op; das nachfolgende Leave-Ack würfe die eben gesetzten
+  // Bindings gleich wieder weg. Deshalb: einen etwaigen Altkanal desselben
+  // Topics zuerst entfernen und das Leave-Ack abwarten — `removeChannel()`
+  // löst erst danach auf —, bevor der neue Kanal angelegt wird. Verglichen
+  // wird über `subTopic`, nicht über das SDK-intern vorangestellte
+  // "realtime:"-Präfix (`RealtimeChannel.topic`): dieser Code soll das Präfix
+  // nicht kennen müssen.
+  const stale = client.getChannels().find((existing) => existing.subTopic === topic);
+  if (stale) {
+    await client.removeChannel(stale);
+  }
+
+  const channel = client.channel(topic, { config: { private: true } });
 
   for (const operation of OPERATIONS) {
     channel.on("broadcast", { event: operation }, (message) => {

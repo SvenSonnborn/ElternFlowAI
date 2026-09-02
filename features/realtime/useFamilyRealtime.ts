@@ -65,18 +65,35 @@ export function useFamilyRealtime(): void {
     };
 
     const handleStatus = (status: RealtimeStatus) => {
+      // Der Callback hängt am Kanal, nicht am Effekt: `removeChannel` löst
+      // erst nach dem Leave-Ack auf, und genau dort liefert das SDK `CLOSED`
+      // aus — nach diesem Cleanup, aus einer toten Closure heraus. Ohne diesen
+      // Guard schriebe sie noch `setStatus("closed")` und stellte einen
+      // Degraded-Timer, den niemand mehr besitzt; bei einem Familienwechsel
+      // verfälschte sie außerdem `previousStatus` für den gerade gestarteten
+      // neuen Kanal.
+      if (cancelled) return;
+
       const previous = previousStatus.current;
       previousStatus.current = status;
       useRealtimeStatusStore.getState().setStatus(status);
 
-      if (degradeTimer.current) clearTimeout(degradeTimer.current);
-      const delay = degradedDelayMs(status);
-      degradeTimer.current =
-        delay === null
-          ? null
-          : setTimeout(() => {
-              useRealtimeStatusStore.getState().setDegraded(true);
-            }, delay);
+      // Nur bei einem tatsächlichen Wechsel neu stellen: Phoenix' interner
+      // Rejoin-Backoff pendelt sich nach den ersten Versuchen auf konstant
+      // 10s ein — exakt `DEGRADED_AFTER_MS`. Ein Reset bei jedem Callback,
+      // auch ohne Statuswechsel, verwechselt eine Dauer mit einem Abstand: Ein
+      // Kanal, der schneller als alle 10s denselben Status erneut meldet,
+      // zeigte den Hinweis so nie.
+      if (status !== previous) {
+        if (degradeTimer.current) clearTimeout(degradeTimer.current);
+        const delay = degradedDelayMs(status);
+        degradeTimer.current =
+          delay === null
+            ? null
+            : setTimeout(() => {
+                useRealtimeStatusStore.getState().setDegraded(true);
+              }, delay);
+      }
 
       // Verpasste Broadcasts kommen nicht nach: nach einer Unterbrechung ist
       // der Cache stumm veraltet.
@@ -91,6 +108,9 @@ export function useFamilyRealtime(): void {
       client: supabase,
       familyId,
       onChange: (change) => {
+        // Dieselbe Absicherung wie in `handleStatus`: Der Callback hängt am
+        // Kanal, nicht am Effekt, und kann nach diesem Cleanup noch feuern.
+        if (cancelled) return;
         buffer.current.push(change);
         if (flushTimer.current === null) {
           flushTimer.current = setTimeout(flush, COALESCE_WINDOW_MS);
@@ -106,9 +126,11 @@ export function useFamilyRealtime(): void {
         unsubscribe = cleanup;
       },
       (error: unknown) => {
-        // `setAuth` kann ablehnen (kein Token, kein Netz). Das ist kein
-        // Kanal-Zustand, den der Server meldet — ohne diesen Zweig bliebe der
-        // Status auf `subscribing` stehen und niemand erführe davon.
+        // `setAuth` kann ablehnen (kein Token, kein Netz) — noch bevor
+        // `onStatus` auch nur einmal gerufen wurde. Das ist kein Kanal-Zustand,
+        // den der Server meldet: Ohne diesen Zweig bliebe der Status auf
+        // seinem vorherigen Wert stehen (typisch `idle`) und niemand erführe
+        // vom gescheiterten Aufbau.
         console.error("[useFamilyRealtime] Kanal konnte nicht aufgebaut werden", { error });
         if (!cancelled) handleStatus("error");
       },
