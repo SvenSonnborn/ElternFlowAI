@@ -27,6 +27,10 @@ function fakeClient() {
     topic: "",
     config: undefined as unknown,
     subscribeCallbacks: [] as ((state: string) => void)[],
+    // Aufruf-Protokoll für die Reihenfolge-Assertion: Zählwerte und
+    // Endzustände allein belegen nicht, dass `setAuth()` vor `channel()`
+    // lief — nur die Sequenz tut das.
+    order: [] as string[],
   };
 
   const channel = {
@@ -44,12 +48,14 @@ function fakeClient() {
     realtime: {
       setAuth: () => {
         calls.setAuth += 1;
+        calls.order.push("setAuth");
         return Promise.resolve();
       },
     },
     channel(topic: string, config?: unknown) {
       calls.topic = topic;
       calls.config = config;
+      calls.order.push("channel");
       return channel;
     },
     removeChannel: () => {
@@ -76,6 +82,14 @@ describe("subscribeToFamilyChanges", () => {
     expect(calls.setAuth).toBe(1);
     expect(calls.topic).toBe(familyTopic(FAMILY_ID));
     expect(calls.config).toEqual({ config: { private: true } });
+    // Reihenfolge, nicht nur Endzustand: Joint der Kanal, bevor `setAuth()`
+    // den Zugriffstoken am Socket gesetzt hat, lehnt die RLS-Policy auf
+    // `realtime.messages` den Beitritt ab, ohne dass irgendwo ein Fehler
+    // entsteht — der Kanal bleibt einfach still. Zählwerte allein (`setAuth`
+    // war 1x da, `channel` wurde mit dem richtigen Topic gerufen) belegen das
+    // nicht: Ein vertauschtes `await` oder ein `Promise.all` wäre am Ende
+    // genauso grün. Deshalb hier explizit die Sequenz prüfen.
+    expect(calls.order).toEqual(["setAuth", "channel"]);
   });
 
   test("bindet genau die drei Operationen", async () => {
