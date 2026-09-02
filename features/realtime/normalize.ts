@@ -5,10 +5,6 @@
  * Sonderfall: Der Trigger sieht die alte Zeile noch und schickt sie in
  * `old_record`, inklusive `family_id` und `event_id`. Genau deshalb hat
  * `FamilyChange` keine Null-Variante mehr für die zuordnende Id.
- *
- * Die Eingabe ist `unknown` und wird zur Laufzeit geprüft: Der Payload kommt
- * über das Netz aus einer Trigger-Funktion, nicht aus dem eigenen Typsystem.
- * Eine kaputte Nachricht darf den Kanal nicht abreißen lassen.
  */
 export type FamilyChangeType = "INSERT" | "UPDATE" | "DELETE";
 
@@ -35,6 +31,13 @@ function stringField(source: Record<string, unknown> | null, key: string): strin
   return typeof value === "string" ? value : null;
 }
 
+/**
+ * Prüft und normalisiert eine Broadcast-Nachricht zur Laufzeit.
+ *
+ * Die Eingabe ist `unknown`, nicht `FamilyChange`-typisiert: Der Payload kommt
+ * über das Netz aus einer Trigger-Funktion, nicht aus dem eigenen Typsystem.
+ * Eine kaputte Nachricht darf den Kanal nicht abreißen lassen.
+ */
 export function normalizeBroadcast(
   type: FamilyChangeType,
   message: unknown,
