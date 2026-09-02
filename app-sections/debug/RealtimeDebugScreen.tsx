@@ -3,7 +3,6 @@
    Designer-Copy aus docs/COPY.md; ein Debug-Screen gehört dort nicht hinein
    (ADR-028, Decision 8). */
 import { Redirect, router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 
 import { Icon, Pill, type PillTone } from "@/app-sections/shared";
@@ -12,15 +11,10 @@ import { Button, Card, Screen, Text } from "@/design-system/ui";
 import { useCurrentParent } from "@/features/auth";
 import {
   familyTopic,
-  subscribeToFamilyChanges,
   useRealtimeStatusStore,
-  type FamilyChange,
+  DEBUG_CHANGE_LOG_LIMIT,
   type RealtimeStatus,
 } from "@/features/realtime";
-import { supabase } from "@/features/supabase";
-
-/** Genug, um eine Testreihe zu überblicken, wenig genug für eine flüssige Liste. */
-const MAX_ENTRIES = 50;
 
 const statusTone: Record<RealtimeStatus, PillTone> = {
   idle: "neutral",
@@ -30,14 +24,6 @@ const statusTone: Record<RealtimeStatus, PillTone> = {
   error: "danger",
   closed: "ink",
 };
-
-/**
- * `receivedAt` allein taugt nicht als React-Key — zwei Ereignisse teilen sich
- * ohne Weiteres dieselbe Millisekunde.
- */
-interface LoggedChange extends FamilyChange {
-  seq: number;
-}
 
 /**
  * Sperrt den Screen außerhalb von Entwicklungs-Builds.
@@ -56,43 +42,25 @@ export function RealtimeDebugScreen() {
 }
 
 /**
- * Fenster in den Realtime-Strom, das die Übertragungsstrecke sichtbar macht,
- * bevor Issue #51 sie an `useFamilyEvents` hängt. Bewusst roh: Zeitstempel,
- * Tabelle, Typ, Ids — keine Aufbereitung, die einen Fehler verstecken könnte.
+ * Fenster in den Realtime-Strom: Zeigt die Ereignisse, die der eine
+ * Familien-Kanal aus `useFamilyRealtime` (gemountet in `ThemedStack`, ADR-030
+ * Decision 4) empfangen hat — #51 hängt seit Task 6 dort und bewusst nicht an
+ * `useFamilyEvents`. Bewusst roh: Zeitstempel, Tabelle, Typ, Ids — keine
+ * Aufbereitung, die einen Fehler verstecken könnte.
  */
 function RealtimeDebugContent() {
   const { theme } = useTheme();
   const parentQuery = useCurrentParent();
   const familyId = parentQuery.data?.family_id ?? null;
 
-  const [changes, setChanges] = useState<LoggedChange[]>([]);
-  const seq = useRef(0);
-  // Der Screen liest den Status aus dem Store statt aus seinem eigenen Abo:
-  // Geschrieben wird er vom einen Mountpunkt in `ThemedStack`, und genau der
-  // Zustand ist hier interessant — nicht der eines zweiten Kanals.
+  // Status und Liste kommen aus derselben Quelle — dem einen App-Kanal, den
+  // `useFamilyRealtime` in `ThemedStack` hält. Der Screen öffnet keinen
+  // eigenen mehr: `subscribeToFamilyChanges` entsorgt seit Task 6 jeden
+  // Altkanal mit passendem `subTopic`, ein zweites Abo auf demselben Topic
+  // risse also den lebenden App-Kanal ein.
   const status = useRealtimeStatusStore((s) => s.status);
-
-  useEffect(() => {
-    if (!familyId) return;
-    let cancelled = false;
-    let unsubscribe: (() => void) | null = null;
-    void subscribeToFamilyChanges({
-      client: supabase,
-      familyId,
-      onChange: (change) => {
-        seq.current += 1;
-        const entry: LoggedChange = { ...change, seq: seq.current };
-        setChanges((prev) => [entry, ...prev].slice(0, MAX_ENTRIES));
-      },
-    }).then((cleanup) => {
-      if (cancelled) cleanup();
-      else unsubscribe = cleanup;
-    });
-    return () => {
-      cancelled = true;
-      unsubscribe?.();
-    };
-  }, [familyId]);
+  const changes = useRealtimeStatusStore((s) => s.recentChanges);
+  const clearChanges = useRealtimeStatusStore((s) => s.clearChanges);
 
   return (
     <Screen scroll>
@@ -119,15 +87,15 @@ function RealtimeDebugContent() {
           {familyId ? familyTopic(familyId) : "Familie noch nicht geladen"}
         </Text>
         <Text variant="meta" tone="inkTertiary">
-          {`${String(changes.length)} von max. ${String(MAX_ENTRIES)} Ereignissen`}
+          {`${String(changes.length)} von max. ${String(DEBUG_CHANGE_LOG_LIMIT)} Ereignissen`}
         </Text>
       </Card>
 
       <Card variant="tinted" tint="warning" className="mt-3">
         <Text variant="meta">
-          Zweiter Kanal auf demselben Topic wie der App-Kanal: Was hier einläuft, hat die App
-          ebenfalls gesehen. Ereignisse tragen seit ADR-030 auch bei DELETE ihre Zeile — fremde
-          Familien erreichen dieses Topic gar nicht mehr.
+          Kein eigener Kanal mehr: Diese Liste liest mit, was der eine App-Kanal empfangen hat, und
+          füllt sich nur unter __DEV__. Ereignisse tragen seit ADR-030 auch bei DELETE ihre Zeile —
+          fremde Familien erreichen dieses Topic gar nicht mehr.
         </Text>
       </Card>
 
@@ -141,7 +109,7 @@ function RealtimeDebugContent() {
           tone="neutral"
           size="md"
           disabled={changes.length === 0}
-          onPress={() => setChanges([])}
+          onPress={clearChanges}
         />
       </View>
 
