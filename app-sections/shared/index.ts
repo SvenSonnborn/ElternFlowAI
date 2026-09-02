@@ -22,6 +22,7 @@ export {
 export { Pill, type PillTone } from "./Pill";
 export { recipeA11yLabel } from "./recipeA11y";
 export { SectionHeader } from "./SectionHeader";
+export { SyncNotice } from "./SyncNotice";
 export { TopBar } from "./TopBar";
 export { Toast } from "./Toast";
 export { ToastProvider } from "./ToastProvider";

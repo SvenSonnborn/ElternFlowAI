@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { Alert, Pressable, View } from "react-native";
 import { Calendar } from "react-native-calendars";
 
-import { ChildAvatar, Icon, SectionHeader, TopBar } from "@/app-sections/shared";
+import { ChildAvatar, Icon, SectionHeader, SyncNotice, TopBar } from "@/app-sections/shared";
 import { palette } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
@@ -92,6 +92,7 @@ export function KalenderScreen() {
         onAdd={() => openAdd()}
         addLabel={t("cal.add.new")}
       />
+      <SyncNotice />
 
       <Card className="p-2">
         <Calendar

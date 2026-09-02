@@ -635,6 +635,12 @@
     "logout": "Sign out",
     "footer": "Eltern Flow · v{{version}} · Made in Berlin"
   },
+  "sync": {
+    "offline": {
+      "title": "No connection",
+      "hint": "You may not be seeing the latest changes."
+    }
+  },
   "sample": {
     "family": {
       "name": "The Becker family"
