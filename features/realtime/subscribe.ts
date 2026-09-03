@@ -78,7 +78,17 @@ export async function subscribeToFamilyChanges({
   // nicht kennen müssen.
   const stale = client.getChannels().find((existing) => existing.subTopic === topic);
   if (stale) {
-    await client.removeChannel(stale);
+    // `removeChannel()` lehnt nicht ab, es **meldet**: "ok" | "timed out" |
+    // "error". Bei allem außer "ok" kann der Kanal in der Liste des Clients
+    // stehen bleiben — dann gäbe `client.channel(topic)` gleich wieder ihn
+    // zurück, und der Join wäre erneut der stille No-Op, gegen den dieser Block
+    // gebaut ist. Erzwingen lässt sich das Entfernen nicht (das SDK kennt dafür
+    // keinen Weg); den Ausfall benennen schon — sonst ist er von außen von
+    // einem funktionierenden Kanal nicht zu unterscheiden.
+    const removal = await client.removeChannel(stale);
+    if (removal !== "ok") {
+      console.error("[realtime] Altkanal nicht sauber entfernt", { topic, removal });
+    }
   }
 
   const channel = client.channel(topic, { config: { private: true } });
