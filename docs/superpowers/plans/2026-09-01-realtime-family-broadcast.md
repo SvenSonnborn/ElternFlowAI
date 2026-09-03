@@ -1,5 +1,17 @@
 # Live-Sync für den Kalender (Broadcast from Database) — Implementation Plan
 
+> **Ausführungsartefakt, Stand 2026-09-01 — nicht nachgepflegt.**
+> Dieser Plan hält fest, was _geplant_ war; maßgeblich für den gebauten Zustand ist
+> [ADR-030](../../decision-log.md). Während der Umsetzung wurden mehrere Punkte hier
+> korrigiert, und zwar bewusst nur im Code und im ADR, damit dieses Dokument zeigt,
+> wo der Plan danebenlag: Die Trigger-Funktion in Task 1 brach so, wie sie unten steht,
+> bei jeder Mutation (`case`-Ausdruck über zwei Zeilentypen — siehe ADR-030 Decision 4);
+> die Migration heißt tatsächlich `20260902065203_realtime_family_broadcast.sql`, weil
+> der Supabase-Server beim Anwenden einen eigenen Timestamp vergibt; der Beispieltest in
+> Task 4 prüfte die `setAuth`-Reihenfolge nicht wirklich und bekam eine Sequenz-Assertion;
+> und Task 7 öffnete für den Debug-Screen ein zweites Abo auf demselben Topic, was den
+> zentralen Kanal eingerissen hätte — der Screen liest jetzt einen `__DEV__`-Ringpuffer.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Eine Termin-Änderung eines Familienmitglieds erscheint bei allen anderen Mitgliedern derselben Familie innerhalb von Sekundenbruchteilen auf Kalender und Dashboard — und ausschließlich dort.
@@ -1799,7 +1811,7 @@ git commit -m "feat(realtime): Hinweis auf veraltete Daten bei totem Kanal"
 
 Ans **Ende** von `docs/decision-log.md`. ADR-028 wird **nicht** angefasst. Struktur wie die Nachbarn (`## ADR-030 — …`, dann `### Status`, `### Context`, `### Decisions`, `### Consequences`). Inhalt der Decisions 1–10 aus §11 der Spec, plus:
 
-- **Status:** „Accepted. Löst [ADR-028](#adr-028--…) in den Decisions 2, 3, 4 und 6 ab; 5, 7, 8 und 9 bleiben gültig. Zweite von drei Realtime-Iterationen (#50 → **#51** → #52)."
+- **Status:** „Accepted. Löst [ADR-028](../../decision-log.md#adr-028--realtime-für-den-kalender-ein-kanal-pro-familie-delete-bleibt-unzuordenbar-2026-09-01) in den Decisions 2, 3, 4 und 6 ab; 5, 7, 8 und 9 bleiben gültig. Zweite von drei Realtime-Iterationen (#50 → **#51** → #52)."
 - Zusätzlich zu §11 in die Decisions aufnehmen: **die Abweichung von §7 der Spec** — `degradedDelayMs` + Timer im Hook statt `isDegraded` in der Komponente, Begründung `react-hooks/set-state-in-effect` (siehe „Abweichung von der Spec" oben in diesem Plan).
 - Consequences: (a) jede Termin-Mutation schreibt zusätzlich in `realtime.messages`; (b) der Reconnect-Refetch holt den _Zustand_ nach, nicht die verpassten _Ereignisse_; (c) `useFamilyRealtime` selbst bleibt ungetestet — dieselbe Lücke wie bei `useCalendarRealtime`, alles Prüfenswerte liegt darunter; (d) falls die Migration mangels PAT nicht angewendet werden konnte, hier vermerken.
 

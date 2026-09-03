@@ -45,6 +45,22 @@ describe("calendarInvalidationKeys", () => {
     expect(keys).toEqual([calendarKeys.eventsRoot, calendarKeys.one("evt-4")]);
   });
 
+  test("ein UPDATE, das eine Exception umhängt, invalidiert beide Termine", () => {
+    const keys = calendarInvalidationKeys(
+      change(
+        "event_exceptions",
+        "UPDATE",
+        { id: "exc-9", event_id: "evt-neu" },
+        { id: "exc-9", event_id: "evt-alt" },
+      ),
+    );
+    expect(keys).toEqual([
+      calendarKeys.eventsRoot,
+      calendarKeys.one("evt-neu"),
+      calendarKeys.one("evt-alt"),
+    ]);
+  });
+
   test("ohne zuordenbare Event-Id bleiben die Ranges übrig", () => {
     expect(calendarInvalidationKeys(change("event_exceptions", "INSERT", { id: "exc-3" }))).toEqual(
       [calendarKeys.eventsRoot],

@@ -18,15 +18,28 @@ import { calendarKeys } from "./queries";
  *
  * Ist keine Event-Id zuordenbar (etwa bei einer Exception ohne `event_id`-Feld),
  * fällt die Funktion auf `[calendarKeys.eventsRoot]` zurück: Die Range hat sich
- * dennoch geändert, auch wenn die Einzeltermin-Query unbekannt bleibt.
+ * dennoch geändert, auch wenn die Einzeltermin-Query unbekannt bleibt. Sind es
+ * **zwei** (ein UPDATE, das eine Exception umhängt), kommen beide zurück.
  */
 export function calendarInvalidationKeys(change: FamilyChange): QueryKey[] {
   if (change.table !== "events" && change.table !== "event_exceptions") return [];
 
-  const eventId =
-    change.table === "events" ? change.rowId : eventIdOf(change.record ?? change.oldRecord);
+  // Beide Seiten der Änderung, nicht nur die neue: Ein UPDATE, das eine
+  // Exception an ein **anderes** Event hängt, veraltet die Einzeltermin-Query
+  // beider Termine. Die App erzeugt so ein UPDATE heute nicht — der `upsert` in
+  // recurrence.ts schreibt immer dieselbe `event_id` —, aber die Update-Policy
+  // auf `event_exceptions` erlaubt es. Der Vertrag gehört vollständig hierher
+  // statt in eine Annahme über die Aufrufer.
+  const eventIds =
+    change.table === "events"
+      ? [change.rowId]
+      : [eventIdOf(change.record), eventIdOf(change.oldRecord)];
 
-  return eventId ? [calendarKeys.eventsRoot, calendarKeys.one(eventId)] : [calendarKeys.eventsRoot];
+  const keys: QueryKey[] = [calendarKeys.eventsRoot];
+  for (const id of new Set(eventIds.filter((value): value is string => value !== null))) {
+    keys.push(calendarKeys.one(id));
+  }
+  return keys;
 }
 
 function eventIdOf(row: Record<string, unknown> | null): string | null {
