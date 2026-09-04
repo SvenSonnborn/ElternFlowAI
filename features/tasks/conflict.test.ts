@@ -99,6 +99,49 @@ describe("differingTaskFields", () => {
       differingTaskFields(theirs(), mine({ type_id: undefined }), theirs({ type_id: "type-9" })),
     ).toEqual([]);
   });
+
+  test("undefined im Fach meldet keine Abweichung", () => {
+    expect(
+      differingTaskFields(theirs(), mine({ subject: undefined }), theirs({ subject: "Fremd" })),
+    ).toEqual([]);
+  });
+
+  test("undefined in der Notiz meldet keine Abweichung", () => {
+    // `theirs` trägt bewusst eine eigene (nicht-leere) Notiz statt des
+    // `null`-Standards: `sameText` normalisiert `null` und `undefined` beide
+    // zu `""`, ein `theirs`-Standard von `null` hätte den Wächter-Wegfall
+    // nicht von einem echten Toleranzfall unterscheidbar gemacht.
+    expect(
+      differingTaskFields(
+        theirs({ description: "Woanders notiert" }),
+        mine({ description: undefined }),
+        theirs({ description: "Fremd" }),
+      ),
+    ).toEqual([]);
+  });
+
+  test("undefined im Fälligkeitsdatum meldet keine Abweichung", () => {
+    expect(
+      differingTaskFields(
+        theirs(),
+        mine({ due_date: undefined }),
+        theirs({ due_date: "2026-06-20" }),
+      ),
+    ).toEqual([]);
+  });
+
+  test("undefined in der Uhrzeit meldet keine Abweichung", () => {
+    // Dieselbe Begründung wie bei der Notiz: `theirs` braucht eine
+    // nicht-leere Uhrzeit, sonst normalisiert `sameTime` sie wie `undefined`
+    // zu `""` und der Test unterscheidet nicht mehr, ob der Wächter greift.
+    expect(
+      differingTaskFields(
+        theirs({ due_time: "16:00:00" }),
+        mine({ due_time: undefined }),
+        theirs({ due_time: "14:00:00" }),
+      ),
+    ).toEqual([]);
+  });
 });
 
 describe("differingTaskFields — Drei-Wege", () => {

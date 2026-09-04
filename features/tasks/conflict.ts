@@ -5,29 +5,18 @@ import type { TaskWithType } from "./types";
 export type TaskConflictField =
   "title" | "subject" | "description" | "due_date" | "due_time" | "child_id" | "type_id";
 
-/**
- * `""` und `null` heißen beide „nicht gesetzt". `undefined` ist ein dritter,
- * stärkerer Fall und deshalb ein eigener früher Ausstieg: In einem
- * PostgREST-Update heißt eine fehlende Spalte „dieser Request schreibt sie
- * nicht" — ein Feld, das gar nicht geschrieben wird, kann per Definition
- * nicht mit einer fremden Fassung kollidieren, unabhängig davon, was
- * `theirs` trägt.
- */
-function sameText(a: string | null | undefined, b: string | null | undefined): boolean {
-  if (b === undefined) return true;
+/** `""` und `null` heißen beide „nicht gesetzt" — dieselbe Toleranz wie im Kalender. */
+function sameText(a: string | null, b: string | null): boolean {
   return (a ?? "") === (b ?? "");
 }
 
 /**
  * Postgres rendert `time` als `HH:mm:ss`, ein als `HH:mm` geschriebener Wert
  * erreicht den Client aber unverändert — `parseDueTime` in form.ts akzeptiert
- * deshalb beide Schreibweisen. Verglichen werden nur Stunde und Minute;
- * `undefined` ist wie bei `sameText` „nicht geschrieben" und damit immer
- * gleich.
+ * deshalb beide Schreibweisen. Verglichen werden nur Stunde und Minute.
  */
-function sameTime(a: string | null | undefined, b: string | null | undefined): boolean {
-  if (b === undefined) return true;
-  const clock = (value: string | null | undefined) => (value ?? "").slice(0, 5);
+function sameTime(a: string | null, b: string | null): boolean {
+  const clock = (value: string | null) => (value ?? "").slice(0, 5);
   return clock(a) === clock(b);
 }
 
@@ -53,11 +42,18 @@ function sameTime(a: string | null | undefined, b: string | null | undefined): b
  * durch. Sie ist jetzt nur wieder das, was sie sein sollte — der Normalfall,
  * wenn niemand ins Gehege kommt (ADR-031).
  *
- * Die `undefined`-Toleranz bleibt vor der neuen Regel und läuft ihr für jedes
- * Feld voraus: `TaskChanges` lässt jedes seiner Felder `undefined`, und ein
- * `undefined`-Feld schreibt PostgREST gar nicht erst — es kann also nie mit
- * einer fremden Fassung kollidieren, unabhängig davon, was `theirs` oder
- * `base` tragen.
+ * Jedes der sieben Felder prüft zuerst `mine.<feld> !== undefined`, bevor es
+ * `theirs`/`base` überhaupt anfasst: `TaskChanges` lässt jedes seiner Felder
+ * `undefined`, und ein `undefined`-Feld schreibt PostgREST gar nicht erst —
+ * es kann also nie mit einer fremden Fassung kollidieren, unabhängig davon,
+ * was `theirs` oder `base` tragen. Dieser Wächter sitzt an der Aufrufstelle,
+ * nicht in `sameText`/`sameTime` selbst: `child_id` vergleicht roh über `??`
+ * und benutzt keinen der beiden Helfer — eine Regel an sieben gleichen
+ * Stellen ist ehrlicher als eine an sechs plus eine Ausnahme für `child_id`.
+ * (Die Helfer trugen diese Toleranz früher zusätzlich selbst, per eigenem
+ * `undefined`-Zweig — der war unerreichbar, weil der Aufrufer-Wächter jeden
+ * Aufruf mit `b === undefined` bereits abfing, bevor der Helfer ihn sah;
+ * inzwischen entfernt.)
  *
  * `child_id` und `type_id` sind Fremdschlüssel; der Vergleich läuft auf der
  * Id, die *Anzeige* löst der Screen aus den ohnehin geladenen Kind- und
