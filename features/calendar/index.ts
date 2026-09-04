@@ -66,3 +66,4 @@ export {
 } from "./pendingDeletes";
 export { calendarInvalidationKeys } from "./realtimeKeys";
 export { undoDeleteMessage } from "./undoDeleteMessage";
+export { occurrenceVersion } from "./version";

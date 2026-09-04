@@ -189,6 +189,9 @@ function seedToOccurrence(seed: Seed, base: Date, translate: Translate): Calenda
     parentId: null,
     isException: false,
     isRecurring: false,
+    // Fixture, nicht aus einer echten Zeile abgeleitet — Conflict-Detection
+    // greift erst an echten Supabase-Rows, nicht an diesen Sample-Seeds.
+    version: "sample",
     rrule: { freq: null, interval: 1, byweekday: null, count: null, until: null },
     type: {
       slug: seed.slug,

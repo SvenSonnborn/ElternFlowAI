@@ -22,6 +22,7 @@ function occ(occurrenceDate: string, eventId = "e1"): CalendarOccurrence {
     parentId: null,
     isException: false,
     isRecurring: false,
+    version: "v1",
     rrule: {
       freq: null,
       interval: 0,

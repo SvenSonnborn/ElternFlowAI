@@ -32,6 +32,7 @@ function occ(partial: Partial<CalendarOccurrence> = {}): CalendarOccurrence {
     parentId: null,
     isException: false,
     isRecurring: true,
+    version: "v1",
     rrule: { freq: "weekly", interval: 1, byweekday: [3], count: null, until: null },
     type: {
       slug: "sport",
