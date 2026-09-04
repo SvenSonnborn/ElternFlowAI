@@ -8,7 +8,7 @@ import { useEffect, useMemo } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { ToastProvider } from "@/app-sections/shared";
+import { ConflictDialogHost, ToastProvider } from "@/app-sections/shared";
 import { ThemeProvider, useTheme } from "@/design-system/ThemeProvider";
 import { AuthGate, initDeepLinkHandler, useInitSession } from "@/features/auth";
 import { useFamilyRealtime } from "@/features/realtime";
@@ -123,6 +123,9 @@ function ThemedStack() {
           />
           <Stack.Screen name="+not-found" options={{ presentation: "modal" }} />
         </Stack>
+        {/* Neben den Toasts und aus demselben Grund: Der Dialog überlebt den
+            Screenwechsel, der ihn ausgelöst hat. */}
+        <ConflictDialogHost />
       </ToastProvider>
     </AuthGate>
   );

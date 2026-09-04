@@ -6,6 +6,16 @@ export {
   type AlertLabels,
   type ConfirmLabels,
 } from "./confirmDialog";
+export { ConflictDialog } from "./ConflictDialog";
+export { ConflictDialogHost } from "./ConflictDialogHost";
+export {
+  useConflict,
+  useConflictStore,
+  type ConflictApi,
+  type ConflictEntry,
+  type ConflictRow,
+  type ShowConflictOptions,
+} from "./conflictStore";
 export { DateTimePickerSheet } from "./DateTimePickerSheet";
 export type { DateTimePickerMode, DateTimePickerSheetProps } from "./DateTimePickerSheet.types";
 export { EventRow, type EventRowProps } from "./EventRow";
