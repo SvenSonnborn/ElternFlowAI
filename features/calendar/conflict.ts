@@ -14,6 +14,13 @@ function sameText(a: string | null, b: string | null): boolean {
  * PostgREST-Zeitstempel (`2026-06-15T17:00:00+00:00`), das Formular
  * `toISOString()` (`…Z`). Ein Stringvergleich meldete jedes Speichern als
  * Konflikt.
+ *
+ * Ein unparsbares `b` wird über `new Date(b).getTime()` zu `NaN`, und
+ * `NaN !== NaN` meldet das Feld dann immer als abweichend — bewusst so: bei
+ * einem kaputten Datum ist „melden" die sichere Richtung, nicht stillschweigend
+ * durchwinken. `EventChanges` hat keine optionalen Felder und die Werte
+ * stammen aus `Date.toISOString()`, dieser Pfad ist nach Design also nicht
+ * erreichbar.
  */
 function sameInstant(a: Date, b: string): boolean {
   return a.getTime() === new Date(b).getTime();
