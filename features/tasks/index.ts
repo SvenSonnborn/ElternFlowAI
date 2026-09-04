@@ -61,3 +61,4 @@ export type {
   TaskUpdate,
   TaskWithType,
 } from "./types";
+export { differingTaskFields, type TaskConflictField } from "./conflict";
