@@ -76,6 +76,7 @@ export type Database = {
           id: string;
           occurrence_date: string;
           override: Json | null;
+          updated_at: string;
         };
         Insert: {
           action: Database["public"]["Enums"]["event_exception_action_enum"];
@@ -84,6 +85,7 @@ export type Database = {
           id?: string;
           occurrence_date: string;
           override?: Json | null;
+          updated_at?: string;
         };
         Update: {
           action?: Database["public"]["Enums"]["event_exception_action_enum"];
@@ -92,6 +94,7 @@ export type Database = {
           id?: string;
           occurrence_date?: string;
           override?: Json | null;
+          updated_at?: string;
         };
         Relationships: [
           {
