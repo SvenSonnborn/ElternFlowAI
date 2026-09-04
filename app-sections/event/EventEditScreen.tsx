@@ -86,6 +86,9 @@ export function EventEditScreen() {
         occurrence.startAt,
       ),
       countText: rrule.count == null ? "" : String(rrule.count),
+      // Mitgeführt, damit sie zusammen mit dem Rest bei der Hydration
+      // eingefroren werden kann — siehe `baseVersion` unten.
+      version: occurrence.version,
     };
   }, [occurrence]);
 
@@ -97,6 +100,21 @@ export function EventEditScreen() {
   const [countText, setCountText] = useState("");
   const [picker, setPicker] = useState<RangeField | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  // Invariante: `baseVersion` ist die Version, aus der der Formular-State
+  // entstanden ist — nicht die neueste, die `useEvent` gerade führt. Nicht
+  // offensichtlich, weil die Query weiterlebt (30s `staleTime`,
+  // Default-`refetchOnMount`/`-WindowFocus`/`-Reconnect` auf Web), das
+  // Formular aber nur einmal hydriert (`if (initial && !hydrated)` unten):
+  // Ein Refetch, der Millisekunden nach der Hydration landet — der übliche
+  // Fall, nicht der seltene —, schiebt `occurrence.version` weiter, ohne
+  // dass Titel/Zeiten/Ort/Notizen mitziehen. Läse `onSave` die Version
+  // direkt aus der lebenden Query statt aus diesem eingefrorenen Wert,
+  // träfe das CAS beim Speichern anstandslos, obwohl das Formular noch die
+  // alten Eingaben trägt — der Guard erkennte dann exakt die
+  // Fremdänderung nicht, gegen die er gebaut ist. Der Wiederholungsversuch
+  // aus dem Dialog (`showConflict`) ist davon ausgenommen: der berechnet
+  // bewusst die frische Version aus `theirs`/`err.row`.
+  const [baseVersion, setBaseVersion] = useState<string | null>(null);
   const { startAt, endAt } = range;
 
   if (initial && !hydrated) {
@@ -106,6 +124,7 @@ export function EventEditScreen() {
     setNotes(initial.notes);
     setRecurrence(initial.recurrence ?? "none");
     setCountText(initial.countText);
+    setBaseVersion(initial.version);
     setHydrated(true);
   }
 
@@ -347,7 +366,7 @@ export function EventEditScreen() {
   }
 
   async function onSave() {
-    if (!occurrence || !canSave) return;
+    if (!occurrence || !canSave || baseVersion == null) return;
     // `updateMutation.isPending` kommt hier zu spät (siehe `submitLock.ts`):
     // Ein zweiter Tap während der Schließanimation hat real einen zweiten,
     // identischen Termin angelegt (dort beim Anlegen — hier dasselbe Loch
@@ -394,7 +413,7 @@ export function EventEditScreen() {
         description: notes.trim() || null,
       },
       recurrence: recurrenceChanges,
-      baseVersion: occurrence.version,
+      baseVersion,
     };
     // Sofort schließen: Die Änderung steht dank `onMutate` schon im Kalender.
     goBackOrToKalender();
