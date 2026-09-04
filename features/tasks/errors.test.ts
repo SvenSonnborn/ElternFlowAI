@@ -1,10 +1,21 @@
 import { describe, expect, test } from "bun:test";
 
-import { mapTaskError, MissingParentError } from "./errors";
+import { mapTaskError, MissingParentError, TaskConflictError } from "./errors";
 
 describe("mapTaskError", () => {
   test("MissingParentError → hw.error.notAuthenticated", () => {
     expect(mapTaskError(new MissingParentError())).toBe("hw.error.notAuthenticated");
+  });
+
+  test("TaskConflictError → hw.error.conflict", () => {
+    const row = { id: "task-1" } as never;
+    expect(mapTaskError(new TaskConflictError(row))).toBe("hw.error.conflict");
+  });
+
+  test("auch der Konflikt wird an `name` erkannt, nicht an der Meldung", () => {
+    expect(mapTaskError({ name: "TaskConflictError", message: "irgendwas" })).toBe(
+      "hw.error.conflict",
+    );
   });
 
   test("Postgres 42501 (RLS refused) → hw.error.notAuthenticated", () => {

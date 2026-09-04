@@ -1,6 +1,6 @@
 import { describe, expect, spyOn, test } from "bun:test";
 
-import { EventNotFoundError, mapEventError } from "./errors";
+import { EventConflictError, EventNotFoundError, mapEventError } from "./errors";
 
 describe("mapEventError", () => {
   test("EventNotFoundError → cal.error.eventGone", () => {
@@ -12,6 +12,16 @@ describe("mapEventError", () => {
     // deshalb gibt es die Klasse überhaupt.
     expect(mapEventError({ name: "EventNotFoundError", message: "irgendwas anderes" })).toBe(
       "cal.error.eventGone",
+    );
+  });
+
+  test("EventConflictError → cal.error.conflict", () => {
+    expect(mapEventError(new EventConflictError(null))).toBe("cal.error.conflict");
+  });
+
+  test("auch der Konflikt wird an `name` erkannt, nicht an der Meldung", () => {
+    expect(mapEventError({ name: "EventConflictError", message: "irgendwas" })).toBe(
+      "cal.error.conflict",
     );
   });
 

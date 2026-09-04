@@ -1,4 +1,4 @@
-export { mapTaskError, MissingParentError, type TaskErrorKey } from "./errors";
+export { mapTaskError, MissingParentError, TaskConflictError, type TaskErrorKey } from "./errors";
 export {
   CHILD_ALL,
   CHILD_NONE,

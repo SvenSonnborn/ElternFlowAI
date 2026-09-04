@@ -277,6 +277,7 @@
     "error": {
       "notAuthenticated": "Bitte erneut anmelden.",
       "eventGone": "Der Termin existiert nicht mehr.",
+      "conflict": "Jemand anderes hat den Termin geändert.",
       "network": "Verbindung fehlgeschlagen. Bitte später erneut versuchen.",
       "generic": "Etwas ist schiefgelaufen. Bitte später erneut versuchen."
     },
@@ -510,6 +511,7 @@
     "error": {
       "notAuthenticated": "Bitte erneut anmelden.",
       "staleReference": "Kind oder Aufgabentyp existiert nicht mehr.",
+      "conflict": "Jemand anderes hat die Aufgabe geändert.",
       "network": "Verbindung fehlgeschlagen. Bitte später erneut versuchen.",
       "generic": "Etwas ist schiefgelaufen. Bitte später erneut versuchen.",
       "titleRequired": "Bitte einen Titel eingeben",
@@ -640,6 +642,18 @@
       "title": "Keine Verbindung",
       "hint": "Du siehst möglicherweise nicht die neuesten Änderungen."
     }
+  },
+  "conflict": {
+    "title": "Gleichzeitig bearbeitet",
+    "body": {
+      "event": "Jemand anderes hat diesen Termin geändert, während du ihn bearbeitet hast.",
+      "task": "Jemand anderes hat diese Aufgabe geändert, während du sie bearbeitet hast."
+    },
+    "theirs": "Jetzt gespeichert",
+    "mine": "Deine Fassung",
+    "keepMine": "Deine Fassung speichern",
+    "keepTheirs": "Andere Fassung behalten",
+    "deleteAnyway": "Trotzdem löschen"
   },
   "sample": {
     "family": {

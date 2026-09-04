@@ -277,6 +277,7 @@
     "error": {
       "notAuthenticated": "Please sign in again.",
       "eventGone": "This event no longer exists.",
+      "conflict": "Someone else changed this event.",
       "network": "Connection failed. Please try again later.",
       "generic": "Something went wrong. Please try again later."
     },
@@ -510,6 +511,7 @@
     "error": {
       "notAuthenticated": "Please sign in again.",
       "staleReference": "That child or task type no longer exists.",
+      "conflict": "Someone else changed this task.",
       "network": "Connection failed. Please try again later.",
       "generic": "Something went wrong. Please try again later.",
       "titleRequired": "Please enter a title",
@@ -640,6 +642,18 @@
       "title": "No connection",
       "hint": "You may not be seeing the latest changes."
     }
+  },
+  "conflict": {
+    "title": "Edited at the same time",
+    "body": {
+      "event": "Someone else changed this event while you were editing it.",
+      "task": "Someone else changed this task while you were editing it."
+    },
+    "theirs": "Saved now",
+    "mine": "Your version",
+    "keepMine": "Save your version",
+    "keepTheirs": "Keep the other version",
+    "deleteAnyway": "Delete anyway"
   },
   "sample": {
     "family": {

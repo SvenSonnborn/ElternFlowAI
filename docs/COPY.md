@@ -36,6 +36,28 @@ than 10 seconds. Not interactive — it states a fact, it does not ask for an ac
 | `sync.offline.title` | Keine Verbindung                                        | No connection                             |
 | `sync.offline.hint`  | Du siehst möglicherweise nicht die neuesten Änderungen. | You may not be seeing the latest changes. |
 
+## Conflict (cross-screen)
+
+Shown when a save collides with someone else's change to the same row —
+calendar and tasks share one dialog. Two ways out, not three: the edit sheet has
+already closed by the time the server answers, so "cancel" and "keep theirs"
+would be the same thing. Dismissing the dialog keeps the other version.
+
+| Key                     | DE                                                                         | EN                                                         |
+| ----------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `conflict.title`        | Gleichzeitig bearbeitet                                                    | Edited at the same time                                    |
+| `conflict.body.event`   | Jemand anderes hat diesen Termin geändert, während du ihn bearbeitet hast. | Someone else changed this event while you were editing it. |
+| `conflict.body.task`    | Jemand anderes hat diese Aufgabe geändert, während du sie bearbeitet hast. | Someone else changed this task while you were editing it.  |
+| `conflict.theirs`       | Jetzt gespeichert                                                          | Saved now                                                  |
+| `conflict.mine`         | Deine Fassung                                                              | Your version                                               |
+| `conflict.keepMine`     | Deine Fassung speichern                                                    | Save your version                                          |
+| `conflict.keepTheirs`   | Andere Fassung behalten                                                    | Keep the other version                                     |
+| `conflict.deleteAnyway` | Trotzdem löschen                                                           | Delete anyway                                               |
+
+Not "Ihre Fassung": in German that reads as the polite second person and breaks
+the Du rule. Field labels are not new copy — the dialog reuses `cal.edit.field*`
+and the `hw.*` form labels.
+
 ## Auth
 
 | Key                | DE                                                      | EN                                    |
