@@ -2610,3 +2610,217 @@ Findings abarbeiten oder mit Begründung verwerfen. Rate-Limit: ~3 Reviews/Stund
 git push -u origin feat/conflict-detection
 gh pr create --fill
 ```
+
+---
+
+## Task 13: Drei-Wege-Vergleich (nachgezogen aus Task 11)
+
+**Warum diese Task nach dem Plan dazukam:** Der Zwei-Client-Lauf (Task 11, Schritt 6) hat gezeigt, dass der Dialog **die eigenen Änderungen des Nutzers als Konflikte mitlistet**. Ursache: Der Vergleich ist zweiwertig (`theirs` gegen `mine`), und `mine` ist immer der **volle** Feldsatz des Formulars. Ändert A den Titel, weicht `mine.title` von `theirs.title` ab — obwohl niemand sonst den Titel angefasst hat.
+
+Die Folge ist nicht nur Rauschen: Weil A's eigene Änderungen immer abweichen, ist die Liste nach jedem Versionssprung nicht-leer, und die Regel „leere Liste → durchspeichern" feuert praktisch nie. Damit erscheint bei **jedem** Fremdschreibvorgang ein Dialog, solange A's Sheet offen ist — genau das „wird weggeklickt", vor dem der Docstring von `differingEventFields` warnt.
+
+**Die richtige Regel** braucht drei Werte pro Feld — was A geladen hat (`base`), was A schreiben will (`mine`), was jetzt gespeichert ist (`theirs`):
+
+```
+Konflikt ⟺ theirs ≠ base   (jemand anderes hat das Feld geändert)
+        UND mine ≠ theirs  (und ich würde es überschreiben)
+```
+
+Durchgespielt:
+
+| Fall                                 | base | mine | theirs | Konflikt?                       |
+| ------------------------------------ | ---- | ---- | ------ | ------------------------------- |
+| A ändert den Titel, sonst niemand    | T    | T2   | T      | nein — `theirs == base`         |
+| B ändert den Ort, A lässt ihn stehen | L    | L    | L2     | **ja** — A würde B zurückdrehen |
+| Beide ändern den Titel verschieden   | T    | T2   | T3     | **ja**                          |
+| Beide ändern den Titel gleich        | T    | T2   | T2     | nein — `mine == theirs`         |
+| Version springt ohne Feldänderung    | —    | —    | —      | nein                            |
+
+Zeile 2 ist der Grund, warum die Erwartung „kein Dialog" in Task 11 Schritt 6 falsch war: A **würde** B's Ortsänderung verwerfen. Richtig ist genau **eine** Zeile („Ort"), nicht null und nicht zwei.
+
+**Files:**
+
+- Modify: `features/calendar/conflict.ts` + `.test.ts`
+- Modify: `features/tasks/conflict.ts` + `.test.ts`
+- Modify: `app-sections/event/EventEditScreen.tsx`
+- Modify: `app-sections/task/TaskEditScreen.tsx`
+
+**Interfaces:**
+
+- Consumes: `CalendarOccurrence` (mit `version`), `EventChanges`, `TaskWithType`, `TaskChanges`
+- Produces:
+  - `differingEventFields(theirs: CalendarOccurrence, mine: EventChanges, base: CalendarOccurrence): EventConflictField[]`
+  - `differingTaskFields(theirs: TaskWithType, mine: TaskChanges, base: TaskWithType): TaskConflictField[]`
+
+**Warum `base` denselben Typ hat wie `theirs`** und nicht wie `mine`: Dann läuft der Vergleich `theirs ≠ base` über dieselben Feldzugriffe und dieselben Toleranz-Helfer wie alles andere, statt den Formularzustand ein zweites Mal in die `*Changes`-Form bringen zu müssen. Jede Umrechnung wäre eine Stelle, an der Normalisierung driften kann.
+
+- [ ] **Step 1: Failing tests für den Kalender**
+
+In `features/calendar/conflict.test.ts` die vorhandene `theirs()`-Fabrik behalten und die Aufrufe um ein drittes Argument erweitern. Wo bisher `differingEventFields(theirs(), mine({...}))` steht, wird `differingEventFields(theirs(), mine({...}), theirs())` — die unveränderte Fixture ist die Basis, das erhält die Bedeutung aller bestehenden Fälle (niemand sonst hat etwas geändert).
+
+Dann die neuen Fälle anhängen:
+
+```ts
+describe("differingEventFields — Drei-Wege", () => {
+  test("die eigene Änderung ist kein Konflikt", () => {
+    // base == theirs: niemand sonst hat den Titel angefasst.
+    expect(differingEventFields(theirs(), mine({ title: "Neu" }), theirs())).toEqual([]);
+  });
+
+  test("ein fremd geändertes Feld, das ich zurückdrehen würde, ist einer", () => {
+    // Ich habe den Ort nicht angefasst — aber mein Formular trägt den alten
+    // Wert, und Speichern würde die fremde Änderung verwerfen.
+    const fremd = theirs({ location: "Praxis Nord" });
+    expect(differingEventFields(fremd, mine(), theirs())).toEqual(["location"]);
+  });
+
+  test("beide Seiten haben dasselbe Feld verschieden geändert", () => {
+    const fremd = theirs({ title: "Ihre Fassung" });
+    expect(differingEventFields(fremd, mine({ title: "Meine Fassung" }), theirs())).toEqual([
+      "title",
+    ]);
+  });
+
+  test("beide Seiten haben dasselbe Feld gleich geändert — kein Konflikt", () => {
+    const fremd = theirs({ title: "Gleich" });
+    expect(differingEventFields(fremd, mine({ title: "Gleich" }), theirs())).toEqual([]);
+  });
+
+  test("meine Änderung und eine fremde an einem anderen Feld: nur das fremde", () => {
+    // Der Fall aus Schritt 6 der Zwei-Client-Verifikation.
+    const fremd = theirs({ location: "Praxis Nord" });
+    expect(differingEventFields(fremd, mine({ title: "Neu" }), theirs())).toEqual(["location"]);
+  });
+});
+```
+
+- [ ] **Step 2: Tests laufen lassen, Fehlschlag prüfen**
+
+```bash
+bun test features/calendar/conflict.test.ts
+```
+
+Erwartet: FAIL — die Funktion nimmt zwei Argumente, die neuen Erwartungen treffen nicht zu.
+
+- [ ] **Step 3: `features/calendar/conflict.ts` umschreiben**
+
+Die Toleranz-Helfer (`sameText`, `sameInstant`) bleiben unverändert. Neu ist die Regel darüber:
+
+```ts
+/**
+ * Welche Felder ein Speichern **fremde** Änderungen überschreiben würde.
+ *
+ * Drei Werte pro Feld, nicht zwei: `base` ist der Stand, aus dem das Formular
+ * hydriert wurde, `mine` das, was geschrieben würde, `theirs` das, was jetzt
+ * auf dem Server steht. Ein Feld ist nur dann ein Konflikt, wenn **jemand
+ * anderes** es geändert hat (`theirs ≠ base`) **und** mein Schreibvorgang es
+ * überschriebe (`mine ≠ theirs`).
+ *
+ * Der zweiwertige Vergleich (nur `theirs` gegen `mine`) hat die eigenen
+ * Änderungen des Nutzers mitgelistet — das Formular schickt immer den vollen
+ * Feldsatz, ein geänderter Titel weicht also zwangsläufig ab, auch wenn ihn
+ * sonst niemand angefasst hat. Damit war die Liste nach **jedem**
+ * Versionssprung nicht-leer, die Regel „leere Liste → durchspeichern" feuerte
+ * nie, und der Dialog erschien bei jeder fremden Schreiboperation. Belegt in
+ * der Zwei-Client-Verifikation, Schritt 6
+ * ([docs/superpowers/plans/2026-09-04-conflict-detection-verification.md](./2026-09-04-conflict-detection-verification.md)).
+ *
+ * Eine leere Liste heißt weiterhin: kein Dialog, der Schreibvorgang läuft
+ * durch. Sie ist jetzt nur wieder das, was sie sein sollte — der Normalfall,
+ * wenn niemand ins Gehege kommt.
+ */
+export function differingEventFields(
+  theirs: CalendarOccurrence,
+  mine: EventChanges,
+  base: CalendarOccurrence,
+): EventConflictField[] {
+  const out: EventConflictField[] = [];
+  if (!sameText(theirs.title, base.title) && !sameText(theirs.title, mine.title)) {
+    out.push("title");
+  }
+  if (
+    theirs.startAt.getTime() !== base.startAt.getTime() &&
+    !sameInstant(theirs.startAt, mine.start_at)
+  ) {
+    out.push("start_at");
+  }
+  if (theirs.endAt.getTime() !== base.endAt.getTime() && !sameInstant(theirs.endAt, mine.end_at)) {
+    out.push("end_at");
+  }
+  if (!sameText(theirs.location, base.location) && !sameText(theirs.location, mine.location)) {
+    out.push("location");
+  }
+  if (
+    !sameText(theirs.description, base.description) &&
+    !sameText(theirs.description, mine.description)
+  ) {
+    out.push("description");
+  }
+  return out;
+}
+```
+
+`sameText` nimmt heute `string | null`; `CalendarOccurrence.title` ist `string`, `location`/`description` sind `string | null` — das passt ohne Änderung an den Helfern. Die Prüfreihenfolge bleibt: `title` → `start_at` → `end_at` → `location` → `description`.
+
+- [ ] **Step 4: Tests laufen lassen, Erfolg prüfen**
+
+```bash
+bun test features/calendar/conflict.test.ts
+```
+
+Erwartet: PASS, alle alten und die fünf neuen Fälle.
+
+- [ ] **Step 5: Dasselbe für Aufgaben**
+
+`features/tasks/conflict.test.ts`: bestehende Aufrufe um `theirs()` als drittes Argument erweitern, dann die analogen fünf Fälle anhängen — mit `subject` statt `location` als „fremd geändertes Feld" (das ist der Fall aus Schritt 8 der Verifikation) und `type_id` für den Fremdschlüssel-Fall.
+
+`features/tasks/conflict.ts`: dieselbe Drei-Wege-Regel. **Die `undefined`-Toleranz bleibt und wird zuerst geprüft** — ein Feld, das PostgREST gar nicht schreibt, kann nichts überschreiben, unabhängig von `base`. Also je Feld: erst `mine === undefined` → kein Konflikt, dann `theirs ≠ base`, dann `mine ≠ theirs`. Die Prüfreihenfolge der sieben Felder bleibt unverändert.
+
+- [ ] **Step 6: Basis in `EventEditScreen` einfrieren**
+
+Der Screen friert seit Task 9 `baseVersion` bei der Hydration ein. Dieselbe Stelle friert jetzt zusätzlich die **Occurrence** ein, aus der das Formular befüllt wurde:
+
+```ts
+const [baseOccurrence, setBaseOccurrence] = useState<CalendarOccurrence | null>(null);
+```
+
+im Hydrations-Block gesetzt, zusammen mit `setBaseVersion(...)` — beide beschreiben denselben Stand, sie gehören nebeneinander und dürfen nicht auseinanderlaufen.
+
+In `showConflict` wird daraus das dritte Argument:
+
+```ts
+const fields =
+  theirs && baseOccurrence ? differingEventFields(theirs, vars.changes, baseOccurrence) : [];
+```
+
+**Fehlt `baseOccurrence`** (theoretisch: der Konflikt kommt vor der Hydration), bleibt die Liste leer — und der Dialog erscheint dann ohne Zeilen, **nicht** als Durchspeichern. Der bestehende Guard `if (theirs && fields.length === 0)` muss also um diese Bedingung erweitert werden, sonst würde ein fehlender Basis-Stand stillschweigend durchgewinkt. Genau davor warnt die Behandlung des `row === null`-Falls schon heute.
+
+- [ ] **Step 7: Basis in `TaskEditScreen` einfrieren**
+
+Analog: `const [baseTask, setBaseTask] = useState<TaskWithType | null>(null);`, gesetzt im Hydrations-Block neben `setBaseVersion(...)`, und in `showConflict` als drittes Argument. Derselbe Guard-Vorbehalt wie in Step 6.
+
+- [ ] **Step 8: Typecheck, Lint, volle Suite, Web-Export**
+
+```bash
+bun run typecheck && bun lint && bun test
+bunx expo export --platform web --output-dir /tmp/eltern-web
+```
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add features/calendar features/tasks app-sections
+git commit -m "fix(conflict): Drei-Wege-Vergleich statt zwei
+
+Der Dialog listete die eigenen Änderungen des Nutzers als Konflikte mit: Das
+Formular schickt immer den vollen Feldsatz, ein geänderter Titel weicht also
+zwangsläufig von der Serverzeile ab, auch wenn ihn sonst niemand angefasst hat.
+Damit war die Liste nach jedem Versionssprung nicht-leer und der Dialog
+erschien bei jeder fremden Schreiboperation.
+
+Ein Feld ist jetzt nur dann ein Konflikt, wenn jemand anderes es geändert hat
+UND mein Schreibvorgang es überschriebe. Die Basis dafür wird zusammen mit
+baseVersion bei der Hydration eingefroren.
+
+Belegt in der Zwei-Client-Verifikation, Schritt 6."
+```
