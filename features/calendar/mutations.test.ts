@@ -2,13 +2,20 @@ import { describe, expect, mock, test } from "bun:test";
 
 import type { Database } from "@/features/supabase/database.types";
 
+import type { EventWithRelations } from "./expand";
 import type { EventChanges, EventOps } from "./recurrence";
 
+import { EventConflictError } from "./errors";
 import { deleteEvent, updateEvent, type DeleteEventVars, type UpdateEventVars } from "./mutations";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
 const MASTER_START = new Date("2026-05-04T16:30:00.000Z");
+
+// Der Stempel, den `makeMaster` trägt. `occurrenceVersion` hängt "|-" an, weil
+// die Fixture keine Exceptions führt.
+const MASTER_UPDATED_AT = "2026-05-01T00:00:00.000Z";
+const MASTER_VERSION = `${MASTER_UPDATED_AT}|-`;
 
 function makeOps(): EventOps {
   return {
@@ -49,6 +56,10 @@ function makeMaster(overrides: Partial<EventRow> = {}): EventRow {
   };
 }
 
+function makeRelations(overrides: Partial<EventRow> = {}): EventWithRelations {
+  return { ...makeMaster(overrides), event_types: null, event_exceptions: null };
+}
+
 const CHANGES: EventChanges = {
   title: "Neuer Titel",
   start_at: "2026-06-15T15:00:00.000Z",
@@ -63,11 +74,12 @@ const BASE_VARS: UpdateEventVars = {
   occurrenceDate: "2026-06-15",
   isRecurring: true,
   changes: CHANGES,
+  baseVersion: MASTER_VERSION,
 };
 
 describe("updateEvent", () => {
   test("scope=forward on recurring → uses refetched master for insertSplitEvent", async () => {
-    const master = makeMaster();
+    const master = makeRelations();
     const fetchMaster = mock((_id: string) => Promise.resolve(master));
     const ops = makeOps();
 
@@ -80,7 +92,7 @@ describe("updateEvent", () => {
   });
 
   test("scope=forward on a count-series uses the refetched count for the split", async () => {
-    const master = makeMaster({ rrule_count: 10 });
+    const master = makeRelations({ rrule_count: 10 });
     const fetchMaster = mock((_id: string) => Promise.resolve(master));
     const ops = makeOps();
 
@@ -101,6 +113,63 @@ describe("updateEvent", () => {
     );
     expect(ops.updateMaster).not.toHaveBeenCalled();
   });
+
+  test("wirft EventConflictError, wenn die Version abweicht", async () => {
+    const master = makeRelations({ updated_at: "2026-05-02T00:00:00.000Z" });
+    const fetchMaster = mock((_id: string) => Promise.resolve(master));
+    const ops = makeOps();
+
+    // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
+    await expect(updateEvent(BASE_VARS, { fetchMaster, ops })).rejects.toBeInstanceOf(
+      EventConflictError,
+    );
+    expect(ops.updateMaster).not.toHaveBeenCalled();
+  });
+
+  test("der Konflikt trägt die fremde Fassung mit", async () => {
+    const master = makeRelations({ updated_at: "2026-05-02T00:00:00.000Z", title: "Fremd" });
+    const fetchMaster = mock((_id: string) => Promise.resolve(master));
+
+    const error = await updateEvent(BASE_VARS, { fetchMaster, ops: makeOps() }).catch(
+      (err: unknown) => err,
+    );
+
+    expect(error).toBeInstanceOf(EventConflictError);
+    expect((error as EventConflictError).row?.title).toBe("Fremd");
+  });
+
+  test("eine fremde Exception an DIESEM Datum ist ein Konflikt", async () => {
+    const master = makeRelations();
+    master.event_exceptions = [
+      {
+        id: "ex-1",
+        event_id: "evt-1",
+        occurrence_date: "2026-06-15",
+        action: "modified",
+        override: null,
+        created_at: "2026-05-01T00:00:00.000Z",
+        updated_at: "2026-05-03T00:00:00.000Z",
+      },
+    ];
+    const fetchMaster = mock((_id: string) => Promise.resolve(master));
+    const ops = makeOps();
+
+    // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
+    await expect(updateEvent(BASE_VARS, { fetchMaster, ops })).rejects.toBeInstanceOf(
+      EventConflictError,
+    );
+  });
+
+  test("der Existenz-Check kommt vor dem Versions-Check", async () => {
+    // Ein gelöschter Termin ist „weg", nicht „geändert" — die Meldungen sind
+    // verschieden, und eine fehlende Zeile hat gar keine Version.
+    const fetchMaster = mock((_id: string) => Promise.resolve(null));
+
+    // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
+    await expect(updateEvent(BASE_VARS, { fetchMaster, ops: makeOps() })).rejects.toThrow(
+      /Event evt-1 not found/,
+    );
+  });
 });
 
 const DELETE_VARS: DeleteEventVars = {
@@ -108,11 +177,12 @@ const DELETE_VARS: DeleteEventVars = {
   eventId: "evt-1",
   occurrenceDate: "2026-06-15",
   isRecurring: true,
+  baseVersion: MASTER_VERSION,
 };
 
 describe("deleteEvent", () => {
   test("scope=forward on a count-series shrinks the count instead of writing until", async () => {
-    const fetchMaster = mock((_id: string) => Promise.resolve(makeMaster({ rrule_count: 10 })));
+    const fetchMaster = mock((_id: string) => Promise.resolve(makeRelations({ rrule_count: 10 })));
     const ops = makeOps();
 
     await deleteEvent({ ...DELETE_VARS, scope: "forward" }, { fetchMaster, ops });
@@ -124,7 +194,7 @@ describe("deleteEvent", () => {
   });
 
   test("scope=forward on an unbounded series still writes until", async () => {
-    const fetchMaster = mock((_id: string) => Promise.resolve(makeMaster()));
+    const fetchMaster = mock((_id: string) => Promise.resolve(makeRelations()));
     const ops = makeOps();
 
     await deleteEvent({ ...DELETE_VARS, scope: "forward" }, { fetchMaster, ops });
@@ -140,6 +210,19 @@ describe("deleteEvent", () => {
     // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
     await expect(deleteEvent(DELETE_VARS, { fetchMaster, ops })).rejects.toThrow(
       /Event evt-1 not found/,
+    );
+    expect(ops.deleteMaster).not.toHaveBeenCalled();
+  });
+
+  test("wirft EventConflictError, wenn die Version abweicht", async () => {
+    const fetchMaster = mock((_id: string) =>
+      Promise.resolve(makeRelations({ updated_at: "2026-05-02T00:00:00.000Z" })),
+    );
+    const ops = makeOps();
+
+    // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
+    await expect(deleteEvent(DELETE_VARS, { fetchMaster, ops })).rejects.toBeInstanceOf(
+      EventConflictError,
     );
     expect(ops.deleteMaster).not.toHaveBeenCalled();
   });

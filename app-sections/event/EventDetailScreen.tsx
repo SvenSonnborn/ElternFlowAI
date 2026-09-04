@@ -162,6 +162,7 @@ export function EventDetailScreen() {
                   eventId: data.eventId,
                   occurrenceDate: data.occurrenceDate,
                   isRecurring,
+                  baseVersion: data.version,
                 }),
               errorTitle: t("cal.delete.error"),
               // Nicht `err.message`: der Fehler-Toast läuft nie ab, eine rohe

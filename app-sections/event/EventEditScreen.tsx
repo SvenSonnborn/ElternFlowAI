@@ -229,6 +229,7 @@ export function EventEditScreen() {
         description: notes.trim() || null,
       },
       recurrence: recurrenceChanges,
+      baseVersion: occurrence.version,
     };
     // Sofort schließen: Die Änderung steht dank `onMutate` schon im Kalender.
     goBackOrToKalender();
