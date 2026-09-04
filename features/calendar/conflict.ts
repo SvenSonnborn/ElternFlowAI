@@ -46,7 +46,7 @@ function sameInstant(a: Date, b: string): boolean {
  *
  * Eine leere Liste heißt weiterhin: kein Dialog, der Schreibvorgang läuft
  * durch. Sie ist jetzt nur wieder das, was sie sein sollte — der Normalfall,
- * wenn niemand ins Gehege kommt.
+ * wenn niemand ins Gehege kommt (ADR-031).
  */
 export function differingEventFields(
   theirs: CalendarOccurrence,

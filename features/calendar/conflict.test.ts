@@ -71,11 +71,19 @@ describe("differingEventFields", () => {
   });
 
   test("Zeitpunkte werden als Zeitpunkt verglichen, nicht als Zeichenkette", () => {
+    // `base` weicht bewusst vom Standard-`startAt` ab (12:00Z statt 15:00Z),
+    // damit die Basis-Bedingung wahr ist und `sameInstant` tatsächlich
+    // ausgewertet wird — mit `base == theirs` (wie zuvor) würde der Kurzschluss
+    // vor `mine`-Vergleich schon greifen und der Toleranz-Test liefe leer.
     // Dasselbe Instant, andere Schreibweise — der Server liefert PostgREST-
     // Zeitstempel, das Formular `toISOString()`. Ein Stringvergleich meldete
     // hier eine Abweichung, die keine ist.
     expect(
-      differingEventFields(theirs(), mine({ start_at: "2026-06-15T17:00:00+02:00" }), theirs()),
+      differingEventFields(
+        theirs(),
+        mine({ start_at: "2026-06-15T17:00:00+02:00" }),
+        theirs({ startAt: new Date("2026-06-15T12:00:00.000Z") }),
+      ),
     ).toEqual([]);
   });
 
@@ -126,5 +134,18 @@ describe("differingEventFields — Drei-Wege", () => {
     // Der Fall aus Schritt 6 der Zwei-Client-Verifikation.
     const fremd = theirs({ location: "Praxis Nord" });
     expect(differingEventFields(fremd, mine({ title: "Neu" }), theirs())).toEqual(["location"]);
+  });
+
+  test("ein fremd verschobener Start ist ein Konflikt", () => {
+    // Positive Erkennung für start_at: theirs weicht vom eingefrorenen `base`
+    // ab, mein Formular trägt noch den alten Wert.
+    const fremd = theirs({ startAt: new Date("2026-06-15T18:00:00.000Z") });
+    expect(differingEventFields(fremd, mine(), theirs())).toEqual(["start_at"]);
+  });
+
+  test("ein fremd verschobenes Ende ist ein Konflikt", () => {
+    // Dasselbe für end_at.
+    const fremd = theirs({ endAt: new Date("2026-06-15T19:00:00.000Z") });
+    expect(differingEventFields(fremd, mine(), theirs())).toEqual(["end_at"]);
   });
 });
