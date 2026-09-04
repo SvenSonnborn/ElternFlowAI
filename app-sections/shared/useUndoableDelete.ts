@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { UNDO_WINDOW_MS, usePendingDeleteStore, type PendingDeleteKind } from "@/features/shared";
 
-import { useToast } from "./toastStore";
+import { useToast, type ToastAction } from "./toastStore";
 
 export interface UndoableDeleteArgs {
   kind: PendingDeleteKind;
@@ -17,6 +17,16 @@ export interface UndoableDeleteArgs {
   run: () => Promise<void>;
   errorTitle: string;
   formatError: (err: unknown) => string;
+  /**
+   * Optionale Aktion am Fehler-Toast, abhängig davon, *woran* es scheiterte.
+   *
+   * Bewusst eine Funktion über den Fehler und nicht ein fertiges `ToastAction`:
+   * „Trotzdem löschen" ergibt nur bei einem Konflikt Sinn, nicht bei einem
+   * Netzwerkfehler — und der Aufrufer ist der einzige, der den Fehler
+   * klassifizieren kann. `undefined` heißt: dieser Fehler bekommt keine Aktion,
+   * der Toast bleibt wie bisher.
+   */
+  errorAction?: (err: unknown) => ToastAction | undefined;
 }
 
 /**
@@ -60,6 +70,7 @@ export function useUndoableDelete(): (args: UndoableDeleteArgs) => void {
             message: args.formatError(err),
             variant: "error",
             position: "bottom",
+            action: args.errorAction?.(err),
           });
         }
       });

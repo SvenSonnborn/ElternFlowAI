@@ -10,8 +10,10 @@ import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
 import {
+  EventConflictError,
   isMultiDay,
   mapEventError,
+  occurrenceVersion,
   REMINDER_OFFSET_1H,
   REMINDER_OFFSET_24H,
   undoDeleteMessage,
@@ -170,6 +172,28 @@ export function EventDetailScreen() {
               // deutschen Oberfläche. `mapEventError` klassifiziert wie
               // `mapTaskError` bei den Aufgaben.
               formatError: (err) => t(mapEventError(err)),
+              // „Trotzdem löschen" statt eines Dialogs: Seit ADR-026 läuft das
+              // Löschen fünf Sekunden verzögert, der Nutzer ist längst auf
+              // einem anderen Screen und hat den Termin nicht mehr vor sich —
+              // ein Feldvergleich hätte dort nichts zu vergleichen (ADR-031).
+              // Die frische Basis-Version kommt aus der Fassung, die der
+              // Fehler mitträgt; ein Bypass ist damit nicht nötig.
+              errorAction: (err) => {
+                if (!(err instanceof EventConflictError) || !err.row) return undefined;
+                const fresh = occurrenceVersion(err.row, data.occurrenceDate);
+                return {
+                  label: t("conflict.deleteAnyway"),
+                  onPress: () => {
+                    void deleteMutation.mutateAsync({
+                      scope,
+                      eventId: data.eventId,
+                      occurrenceDate: data.occurrenceDate,
+                      isRecurring,
+                      baseVersion: fresh,
+                    });
+                  },
+                };
+              },
             });
             router.back();
           })();
