@@ -906,7 +906,7 @@ updateMaster: (
 ) => Promise<void>;
 ```
 
-In `applyEditScope` **alle vier** `ops.updateMaster`-Aufrufstellen ergänzen — `master` ist überall in Scope:
+In `applyEditScope` **alle fünf** `ops.updateMaster`-Aufrufstellen ergänzen (Zeilen 177, 186, 194, 213, 224) — `master` ist überall in Scope:
 
 ```ts
     await ops.updateMaster(eventId, changes, master.updated_at, recurrence);   // recurrence-Zweig
