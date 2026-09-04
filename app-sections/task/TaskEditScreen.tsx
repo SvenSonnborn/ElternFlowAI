@@ -88,10 +88,19 @@ export function TaskEditScreen() {
   // ausgenommen: der übergibt bewusst `theirs.updated_at`, die frische
   // Version, die der Server gerade gemeldet hat.
   const [baseVersion, setBaseVersion] = useState<string | null>(null);
+  // Dieselbe Invariante, derselbe Moment: `baseTask` ist die Zeile, aus der
+  // `state` entstanden ist — nicht die, die `useTask` gerade führt. Sie
+  // gehört neben `baseVersion`, weil beide denselben Stand beschreiben und
+  // nicht auseinanderlaufen dürfen. `differingTaskFields` braucht sie als
+  // `base`, um eigene Änderungen (mein Formular weicht von `theirs` ab, weil
+  // *ich* etwas geändert habe) von echten Konflikten (`theirs` weicht von
+  // *dieser* Basis ab) zu unterscheiden — siehe `conflict.ts`.
+  const [baseTask, setBaseTask] = useState<TaskWithType | null>(null);
 
   if (task && !hydrated) {
     setState(taskToForm(task));
     setBaseVersion(task.updated_at);
+    setBaseTask(task);
     setHydrated(true);
   }
 
@@ -177,8 +186,16 @@ export function TaskEditScreen() {
     let rows: ConflictRow[];
     try {
       theirs = err.row;
-      fields = differingTaskFields(theirs, vars.changes);
-      if (fields.length === 0) {
+      // Fehlt `baseTask` (theoretisch: der Konflikt trifft vor der Hydration
+      // ein), bleibt `fields` leer — aber der Guard darunter prüft `baseTask`
+      // zusätzlich zu `fields.length === 0`, damit eine fehlende Basis nicht
+      // denselben Weg nimmt wie ein echtes „niemand hat etwas geändert". Ohne
+      // Basis lässt sich das gar nicht feststellen, also muss der Dialog
+      // erscheinen — ohne Zeilen, aber sichtbar. Genau die Überlegung, die im
+      // Kalender-Sheet den `row === null`-Fall schon heute in den Dialog statt
+      // ins Durchspeichern schickt.
+      fields = baseTask ? differingTaskFields(theirs, vars.changes, baseTask) : [];
+      if (baseTask && fields.length === 0) {
         submit({ ...vars, baseVersion: theirs.updated_at });
         return;
       }
