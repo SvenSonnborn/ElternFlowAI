@@ -1,7 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import type { Database } from "@/features/supabase/database.types";
-
 import { supabase } from "@/features/supabase";
 
 import type { EventWithRelations } from "./expand";
@@ -29,8 +27,6 @@ export {
   type RecurrenceOption,
   type RruleFields,
 } from "./createMutation";
-
-type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
 export interface DeleteEventVars {
   scope: EditScope;
@@ -60,7 +56,7 @@ export interface UpdateEventDeps {
  * „weg" und „geändert" sind verschiedene Meldungen, und eine fehlende Zeile
  * hat keine Version, gegen die verglichen werden könnte. Der Fetch war für
  * `applyEditScope` ohnehin nötig, der Vergleich kostet also nichts zusätzlich
- * — und deckt alle vier Scopes ab, auch den mehrstufigen Forward-Split, der
+ * — und deckt alle Scopes ab, auch den mehrstufigen Forward-Split, der
  * `updateMaster` (und damit dessen eigenes Compare-and-Swap) gar nicht ruft.
  */
 export async function updateEvent(vars: UpdateEventVars, deps: UpdateEventDeps): Promise<void> {
@@ -68,8 +64,6 @@ export async function updateEvent(vars: UpdateEventVars, deps: UpdateEventDeps):
   if (!master) {
     throw new EventNotFoundError(vars.eventId);
   }
-  // Der Existenz-Check steht bewusst davor: „weg" und „geändert" sind
-  // verschiedene Meldungen, und eine fehlende Zeile hat keine Version.
   if (occurrenceVersion(master, vars.occurrenceDate) !== vars.baseVersion) {
     throw new EventConflictError(master);
   }
@@ -94,8 +88,6 @@ export async function deleteEvent(vars: DeleteEventVars, deps: UpdateEventDeps):
   if (!master) {
     throw new EventNotFoundError(vars.eventId);
   }
-  // Der Existenz-Check steht bewusst davor: „weg" und „geändert" sind
-  // verschiedene Meldungen, und eine fehlende Zeile hat keine Version.
   if (occurrenceVersion(master, vars.occurrenceDate) !== vars.baseVersion) {
     throw new EventConflictError(master);
   }
