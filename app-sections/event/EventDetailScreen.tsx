@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Alert, Pressable, ScrollView, Switch, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ChildAvatar, Icon, useUndoableDelete } from "@/app-sections/shared";
+import { ChildAvatar, Icon, useToast, useUndoableDelete } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
@@ -75,6 +75,7 @@ export function EventDetailScreen() {
 
   const deleteMutation = useDeleteEvent();
   const undoableDelete = useUndoableDelete();
+  const { show } = useToast();
   const reminders = useEventReminders(id ?? "");
   const toggleReminder = useToggleReminder();
   const familyId = parent.data?.family_id ?? null;
@@ -177,20 +178,43 @@ export function EventDetailScreen() {
               // einem anderen Screen und hat den Termin nicht mehr vor sich —
               // ein Feldvergleich hätte dort nichts zu vergleichen (ADR-031).
               // Die frische Basis-Version kommt aus der Fassung, die der
-              // Fehler mitträgt; ein Bypass ist damit nicht nötig.
+              // Fehler mitträgt; ein Bypass ist damit nicht nötig. Der Retry
+              // läuft ohne eigenes Undo-Fenster: Der Nutzer hat gerade
+              // ausdrücklich entschieden, ein zweites „bist du sicher?" wäre
+              // eine Rückfrage auf eine Antwort, die schon gegeben ist.
               errorAction: (err) => {
                 if (!(err instanceof EventConflictError) || !err.row) return undefined;
                 const fresh = occurrenceVersion(err.row, data.occurrenceDate);
                 return {
                   label: t("conflict.deleteAnyway"),
                   onPress: () => {
-                    void deleteMutation.mutateAsync({
-                      scope,
-                      eventId: data.eventId,
-                      occurrenceDate: data.occurrenceDate,
-                      isRecurring,
-                      baseVersion: fresh,
-                    });
+                    // `useDeleteEvent` kennt nur `onSuccess`, kein `onError` —
+                    // ohne dieses `.catch()` verschwindet ein zweiter
+                    // Kollisions- oder Netzwerkfehler lautlos: kein
+                    // `unhandledrejection`-Handler und keine ErrorBoundary im
+                    // Repo fangen ihn auf, siehe `showConflict` in
+                    // `EventEditScreen.tsx`. Bewusst ohne eine zweite
+                    // „Trotzdem löschen"-Aktion: Eine Aktion, die sich selbst
+                    // nachreicht, baute eine Kette, die nur wächst. Der Termin
+                    // steht ja noch — der Nutzer kann ihn regulär erneut
+                    // löschen, dann mit vollem Undo-Fenster. Ein Toast, der
+                    // den Fehlschlag benennt, ist hier die ehrliche Auskunft.
+                    deleteMutation
+                      .mutateAsync({
+                        scope,
+                        eventId: data.eventId,
+                        occurrenceDate: data.occurrenceDate,
+                        isRecurring,
+                        baseVersion: fresh,
+                      })
+                      .catch((retryErr: unknown) => {
+                        show({
+                          title: t("cal.delete.error"),
+                          message: t(mapEventError(retryErr)),
+                          variant: "error",
+                          position: "bottom",
+                        });
+                      });
                   },
                 };
               },
