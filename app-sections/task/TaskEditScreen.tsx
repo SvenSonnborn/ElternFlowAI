@@ -176,9 +176,12 @@ export function TaskEditScreen() {
    * Dialog stehen lassen, während der Screen — mangels Navigation — mit dem
    * veralteten Formular montiert bliebe, genau das Loch, das die
    * `goBackOrToTasks()`-Zeile unten schließen soll. Anders als im
-   * Kalender-Sheet braucht der `catch`-Zweig hier keinen Fallback-Toast
-   * (den gibt es in diesem Screen nicht) — er loggt stattdessen, weil es
-   * sonst keinen Kanal für diesen seltenen Fall gibt.
+   * Kalender-Sheet zeigt der `catch`-Zweig hier keinen Toast (den gibt es in
+   * diesem Screen nicht); er loggt und lässt den Screen stehen, womit
+   * `updateMutation.error` die Inline-Zeile mit `hw.error.conflict` rendert —
+   * eine Meldung über den Konflikt, obwohl fehlgeschlagen der Aufbau des
+   * Vergleichs ist. Der Log trägt als einziger den echten Grund; siehe den
+   * Kommentar im `catch` selbst.
    */
   function showConflict(err: TaskConflictError, vars: Parameters<typeof updateMutation.mutate>[0]) {
     let theirs: TaskWithType;
@@ -205,10 +208,17 @@ export function TaskEditScreen() {
         mine: `${t("conflict.mine")}: ${formatTaskField(field, vars.changes)}`,
       }));
     } catch (renderErr) {
-      // Kein Fallback-Kanal in diesem Screen (kein Toast) — loggen ist alles,
-      // was hier möglich ist. Nur sichere Primitive (Name, ob eine Message
-      // vorlag), keine rohe Fehlermeldung: Die kann Aufgabentitel enthalten
-      // (dieselbe Vorsicht wie in `mapTaskError`).
+      // Kein Toast in diesem Screen, und dieser Zweig navigiert auch nicht —
+      // der Screen bleibt montiert, `updateMutation.error` rendert also
+      // weiterhin die Inline-Zeile unter dem Formular. Der Nutzer sieht damit
+      // `hw.error.conflict`, also die Meldung über den *Konflikt*, während
+      // fehlgeschlagen ist der *Aufbau des Vergleichs*. Das ist die bewusst in
+      // Kauf genommene Ungenauigkeit: Eine eigene Meldung dafür bräuchte einen
+      // neuen Copy-Key, und die Inline-Zeile ist inhaltlich näher an der Lage
+      // (es liegt ein Konflikt vor) als gar nichts. Der Logeintrag ist der
+      // einzige Kanal, der den *echten* Grund trägt. Nur sichere Primitive
+      // (Name, ob eine Message vorlag), keine rohe Fehlermeldung: Die kann
+      // Aufgabentitel enthalten (dieselbe Vorsicht wie in `mapTaskError`).
       console.error("[TaskEditScreen] showConflict: Aufbau des Vergleichs fehlgeschlagen", {
         name: renderErr instanceof Error ? renderErr.name : typeof renderErr,
         hasMessage: renderErr instanceof Error && renderErr.message.length > 0,
