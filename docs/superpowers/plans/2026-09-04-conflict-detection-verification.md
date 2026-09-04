@@ -175,3 +175,136 @@ kollidiert.
 Fläche im `KalenderScreen` (vermutlich `enableSwipeMonths`-Pager) fing auf Web
 Mausklicks auf die Tagesagenda ab — umgangen für diesen Testlauf, nicht
 weiter untersucht.
+
+## Nachlauf: Schritt 6 nach dem Drei-Wege-Umbau
+
+Nachdem der Feldvergleich von zweiwertig (`theirs` vs. `mine`) auf dreiwertig
+umgestellt wurde (`differingEventFields`/`differingTaskFields` vergleichen
+jetzt zusätzlich gegen `base`, den beim Öffnen des Formulars eingefrorenen
+Stand — siehe `features/calendar/conflict.ts`, `features/tasks/conflict.ts`),
+wurde Schritt 6 erneut gefahren, für Termin **und** Aufgabe, plus zwei
+Gegenproben (6b, 6c), die vor dem Umbau nicht sinnvoll durchführbar waren.
+Gleicher Aufbau wie der erste Lauf: zwei persistente, bereits angemeldete
+Playwright-Kontexte (`ctx-a`/`ctx-b`, „SV" / Familie Becker) gegen
+`http://localhost:8082`, ein Skript, sequenziell, saubere `context.close()`
+im `finally`-Block. Skript: `followup_step6.py` (Scratch-Verzeichnis der
+Session, nicht committet), Log: `followup-log.txt`, Screenshots `f01`–`f29`
+(ebenfalls Scratch, nicht committet).
+
+**Navigationsfalle des ersten Versuchs:** Ein erster Anlauf, der für jedes
+Teilszenario einen frischen Termin anlegte, brach beim Erzeugen des zweiten
+Termins mit einem Playwright-Timeout auf „Termin hinzufügen" ab. Ursache:
+`event/[id]` ist selbst ein `presentation: "formSheet"`-Screen im
+ROOT-Stack (`app/_layout.tsx`), nicht Teil der `(tabs)`-Gruppe. „Bearbeiten"
+pusht das Edit-Sheet eine Ebene _über_ das Detail-Sheet; ein Speichern poppt
+per `router.back()` nur diese eine Ebene zurück auf das Detail-Sheet, nicht
+bis zum Kalender-Tab. Ein Klick auf das „Kalender"-Tab-Label traf dabei zwar
+ein im DOM vorhandenes, aber von den Sheet-Ebenen verdecktes Element — ohne
+Fehler, aber ohne Wirkung, weil die Stack-Ebene darüber liegen blieb, sodass
+„Termin hinzufügen" nie erreichbar wurde. Der zweite (hier protokollierte)
+Anlauf hat das umgangen, indem EVENT-6/6b/6c bewusst auf **demselben**
+Testtermin laufen, nacheinander — genau das Muster, das `run1_event.py`
+bereits über seine Schritte 1–6 hinweg benutzt hat: beide Clients bleiben auf
+dem einmal geöffneten Detail-Sheet und öffnen „Bearbeiten" für jedes
+Teilszenario erneut (jeder Öffnen-Klick hydriert ohnehin frisch von der
+lebenden Query). Erst nach EVENT-6c wurde einmal „Schließen" auf beiden
+Seiten geklickt, um sauber zum Kalender-Tab für den Aufgaben-Teil
+zurückzukehren — dort gibt es keine Detail-Sheet-Ebene: ein Klick auf eine
+Aufgabenzeile öffnet das Edit-Sheet direkt aus der Aufgaben-Tab-Liste, ein
+Speichern poppt daher in einem Schritt zurück bis dorthin.
+
+Die Zeilenzahl im Dialog wurde jeweils zweifach geprüft: automatisiert über
+die Anzahl der Text-Knoten, die mit „Jetzt gespeichert:" beginnen (genau
+einer pro Vergleichszeile, unabhängig vom Feldnamen), und zusätzlich per
+Sichtprüfung des Screenshots mit dem Read-Tool — nicht aus dem DOM
+geschlossen.
+
+### Termin, Schritt 6 (B ändert Ort, A ändert Titel)
+
+| Erwartet                               | Beobachtet                                                                                                                                                                                         | Screenshot                |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| Dialog mit genau **einer** Zeile „Ort" | Bestätigt exakt — Dialog erschienen, **1 Zeile**, Label `['Ort']`: „Jetzt gespeichert: Ort von B (Schritt 6)" / „Deine Fassung: Zuhause". A's eigene Titeländerung taucht **nicht** als Zeile auf. | `f10-a-event6-dialog.png` |
+
+Das ist der Kernbefund des Nachlaufs: Im ersten Lauf hatte exakt dieses
+Szenario zwei Zeilen geliefert („Titel" und „Ort"), weil der zweiwertige
+Vergleich A's eigene, unveränderte Ort-Angabe fälschlich als Konflikt
+gegen B's frischen Wert gewertet hat. Mit `base` als drittem Wert bleibt nur
+noch die Zeile stehen, die tatsächlich einen Konflikt beschreibt: A's
+Speichern würde B's Ortsänderung zurückdrehen (mine.location = „Zuhause" ≠
+theirs.location = „Ort von B"), während A's Titeländerung niemanden
+überschreibt, den B nicht angefasst hat.
+
+### Aufgabe, Schritt 6 (B ändert Fach, A ändert Titel)
+
+| Erwartet                                | Beobachtet                                                                                                                 | Screenshot                |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| Dialog mit genau **einer** Zeile „Fach" | Bestätigt exakt — Dialog erschienen, **1 Zeile**, Label `['Fach']`: „Jetzt gespeichert: Deutsch" / „Deine Fassung: Mathe". | `f29-a-taskT6-dialog.png` |
+
+Identisch zum Termin-Fall — dieselbe Korrektur wirkt in
+`differingTaskFields` genau wie in `differingEventFields`, wie schon im
+ersten Lauf beobachtet, dass beide Implementierungen strukturell denselben
+Fehlermodus (und jetzt: dieselbe Korrektur) teilen.
+
+### Gegenprobe 6b: B speichert unverändert, dann ändert A den Titel
+
+Durchführbar wie spezifiziert — ein unverändertes Speichern löst sehr wohl
+einen Schreibvorgang aus: `EventEditScreen.onSave` prüft nicht, ob sich
+Feldwerte geändert haben, und der `BEFORE UPDATE`-Trigger
+`public.set_updated_at()` (`supabase/migrations/20260904075041_conflict_detection.sql`)
+stempelt `updated_at` bei **jedem** `UPDATE` neu, unabhängig vom Inhalt.
+
+Ablauf: B öffnet das Bearbeiten-Sheet auf demselben Stand wie A, ändert kein
+Feld und klickt „Speichern" — die Version springt server-seitig, obwohl sich
+kein Feldwert ändert. A (Sheet weiterhin auf dem alten, eingefrorenen Stand)
+ändert danach nur den Titel und speichert.
+
+| Erwartet                            | Beobachtet                                                                                                                                                                                                                                                                  | Screenshot                                                                                                   |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **Kein Dialog** — A speichert durch | Bestätigt exakt — kein Dialog (5 s Wartezeit ausgeschöpft, kein „Gleichzeitig bearbeitet"-Text erschienen). A's Titeländerung ist sichtbar durchgespeichert (Detail zeigt „… · A6b"), B's zuvor gehaltener Ort („Ort von B (Schritt 6)") blieb dabei unangetastet erhalten. | `f16-a-event6b-dialog-check.png` (kein Dialog), `f17-a-event6b-final-detail.png` (Detail nach dem Speichern) |
+
+Das ist der wertvollste der vier Nachlauf-Befunde: Vor dem Drei-Wege-Umbau
+konnte dieser Fall gar nicht eintreten, weil der volle Formular-Snapshot
+(`mine`) immer gegen die frische Server-Zeile (`theirs`) verglichen wurde —
+A's eigene, unveränderte Felder wichen dabei zwangsläufig von _irgendeinem_
+frischen Wert ab, sobald die Version sprang, und die Liste war nach jedem
+Versionssprung nicht-leer. Die Regel „leere Liste → durchspeichern"
+(`ADR-031`) war damit **praktisch tot** — es gab keinen erreichbaren Pfad,
+auf dem sie feuerte. Dass hier jetzt „Version gesprungen, Inhalt weicht
+nicht ab → kein Dialog" korrekt herauskommt, ist der Beleg, dass diese Regel
+nach dem Umbau tatsächlich wieder einen echten, beobachtbaren Fall abdeckt —
+nicht nur theoretisch im Code steht.
+
+### Gegenprobe 6c: B und A ändern beide den Titel, auf verschiedene Werte
+
+| Erwartet                                                   | Beobachtet                                                                                                                    | Screenshot                 |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| Dialog mit genau **einer** Zeile „Titel" — echter Konflikt | Bestätigt exakt — Dialog erschienen, **1 Zeile**, Label `['Titel']`: „Jetzt gespeichert: … · B6c" / „Deine Fassung: … · A6c". | `f22-a-event6c-dialog.png` |
+
+Bestätigt, dass der Drei-Wege-Umbau einen echten, von beiden Seiten
+berührten Feldkonflikt weiterhin zuverlässig meldet — die Korrektur hat den
+Guard nicht „scharf" gemacht in dem Sinne, dass er jetzt zu wenig meldet.
+
+### Nebenbeobachtungen
+
+- **Realtime für Termine** funktionierte wie in ADR-030 beschrieben: B sah
+  den neu angelegten Testtermin nach ~0 s, ohne eigenes Zutun (Log:
+  „B sieht … nach ~0s (Realtime)").
+- **Keine Realtime-Schicht für Aufgaben** (ADR-030 deckt nur
+  `events`/`event_exceptions` ab) — B musste die neue Testaufgabe per
+  `page.reload()` nachladen, um sie zu sehen. Erwartetes, dokumentiertes
+  Scope-Verhalten, kein Fehler — deckungsgleich mit dem ersten Lauf.
+
+### Fazit des Nachlaufs
+
+Alle vier Szenarien treffen die im Auftrag formulierte, korrigierte
+Erwartung exakt — für Termin und Aufgabe je eine Zeile beim echten
+Feldkonflikt (Schritt 6), kein Dialog beim inhaltlich leeren Versionssprung
+(6b), und weiterhin zuverlässige Meldung beim echten, beidseitig berührten
+Feld (6c). Der im ersten Lauf als „wichtigster negativer Befund" markierte
+Konstruktionsfehler — der Guard schlug an, obwohl A und B disjunkte Felder
+geändert hatten — ist mit dem Drei-Wege-Vergleich (`base`/`mine`/`theirs`)
+behoben und hier für beide Entitäten (Termin, Aufgabe) sowie für den bislang
+unerreichbaren Leer-Listen-Pfad (6b) neu und positiv belegt. Das
+non-negotiable Ziel aus dem ursprünglichen Task-Brief — „der Mechanismus
+schlägt nicht an, wo er nicht soll" — ist damit, anders als im ersten Lauf,
+jetzt erfüllt.
