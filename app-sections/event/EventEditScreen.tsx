@@ -6,11 +6,14 @@ import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { DateTimePickerSheet, Field, useToast } from "@/app-sections/shared";
+import { DateTimePickerSheet, Field, useConflict, useToast } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import {
   applyRangePick,
+  differingEventFields,
+  EventConflictError,
+  expandEvents,
   isDateRangeInvalid,
   isTimeRangeInvalid,
   mapEventError,
@@ -23,6 +26,7 @@ import {
   useUpdateEvent,
   type DateRange,
   type EditScope,
+  type EventConflictField,
   type RangeField,
   type RecurrenceChanges,
   type RecurrenceOption,
@@ -33,6 +37,15 @@ import { RecurrenceRadio } from "./RecurrenceRadio";
 import { pickScope } from "./scopeDialog";
 import { createSubmitLock } from "./submitLock";
 
+/** Welcher Copy-Key welches Feld benennt — die Beschriftungen des Formulars. */
+const FIELD_LABEL_KEY: Record<EventConflictField, string> = {
+  title: "cal.edit.fieldTitle",
+  start_at: "cal.edit.fieldStart",
+  end_at: "cal.edit.fieldEnd",
+  location: "cal.edit.fieldLocation",
+  description: "cal.edit.fieldNotes",
+};
+
 export function EventEditScreen() {
   const { id, occ } = useLocalSearchParams<{ id?: string; occ?: string }>();
   const { t, i18n } = useTranslation();
@@ -42,6 +55,7 @@ export function EventEditScreen() {
 
   const { data: occurrence, isLoading } = useEvent(id ?? "", occ);
   const { show } = useToast();
+  const conflict = useConflict();
   const updateMutation = useUpdateEvent();
   // Siehe `submitLock.ts`: sperrt einen zweiten Tap auf „Speichern" während
   // der Schließanimation nach `router.back()`, in der der Button noch
@@ -142,14 +156,49 @@ export function EventEditScreen() {
   }
 
   /**
+   * Ein Feldwert, wie er im Vergleich lesbar ist. `—` für „nicht gesetzt".
+   *
+   * `source` deckt sowohl eine fremde `CalendarOccurrence` als auch das aus
+   * `vars.changes` gebaute Objekt der eigenen Eingabe ab — beide tragen
+   * dieselben fünf Felder, nur unter anderen Typen (`Date` vs. ISO-String für
+   * die Zeiten kommt hier schon aufgelöst als `Date` an).
+   */
+  function formatField(
+    field: EventConflictField,
+    source: {
+      title: string;
+      startAt: Date;
+      endAt: Date;
+      location: string | null;
+      description: string | null;
+    },
+  ): string {
+    switch (field) {
+      case "title":
+        return source.title || "—";
+      case "start_at":
+        return format(source.startAt, "E, d. MMM yyyy, HH:mm", { locale: dateLocale });
+      case "end_at":
+        return format(source.endAt, "E, d. MMM yyyy, HH:mm", { locale: dateLocale });
+      case "location":
+        return source.location?.trim() || "—";
+      case "description":
+        return source.description?.trim() || "—";
+    }
+  }
+
+  /**
    * Schickt die Mutation und meldet einen Fehlschlag selbst.
    *
    * Bewusst `mutateAsync` mit eigenem `catch` statt eines Per-Call-`onError`:
    * Das Sheet ist unmontiert, bevor der Server antwortet, und TanStack Query
    * ruft Per-Call-Callbacks dann nicht mehr — festgehalten in
-   * `features/tasks/mutateAsyncSurvivesUnmount.test.ts`. Die Retry-Aktion
-   * schickt dieselben `vars` erneut, damit der Rollback dem Nutzer nicht die
-   * Eingaben nimmt.
+   * `features/tasks/mutateAsyncSurvivesUnmount.test.ts`. Genau deshalb geht der
+   * Konflikt-Fall in den Store und nicht in lokalen State: Dieser `catch` ist
+   * eine Closure und überlebt den Unmount, ein `useState` nicht (ADR-031).
+   *
+   * Die Retry-Aktion schickt dieselben `vars` erneut, damit der Rollback dem
+   * Nutzer nicht die Eingaben nimmt.
    *
    * Eine Funktionsdeklaration statt `useCallback`, damit sie sich in der
    * Retry-Aktion selbst aufrufen kann — und weil der Screen seine übrigen
@@ -157,6 +206,10 @@ export function EventEditScreen() {
    */
   function save(vars: Parameters<typeof updateMutation.mutateAsync>[0]) {
     updateMutation.mutateAsync(vars).catch((err: unknown) => {
+      if (err instanceof EventConflictError) {
+        showConflict(err, vars);
+        return;
+      }
       show({
         title: t("cal.edit.error.saveFailed"),
         message: t(mapEventError(err)),
@@ -169,6 +222,66 @@ export function EventEditScreen() {
           },
         },
       });
+    });
+  }
+
+  /**
+   * Öffnet den Vergleich — oder speichert stillschweigend durch.
+   *
+   * Weicht inhaltlich nichts ab, gibt es nichts zu entscheiden: Jemand hat
+   * dasselbe geändert, oder etwas, das dieser Nutzer gar nicht angefasst hat.
+   * Ein Dialog wäre dann nur im Weg (ADR-031). Der Wiederholungsversuch nimmt
+   * die **frische** Version als Basis — kein `force`-Flag, kein Bypass: Er kann
+   * erneut kollidieren, wenn ein Dritter dazwischenschreibt.
+   */
+  function showConflict(
+    err: EventConflictError,
+    vars: Parameters<typeof updateMutation.mutateAsync>[0],
+  ) {
+    // Kein `row` heißt: der Compare-and-Swap hat den Konflikt erkannt, ohne die
+    // fremde Fassung zu kennen. Dann steht der Dialog ohne Vergleichszeilen —
+    // und ohne frische Version bleibt nur die alte als Basis, der zweite
+    // Versuch schlägt also erneut fehl, bis der Refetch durch ist. Das ist
+    // ehrlicher als stilles Überschreiben.
+    const theirs = err.row
+      ? (expandEvents(
+          [err.row],
+          new Date(vars.changes.start_at),
+          new Date(vars.changes.end_at),
+          theme,
+        ).find((o) => o.occurrenceDate === vars.occurrenceDate) ?? null)
+      : null;
+
+    const fields = theirs ? differingEventFields(theirs, vars.changes) : [];
+    if (theirs && fields.length === 0) {
+      save({ ...vars, baseVersion: theirs.version });
+      return;
+    }
+
+    const mineSource = {
+      title: vars.changes.title,
+      startAt: new Date(vars.changes.start_at),
+      endAt: new Date(vars.changes.end_at),
+      location: vars.changes.location,
+      description: vars.changes.description,
+    };
+
+    conflict.show({
+      title: t("conflict.title"),
+      body: t("conflict.body.event"),
+      rows:
+        theirs === null
+          ? []
+          : fields.map((field) => ({
+              label: t(FIELD_LABEL_KEY[field]),
+              theirs: `${t("conflict.theirs")}: ${formatField(field, theirs)}`,
+              mine: `${t("conflict.mine")}: ${formatField(field, mineSource)}`,
+            })),
+      keepMineLabel: t("conflict.keepMine"),
+      keepTheirsLabel: t("conflict.keepTheirs"),
+      onKeepMine: () => {
+        save({ ...vars, baseVersion: theirs?.version ?? vars.baseVersion });
+      },
     });
   }
 
