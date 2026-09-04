@@ -1,10 +1,14 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { describe, expect, mock, test } from "bun:test";
 
 import type { Database } from "@/features/supabase/database.types";
 
+import { EventConflictError } from "./errors";
 import {
   applyDeleteScope,
   applyEditScope,
+  createSupabaseEventOps,
   type EventChanges,
   type EventOps,
   type RecurrenceChanges,
@@ -64,8 +68,12 @@ function makeMaster(overrides: Partial<EventRow> = {}): EventRow {
     rrule_until: null,
     rrule_count: null,
     created_by: null,
-    created_at: "2026-05-01T00:00:00.000Z",
-    updated_at: "2026-05-01T00:00:00.000Z",
+    // Bewusst ungleich `updated_at`: Die neun CAS-Assertions unten prüfen, dass
+    // `updateMaster` genau den Stempel von `updated_at` durchreicht — mit
+    // identischen Werten hätte ein `master.created_at`-Vertipper unbemerkt
+    // durchgehen können.
+    created_at: "2026-04-20T00:00:00.000Z",
+    updated_at: MASTER_UPDATED_AT,
     ...overrides,
   };
 }
@@ -555,5 +563,104 @@ describe("applyEditScope", () => {
     });
 
     expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, "2026-05-09T08:00:00.000Z");
+  });
+});
+
+// ── createSupabaseEventOps ────────────────────────────────────────────────
+// Bisher die einzige Suite, die den Supabase-Adapter selbst anfasst: Ohne sie
+// blieben alle Kalender-Tests grün, würde man `.eq("updated_at", …)` oder das
+// `if (!data) throw` aus `updateMaster` entfernen — genau die Hälfte des CAS,
+// die dem Task seinen Namen gibt.
+
+const SEEN_UPDATED_AT = "2026-05-01T00:00:00.000Z";
+
+/**
+ * Doppelgänger des Query-Builders, den `updateMaster` durchläuft
+ * (`.from().update().eq().eq().select().maybeSingle()`). Kein `mock.module`:
+ * `createSupabaseEventOps` nimmt den Client als Parameter, genau damit ein
+ * Test ihn ersetzen kann — gleiches Muster wie `fakeClient` in
+ * `features/realtime/subscribe.test.ts`.
+ */
+function fakeUpdateClient(result: { data: { id: string } | null; error: unknown }) {
+  const calls = {
+    table: "",
+    updatePayload: undefined as unknown,
+    eqCalls: [] as [string, unknown][],
+    selectColumns: "",
+  };
+  const builder = {
+    eq(column: string, value: unknown) {
+      calls.eqCalls.push([column, value]);
+      return builder;
+    },
+    select(columns: string) {
+      calls.selectColumns = columns;
+      return builder;
+    },
+    maybeSingle: () => Promise.resolve(result),
+  };
+  const client = {
+    from(table: string) {
+      calls.table = table;
+      return {
+        update(payload: unknown) {
+          calls.updatePayload = payload;
+          return builder;
+        },
+      };
+    },
+  };
+  return { client: client as unknown as SupabaseClient<Database>, calls };
+}
+
+describe("createSupabaseEventOps", () => {
+  test("updateMaster filtert auf id UND den gerade gelesenen Stempel", async () => {
+    const { client, calls } = fakeUpdateClient({ data: { id: "evt-1" }, error: null });
+    const ops = createSupabaseEventOps(client);
+
+    await ops.updateMaster("evt-1", CHANGES, SEEN_UPDATED_AT);
+
+    expect(calls.table).toBe("events");
+    expect(calls.updatePayload).toEqual(CHANGES);
+    expect(calls.eqCalls).toEqual([
+      ["id", "evt-1"],
+      ["updated_at", SEEN_UPDATED_AT],
+    ]);
+  });
+
+  test("maybeSingle liefert keine Zeile → EventConflictError, nicht die fremde Fassung", async () => {
+    const { client } = fakeUpdateClient({ data: null, error: null });
+    const ops = createSupabaseEventOps(client);
+
+    const error = await ops
+      .updateMaster("evt-1", CHANGES, SEEN_UPDATED_AT)
+      .catch((err: unknown) => err);
+
+    // `null` statt der fremden Fassung: Hier ist nur bekannt, *dass* jemand
+    // dazwischengeschrieben hat, nicht *was* — siehe Docstring in errors.ts.
+    expect(error).toBeInstanceOf(EventConflictError);
+    expect((error as EventConflictError).row).toBeNull();
+  });
+
+  test("maybeSingle liefert eine Zeile → kein Wurf", async () => {
+    const { client } = fakeUpdateClient({ data: { id: "evt-1" }, error: null });
+    const ops = createSupabaseEventOps(client);
+
+    // Kein `.resolves`: dieselbe `@typescript-eslint/await-thenable`-Lücke in
+    // @types/bun wie bei `.rejects` (siehe die anderen Suiten). Ein Wurf hier
+    // ließe den Test selbst fehlschlagen.
+    await ops.updateMaster("evt-1", CHANGES, SEEN_UPDATED_AT);
+  });
+
+  test("ein PostgREST-Fehler wird durchgereicht, nicht als Konflikt maskiert", async () => {
+    const pgError = { message: "connection reset", code: "08006" };
+    const { client } = fakeUpdateClient({ data: null, error: pgError });
+    const ops = createSupabaseEventOps(client);
+
+    const error = await ops
+      .updateMaster("evt-1", CHANGES, SEEN_UPDATED_AT)
+      .catch((err: unknown) => err);
+
+    expect(error).toBe(pgError);
   });
 });
