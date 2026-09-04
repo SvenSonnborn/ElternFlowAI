@@ -1,3 +1,5 @@
+import type { TaskWithType } from "./types";
+
 /**
  * Thrown before any network call when a mutation needs the current parent row
  * and it is not loaded. Naming the failure locally beats firing a request that
@@ -10,8 +12,27 @@ export class MissingParentError extends Error {
   }
 }
 
+/**
+ * Someone else changed the task since this form loaded it.
+ *
+ * Carries their version so the screen can diff it field by field against the
+ * user's own input without a second round trip (ADR-031). Unlike the calendar's
+ * counterpart, `row` is never null here: the task path detects the conflict via
+ * compare-and-swap and then reads the row precisely to fill this in.
+ */
+export class TaskConflictError extends Error {
+  constructor(readonly row: TaskWithType) {
+    super("Task was modified by someone else");
+    this.name = "TaskConflictError";
+  }
+}
+
 export type TaskErrorKey =
-  "hw.error.notAuthenticated" | "hw.error.staleReference" | "hw.error.network" | "hw.error.generic";
+  | "hw.error.notAuthenticated"
+  | "hw.error.staleReference"
+  | "hw.error.conflict"
+  | "hw.error.network"
+  | "hw.error.generic";
 
 interface ErrorLike {
   message?: string;
@@ -34,6 +55,7 @@ export function mapTaskError(input: unknown): TaskErrorKey {
   if (!err) return "hw.error.generic";
 
   if (err.name === "MissingParentError") return "hw.error.notAuthenticated";
+  if (err.name === "TaskConflictError") return "hw.error.conflict";
 
   // Postgres SQLSTATE codes — checked first because they're specific.
   // 42501 is RLS refusing the row; 23503 means the child or task type the row

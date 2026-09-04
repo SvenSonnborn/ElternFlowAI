@@ -1,3 +1,5 @@
+import type { EventWithRelations } from "./expand";
+
 /**
  * Fehler-Klassifizierung für den Kalender — das Gegenstück zu `mapTaskError`
  * in [features/tasks/errors.ts](../tasks/errors.ts), aus demselben Anlass und
@@ -28,8 +30,32 @@ export class EventNotFoundError extends Error {
   }
 }
 
+/**
+ * Jemand anderes hat den Termin geändert, seit dieses Formular ihn geladen hat.
+ *
+ * Trägt die fremde Fassung mit, damit der Screen sie ohne zweiten Roundtrip
+ * mit `expandEvents` auflösen und Feld für Feld gegen die eigene Eingabe
+ * stellen kann — genau das, was der Vergleichs-Dialog zeigt (ADR-031).
+ *
+ * `row` ist `null`, wenn der Konflikt aus dem Compare-and-Swap in
+ * `updateMaster` kommt statt aus dem Pre-Flight: Dort ist bekannt, *dass*
+ * jemand dazwischengeschrieben hat, aber nicht *was*. Der Dialog erscheint dann
+ * ohne Vergleichszeilen — stilles Durchwinken wäre genau der Fehler, gegen den
+ * diese Klasse gebaut ist.
+ */
+export class EventConflictError extends Error {
+  constructor(readonly row: EventWithRelations | null) {
+    super("Event was modified by someone else");
+    this.name = "EventConflictError";
+  }
+}
+
 export type CalendarErrorKey =
-  "cal.error.notAuthenticated" | "cal.error.eventGone" | "cal.error.network" | "cal.error.generic";
+  | "cal.error.notAuthenticated"
+  | "cal.error.eventGone"
+  | "cal.error.conflict"
+  | "cal.error.network"
+  | "cal.error.generic";
 
 interface ErrorLike {
   message?: string;
@@ -52,6 +78,7 @@ export function mapEventError(input: unknown): CalendarErrorKey {
   if (!err) return "cal.error.generic";
 
   if (err.name === "EventNotFoundError") return "cal.error.eventGone";
+  if (err.name === "EventConflictError") return "cal.error.conflict";
 
   // Postgres-SQLSTATE zuerst, weil spezifischer. 42501 ist RLS, die die Zeile
   // verweigert; 23503 heißt, dass eine referenzierte Zeile fehlt — beim
