@@ -42,7 +42,7 @@ function sameInstant(a: Date, b: string): boolean {
  * Versionssprung nicht-leer, die Regel „leere Liste → durchspeichern" feuerte
  * nie, und der Dialog erschien bei jeder fremden Schreiboperation. Belegt in
  * der Zwei-Client-Verifikation, Schritt 6
- * ([docs/superpowers/plans/2026-09-04-conflict-detection-verification.md](./2026-09-04-conflict-detection-verification.md)).
+ * ([docs/superpowers/plans/2026-09-04-conflict-detection-verification.md](../../docs/superpowers/plans/2026-09-04-conflict-detection-verification.md)).
  *
  * Eine leere Liste heißt weiterhin: kein Dialog, der Schreibvorgang läuft
  * durch. Sie ist jetzt nur wieder das, was sie sein sollte — der Normalfall,
