@@ -7,6 +7,7 @@ import type { CalendarOccurrence } from "./types";
 
 import { eventColorFor, eventIconFor, typeLabelsForSlug } from "./palette";
 import { buildRule } from "./rrule";
+import { occurrenceVersion } from "./version";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
@@ -138,6 +139,7 @@ export function expandEvents(
         parentId: row.parent_id,
         isException: !!ex,
         isRecurring: !!row.rrule_freq,
+        version: occurrenceVersion(row, occurrenceDate),
         rrule,
         type: { slug, color, iconName, labelDe: labels.de, labelEn: labels.en },
       });

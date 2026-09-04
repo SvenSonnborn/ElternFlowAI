@@ -27,6 +27,12 @@ export interface CalendarOccurrence {
   parentId: string | null;
   isException: boolean;
   isRecurring: boolean;
+  /**
+   * Der Stand dieser Occurrence beim Laden — siehe `occurrenceVersion`. Das
+   * Bearbeiten-Formular schickt ihn als `baseVersion` zurück, damit die
+   * Mutation erkennt, ob jemand zwischenzeitlich geschrieben hat (ADR-031).
+   */
+  version: string;
   rrule: OccurrenceRrule;
   type: {
     slug: string;

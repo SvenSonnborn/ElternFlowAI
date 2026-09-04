@@ -29,6 +29,7 @@ function makeOccurrence(
     parentId: null,
     isException: false,
     isRecurring: false,
+    version: "v1",
     rrule: { freq: null, interval: 1, byweekday: null, count: null, until: null },
     type: {
       slug: "schule",
