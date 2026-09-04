@@ -51,7 +51,7 @@ function sameTime(a: string | null | undefined, b: string | null | undefined): b
  *
  * Eine leere Liste heißt weiterhin: kein Dialog, der Schreibvorgang läuft
  * durch. Sie ist jetzt nur wieder das, was sie sein sollte — der Normalfall,
- * wenn niemand ins Gehege kommt.
+ * wenn niemand ins Gehege kommt (ADR-031).
  *
  * Die `undefined`-Toleranz bleibt vor der neuen Regel und läuft ihr für jedes
  * Feld voraus: `TaskChanges` lässt jedes seiner Felder `undefined`, und ein

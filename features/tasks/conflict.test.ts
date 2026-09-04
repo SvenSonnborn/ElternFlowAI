@@ -86,12 +86,18 @@ describe("differingTaskFields", () => {
   test("undefined im Titel meldet keine Abweichung — die Spalte wird nicht geschrieben", () => {
     // Reproduziert den vorher falsch anschlagenden Fall: `mine.title` fehlt
     // im Update, kann also nicht mit `theirs.title` kollidieren, egal was
-    // dort steht.
-    expect(differingTaskFields(theirs(), mine({ title: undefined }), theirs())).toEqual([]);
+    // dort steht. `base` trägt bewusst einen anderen Titel als `theirs`, damit
+    // wirklich der `undefined`-Wächter greift (er kommt zuerst) und nicht nur
+    // zufällig `base == theirs` das Ergebnis erklärt.
+    expect(
+      differingTaskFields(theirs(), mine({ title: undefined }), theirs({ title: "Fremd" })),
+    ).toEqual([]);
   });
 
   test("undefined im type_id meldet ebenfalls keine Abweichung", () => {
-    expect(differingTaskFields(theirs(), mine({ type_id: undefined }), theirs())).toEqual([]);
+    expect(
+      differingTaskFields(theirs(), mine({ type_id: undefined }), theirs({ type_id: "type-9" })),
+    ).toEqual([]);
   });
 });
 
@@ -122,5 +128,44 @@ describe("differingTaskFields — Drei-Wege", () => {
   test("meine Änderung und eine fremde an einem anderen Feld: nur das fremde", () => {
     const fremd = theirs({ subject: "Deutsch" });
     expect(differingTaskFields(fremd, mine({ title: "Neu" }), theirs())).toEqual(["subject"]);
+  });
+
+  test("ein fremd geändertes Fälligkeitsdatum ist ein Konflikt", () => {
+    // Positive Erkennung für due_date: theirs weicht vom eingefrorenen `base`
+    // ab, mein Formular trägt noch den alten Wert.
+    const fremd = theirs({ due_date: "2026-06-20" });
+    expect(differingTaskFields(fremd, mine(), theirs())).toEqual(["due_date"]);
+  });
+
+  test("ein fremder Kind-Wechsel ist ein Konflikt", () => {
+    // Positive Erkennung für child_id — der einzige Fremdschlüssel-Vergleich,
+    // der nicht über `sameText` läuft, sondern roh über `??`.
+    const fremd = theirs({ child_id: "child-9" });
+    expect(differingTaskFields(fremd, mine(), theirs())).toEqual(["child_id"]);
+  });
+
+  test("eine fremd geänderte Notiz ist ein Konflikt", () => {
+    // Positive Erkennung für description — vorbestehende Lücke (weder
+    // `81ce04a` noch `2a05966` hatten dafür einen Test), hier geschlossen.
+    const fremd = theirs({ description: "Bitte Taschenrechner mitbringen" });
+    expect(differingTaskFields(fremd, mine(), theirs())).toEqual(["description"]);
+  });
+
+  test("eine fremd geänderte Uhrzeit ist ein Konflikt", () => {
+    // Positive Erkennung für due_time — dieselbe vorbestehende Lücke wie bei
+    // description, hier geschlossen.
+    const fremd = theirs({ due_time: "14:00:00" });
+    expect(differingTaskFields(fremd, mine(), theirs())).toEqual(["due_time"]);
+  });
+
+  test("undefined im child_id meldet keine Abweichung, obwohl theirs von base abweicht", () => {
+    // `child_id` ist der einzige der sieben Felder, dessen `undefined`-Wächter
+    // nicht redundant zu einem Toleranz-Helfer ist: `sameText`/`sameTime`
+    // fangen ihr eigenes `undefined` intern ab, der rohe `??`-Vergleich von
+    // `child_id` nicht — ohne `mine.child_id !== undefined` als eigene erste
+    // Bedingung meldete ein nicht geschriebenes `child_id` hier fälschlich
+    // einen Konflikt.
+    const fremd = theirs({ child_id: "child-5" });
+    expect(differingTaskFields(fremd, mine({ child_id: undefined }), theirs())).toEqual([]);
   });
 });
