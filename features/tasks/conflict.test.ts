@@ -75,4 +75,15 @@ describe("differingTaskFields", () => {
       "type_id",
     ]);
   });
+
+  test("undefined im Titel meldet keine Abweichung — die Spalte wird nicht geschrieben", () => {
+    // Reproduziert den vorher falsch anschlagenden Fall: `mine.title` fehlt
+    // im Update, kann also nicht mit `theirs.title` kollidieren, egal was
+    // dort steht.
+    expect(differingTaskFields(theirs(), mine({ title: undefined }))).toEqual([]);
+  });
+
+  test("undefined im type_id meldet ebenfalls keine Abweichung", () => {
+    expect(differingTaskFields(theirs(), mine({ type_id: undefined }))).toEqual([]);
+  });
 });
