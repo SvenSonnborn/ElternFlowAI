@@ -73,3 +73,4 @@ export { calendarInvalidationKeys } from "./realtimeKeys";
 export { undoDeleteMessage } from "./undoDeleteMessage";
 export { occurrenceVersion } from "./version";
 export { differingEventFields, type EventConflictField } from "./conflict";
+export { expandEvents, type EventWithRelations } from "./expand";
