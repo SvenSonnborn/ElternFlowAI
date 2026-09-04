@@ -35,6 +35,19 @@ export function ConflictDialog({ entry, onKeepMine, onKeepTheirs }: ConflictDial
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onKeepTheirs}>
+      {/*
+        Beide `Pressable` tragen bewusst `accessible={false}` — bitte nicht
+        „zurückreparieren": React Native setzt sonst `accessible: true` (die
+        Vorgabe für `Pressable`) und macht aus jedem der beiden **ein**
+        A11y-Element. Am Scrim hieße das eine bildschirmfüllende, aktivierbare
+        Fläche; trüge sie zusätzlich ein Label, wäre ausgerechnet der
+        verwerfende Weg der einzige angesagte. An der Karte hieße es, dass
+        Titel, Text, Vergleichszeilen und **beide** Knöpfe zu einem Element
+        verschmelzen — „Deine Fassung speichern" wäre unter VoiceOver gar nicht
+        einzeln fokussierbar. Der Scrim-Tap bleibt für die Maus/den Finger
+        erhalten, er ist nur keine angesagte Aktion mehr: Wer den Screenreader
+        benutzt, nimmt den benannten Knopf darunter.
+      */}
       <Pressable
         style={{
           flex: 1,
@@ -43,10 +56,12 @@ export function ConflictDialog({ entry, onKeepMine, onKeepTheirs }: ConflictDial
           alignItems: "center",
           padding: 24,
         }}
-        accessibilityLabel={entry.keepTheirsLabel}
+        accessible={false}
+        importantForAccessibility="no"
         onPress={onKeepTheirs}
       >
         <Pressable
+          accessible={false}
           onPress={(event) => event.stopPropagation()}
           style={{
             backgroundColor: theme.card,
