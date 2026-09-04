@@ -6,7 +6,7 @@ import { supabase } from "@/features/supabase";
 import type { TaskChanges } from "./optimistic";
 import type { TaskRow, TaskWithType } from "./types";
 
-import { MissingParentError } from "./errors";
+import { MissingParentError, TaskConflictError } from "./errors";
 import { applyDelete, applyToggle, applyUpdate } from "./optimistic";
 import { taskKeys } from "./queries";
 
@@ -24,6 +24,11 @@ export interface CreateTaskVars {
 export interface UpdateTaskVars {
   taskId: string;
   changes: TaskChanges;
+  /**
+   * `task.updated_at` beim Laden des Formulars. Aufgaben brauchen kein
+   * zusammengesetztes Token wie der Kalender — eine Aufgabe ist eine Zeile.
+   */
+  baseVersion: string;
 }
 
 export interface DeleteTaskVars {
@@ -112,19 +117,31 @@ export function useUpdateTask() {
 
   return useMutation({
     mutationFn: async (vars: UpdateTaskVars): Promise<void> => {
-      // `.select("id").maybeSingle()` turns a same-family-but-vanished row
-      // into a genuine error. Without it, an `UPDATE … WHERE id = …` that
-      // matches zero rows — because another family member deleted the task
-      // while this edit was in flight — still reports `error: null`, and the
-      // screen would navigate away believing the edit was saved.
+      // `.eq("updated_at", …)` macht aus dem Update ein Compare-and-Swap: Es
+      // trifft die Zeile nur, solange niemand anderes sie seit dem Laden des
+      // Formulars angefasst hat. Anders als im Kalender ist das hier der
+      // *Detektor*, nicht bloß die Absicherung — es gibt keinen Fetch, den man
+      // mitbenutzen könnte, und ein Pre-Flight kostete einen Roundtrip pro
+      // Speichern (ADR-031).
       const { data, error } = await supabase
         .from("tasks")
         .update(vars.changes)
         .eq("id", vars.taskId)
+        .eq("updated_at", vars.baseVersion)
         .select("id")
         .maybeSingle();
       if (error) throw error;
-      if (!data) {
+      if (data) return;
+
+      // Null Zeilen heißt eines von zwei Dingen. Erst *jetzt* wird gelesen —
+      // im Normalfall kostet der Guard damit keinen zusätzlichen Roundtrip.
+      const { data: current, error: readError } = await supabase
+        .from("tasks")
+        .select("*, task_types(*)")
+        .eq("id", vars.taskId)
+        .maybeSingle();
+      if (readError) throw readError;
+      if (!current) {
         // `hw.error.staleReference` names a stale *child or task type*
         // reference specifically — using it here (the task row itself is
         // gone) would misdescribe the failure. A plain Error falls through
@@ -132,6 +149,7 @@ export function useUpdateTask() {
         // closer fit.
         throw new Error("Task no longer exists");
       }
+      throw new TaskConflictError(current);
     },
     onMutate: (vars) =>
       patchTaskCaches(qc, (tasks) => applyUpdate(tasks, vars.taskId, vars.changes)),

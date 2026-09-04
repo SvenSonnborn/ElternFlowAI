@@ -74,8 +74,11 @@ export function TaskEditScreen() {
 
   function onSave() {
     const changes = toTaskChanges(state);
-    if (!changes || !taskId || updateMutation.isPending) return;
-    updateMutation.mutate({ taskId, changes }, { onSuccess: goBackOrToTasks });
+    if (!changes || !taskId || !task || updateMutation.isPending) return;
+    updateMutation.mutate(
+      { taskId, changes, baseVersion: task.updated_at },
+      { onSuccess: goBackOrToTasks },
+    );
   }
 
   async function onDelete() {
