@@ -197,6 +197,8 @@ Ein drittes „Abbrechen" fällt mit dem zweiten zusammen, sobald das Sheet zu i
 
 Eine reine Funktion pro Feature entscheidet, was abweicht:
 
+> **Überholt — der Codeblock zeigt den zweiwertigen Entwurf.** Gebaut ist ein **dreiwertiger** Vergleich: Beide Funktionen nehmen zusätzlich `base` (den Stand, aus dem das Formular hydriert wurde) und melden ein Feld nur, wenn `theirs ≠ base` **und** `mine ≠ theirs`. Begründung in [ADR-031](../../decision-log.md) Decision 7, Beobachtung in §7 unten. Die Signatur ist absichtlich nicht umgeschrieben — der Entwurf soll nachvollziehbar bleiben —, nur markiert, damit sie niemand für die gebaute API hält.
+
 ```ts
 // features/calendar/conflict.ts
 export function differingEventFields(
