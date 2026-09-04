@@ -65,33 +65,6 @@ export function EventEditScreen() {
   // beim ersten Tap greift statt erst mit dem nächsten Render.
   const submitLock = useRef(createSubmitLock()).current;
 
-  const initial = useMemo(() => {
-    if (!occurrence) return null;
-    // The weekday check in `rruleToRecurrence` runs against this occurrence's
-    // start rather than the master's dtstart — equivalent here, because a
-    // byweekday rule only ever yields occurrences on the days it names.
-    const rrule = occurrence.rrule;
-    return {
-      title: occurrence.title,
-      startAt: occurrence.startAt,
-      endAt: occurrence.endAt,
-      location: occurrence.location ?? "",
-      notes: occurrence.description ?? "",
-      recurrence: rruleToRecurrence(
-        {
-          rrule_freq: rrule.freq,
-          rrule_interval: rrule.interval,
-          rrule_byweekday: rrule.byweekday,
-        },
-        occurrence.startAt,
-      ),
-      countText: rrule.count == null ? "" : String(rrule.count),
-      // Mitgeführt, damit sie zusammen mit dem Rest bei der Hydration
-      // eingefroren werden kann — siehe `baseVersion` unten.
-      version: occurrence.version,
-    };
-  }, [occurrence]);
-
   const [title, setTitle] = useState("");
   const [range, setRange] = useState<DateRange>(() => ({ startAt: new Date(), endAt: new Date() }));
   const [location, setLocation] = useState("");
@@ -126,6 +99,75 @@ export function EventEditScreen() {
   const [baseOccurrence, setBaseOccurrence] = useState<CalendarOccurrence | null>(null);
   const { startAt, endAt } = range;
 
+  /**
+   * Der Stand, aus dem der Formular-State entstand: nach der Hydration die
+   * eingefrorene `baseOccurrence`, davor — beim Laden und im
+   * „nicht gefunden"-Zweig — die lebende Query, weil es dann noch nichts
+   * Eingefrorenes gibt.
+   *
+   * Warum der **ganze** Schreibpfad hieraus liest und nicht nur `baseVersion`:
+   * ADR-030 invalidiert bei *jeder* fremden Änderung an `events`/
+   * `event_exceptions` genau `calendarKeys.one(id)` — die Query, an der dieses
+   * offene Sheet hängt. Ein Refetch schiebt `occurrence` also unter der Hand
+   * weiter, während das Formular nur einmal hydriert. Läse hier irgendetwas
+   * weiterhin live mit, verschöbe sich das Formular unbemerkt, und zwar
+   * folgenschwer:
+   *
+   * - Ändert jemand anderes die Regel (auch „ab hier löschen" tut das —
+   *   `applyDeleteScope` → `setRruleCount`), spränge `initial.recurrence`
+   *   bzw. `initial.countText`. `recurrenceDirty` würde von allein `true`,
+   *   obwohl niemand das Wiederholungs-Feld angefasst hat: `onSave` überspränge
+   *   den Scope-Dialog (`isRecurring && !recurrenceChanges` wäre falsch),
+   *   schickte `vars.recurrence` mit, und `deleteAllExceptions`
+   *   (`features/calendar/recurrence.ts`) löschte beim Speichern **sämtliche**
+   *   Ausnahmen der Serie, um die alte Regel zurückzuschreiben.
+   * - Fällt die angeforderte Occurrence durch eine fremde Regeländerung weg,
+   *   liefert `useEvent` `expanded[0]` — eine **andere** Occurrence. Ein live
+   *   gelesenes `occurrenceDate` schriebe die Exception bei Scope „Nur diesen"
+   *   dann auf ein fremdes Datum.
+   *
+   * ADR-031 Decision 6 fasst die Invariante zusammen: `baseVersion` ist die
+   * Version, aus der der Formular-State entstand — und der Formular-State ist
+   * alles, was hier hängt, nicht nur die Version.
+   */
+  const source = baseOccurrence ?? occurrence;
+
+  const initial = useMemo(() => {
+    if (!source) return null;
+    // The weekday check in `rruleToRecurrence` runs against this occurrence's
+    // start rather than the master's dtstart — equivalent here, because a
+    // byweekday rule only ever yields occurrences on the days it names.
+    const rrule = source.rrule;
+    return {
+      // Mitgeführt, damit die Hydration unten genau die Occurrence einfriert,
+      // aus der diese Felder stammen — die beiden können so nicht
+      // auseinanderlaufen.
+      occurrence: source,
+      eventId: source.eventId,
+      occurrenceDate: source.occurrenceDate,
+      isRecurring: source.isRecurring,
+      allDay: source.allDay,
+      title: source.title,
+      startAt: source.startAt,
+      endAt: source.endAt,
+      location: source.location ?? "",
+      notes: source.description ?? "",
+      recurrence: rruleToRecurrence(
+        {
+          rrule_freq: rrule.freq,
+          rrule_interval: rrule.interval,
+          rrule_byweekday: rrule.byweekday,
+        },
+        source.startAt,
+      ),
+      countText: rrule.count == null ? "" : String(rrule.count),
+      rruleUntil: rrule.until,
+      // Mitgeführt, damit sie zusammen mit dem Rest bei der Hydration
+      // eingefroren werden kann — siehe `baseVersion` oben.
+      version: source.version,
+    };
+  }, [source]);
+
   if (initial && !hydrated) {
     setTitle(initial.title);
     setRange({ startAt: initial.startAt, endAt: initial.endAt });
@@ -134,7 +176,7 @@ export function EventEditScreen() {
     setRecurrence(initial.recurrence ?? "none");
     setCountText(initial.countText);
     setBaseVersion(initial.version);
-    setBaseOccurrence(occurrence ?? null);
+    setBaseOccurrence(initial.occurrence);
     setHydrated(true);
   }
 
@@ -150,7 +192,8 @@ export function EventEditScreen() {
   // All-day is not editable here (the create form owns that switch), but it must
   // still be respected: an all-day event carries synthetic 00:00/23:59 times, so
   // editing them freely would desync `start_at`/`end_at` from `all_day`.
-  const allDay = occurrence?.allDay ?? false;
+  // Aus `initial`, nicht aus `occurrence`: siehe `source` oben.
+  const allDay = initial?.allDay ?? false;
 
   const titleError = !title.trim() ? t("cal.edit.error.titleRequired") : "";
   const dateError = isDateRangeInvalid(range) ? t("cal.edit.error.invalidDateRange") : "";
@@ -182,7 +225,7 @@ export function EventEditScreen() {
       // COUNT and UNTIL are mutually exclusive (`events_rrule_count_xor_until`).
       // A stored UNTIL — e.g. from an earlier forward-delete — survives only as
       // long as no count replaces it.
-      rrule_until: parsedCount == null ? (occurrence?.rrule.until ?? null) : null,
+      rrule_until: parsedCount == null ? (initial?.rruleUntil ?? null) : null,
     };
   }
 
@@ -385,14 +428,16 @@ export function EventEditScreen() {
   }
 
   async function onSave() {
-    if (!occurrence || !canSave || baseVersion == null) return;
+    // `initial` statt `occurrence`: nach der Hydration ist das der eingefrorene
+    // Stand (siehe `source` oben), und `canSave` verlangt `hydrated`.
+    if (!initial || !canSave || baseVersion == null) return;
     // `updateMutation.isPending` kommt hier zu spät (siehe `submitLock.ts`):
     // Ein zweiter Tap während der Schließanimation hat real einen zweiten,
     // identischen Termin angelegt (dort beim Anlegen — hier dasselbe Loch
     // beim Bearbeiten). `tryLock()` prüft synchron, ob bereits ein Speichern
     // läuft, und bricht in diesem Fall folgenlos ab.
     if (!submitLock.tryLock()) return;
-    const isRecurring = occurrence.isRecurring;
+    const isRecurring = initial.isRecurring;
     const recurrenceChanges = buildRecurrenceChanges();
     let scope: EditScope = "all";
     // A rule change redefines the series, so there is nothing to scope: asking
@@ -421,8 +466,8 @@ export function EventEditScreen() {
     const final = allDay ? toAllDayRange(range) : range;
     const vars = {
       scope,
-      eventId: occurrence.eventId,
-      occurrenceDate: occurrence.occurrenceDate,
+      eventId: initial.eventId,
+      occurrenceDate: initial.occurrenceDate,
       isRecurring,
       changes: {
         title: title.trim(),
