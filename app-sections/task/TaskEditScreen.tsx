@@ -4,7 +4,12 @@ import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { confirmDestructive, useConflict, useUndoableDelete } from "@/app-sections/shared";
+import {
+  confirmDestructive,
+  useConflict,
+  useUndoableDelete,
+  type ConflictRow,
+} from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren } from "@/features/auth";
@@ -24,6 +29,7 @@ import {
   type TaskChanges,
   type TaskConflictField,
   type TaskFormState,
+  type TaskWithType,
 } from "@/features/tasks";
 
 import { TaskForm } from "./TaskForm";
@@ -68,9 +74,24 @@ export function TaskEditScreen() {
 
   const [state, setState] = useState<TaskFormState>(() => emptyTaskForm(new Date()));
   const [hydrated, setHydrated] = useState(false);
+  // Invariante: `baseVersion` ist die Version, aus der `state` entstanden ist
+  // — nicht die neueste, die `useTask` gerade führt. Nicht offensichtlich,
+  // weil die Query weiterlebt (30s `staleTime`, Default-`refetchOnMount`),
+  // das Formular aber nur einmal hydriert (`if (task && !hydrated)` unten):
+  // Ein Refetch, der Millisekunden nach der Hydration landet — der übliche
+  // Fall, nicht der seltene —, schiebt `task.updated_at` weiter, ohne dass
+  // `state` mitzieht. Läse `onSave` die Version direkt aus der lebenden
+  // Query statt aus diesem eingefrorenen Wert, träfe das CAS beim Speichern
+  // anstandslos, obwohl das Formular noch die alten Eingaben trägt — der
+  // Guard erkennte dann exakt die Fremdänderung nicht, gegen die er gebaut
+  // ist. Der Wiederholungsversuch aus dem Dialog (`onKeepMine`) ist davon
+  // ausgenommen: der übergibt bewusst `theirs.updated_at`, die frische
+  // Version, die der Server gerade gemeldet hat.
+  const [baseVersion, setBaseVersion] = useState<string | null>(null);
 
   if (task && !hydrated) {
     setState(taskToForm(task));
+    setBaseVersion(task.updated_at);
     setHydrated(true);
   }
 
@@ -100,8 +121,8 @@ export function TaskEditScreen() {
 
   function onSave() {
     const changes = toTaskChanges(state);
-    if (!changes || !taskId || !task || updateMutation.isPending) return;
-    submit({ taskId, changes, baseVersion: task.updated_at });
+    if (!changes || !taskId || !task || updateMutation.isPending || baseVersion == null) return;
+    submit({ taskId, changes, baseVersion });
   }
 
   /**
@@ -134,75 +155,88 @@ export function TaskEditScreen() {
    * Der Wiederholungsversuch nimmt die **frische** Version der fremden Fassung
    * als Basis — kein `force`-Flag, kein Bypass.
    *
-   * Umschließt den Rumpf mit `try`/`catch` (Lehre aus Task 8): Ein Wurf hier
-   * — etwa `differingTaskFields` an einer unerwarteten Zeile oder `t()` an
-   * einem fehlenden Key — liefe sonst als unbehandelte Ablehnung durch
-   * TanStacks eigenen `try`/`catch` um den Per-Call-`onError`-Aufruf
-   * (`MutationObserver#notify`, `Promise.reject(e)` ohne `.catch()`). Anders
-   * als im Kalender-Sheet braucht der `catch`-Zweig hier **keinen** Fallback-
-   * Toast: `updateMutation.error` trägt zu diesem Zeitpunkt schon den
-   * `TaskConflictError`, der `showConflict` überhaupt erst aufgerufen hat —
-   * TanStack setzt den Fehlerstatus, bevor es den Per-Call-`onError` ruft —,
-   * die Inline-Zeile unter dem Formular zeigt ihn also bereits. Nicht
-   * navigieren genügt.
+   * Umschließt nur den Rumpf **vor** `conflict.show(...)` mit `try`/`catch`
+   * (Lehre aus Task 8, verengt in einer Fix-Runde): Ein Wurf beim Aufbau des
+   * Vergleichs — etwa `differingTaskFields` an einer unerwarteten Zeile oder
+   * `t()`/`formatTaskField` beim Bilden der `rows` — liefe sonst als
+   * unbehandelte Ablehnung durch TanStacks eigenen `try`/`catch` um den
+   * Per-Call-`onError`-Aufruf (`MutationObserver#notify`,
+   * `Promise.reject(e)` ohne `.catch()`). `conflict.show(...)` und
+   * `goBackOrToTasks()` selbst stehen bewusst **außerhalb** des `try`: Ein
+   * Wurf dort in den `catch` zu ziehen würde ihn stumm schlucken und den
+   * Dialog stehen lassen, während der Screen — mangels Navigation — mit dem
+   * veralteten Formular montiert bliebe, genau das Loch, das die
+   * `goBackOrToTasks()`-Zeile unten schließen soll. Anders als im
+   * Kalender-Sheet braucht der `catch`-Zweig hier keinen Fallback-Toast
+   * (den gibt es in diesem Screen nicht) — er loggt stattdessen, weil es
+   * sonst keinen Kanal für diesen seltenen Fall gibt.
    */
   function showConflict(err: TaskConflictError, vars: Parameters<typeof updateMutation.mutate>[0]) {
+    let theirs: TaskWithType;
+    let fields: TaskConflictField[];
+    let rows: ConflictRow[];
     try {
-      const theirs = err.row;
-      const fields = differingTaskFields(theirs, vars.changes);
+      theirs = err.row;
+      fields = differingTaskFields(theirs, vars.changes);
       if (fields.length === 0) {
         submit({ ...vars, baseVersion: theirs.updated_at });
         return;
       }
-
-      conflict.show({
-        title: t("conflict.title"),
-        body: t("conflict.body.task"),
-        rows: fields.map((field) => ({
-          label: t(FIELD_LABEL_KEY[field]),
-          theirs: `${t("conflict.theirs")}: ${formatTaskField(field, theirs)}`,
-          mine: `${t("conflict.mine")}: ${formatTaskField(field, vars.changes)}`,
-        })),
-        keepMineLabel: t("conflict.keepMine"),
-        keepTheirsLabel: t("conflict.keepTheirs"),
-        onKeepMine: () => {
-          submit({ ...vars, baseVersion: theirs.updated_at });
-        },
+      rows = fields.map((field) => ({
+        label: t(FIELD_LABEL_KEY[field]),
+        theirs: `${t("conflict.theirs")}: ${formatTaskField(field, theirs)}`,
+        mine: `${t("conflict.mine")}: ${formatTaskField(field, vars.changes)}`,
+      }));
+    } catch (renderErr) {
+      // Kein Fallback-Kanal in diesem Screen (kein Toast) — loggen ist alles,
+      // was hier möglich ist. Nur sichere Primitive (Name, ob eine Message
+      // vorlag), keine rohe Fehlermeldung: Die kann Aufgabentitel enthalten
+      // (dieselbe Vorsicht wie in `mapTaskError`).
+      console.error("[TaskEditScreen] showConflict: Aufbau des Vergleichs fehlgeschlagen", {
+        name: renderErr instanceof Error ? renderErr.name : typeof renderErr,
+        hasMessage: renderErr instanceof Error && renderErr.message.length > 0,
       });
-
-      // Verlässt den Screen bewusst schon hier, nicht erst wenn der Nutzer
-      // eine Wahl trifft: `onSettled` hat `task.updated_at` längst auf den
-      // neuen Serverstand gesetzt, das Formular hydriert aber nur einmal
-      // (`if (task && !hydrated)`) und trägt weiterhin die veralteten
-      // Eingaben. Bliebe der Screen offen, würde ein zweiter Tap auf
-      // „Speichern" mit frischer `baseVersion` anstandslos durchgehen — das
-      // CAS träfe, und `toTaskChanges`s voller Feldsatz überschriebe die
-      // fremde Änderung vollständig und lautlos, genau das Überschreiben,
-      // gegen das dieses Feature gebaut ist, nur einen Klick später. Der
-      // Dialog lebt im Root-Layout (`ConflictDialogHost`) und überlebt den
-      // Screenwechsel: „Deine Fassung speichern" schickt aus der Closure von
-      // `onKeepMine` weiter, „Andere Fassung behalten" schließt nur noch den
-      // Dialog (`ConflictDialogHost.onKeepTheirs` kennt diesen Screen gar
-      // nicht mehr).
-      //
-      // Nebenwirkung, geprüft: Der Wiederholungsversuch aus `onKeepMine`
-      // läuft damit nach dem Unmount. `submit`s Per-Call-`onSuccess` und
-      // `onError` feuern dann nicht mehr (siehe
-      // `mutateAsyncSurvivesUnmount.test.ts`) — ein erneuter Erfolg navigiert
-      // also kein zweites Mal (unproblematisch, der Screen ist schon zu und
-      // die Liste aktualisiert sich ohnehin über `useUpdateTask`s
-      // Hook-Level-`onSettled`), aber eine dritte Kollision genau in diesem
-      // Fenster öffnet keinen zweiten Dialog mehr und bleibt ohne
-      // Fehlermeldung. Selten (verlangt eine dritte Schreiboperation
-      // zwischen Dialog und Retry) — siehe `docs/TODO.md`.
-      goBackOrToTasks();
-    } catch {
-      // Nicht navigieren, nichts weiter tun: Die Inline-Zeile unter dem
-      // Formular zeigt bereits den `TaskConflictError`, der diesen Aufruf
-      // ausgelöst hat (siehe Docstring oben) — ein zweiter Kanal wie im
-      // Kalender-Sheet (dort ein Fallback-Toast) bräuchte einen Toast, den
-      // dieser Screen bewusst nicht hat.
+      return;
     }
+
+    conflict.show({
+      title: t("conflict.title"),
+      body: t("conflict.body.task"),
+      rows,
+      keepMineLabel: t("conflict.keepMine"),
+      keepTheirsLabel: t("conflict.keepTheirs"),
+      onKeepMine: () => {
+        submit({ ...vars, baseVersion: theirs.updated_at });
+      },
+    });
+
+    // Verlässt den Screen bewusst schon hier, nicht erst wenn der Nutzer
+    // eine Wahl trifft: `onSettled` hat `task.updated_at` längst auf den
+    // neuen Serverstand gesetzt, das Formular hydriert aber nur einmal
+    // (`if (task && !hydrated)`) und trägt weiterhin die veralteten
+    // Eingaben. Bliebe der Screen offen, würde ein zweiter Tap auf
+    // „Speichern" mit frischer `baseVersion` anstandslos durchgehen — das
+    // CAS träfe, und `toTaskChanges`s voller Feldsatz überschriebe die
+    // fremde Änderung vollständig und lautlos, genau das Überschreiben,
+    // gegen das dieses Feature gebaut ist, nur einen Klick später. Der
+    // Dialog lebt im Root-Layout (`ConflictDialogHost`) und überlebt den
+    // Screenwechsel: „Deine Fassung speichern" schickt aus der Closure von
+    // `onKeepMine` weiter, „Andere Fassung behalten" schließt nur noch den
+    // Dialog (`ConflictDialogHost.onKeepTheirs` kennt diesen Screen gar
+    // nicht mehr).
+    //
+    // Nebenwirkung, geprüft: Der Wiederholungsversuch aus `onKeepMine`
+    // läuft damit nach dem Unmount. `submit`s Per-Call-Callbacks
+    // (`onSuccess` **und** `onError`) feuern dann nicht mehr (siehe
+    // `mutateAsyncSurvivesUnmount.test.ts`) — ein erneuter Erfolg navigiert
+    // also kein zweites Mal (unproblematisch, der Screen ist schon zu und
+    // die Liste aktualisiert sich ohnehin über `useUpdateTask`s
+    // Hook-Level-`onSettled`), aber **jeder** Fehler in diesem Fenster
+    // (eine erneute Kollision, ein Netzwerkfehler, RLS, eine inzwischen
+    // gelöschte Zeile) bleibt ohne Rückmeldung — kein zweiter Dialog, keine
+    // Fehlermeldung. Selten (verlangt ein zweites Ereignis exakt zwischen
+    // Dialog und Retry) — siehe `docs/TODO.md`.
+    goBackOrToTasks();
   }
 
   /**
