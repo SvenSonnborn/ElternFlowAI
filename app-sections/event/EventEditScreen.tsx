@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { addDays, format, max as dateMax, min as dateMin, parseISO } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useRef, useState } from "react";
@@ -17,6 +17,7 @@ import {
   isDateRangeInvalid,
   isTimeRangeInvalid,
   mapEventError,
+  occurrenceVersion,
   parseRecurrenceCount,
   rangeFieldLabelKey,
   toAllDayRange,
@@ -24,6 +25,7 @@ import {
   rruleToRecurrence,
   useEvent,
   useUpdateEvent,
+  type CalendarOccurrence,
   type DateRange,
   type EditScope,
   type EventConflictField,
@@ -233,56 +235,106 @@ export function EventEditScreen() {
    * Ein Dialog wäre dann nur im Weg (ADR-031). Der Wiederholungsversuch nimmt
    * die **frische** Version als Basis — kein `force`-Flag, kein Bypass: Er kann
    * erneut kollidieren, wenn ein Dritter dazwischenschreibt.
+   *
+   * Läuft synchron im `.catch()` von `save()` — ein Wurf hier (z. B.
+   * `expandEvents` an einer kaputten RRULE-Zeile, oder `format` an einem
+   * ungültigen `Date`) ließe die daraus entstehende Promise unbehandelt: Es
+   * gibt weder einen `unhandledrejection`-Handler noch eine ErrorBoundary,
+   * und das Sheet ist längst zu. Der Nutzer sähe dann **weder Dialog noch
+   * Toast** — schlimmer als jeder andere Fehlerfall in diesem Screen, weil
+   * selbst der Retry-Toast ausbliebe. Der `try`/`catch` fängt das mit
+   * demselben Fehler-Toast auf, den `save()` sonst zeigt.
    */
   function showConflict(
     err: EventConflictError,
     vars: Parameters<typeof updateMutation.mutateAsync>[0],
   ) {
-    // Kein `row` heißt: der Compare-and-Swap hat den Konflikt erkannt, ohne die
-    // fremde Fassung zu kennen. Dann steht der Dialog ohne Vergleichszeilen —
-    // und ohne frische Version bleibt nur die alte als Basis, der zweite
-    // Versuch schlägt also erneut fehl, bis der Refetch durch ist. Das ist
-    // ehrlicher als stilles Überschreiben.
-    const theirs = err.row
-      ? (expandEvents(
-          [err.row],
-          new Date(vars.changes.start_at),
-          new Date(vars.changes.end_at),
-          theme,
-        ).find((o) => o.occurrenceDate === vars.occurrenceDate) ?? null)
-      : null;
+    try {
+      // Kein `row` heißt: der Compare-and-Swap hat den Konflikt erkannt, ohne
+      // die fremde Fassung zu kennen. Dann steht der Dialog ohne
+      // Vergleichszeilen und ohne frische Version — siehe `docs/TODO.md`.
+      const row = err.row;
+      let theirs: CalendarOccurrence | null = null;
+      if (row) {
+        // Fenster wie `useEvent` (`features/calendar/hooks.ts`): an der Zeile
+        // selbst verankert und um das angeforderte Datum geweitet — nicht an
+        // den geänderten Eingabewerten aus `vars.changes`. Sonst fiele jede
+        // Verschiebung des Termins um mehr als seine eigene Dauer (ein
+        // anderer Tag, mehrere Stunden) aus dem Fenster, und `theirs` würde
+        // `null`, obwohl die fremde Fassung bekannt ist — ausgerechnet beim
+        // häufigsten echten Konfliktfall („wir haben beide verschoben").
+        // Dieselbe Begründung wie dort: eine weit in der Zukunft liegende
+        // Occurrence (>1 Jahr) würde sonst abgeschnitten.
+        const rowStart = new Date(row.start_at);
+        const requested = parseISO(vars.occurrenceDate);
+        const windowStart = dateMin([addDays(rowStart, -1), requested]);
+        const windowEnd = dateMax([addDays(rowStart, 366), requested]);
+        theirs =
+          expandEvents([row], windowStart, windowEnd, theme).find(
+            (o) => o.occurrenceDate === vars.occurrenceDate,
+          ) ?? null;
+      }
 
-    const fields = theirs ? differingEventFields(theirs, vars.changes) : [];
-    if (theirs && fields.length === 0) {
-      save({ ...vars, baseVersion: theirs.version });
-      return;
+      const fields = theirs ? differingEventFields(theirs, vars.changes) : [];
+      if (theirs && fields.length === 0) {
+        save({ ...vars, baseVersion: theirs.version });
+        return;
+      }
+
+      const mineSource = {
+        title: vars.changes.title,
+        startAt: new Date(vars.changes.start_at),
+        endAt: new Date(vars.changes.end_at),
+        location: vars.changes.location,
+        description: vars.changes.description,
+      };
+
+      conflict.show({
+        title: t("conflict.title"),
+        body: t("conflict.body.event"),
+        rows:
+          theirs === null
+            ? []
+            : fields.map((field) => ({
+                label: t(FIELD_LABEL_KEY[field]),
+                theirs: `${t("conflict.theirs")}: ${formatField(field, theirs)}`,
+                mine: `${t("conflict.mine")}: ${formatField(field, mineSource)}`,
+              })),
+        keepMineLabel: t("conflict.keepMine"),
+        keepTheirsLabel: t("conflict.keepTheirs"),
+        onKeepMine: () => {
+          save({
+            ...vars,
+            // `theirs` fehlt entweder, weil die fremde Fassung außerhalb des
+            // Fensters lag, oder weil der CAS-Fall (`row === null`) sie gar
+            // nicht kennt. Im ersten Fall ist `row` trotzdem da — die frische
+            // Version lässt sich dann direkt berechnen, ohne erneut zu
+            // expandieren. **Nur** wenn auch `row` fehlt, bleibt die alte
+            // `vars.baseVersion` übrig: Es gibt nichts Frischeres, dieser
+            // Versuch kollidiert dann erneut, bis der nächste Refetch durch
+            // ist (siehe `docs/TODO.md`) — anders als vorher fällt der
+            // Normalfall (Fenster hätte `theirs` sonst gefunden, `row`
+            // bekannt) aber nicht mehr auf denselben toten Wert zurück.
+            baseVersion:
+              theirs?.version ??
+              (row ? occurrenceVersion(row, vars.occurrenceDate) : vars.baseVersion),
+          });
+        },
+      });
+    } catch (renderErr) {
+      show({
+        title: t("cal.edit.error.saveFailed"),
+        message: t(mapEventError(renderErr)),
+        variant: "error",
+        position: "bottom",
+        action: {
+          label: t("action.retry"),
+          onPress: () => {
+            save(vars);
+          },
+        },
+      });
     }
-
-    const mineSource = {
-      title: vars.changes.title,
-      startAt: new Date(vars.changes.start_at),
-      endAt: new Date(vars.changes.end_at),
-      location: vars.changes.location,
-      description: vars.changes.description,
-    };
-
-    conflict.show({
-      title: t("conflict.title"),
-      body: t("conflict.body.event"),
-      rows:
-        theirs === null
-          ? []
-          : fields.map((field) => ({
-              label: t(FIELD_LABEL_KEY[field]),
-              theirs: `${t("conflict.theirs")}: ${formatField(field, theirs)}`,
-              mine: `${t("conflict.mine")}: ${formatField(field, mineSource)}`,
-            })),
-      keepMineLabel: t("conflict.keepMine"),
-      keepTheirsLabel: t("conflict.keepTheirs"),
-      onKeepMine: () => {
-        save({ ...vars, baseVersion: theirs?.version ?? vars.baseVersion });
-      },
-    });
   }
 
   // Kein Verlauf bei einem Kaltstart-Deep-Link direkt auf `/event/edit/[id]` —
