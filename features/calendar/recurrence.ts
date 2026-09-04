@@ -4,6 +4,7 @@ import { addDays, format, parseISO } from "date-fns";
 
 import type { Database } from "@/features/supabase/database.types";
 
+import { EventConflictError } from "./errors";
 import { buildRule } from "./rrule";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
@@ -43,9 +44,19 @@ export interface EventOps {
     override: Partial<EventChanges>,
   ) => Promise<void>;
   deleteMaster: (eventId: string) => Promise<void>;
+  /**
+   * `seenUpdatedAt` ist `master.updated_at` aus dem gerade gelesenen Row —
+   * **nicht** die `baseVersion` des Formulars. Der Unterschied ist der Zweck:
+   * Der Pre-Flight in `mutations.ts` prüft gegen das, was das *Formular*
+   * gesehen hat (Fenster: Minuten), dieses Compare-and-Swap gegen das, was
+   * *dieser Schreibvorgang* eine Zeile vorher gelesen hat (Fenster:
+   * Millisekunden). Mit der `baseVersion` prüfte es dieselbe Bedingung zweimal
+   * und schlösse das Fenster nicht, für das es da ist (ADR-031).
+   */
   updateMaster: (
     eventId: string,
     changes: EventChanges,
+    seenUpdatedAt: string,
     recurrence?: RecurrenceChanges,
   ) => Promise<void>;
   deleteAllExceptions: (eventId: string) => Promise<void>;
@@ -174,7 +185,7 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
     if (ruleDiffers(master, recurrence)) {
       await ops.deleteAllExceptions(eventId);
     }
-    await ops.updateMaster(eventId, changes, recurrence);
+    await ops.updateMaster(eventId, changes, master.updated_at, recurrence);
     return;
   }
 
@@ -183,7 +194,7 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
       await ops.modifyOccurrence(eventId, occurrenceDate, changes);
       return;
     }
-    await ops.updateMaster(eventId, changes);
+    await ops.updateMaster(eventId, changes, master.updated_at);
     return;
   }
 
@@ -191,7 +202,7 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
     if (master.rrule_count != null) {
       const consumed = consumedBefore(master, occurrenceDate);
       if (consumed === 0) {
-        await ops.updateMaster(eventId, changes);
+        await ops.updateMaster(eventId, changes, master.updated_at);
         return;
       }
       const remaining = master.rrule_count - consumed;
@@ -210,7 +221,7 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
     }
     const cutoff = dayBefore(occurrenceDate);
     if (cutoff < dateOnly(new Date(master.start_at))) {
-      await ops.updateMaster(eventId, changes);
+      await ops.updateMaster(eventId, changes, master.updated_at);
       return;
     }
     // Tail first — same durability reasoning as the count path above.
@@ -221,7 +232,7 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
   }
 
   // scope === "all" (or "forward" on a non-recurring event — same outcome)
-  await ops.updateMaster(eventId, changes);
+  await ops.updateMaster(eventId, changes, master.updated_at);
 }
 
 export function createSupabaseEventOps(client: SupabaseClient<Database>): EventOps {
@@ -257,12 +268,19 @@ export function createSupabaseEventOps(client: SupabaseClient<Database>): EventO
       if (error) throw error;
     },
 
-    updateMaster: async (eventId, changes, recurrence) => {
-      const { error } = await client
+    updateMaster: async (eventId, changes, seenUpdatedAt, recurrence) => {
+      const { data, error } = await client
         .from("events")
         .update(recurrence ? { ...changes, ...recurrence } : changes)
-        .eq("id", eventId);
+        .eq("id", eventId)
+        .eq("updated_at", seenUpdatedAt)
+        .select("id")
+        .maybeSingle();
       if (error) throw error;
+      // Null Zeilen heißt: zwischen dem Lesen und diesem Schreiben hat jemand
+      // die Zeile angefasst (oder gelöscht). `null` statt der fremden Fassung —
+      // hier ist bekannt, *dass*, nicht *was*.
+      if (!data) throw new EventConflictError(null);
     },
 
     deleteAllExceptions: async (eventId) => {

@@ -4,7 +4,9 @@ import type { Database } from "@/features/supabase/database.types";
 
 import { supabase } from "@/features/supabase";
 
-import { EventNotFoundError } from "./errors";
+import type { EventWithRelations } from "./expand";
+
+import { EventConflictError, EventNotFoundError } from "./errors";
 import { canApplyOptimistically, useOptimisticEventsStore } from "./optimisticEvents";
 import { calendarKeys, fetchEventById } from "./queries";
 import {
@@ -16,6 +18,7 @@ import {
   type EventOps,
   type RecurrenceChanges,
 } from "./recurrence";
+import { occurrenceVersion } from "./version";
 
 export {
   useCreateEvent,
@@ -34,6 +37,11 @@ export interface DeleteEventVars {
   eventId: string;
   occurrenceDate: string;
   isRecurring: boolean;
+  /**
+   * Der Stand, den der Screen beim Laden gesehen hat (`CalendarOccurrence.version`).
+   * Weicht er beim Schreiben ab, hat jemand anderes dazwischen geschrieben.
+   */
+  baseVersion: string;
 }
 
 export interface UpdateEventVars extends DeleteEventVars {
@@ -42,14 +50,28 @@ export interface UpdateEventVars extends DeleteEventVars {
 }
 
 export interface UpdateEventDeps {
-  fetchMaster: (eventId: string) => Promise<EventRow | null>;
+  fetchMaster: (eventId: string) => Promise<EventWithRelations | null>;
   ops: EventOps;
 }
 
+/**
+ * Lädt den Master, prüft ihn gegen `vars.baseVersion` und delegiert dann an
+ * `applyEditScope`. Der Existenz-Check steht bewusst vor dem Versions-Check:
+ * „weg" und „geändert" sind verschiedene Meldungen, und eine fehlende Zeile
+ * hat keine Version, gegen die verglichen werden könnte. Der Fetch war für
+ * `applyEditScope` ohnehin nötig, der Vergleich kostet also nichts zusätzlich
+ * — und deckt alle vier Scopes ab, auch den mehrstufigen Forward-Split, der
+ * `updateMaster` (und damit dessen eigenes Compare-and-Swap) gar nicht ruft.
+ */
 export async function updateEvent(vars: UpdateEventVars, deps: UpdateEventDeps): Promise<void> {
   const master = await deps.fetchMaster(vars.eventId);
   if (!master) {
     throw new EventNotFoundError(vars.eventId);
+  }
+  // Der Existenz-Check steht bewusst davor: „weg" und „geändert" sind
+  // verschiedene Meldungen, und eine fehlende Zeile hat keine Version.
+  if (occurrenceVersion(master, vars.occurrenceDate) !== vars.baseVersion) {
+    throw new EventConflictError(master);
   }
   await applyEditScope({
     scope: vars.scope,
@@ -63,10 +85,19 @@ export async function updateEvent(vars: UpdateEventVars, deps: UpdateEventDeps):
   });
 }
 
+/**
+ * Derselbe Pre-Flight wie `updateEvent` — siehe dort für die Begründung der
+ * Reihenfolge und warum der Fetch/Vergleich nichts zusätzlich kostet.
+ */
 export async function deleteEvent(vars: DeleteEventVars, deps: UpdateEventDeps): Promise<void> {
   const master = await deps.fetchMaster(vars.eventId);
   if (!master) {
     throw new EventNotFoundError(vars.eventId);
+  }
+  // Der Existenz-Check steht bewusst davor: „weg" und „geändert" sind
+  // verschiedene Meldungen, und eine fehlende Zeile hat keine Version.
+  if (occurrenceVersion(master, vars.occurrenceDate) !== vars.baseVersion) {
+    throw new EventConflictError(master);
   }
   await applyDeleteScope({
     scope: vars.scope,

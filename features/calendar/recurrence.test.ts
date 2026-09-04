@@ -43,6 +43,7 @@ function makeRecordingOps(): { ops: EventOps; calls: string[] } {
 // 2026-05-04 is a Monday. A weekly/byweekday=[Mo] series from here runs
 // 05-04, 05-11, 05-18, 05-25, 06-01, 06-08, 06-15, 06-22, 06-29, 07-06.
 const MASTER_START = new Date("2026-05-04T16:30:00.000Z");
+const MASTER_UPDATED_AT = "2026-05-01T00:00:00.000Z";
 
 function makeMaster(overrides: Partial<EventRow> = {}): EventRow {
   return {
@@ -230,7 +231,7 @@ describe("applyEditScope", () => {
       master: makeMaster({ rrule_freq: null, rrule_byweekday: null }),
       changes: CHANGES,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT);
   });
 
   test("scope=all → updateMaster", async () => {
@@ -244,7 +245,7 @@ describe("applyEditScope", () => {
       master: makeMaster(),
       changes: CHANGES,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
   });
 
@@ -278,7 +279,7 @@ describe("applyEditScope", () => {
       master: makeMaster(),
       changes: CHANGES,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
   });
 
@@ -293,7 +294,7 @@ describe("applyEditScope", () => {
       master: makeMaster({ rrule_freq: null, rrule_byweekday: null }),
       changes: CHANGES,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
     expect(ops.setRruleUntil).not.toHaveBeenCalled();
   });
@@ -331,7 +332,7 @@ describe("applyEditScope", () => {
       master: makeMaster({ rrule_count: 10 }),
       changes: CHANGES,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
     expect(ops.setRruleCount).not.toHaveBeenCalled();
   });
@@ -431,7 +432,7 @@ describe("applyEditScope", () => {
       changes: CHANGES,
       recurrence: NEW_RULE,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, NEW_RULE);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT, NEW_RULE);
     expect(ops.deleteAllExceptions).toHaveBeenCalledWith("evt-1");
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
   });
@@ -448,7 +449,7 @@ describe("applyEditScope", () => {
       changes: CHANGES,
       recurrence: NEW_RULE,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, NEW_RULE);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT, NEW_RULE);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
     expect(ops.setRruleUntil).not.toHaveBeenCalled();
   });
@@ -472,7 +473,7 @@ describe("applyEditScope", () => {
       changes: CHANGES,
       recurrence: unchanged,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, unchanged);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT, unchanged);
     expect(ops.deleteAllExceptions).not.toHaveBeenCalled();
   });
 
@@ -517,7 +518,7 @@ describe("applyEditScope", () => {
       changes: CHANGES,
       recurrence: none,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, none);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT, none);
     expect(ops.deleteAllExceptions).toHaveBeenCalledWith("evt-1");
   });
 
@@ -535,5 +536,24 @@ describe("applyEditScope", () => {
     // All 10 occurrences are before the cutoff → nothing left to split off.
     expect(ops.setRruleCount).toHaveBeenCalledWith("evt-1", 10);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
+  });
+
+  test("updateMaster bekommt den Stempel des gelesenen Masters, nicht den des Formulars", async () => {
+    // Das CAS soll das Fenster zwischen *diesem* Lesen und *diesem* Schreiben
+    // schließen — nicht dasselbe prüfen wie der Pre-Flight.
+    const master = makeMaster({ updated_at: "2026-05-09T08:00:00.000Z" });
+    const ops = makeOps();
+
+    await applyEditScope({
+      ops,
+      scope: "all",
+      eventId: "evt-1",
+      occurrenceDate: "2026-06-15",
+      isRecurring: true,
+      master,
+      changes: CHANGES,
+    });
+
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, "2026-05-09T08:00:00.000Z");
   });
 });
