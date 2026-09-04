@@ -234,11 +234,13 @@ Stattdessen der Weg, für den `mapEventError` ausdrücklich gebaut wurde (siehe 
 | 3   | A ändert den Titel abweichend und speichert                     | Konflikt-Dialog in A, eine Zeile „Titel"                                    |
 | 4   | A wählt „Deine Fassung speichern"                               | B aktualisiert sich innerhalb des 300-ms-Sammelfensters                     |
 | 5   | Gegenprobe: A wählt „Andere Fassung behalten"                   | A behält Bs Fassung, kein Schreibvorgang                                    |
-| 6   | Gegenprobe: B ändert den **Ort**, A ändert den **Titel**        | kein Dialog — die Felder überschneiden sich nicht                           |
+| 6   | Gegenprobe: B ändert den **Ort**, A ändert den **Titel**        | Dialog mit genau **einer** Zeile „Ort"                                      |
 | 7   | A plant eine Löschung, B ändert innerhalb des 5-s-Undo-Fensters | Fehler-Toast in A mit „Trotzdem löschen"                                    |
 | 8   | Schritte 1–6 auf einer Aufgabe                                  | gleiches Verhalten                                                          |
 
 Schritt 6 ist der wichtigste: Er prüft, dass der Mechanismus **nicht** anschlägt, wo er nicht soll. Ein Konflikt-Guard, der zu oft meldet, wird weggeklickt und ist dann schlechter als keiner.
+
+> **Korrektur nach dem Lauf.** Die ursprüngliche Erwartung in Zeile 6 lautete „kein Dialog — die Felder überschneiden sich nicht". Sie ist **falsch**: A's Formular schickt den vollen Feldsatz, A's Speichern drehte B's Ortsänderung also tatsächlich zurück — das gehört gemeldet. Richtig ist genau **eine** Zeile („Ort"); A's eigene Titeländerung überschreibt niemanden und darf nicht gelistet werden. Getragen wird das vom dreiwertigen Vergleich (`base`/`mine`/`theirs`), den [ADR-031](../../decision-log.md) Decision 7 beschreibt — §5.4 dieses Dokuments beschreibt noch den zweiwertigen Entwurf. Die Zeile ist oben an Ort und Stelle korrigiert, statt die falsche Erwartung als Falle für den nächsten Leser stehen zu lassen (dieselbe Regel wie ADR-030 Decision 4). Protokoll beider Läufe: [2026-09-04-conflict-detection-verification.md](../plans/2026-09-04-conflict-detection-verification.md).
 
 Screenshots je Schritt; Ergebnis in den ADR.
 
