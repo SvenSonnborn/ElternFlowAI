@@ -27,26 +27,53 @@ function sameInstant(a: Date, b: string): boolean {
 }
 
 /**
- * Welche Felder die fremde Fassung anders trägt als die eigene Eingabe.
+ * Welche Felder ein Speichern **fremde** Änderungen überschreiben würde.
  *
- * **Eine leere Liste heißt: kein Dialog, der Schreibvorgang läuft durch.** Das
- * ist kein Sonderfall, sondern was den Mechanismus benutzbar macht — ein
- * Versionssprung ohne inhaltliche Abweichung (jemand hat dasselbe geändert,
- * oder etwas, das ich gar nicht anfasse) darf niemanden anhalten. Ein Guard,
- * der bei jedem Versionssprung meldet, wird weggeklickt (ADR-031).
+ * Drei Werte pro Feld, nicht zwei: `base` ist der Stand, aus dem das Formular
+ * hydriert wurde, `mine` das, was geschrieben würde, `theirs` das, was jetzt
+ * auf dem Server steht. Ein Feld ist nur dann ein Konflikt, wenn **jemand
+ * anderes** es geändert hat (`theirs ≠ base`) **und** mein Schreibvorgang es
+ * überschriebe (`mine ≠ theirs`).
  *
- * Gibt Schlüssel zurück, keine Zeichenketten: Formatiert wird im Screen, der
- * Locale, Datumsformat und die geladenen Nachschlagelisten hat.
+ * Der zweiwertige Vergleich (nur `theirs` gegen `mine`) hat die eigenen
+ * Änderungen des Nutzers mitgelistet — das Formular schickt immer den vollen
+ * Feldsatz, ein geänderter Titel weicht also zwangsläufig ab, auch wenn ihn
+ * sonst niemand angefasst hat. Damit war die Liste nach **jedem**
+ * Versionssprung nicht-leer, die Regel „leere Liste → durchspeichern" feuerte
+ * nie, und der Dialog erschien bei jeder fremden Schreiboperation. Belegt in
+ * der Zwei-Client-Verifikation, Schritt 6
+ * ([docs/superpowers/plans/2026-09-04-conflict-detection-verification.md](./2026-09-04-conflict-detection-verification.md)).
+ *
+ * Eine leere Liste heißt weiterhin: kein Dialog, der Schreibvorgang läuft
+ * durch. Sie ist jetzt nur wieder das, was sie sein sollte — der Normalfall,
+ * wenn niemand ins Gehege kommt.
  */
 export function differingEventFields(
   theirs: CalendarOccurrence,
   mine: EventChanges,
+  base: CalendarOccurrence,
 ): EventConflictField[] {
   const out: EventConflictField[] = [];
-  if (theirs.title !== mine.title) out.push("title");
-  if (!sameInstant(theirs.startAt, mine.start_at)) out.push("start_at");
-  if (!sameInstant(theirs.endAt, mine.end_at)) out.push("end_at");
-  if (!sameText(theirs.location, mine.location)) out.push("location");
-  if (!sameText(theirs.description, mine.description)) out.push("description");
+  if (!sameText(theirs.title, base.title) && !sameText(theirs.title, mine.title)) {
+    out.push("title");
+  }
+  if (
+    theirs.startAt.getTime() !== base.startAt.getTime() &&
+    !sameInstant(theirs.startAt, mine.start_at)
+  ) {
+    out.push("start_at");
+  }
+  if (theirs.endAt.getTime() !== base.endAt.getTime() && !sameInstant(theirs.endAt, mine.end_at)) {
+    out.push("end_at");
+  }
+  if (!sameText(theirs.location, base.location) && !sameText(theirs.location, mine.location)) {
+    out.push("location");
+  }
+  if (
+    !sameText(theirs.description, base.description) &&
+    !sameText(theirs.description, mine.description)
+  ) {
+    out.push("description");
+  }
   return out;
 }

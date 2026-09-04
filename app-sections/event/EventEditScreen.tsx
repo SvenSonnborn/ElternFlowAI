@@ -115,6 +115,15 @@ export function EventEditScreen() {
   // aus dem Dialog (`showConflict`) ist davon ausgenommen: der berechnet
   // bewusst die frische Version aus `theirs`/`err.row`.
   const [baseVersion, setBaseVersion] = useState<string | null>(null);
+  // Dieselbe Invariante, derselbe Moment: `baseOccurrence` ist die Occurrence,
+  // aus der der Formular-State entstanden ist — nicht die, die `useEvent`
+  // gerade führt. Sie gehört neben `baseVersion`, weil beide denselben Stand
+  // beschreiben und nicht auseinanderlaufen dürfen. `differingEventFields`
+  // braucht sie als `base`, um eigene Änderungen (mein Formular weicht von
+  // `theirs` ab, weil *ich* etwas geändert habe) von echten Konflikten
+  // (`theirs` weicht von *dieser* Basis ab) zu unterscheiden — siehe
+  // `conflict.ts`.
+  const [baseOccurrence, setBaseOccurrence] = useState<CalendarOccurrence | null>(null);
   const { startAt, endAt } = range;
 
   if (initial && !hydrated) {
@@ -125,6 +134,7 @@ export function EventEditScreen() {
     setRecurrence(initial.recurrence ?? "none");
     setCountText(initial.countText);
     setBaseVersion(initial.version);
+    setBaseOccurrence(occurrence ?? null);
     setHydrated(true);
   }
 
@@ -294,8 +304,17 @@ export function EventEditScreen() {
           ) ?? null;
       }
 
-      const fields = theirs ? differingEventFields(theirs, vars.changes) : [];
-      if (theirs && fields.length === 0) {
+      // Fehlt `baseOccurrence` (theoretisch: der Konflikt trifft vor der
+      // Hydration ein), bleibt `fields` leer — aber der Guard darunter prüft
+      // `baseOccurrence` zusätzlich zu `fields.length === 0`, damit eine
+      // fehlende Basis nicht denselben Weg nimmt wie ein echtes „niemand hat
+      // etwas geändert". Ohne Basis lässt sich das gar nicht feststellen, also
+      // muss der Dialog erscheinen — ohne Zeilen, aber sichtbar. Genau die
+      // Überlegung, die den `row === null`-Fall (`theirs === null`) schon
+      // heute in den Dialog statt ins Durchspeichern schickt.
+      const fields =
+        theirs && baseOccurrence ? differingEventFields(theirs, vars.changes, baseOccurrence) : [];
+      if (theirs && baseOccurrence && fields.length === 0) {
         save({ ...vars, baseVersion: theirs.version });
         return;
       }

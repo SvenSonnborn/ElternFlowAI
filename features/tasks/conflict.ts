@@ -32,31 +32,91 @@ function sameTime(a: string | null | undefined, b: string | null | undefined): b
 }
 
 /**
- * Welche Felder die fremde Fassung anders trägt als die eigene Eingabe.
+ * Welche Felder ein Speichern **fremde** Änderungen überschreiben würde.
  *
- * Leere Liste heißt: kein Dialog, der Schreibvorgang läuft durch — dieselbe
- * Regel und dieselbe Begründung wie bei `differingEventFields` im Kalender
- * (ADR-031).
+ * Drei Werte pro Feld, nicht zwei: `base` ist der Stand, aus dem `state`
+ * hydriert wurde, `mine` das, was geschrieben würde, `theirs` das, was jetzt
+ * auf dem Server steht. Ein Feld ist nur dann ein Konflikt, wenn **jemand
+ * anderes** es geändert hat (`theirs ≠ base`) **und** mein Schreibvorgang es
+ * überschriebe (`mine ≠ theirs`).
  *
- * Alle sieben Felder vergleichen `undefined` tolerant: `TaskChanges` lässt
- * jedes seiner Felder `undefined`, und ein `undefined`-Feld schreibt
- * PostgREST gar nicht erst — es kann also nie mit einer fremden Fassung
- * kollidieren, egal was `theirs` trägt.
+ * Der zweiwertige Vergleich (nur `theirs` gegen `mine`) hat die eigenen
+ * Änderungen des Nutzers mitgelistet — `toTaskChanges` schickt bewusst den
+ * vollen editierbaren Feldsatz, kein Diff, ein geändertes Feld weicht also
+ * zwangsläufig ab, auch wenn sonst niemand es angefasst hat. Damit war die
+ * Liste nach **jedem** Versionssprung nicht-leer, die Regel „leere Liste →
+ * durchspeichern" feuerte nie, und der Dialog erschien bei jeder fremden
+ * Schreiboperation. Belegt in der Zwei-Client-Verifikation, Schritt 8
+ * ([docs/superpowers/plans/2026-09-04-conflict-detection-verification.md](./2026-09-04-conflict-detection-verification.md)).
+ *
+ * Eine leere Liste heißt weiterhin: kein Dialog, der Schreibvorgang läuft
+ * durch. Sie ist jetzt nur wieder das, was sie sein sollte — der Normalfall,
+ * wenn niemand ins Gehege kommt.
+ *
+ * Die `undefined`-Toleranz bleibt vor der neuen Regel und läuft ihr für jedes
+ * Feld voraus: `TaskChanges` lässt jedes seiner Felder `undefined`, und ein
+ * `undefined`-Feld schreibt PostgREST gar nicht erst — es kann also nie mit
+ * einer fremden Fassung kollidieren, unabhängig davon, was `theirs` oder
+ * `base` tragen.
  *
  * `child_id` und `type_id` sind Fremdschlüssel; der Vergleich läuft auf der
  * Id, die *Anzeige* löst der Screen aus den ohnehin geladenen Kind- und
  * Typ-Listen auf.
  */
-export function differingTaskFields(theirs: TaskWithType, mine: TaskChanges): TaskConflictField[] {
+export function differingTaskFields(
+  theirs: TaskWithType,
+  mine: TaskChanges,
+  base: TaskWithType,
+): TaskConflictField[] {
   const out: TaskConflictField[] = [];
-  if (!sameText(theirs.title, mine.title)) out.push("title");
-  if (!sameText(theirs.subject, mine.subject)) out.push("subject");
-  if (!sameText(theirs.description, mine.description)) out.push("description");
-  if (!sameText(theirs.due_date, mine.due_date)) out.push("due_date");
-  if (!sameTime(theirs.due_time, mine.due_time)) out.push("due_time");
-  if (mine.child_id !== undefined && (theirs.child_id ?? null) !== (mine.child_id ?? null)) {
+  if (
+    mine.title !== undefined &&
+    !sameText(theirs.title, base.title) &&
+    !sameText(theirs.title, mine.title)
+  ) {
+    out.push("title");
+  }
+  if (
+    mine.subject !== undefined &&
+    !sameText(theirs.subject, base.subject) &&
+    !sameText(theirs.subject, mine.subject)
+  ) {
+    out.push("subject");
+  }
+  if (
+    mine.description !== undefined &&
+    !sameText(theirs.description, base.description) &&
+    !sameText(theirs.description, mine.description)
+  ) {
+    out.push("description");
+  }
+  if (
+    mine.due_date !== undefined &&
+    !sameText(theirs.due_date, base.due_date) &&
+    !sameText(theirs.due_date, mine.due_date)
+  ) {
+    out.push("due_date");
+  }
+  if (
+    mine.due_time !== undefined &&
+    !sameTime(theirs.due_time, base.due_time) &&
+    !sameTime(theirs.due_time, mine.due_time)
+  ) {
+    out.push("due_time");
+  }
+  if (
+    mine.child_id !== undefined &&
+    (theirs.child_id ?? null) !== (base.child_id ?? null) &&
+    (theirs.child_id ?? null) !== (mine.child_id ?? null)
+  ) {
     out.push("child_id");
   }
-  if (!sameText(theirs.type_id, mine.type_id)) out.push("type_id");
+  if (
+    mine.type_id !== undefined &&
+    !sameText(theirs.type_id, base.type_id) &&
+    !sameText(theirs.type_id, mine.type_id)
+  ) {
+    out.push("type_id");
+  }
   return out;
 }
