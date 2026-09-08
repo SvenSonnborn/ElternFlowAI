@@ -139,7 +139,11 @@ Drei Einzelposten tragen überproportional:
 Zuerst, weil Punkt 1 die Voraussetzung dafür ist, dass jeder PR ab Block 1 überhaupt geprüft wird,
 und Punkt 2 ein Problem ist, das mit jedem Tag teurer wird.
 
-### 0.1 ⚙️ Required Status Checks eintragen
+> **Stand 2026-09-08:** 0.2 · 0.3 · 0.4 sind umgesetzt (Branch `chore/block-0-hygiene`), 0.5 ist
+> erledigt. **0.1 ist offen und liegt bei dir** — der Token darf keine Rulesets schreiben, Klickweg
+> siehe unten.
+
+### 0.1 ⚙️ Required Status Checks eintragen — **offen, Handgriff bei dir**
 
 `TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-scope-items) → **„Branch-Protection-Rule
 ‚Status-Checks required' auf `main`"**
@@ -160,7 +164,37 @@ es im TODO-Eintrag.
 > mindestens so lange. Das ist der beschlossene Preis (ADR-016), aber es ändert den Arbeitsrhythmus
 > ab dem Moment, in dem der Haken gesetzt ist — deshalb bewusst als eigener, benannter Schritt.
 
-### 0.2 SDK-Drift einfangen
+**Warum das nicht automatisch ging:** Der Fine-grained-PAT darf Rulesets **lesen**, nicht schreiben
+(`PUT /repos/.../rulesets/17263678` → `403 Resource not accessible by personal access token`; die
+ältere Branch-Protection-API antwortet ebenso). Es braucht `Administration: Read and write` auf dem
+Token — oder den Klickweg. Das Ruleset ist unverändert, `updated_at` steht weiter auf
+`2026-06-04T14:07:28`.
+
+**Klickweg:** Repo → Settings → Rules → Rulesets → „main protection" → **Require status checks to
+pass** aktivieren → die sechs Namen oben hinzufügen. Zwei Fallen dabei:
+
+- **Nicht** den siebten Check „expo install --fix nach SDK-Bump" auswählen. Der Job läuft nur auf
+  Renovates Expo-SDK-PR; als Required Check bliebe jeder andere PR dauerhaft auf „pending" stehen.
+- **„Require branches to be up to date before merging" ausgelassen lassen.** Bei einem
+  ~30-min-iOS-Job erzwingt die Option nach jedem fremden Merge eine Rebase samt vollem Neulauf. Die
+  lineare Historie sichert bereits `required_linear_history` zusammen mit Rebase-only-Merges.
+
+**Zwei Befunde aus dem Ruleset, die den Nutzen von 0.1 einordnen** — beide als eigene Einträge in
+[docs/TODO.md](./TODO.md) → Renovate / Dependencies aufgenommen:
+
+1. **Der Haken bindet dich selbst nicht.** Einziger Bypass-Actor ist `RepositoryRole 5` (Repo-Admin)
+   mit `bypass_mode: always`; die API meldet für dich `current_user_can_bypass: "always"`. Die sechs
+   Checks machen einen roten Merge für andere Actors unmöglich und zeigen den Zustand deutlich an —
+   dich hindern sie nicht. Das in ADR-016 als _blockierend_ beschlossene Gate ist für dich eine
+   Anzeige, keine Schranke.
+2. **Renovate ist gar kein Bypass-Actor — sein Automerge hat nie funktioniert.** ADR-013 Decision 4
+   sagt, die App müsse als Bypass-Actor eingetragen werden; im Ruleset steht kein
+   `Integration`-Eintrag. Nachgeprüft: alle zehn zuletzt gemergten Renovate-PRs wurden von dir von
+   Hand gemergt, darunter #86 (`lock file maintenance`) und #75–#79 (Actions) — genau die
+   Automerge-Kategorien. Das macht den späteren Block-9-Punkt „`platformAutomerge: true` testen"
+   bis auf Weiteres gegenstandslos.
+
+### 0.2 SDK-Drift einfangen — **erledigt**
 
 `TODO.md` → [Renovate / Dependencies](./TODO.md#renovate--dependencies-siehe-adr-013) → **„Das Repo
 driftet bereits von SDK 57"**
@@ -173,7 +207,7 @@ beim Web-Export endet.
 Je später das passiert, desto mehr trägt der erste echte SDK-Sprung zusätzlich zum SDK-Delta noch
 dieses Alt-Delta mit.
 
-### 0.3 Test-Dependencies bereinigen
+### 0.3 Test-Dependencies bereinigen — **erledigt**
 
 Zwei Einträge, eine `package.json`-Änderung, gehören in **einen** Commit:
 
@@ -184,19 +218,35 @@ Zwei Einträge, eine `package.json`-Änderung, gehören in **einen** Commit:
 - **„`test-renderer` steht nur in der Lockfile"** — `"test-renderer": "^1"` als devDependency
   nachtragen. Heute trägt allein, dass Bun den Peer selbsttätig in `bun.lock` aufgenommen hat.
 
-### 0.4 `persist-credentials: false` in `ci.yml`
+### 0.4 `persist-credentials: false` in `ci.yml` — **erledigt**
 
 `TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-scope-items).
 [native-build.yml](../.github/workflows/native-build.yml) hat es bereits;`ci.yml` macht nach dem
 Checkout ebenfalls keine Git-Operation mehr. **Nicht** für `expo-sdk-sync.yml` — der pusht in den
 PR-Branch und braucht die persistierten Credentials.
 
-### 0.5 GitHub-Issues aufräumen
+### 0.5 GitHub-Issues aufräumen — **erledigt**
 
 Nicht in `TODO.md`, aber es verzerrt jede Backlog-Sicht: Laut `CLAUDE.md` sind **#51** (Live-Sync,
 ADR-030) und **#52** (Conflict-Detection, ADR-031) erledigt, ebenso die Phase-1-Issues **#14–#17**
 und die Phase-2-Issues **#19**, **#21**, **#22**, **#48**. Alle stehen noch offen. Vor dem Schließen
 je einmal gegen den ADR gegenlesen und mit dem Merge-Commit verlinken.
+
+**Ergebnis:** Acht geschlossen — #15, #16, #17, #19, #21, #48, #51, #52 —, jeweils mit einem
+Kommentar, der die Checkliste gegen den ADR abgleicht und Abweichungen benennt (etwa #48, dessen
+„Liste mit E-Mail" durch ADR-021 abgelöst ist, oder #51, dessen Subscription anders sitzt als dort
+skizziert).
+
+**Zwei bewusst offen gelassen**, weil sie es nicht sind:
+
+- **#14** (Dashboard live) — alle fünf Checkboxen erfüllt, aber der im Ziel genannte
+  **Familienname** liest weiter `getSampleFamilyName(t)`. Braucht einen Ladezustand für die TopBar
+  oder eine Copy-Variante ohne Namen, also 🎨.
+- **#22** (Optimistic UI/Toast/Undo) — vier von fünf Punkten stehen; `useCreateTask` ist weiterhin
+  nicht optimistisch, dazu fehlen die Toast-Variante `solid` und das Höhen-Kollabieren.
+
+Beide tragen jetzt einen Kommentar mit genau dieser Restliste, damit sie nicht als „irgendwie noch
+offen" herumliegen.
 
 Offen bleiben danach: [#111](https://github.com/SvenSonnborn/ElternFlowAI/issues/111) (→ Block 7),
 [#88](https://github.com/SvenSonnborn/ElternFlowAI/issues/88) und
