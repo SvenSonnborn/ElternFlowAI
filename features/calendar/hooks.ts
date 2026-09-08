@@ -1,6 +1,7 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import {
   addDays,
+  endOfDay,
   endOfMonth,
   max as dateMax,
   min as dateMin,
@@ -122,7 +123,16 @@ export function useEvent(id: string, occurrenceDate?: string): UseEventResult {
     // a far-future RRULE occurrence (>1y out) would otherwise be cut off.
     const requested = occurrenceDate ? parseISO(occurrenceDate) : null;
     const fallbackStart = requested ? dateMin([addDays(start, -1), requested]) : addDays(start, -1);
-    const fallbackEnd = requested ? dateMax([addDays(start, 366), requested]) : addDays(start, 366);
+    // `endOfDay` auf der Obergrenze: `parseISO("2026-09-08")` ist Mitternacht,
+    // und `expandEvents` verwirft `startAt > rangeEnd`. Ohne das fiele eine
+    // Occurrence um 15:00 am angeforderten Tag aus dem Fenster, sobald der
+    // Serienstart mehr als 366 Tage zurückliegt — `find` liefe dann ins Leere
+    // und der `expanded[0]`-Fallback zeigte stillschweigend eine **andere**
+    // Occurrence. Die Untergrenze braucht das Gegenstück nicht: Dort ist
+    // Mitternacht bereits die frühere Grenze, und verglichen wird gegen `endAt`.
+    const fallbackEnd = requested
+      ? dateMax([addDays(start, 366), endOfDay(requested)])
+      : addDays(start, 366);
     const expanded = expandEvents([row], fallbackStart, fallbackEnd, theme);
     if (occurrenceDate) {
       return expanded.find((o) => o.occurrenceDate === occurrenceDate) ?? expanded[0] ?? null;

@@ -10,7 +10,11 @@ import { useConflictStore } from "./conflictStore";
  * vergessen heißt, dass Konflikte unbemerkt bleiben, nicht dass etwas wirft.
  */
 export function ConflictDialogHost() {
-  const current = useConflictStore((s) => s.current);
+  // Der Kopf der Warteschlange, nicht ein einzelner Eintrag: Ein zweiter
+  // Konflikt verdrängt den ersten nicht mehr, er wartet (siehe `conflictStore`).
+  // `queue[0]` ist referenzstabil, Zustands `Object.is`-Vergleich trägt das
+  // also ohne eigenen Equality-Fn.
+  const current = useConflictStore((s) => s.queue[0] ?? null);
   const dismiss = useConflictStore((s) => s.dismiss);
 
   if (!current) return null;

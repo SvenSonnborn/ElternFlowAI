@@ -9,6 +9,7 @@ export {
 export { ConflictDialog } from "./ConflictDialog";
 export { ConflictDialogHost } from "./ConflictDialogHost";
 export {
+  MAX_CONFLICT_AUTO_RETRIES,
   useConflict,
   useConflictStore,
   type ConflictApi,

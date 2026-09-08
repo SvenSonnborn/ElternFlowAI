@@ -467,7 +467,10 @@
     "edit": {
       "title": "Aufgabe bearbeiten",
       "save": "Speichern",
-      "saving": "Speichere…"
+      "saving": "Speichere…",
+      "error": {
+        "saveFailed": "Änderung konnte nicht gespeichert werden"
+      }
     },
     "form": {
       "fieldType": "Typ",

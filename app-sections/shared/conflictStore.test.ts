@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 
 import type { ShowConflictOptions } from "./conflictStore";
 
@@ -16,34 +16,56 @@ function options(overrides: Partial<ShowConflictOptions> = {}): ShowConflictOpti
   };
 }
 
+function head() {
+  return useConflictStore.getState().queue[0] ?? null;
+}
+
 describe("conflictStore", () => {
-  test("show legt den Dialog ab und gibt seine Id zurück", () => {
-    const id = useConflictStore.getState().show(options());
-    expect(useConflictStore.getState().current?.id).toBe(id);
+  // Der Store liegt auf Modulebene und überlebt den einzelnen Test. Beim
+  // ersetzenden Vorgänger war das folgenlos — jeder `show` warf den alten
+  // Stand weg. Mit der Warteschlange blieben Einträge früherer Tests vor dem
+  // Kopf stehen und jeder Test läse den falschen Dialog.
+  beforeEach(() => {
+    useConflictStore.setState({ queue: [] });
   });
 
-  test("ein zweiter Konflikt ersetzt den ersten", () => {
-    // Ein Modal kann nur eines zeigen, und das jüngste Ereignis ist das, auf
-    // das der Nutzer gerade reagiert — dieselbe Regel wie beim Toast-Stapel.
-    useConflictStore.getState().show(options({ body: "erster" }));
-    const second = useConflictStore.getState().show(options({ body: "zweiter" }));
-    expect(useConflictStore.getState().current?.id).toBe(second);
-    expect(useConflictStore.getState().current?.body).toBe("zweiter");
+  test("show reiht den Dialog ein und gibt seine Id zurück", () => {
+    const id = useConflictStore.getState().show(options());
+    expect(head()?.id).toBe(id);
+  });
+
+  test("ein zweiter Konflikt verdrängt den ersten nicht, sondern wartet", () => {
+    // Ein verdrängter Eintrag nähme seinen `onKeepMine` mit: Die Eingaben des
+    // Nutzers wären ersatzlos weg, ohne dass er je eine Wahl gesehen hätte —
+    // genau der stille Verlust, gegen den dieses Feature gebaut ist.
+    const first = useConflictStore.getState().show(options({ body: "erster" }));
+    useConflictStore.getState().show(options({ body: "zweiter" }));
+    expect(head()?.id).toBe(first);
+    expect(useConflictStore.getState().queue).toHaveLength(2);
+  });
+
+  test("nach dem Schließen rückt der nächste nach", () => {
+    const first = useConflictStore.getState().show(options({ body: "erster" }));
+    useConflictStore.getState().show(options({ body: "zweiter" }));
+    useConflictStore.getState().dismiss(first);
+    expect(head()?.body).toBe("zweiter");
   });
 
   test("dismiss schließt den Dialog", () => {
     const id = useConflictStore.getState().show(options());
     useConflictStore.getState().dismiss(id);
-    expect(useConflictStore.getState().current).toBeNull();
+    expect(head()).toBeNull();
   });
 
-  test("ein veraltetes dismiss schließt den neueren Dialog nicht", () => {
-    // Der Nutzer wählt in Dialog A, während B schon steht: A's Handler ruft
-    // dismiss(idA) und nähme B sonst mit weg, ohne dass jemand es gesehen hat.
+  test("ein dismiss aus einem wartenden Eintrag lässt den sichtbaren stehen", () => {
+    // Der Nutzer wählt in A, während B schon wartet. Ein verspätetes
+    // `dismiss(idB)` — etwa aus einem Handler, den B mitgebracht hat — darf A
+    // nicht mitnehmen, ohne dass jemand es gesehen hat.
     const first = useConflictStore.getState().show(options({ body: "erster" }));
-    useConflictStore.getState().show(options({ body: "zweiter" }));
-    useConflictStore.getState().dismiss(first);
-    expect(useConflictStore.getState().current?.body).toBe("zweiter");
+    const second = useConflictStore.getState().show(options({ body: "zweiter" }));
+    useConflictStore.getState().dismiss(second);
+    expect(head()?.id).toBe(first);
+    expect(useConflictStore.getState().queue).toHaveLength(1);
   });
 
   test("jede Id ist neu", () => {

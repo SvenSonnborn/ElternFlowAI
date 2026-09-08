@@ -14,6 +14,27 @@ import { create } from "zustand";
  * aus `bun.test.preload.ts` zu verlassen.
  */
 
+/**
+ * Wie oft ein Konflikt **stillschweigend** wiederholt werden darf, bevor der
+ * Dialog erscheint.
+ *
+ * Weicht inhaltlich nichts ab, speichern die Edit-Screens ohne Rückfrage mit
+ * frischer Basis-Version durch — richtig so, ein Versionssprung ohne
+ * Abweichung darf niemanden anhalten. Ohne Obergrenze ist das aber eine
+ * Schleife ohne Abbruchbedingung: Schreibt ein zweiter Client die Zeile
+ * fortlaufend (etwa ein `is_done`-Toggle in einer Schleife), wiederholt sich
+ * `speichern → Konflikt → kein Feld weicht ab → speichern` beliebig oft, jedes
+ * Mal ein voller Roundtrip, ohne dass der Nutzer je etwas sieht.
+ *
+ * Nach dem Limit erscheint der Dialog — dann zwar ohne Vergleichszeilen, aber
+ * sichtbar. Dieselbe Überlegung wie beim Compare-and-Swap ohne fremde Fassung:
+ * lieber ein Dialog, der wenig sagt, als stilles Weiterlaufen.
+ *
+ * Gilt **nur** für die stille Wiederholung. Ein Tap auf „Deine Fassung
+ * speichern" ist eine bewusste Entscheidung und setzt den Zähler zurück.
+ */
+export const MAX_CONFLICT_AUTO_RETRIES = 3;
+
 /** Eine Zeile des Vergleichs. Beide Seiten kommen fertig formatiert an. */
 export interface ConflictRow {
   /** Feldname, schon übersetzt — der Screen kennt die passenden `field*`-Keys. */
@@ -50,23 +71,40 @@ function nextConflictId(): string {
 }
 
 interface ConflictState {
-  /** Ein Modal kann nur einen Dialog zeigen; ein zweiter ersetzt den ersten. */
-  current: ConflictEntry | null;
+  /**
+   * FIFO. Ein Modal zeigt genau einen Dialog — weitere **warten**, statt den
+   * ersten zu verdrängen.
+   *
+   * Vorher ersetzte ein zweiter Konflikt den ersten. Der nahm dabei seinen
+   * `onKeepMine` mit, und die Eingaben des Nutzers waren ersatzlos weg, ohne
+   * dass er je eine Wahl gesehen hätte — genau der stille Verlust, gegen den
+   * dieses Feature gebaut ist. Erreichbar, sobald zwei Mutationen kurz
+   * hintereinander scheitern: Beide Edit-Screens verlassen sich beim Zeigen
+   * des Dialogs, ihre Konflikte treffen also unabhängig voneinander hier ein.
+   *
+   * Bewusst **ungedeckelt**, anders als der Toast-Stapel (`toastStore.ts`,
+   * `DS.components.toast.stack.max`): Ein Toast ist eine Mitteilung, die man
+   * verpassen darf; ein Konflikt ist eine offene Entscheidung über Daten, die
+   * sonst verloren gehen. Die Länge begrenzt sich von selbst — jeder Konflikt
+   * endet in einer Nutzerwahl, und die stille Wiederholung hat mit
+   * {@link MAX_CONFLICT_AUTO_RETRIES} ihre eigene Obergrenze.
+   */
+  queue: ConflictEntry[];
   show: (options: ShowConflictOptions) => string;
   dismiss: (id: string) => void;
 }
 
 export const useConflictStore = create<ConflictState>((set) => ({
-  current: null,
+  queue: [],
   show: (options) => {
     const entry: ConflictEntry = { ...options, id: nextConflictId() };
-    set({ current: entry });
+    set((state) => ({ queue: [...state.queue, entry] }));
     return entry.id;
   },
-  // Nur schließen, wenn genau *dieser* Dialog noch steht: Der Nutzer kann in A
-  // wählen, während B bereits darüber liegt — ohne den Vergleich nähme A's
-  // Handler B mit weg, ohne dass jemand es gesehen hat.
-  dismiss: (id) => set((state) => (state.current?.id === id ? { current: null } : state)),
+  // Entfernt genau *diesen* Eintrag, gleich an welcher Stelle er steht. Der
+  // Nutzer kann in A wählen, während B schon wartet — ohne den Id-Vergleich
+  // nähme A's Handler B mit weg, ohne dass jemand es gesehen hat.
+  dismiss: (id) => set((state) => ({ queue: state.queue.filter((entry) => entry.id !== id) })),
 }));
 
 export interface ConflictApi {

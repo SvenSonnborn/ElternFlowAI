@@ -467,7 +467,10 @@
     "edit": {
       "title": "Edit task",
       "save": "Save",
-      "saving": "Saving…"
+      "saving": "Saving…",
+      "error": {
+        "saveFailed": "Couldn't save your change"
+      }
     },
     "form": {
       "fieldType": "Type",
