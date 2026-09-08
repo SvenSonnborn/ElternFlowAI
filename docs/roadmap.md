@@ -28,9 +28,14 @@ eigenen Kapitel.
 Vier Annahmen aus `TODO.md` habe ich vor dem Ordnen nachgemessen, weil sie die Reihenfolge tragen.
 Zwei davon sind schlimmer als dort notiert.
 
+> **Dies ist die Messung _vor_ Block 0.** Befund 1 (SDK-Drift) ist mit 0.2 behoben —
+> `expo install --check` meldet seither „Dependencies are up to date". Befund 5 (Test-Deps) ist
+> mit 0.3 behoben. Die Zahlen bleiben hier als Beleg stehen, warum die Blöcke so sortiert sind;
+> den aktuellen Stand führt jeweils der Block selbst.
+
 **1. Der SDK-Drift ist gewachsen — 13 Pakete statt der zwei notierten.** ✅
 
-```
+```text
 $ bunx expo install --check
   @expo/metro-runtime@57.0.9   → ~57.0.15      expo-router@57.0.12        → ~57.0.19
   expo@57.0.12                 → ~57.0.20      expo-splash-screen@57.0.6  → ~57.0.8
@@ -53,7 +58,7 @@ Lockfile sind bereits auseinander.
 
 **2. Die Branch-Protection hat keine Required Checks.** ✅
 
-```
+```text
 $ gh api repos/SvenSonnborn/ElternFlowAI/rulesets/17263678
 enforcement: active
 RULE: deletion
