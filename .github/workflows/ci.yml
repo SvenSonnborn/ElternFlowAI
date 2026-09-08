@@ -28,6 +28,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # Kein Git-Schritt folgt dem Checkout, der GITHUB_TOKEN wird also nie
+          # gebraucht — ihn trotzdem als http.extraheader in .git/config zu
+          # hinterlassen, exponiert ihn nur gegenüber dem Fremdcode, den dieser
+          # Workflow ausführt: bun-Postinstall-Skripte und die Metro-/Babel-
+          # Plugin-Kette des Web-Exports. Das ist deutlich weniger Angriffsfläche
+          # als der Native-Build in native-build.yml (CocoaPods, Gradle,
+          # expo-Config-Plugins), aber dieselbe Klasse — und der Token wird hier
+          # so wenig gebraucht wie dort. (Gilt nicht für expo-sdk-sync.yml — der
+          # pusht in den PR-Branch und braucht die Credentials.)
+          persist-credentials: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
