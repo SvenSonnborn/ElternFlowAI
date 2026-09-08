@@ -158,6 +158,7 @@ docs/
 ├─ ICONS.md              Icon list + stroke conventions
 ├─ architecture.md
 ├─ decision-log.md       ADRs (append new entries, don't rewrite history)
+├─ roadmap.md            Abarbeitungsreihenfolge für docs/TODO.md (Blöcke + Blocker)
 └─ eltern-flow-ai-project-structure.md
 ```
 

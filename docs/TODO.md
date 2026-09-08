@@ -2,6 +2,8 @@
 
 Aktive Follow-ups aus laufender Arbeit. Workflow: **CLAUDE.md → "Out-of-scope TODOs"** (anhängen wenn entdeckt, entfernen wenn erledigt).
 
+Die **Reihenfolge**, in der diese Einträge abgearbeitet werden, steht in [docs/roadmap.md](./roadmap.md) — dort auch, was extern blockiert ist und was bewusst auf ein drittes Vorkommen wartet. Diese Datei bleibt der Backlog (_was_ und _warum_), `roadmap.md` ordnet ihn (_wann_ und _woran es hängt_).
+
 ## Calendar (V1 — siehe [ADR-008](./decision-log.md))
 
 - **Reminder gelten für die ganze Serie, nicht pro Termin** ([features/calendar/reminders.ts](../features/calendar/reminders.ts)): Die `reminders`-Tabelle hängt an `event_id`, hat keine `occurrence_date`-Spalte. Ein Switch im Detail-Sheet eines wiederkehrenden Termins schaltet die Erinnerung damit für alle Occurrences. Pro-Occurrence-Erinnerungen bräuchten eine Schema-Erweiterung — erst sinnvoll, wenn der Bedarf real ist.
