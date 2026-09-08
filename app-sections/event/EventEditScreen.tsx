@@ -1,4 +1,4 @@
-import { addDays, format, max as dateMax, min as dateMin, parseISO } from "date-fns";
+import { addDays, endOfDay, format, max as dateMax, min as dateMin, parseISO } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useRef, useState } from "react";
@@ -6,7 +6,13 @@ import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { DateTimePickerSheet, Field, useConflict, useToast } from "@/app-sections/shared";
+import {
+  DateTimePickerSheet,
+  Field,
+  MAX_CONFLICT_AUTO_RETRIES,
+  useConflict,
+  useToast,
+} from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import {
@@ -278,10 +284,10 @@ export function EventEditScreen() {
    * Retry-Aktion selbst aufrufen kann — und weil der Screen seine übrigen
    * Handler (`onSave`) genauso deklariert.
    */
-  function save(vars: Parameters<typeof updateMutation.mutateAsync>[0]) {
+  function save(vars: Parameters<typeof updateMutation.mutateAsync>[0], autoRetries = 0) {
     updateMutation.mutateAsync(vars).catch((err: unknown) => {
       if (err instanceof EventConflictError) {
-        showConflict(err, vars);
+        showConflict(err, vars, autoRetries);
         return;
       }
       show({
@@ -320,6 +326,7 @@ export function EventEditScreen() {
   function showConflict(
     err: EventConflictError,
     vars: Parameters<typeof updateMutation.mutateAsync>[0],
+    autoRetries: number,
   ) {
     try {
       // Kein `row` heißt: der Compare-and-Swap hat den Konflikt erkannt, ohne
@@ -340,7 +347,14 @@ export function EventEditScreen() {
         const rowStart = new Date(row.start_at);
         const requested = parseISO(vars.occurrenceDate);
         const windowStart = dateMin([addDays(rowStart, -1), requested]);
-        const windowEnd = dateMax([addDays(rowStart, 366), requested]);
+        // `endOfDay`, nicht `requested` selbst: `parseISO("2026-09-08")` ist
+        // Mitternacht, und `expandEvents` verwirft `startAt > rangeEnd`. Ohne
+        // das fiele eine Occurrence um 15:00 am angeforderten Tag aus dem
+        // Fenster, sobald der Serienstart mehr als 366 Tage zurückliegt — und
+        // `theirs` würde `null`, obwohl die fremde Fassung vorliegt. Für
+        // `windowStart` gibt es kein Gegenstück: Dort ist Mitternacht bereits
+        // die frühere Grenze, und verglichen wird gegen `endAt`.
+        const windowEnd = dateMax([addDays(rowStart, 366), endOfDay(requested)]);
         theirs =
           expandEvents([row], windowStart, windowEnd, theme).find(
             (o) => o.occurrenceDate === vars.occurrenceDate,
@@ -357,9 +371,18 @@ export function EventEditScreen() {
       // heute in den Dialog statt ins Durchspeichern schickt.
       const fields =
         theirs && baseOccurrence ? differingEventFields(theirs, vars.changes, baseOccurrence) : [];
+      // Der Zähler begrenzt **nur** diese stille Wiederholung, nicht den Tap
+      // auf „Deine Fassung speichern": Ohne ihn liefe `speichern → Konflikt →
+      // kein Feld weicht ab → speichern` beliebig oft, solange ein zweiter
+      // Client die Zeile fortlaufend schreibt — jedes Mal ein voller
+      // Roundtrip, ohne dass der Nutzer je etwas sähe. Nach dem Limit fällt
+      // der Ablauf in den Dialog darunter, der dann ohne Vergleichszeilen
+      // erscheint (es weicht ja nichts ab) — sichtbar statt endlos.
       if (theirs && baseOccurrence && fields.length === 0) {
-        save({ ...vars, baseVersion: theirs.version });
-        return;
+        if (autoRetries < MAX_CONFLICT_AUTO_RETRIES) {
+          save({ ...vars, baseVersion: theirs.version }, autoRetries + 1);
+          return;
+        }
       }
 
       const mineSource = {

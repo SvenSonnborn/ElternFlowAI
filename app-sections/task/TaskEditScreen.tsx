@@ -1,12 +1,14 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   confirmDestructive,
+  MAX_CONFLICT_AUTO_RETRIES,
   useConflict,
+  useToast,
   useUndoableDelete,
   type ConflictRow,
 } from "@/app-sections/shared";
@@ -71,6 +73,13 @@ export function TaskEditScreen() {
   const deleteMutation = useDeleteTask();
   const undoableDelete = useUndoableDelete();
   const conflict = useConflict();
+  const { show } = useToast();
+  // Gesetzt, sobald `showConflict` den Screen verlässt. Danach ist die
+  // Inline-Fehlerzeile mit dem Screen weg, und ein erfolgreicher Retry darf
+  // nicht ein zweites Mal navigieren — `submit` liest beides hieraus.
+  // `useRef` statt `useState`: Der Wert steuert keinen Render, und er muss
+  // synchron gelten, nicht erst im nächsten.
+  const leftAfterConflict = useRef(false);
 
   const [state, setState] = useState<TaskFormState>(() => emptyTaskForm(new Date()));
   const [hydrated, setHydrated] = useState(false);
@@ -139,19 +148,45 @@ export function TaskEditScreen() {
    * hierdurch, damit er dieselbe Behandlung bekommt und erneut kollidieren
    * kann.
    *
-   * `mutate` mit Per-Call-Callbacks statt `mutateAsync` mit eigenem `catch`:
-   * Anders als das Kalender-Sheet bleibt dieser Screen bis zum Erfolg montiert,
-   * TanStack ruft die Callbacks also. Alles außer dem Konflikt meldet weiterhin
-   * die Inline-Zeile unter dem Formular (`updateMutation.error`) — ein Toast
-   * wäre ein zweiter Kanal für dieselbe Sache.
+   * Der Meldekanal hängt daran, ob der Screen noch steht: Solange er montiert
+   * ist, trägt die Inline-Zeile unter dem Formular (`updateMutation.error`)
+   * jeden Nicht-Konflikt-Fehler, und ein Toast wäre ein zweiter Kanal für
+   * dieselbe Sache. Nach einem Konflikt ist der Screen verlassen — dann ist
+   * der Toast der einzige. Ein erneuter Konflikt geht in beiden Fällen in den
+   * Dialog, weil der im Root-Layout lebt.
    */
-  function submit(vars: Parameters<typeof updateMutation.mutate>[0]) {
-    updateMutation.mutate(vars, {
-      onSuccess: goBackOrToTasks,
-      onError: (err: unknown) => {
-        if (err instanceof TaskConflictError) showConflict(err, vars);
+  function submit(vars: Parameters<typeof updateMutation.mutateAsync>[0], autoRetries = 0) {
+    // `mutateAsync` mit eigenem Fehlerzweig statt `mutate` mit
+    // Per-Call-Callbacks: Der Wiederholungsversuch aus `onKeepMine` läuft nach
+    // dem Unmount, und dort feuern Per-Call-Callbacks nicht mehr (festgehalten
+    // in `features/tasks/mutateAsyncSurvivesUnmount.test.ts`). Mit `mutate`
+    // blieb dort **jeder** Fehler stumm — eine erneute Kollision so gut wie ein
+    // Netzwerkfehler, RLS oder eine inzwischen gelöschte Zeile. Die Closure
+    // hier überlebt den Screenwechsel.
+    updateMutation.mutateAsync(vars).then(
+      () => {
+        // Nach einem Konflikt hat `showConflict` den Screen schon verlassen —
+        // ein zweites `goBackOrToTasks()` poppte sonst einen fremden Screen weg.
+        if (!leftAfterConflict.current) goBackOrToTasks();
       },
-    });
+      (err: unknown) => {
+        if (err instanceof TaskConflictError) {
+          showConflict(err, vars, autoRetries);
+          return;
+        }
+        // Solange der Screen steht, rendert `updateMutation.error` die
+        // Inline-Zeile unter dem Formular — ein Toast wäre ein zweiter Kanal
+        // für dieselbe Sache. Ist er verlassen, ist der Toast der einzige.
+        if (leftAfterConflict.current) {
+          show({
+            title: t("hw.edit.error.saveFailed"),
+            message: t(mapTaskError(err)),
+            variant: "error",
+            position: "bottom",
+          });
+        }
+      },
+    );
   }
 
   /**
@@ -183,7 +218,11 @@ export function TaskEditScreen() {
    * Vergleichs ist. Der Log trägt als einziger den echten Grund; siehe den
    * Kommentar im `catch` selbst.
    */
-  function showConflict(err: TaskConflictError, vars: Parameters<typeof updateMutation.mutate>[0]) {
+  function showConflict(
+    err: TaskConflictError,
+    vars: Parameters<typeof updateMutation.mutate>[0],
+    autoRetries: number,
+  ) {
     let theirs: TaskWithType;
     let fields: TaskConflictField[];
     let rows: ConflictRow[];
@@ -198,8 +237,15 @@ export function TaskEditScreen() {
       // Kalender-Sheet den `row === null`-Fall schon heute in den Dialog statt
       // ins Durchspeichern schickt.
       fields = baseTask ? differingTaskFields(theirs, vars.changes, baseTask) : [];
-      if (baseTask && fields.length === 0) {
-        submit({ ...vars, baseVersion: theirs.updated_at });
+      // Der Zähler begrenzt **nur** diese stille Wiederholung, nicht den Tap
+      // auf „Deine Fassung speichern": Ohne ihn liefe `speichern → Konflikt →
+      // kein Feld weicht ab → speichern` beliebig oft, solange ein zweiter
+      // Client die Zeile fortlaufend schreibt — jedes Mal ein voller
+      // Roundtrip, ohne dass der Nutzer je etwas sähe. Nach dem Limit fällt
+      // der Ablauf in den Dialog darunter, der dann ohne Vergleichszeilen
+      // erscheint (es weicht ja nichts ab) — sichtbar statt endlos.
+      if (baseTask && fields.length === 0 && autoRetries < MAX_CONFLICT_AUTO_RETRIES) {
+        submit({ ...vars, baseVersion: theirs.updated_at }, autoRetries + 1);
         return;
       }
       rows = fields.map((field) => ({
@@ -252,17 +298,13 @@ export function TaskEditScreen() {
     // Dialog (`ConflictDialogHost.onKeepTheirs` kennt diesen Screen gar
     // nicht mehr).
     //
-    // Nebenwirkung, geprüft: Der Wiederholungsversuch aus `onKeepMine`
-    // läuft damit nach dem Unmount. `submit`s Per-Call-Callbacks
-    // (`onSuccess` **und** `onError`) feuern dann nicht mehr (siehe
-    // `mutateAsyncSurvivesUnmount.test.ts`) — ein erneuter Erfolg navigiert
-    // also kein zweites Mal (unproblematisch, der Screen ist schon zu und
-    // die Liste aktualisiert sich ohnehin über `useUpdateTask`s
-    // Hook-Level-`onSettled`), aber **jeder** Fehler in diesem Fenster
-    // (eine erneute Kollision, ein Netzwerkfehler, RLS, eine inzwischen
-    // gelöschte Zeile) bleibt ohne Rückmeldung — kein zweiter Dialog, keine
-    // Fehlermeldung. Selten (verlangt ein zweites Ereignis exakt zwischen
-    // Dialog und Retry) — siehe `docs/TODO.md`.
+    // Der Wiederholungsversuch aus `onKeepMine` läuft damit nach dem Unmount.
+    // `submit` benutzt deshalb `mutateAsync` mit eigenem Fehlerzweig: Ein
+    // erneuter Konflikt öffnet wieder den Dialog (der lebt im Root-Layout),
+    // jeder andere Fehler kommt als Toast — die Inline-Zeile ist mit dem
+    // Screen weg. Das Ref hält beides auseinander und verhindert zugleich,
+    // dass ein erfolgreicher Retry ein zweites Mal navigiert.
+    leftAfterConflict.current = true;
     goBackOrToTasks();
   }
 
