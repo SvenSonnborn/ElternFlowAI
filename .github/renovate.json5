@@ -103,9 +103,18 @@
       // nicht — gewollt, denn genau dort bricht ein eigenmächtiger Bump den
       // Native-Build, den die CI (nur Web-Export) nicht prüft.
       //
-      // Steht bewusst NACH Regel 1: jest-expo, eslint-config-expo, @types/react
-      // und react-test-renderer sind devDeps *und* Expo-verwaltet. Diese Regel
-      // gewinnt, sie landen also ohne Automerge in der Expo-Gruppe.
+      // Steht bewusst NACH Regel 1: jest-expo, eslint-config-expo und
+      // @types/react sind devDeps *und* Expo-verwaltet. Diese Regel gewinnt,
+      // sie landen also ohne Automerge in der Expo-Gruppe.
+      //
+      // `react-test-renderer` stand hier bis 2026-09-08 mit in der Liste und ist
+      // mit dem Paket selbst entfallen: React 19 hat es deprecatet, SDK 57 führt
+      // es in keinem der beiden Kanäle mehr, und @testing-library/react-native
+      // peert seit v14 auf `test-renderer@^1` statt darauf. ADR-015 (Decision 5)
+      // hatte den Eintrag ausdrücklich nur bis zu dieser Entscheidung behalten.
+      // `test-renderer` kommt bewusst NICHT als Ersatz hier herein — es ist ein
+      // RNTL-Peer, kein Expo-verwaltetes Paket, und läuft damit richtigerweise
+      // unter Regel 1 (devDeps, Automerge für minor+patch).
       //
       // WICHTIG für alle, die diese Liste pflegen: Expo schreibt Versionen über
       // ZWEI Kanäle vor, und beide müssen hier abgedeckt sein.
@@ -128,7 +137,6 @@
         "/^@expo\\//",
         "react",
         "react-dom",
-        "react-test-renderer",
         "@types/react",
         "react-native",
         "/^react-native-/",
