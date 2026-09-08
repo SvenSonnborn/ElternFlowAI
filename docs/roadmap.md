@@ -340,9 +340,13 @@ ab dem 27.10. auf **17:00**. `buildRule` übergibt ein nacktes `Date` an `rrule`
 gelesen wird mit lokalen Gettern. **Betrifft jede Serie, die über eine Zeitumstellung läuft** — also
 in der Praxis fast jede wiederkehrende Familienverabredung, zweimal im Jahr.
 
-Fix: Regel in Ortszeit auswerten (`rrule`s `tzid` mit einer IANA-Zone statt `Date`-Objekten) und die
-Grenzen von `between` mitziehen. Der Test muss beide Umstellungsrichtungen abdecken (Oktober **und**
-März) — die Rückstellung ist der Fall, der gern vergessen wird.
+Fix: die Regel in Ortszeit auswerten. Bei `rrule@2.8.1` heißt das **nicht**, `Date`-Objekte zu
+ersetzen — `tzid` tritt als zusätzliche Option zur Regel hinzu, `dtstart` und `until` bleiben
+`Date`-Instanzen. Die Bibliothek gibt die Occurrences dann als UTC-repräsentierte `Date`-Werte
+zurück, die bereits die Ortszeit der IANA-Zone tragen; sie dürfen folglich **nicht** mehr mit
+lokalen Gettern gelesen werden, sonst addiert die Maschine ihren eigenen Offset ein zweites Mal.
+Die Grenzen von `between` müssen mitziehen. Der Test muss beide Umstellungsrichtungen abdecken
+(Oktober **und** März) — die Rückstellung ist der Fall, der gern vergessen wird.
 
 Zuletzt im Block, weil es die einzige der fünf Baustellen ist, die eine Fremdbibliothek anders
 konfiguriert statt eigene Logik zu korrigieren — höchstes Risiko, unerwartete Nebeneffekte in die
