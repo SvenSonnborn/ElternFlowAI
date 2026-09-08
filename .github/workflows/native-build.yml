@@ -49,6 +49,19 @@ jobs:
 
       - name: Setup toolchain (mise)
         uses: jdx/mise-action@v4
+        with:
+          # mise selbst gepinnt, nicht nur die Tools darin. Ohne `version`
+          # fragt die Action nach „latest" — und mise' Versions-Endpunkt kann
+          # eine Version melden, deren GitHub-Release noch gar nicht
+          # veröffentlicht ist. Genau das ist am 2026-09-08 passiert: Der
+          # Endpunkt nannte 2026.9.3, das Release existierte nicht, und alle
+          # drei Jobs starben nach 15 Sekunden an einem 404 beim Download —
+          # vor der ersten Zeile Projektcode. Ein Pin macht diesen Workflow
+          # gegen fremde Release-Rennen immun und passt zu mise.toml, das
+          # node, bun und java ohnehin exakt festschreibt. Beim Anheben
+          # prüfen, dass das Release wirklich existiert:
+          # https://github.com/jdx/mise/releases
+          version: 2026.9.2
 
       - name: Cache Bun dependencies
         uses: actions/cache@v6
@@ -96,6 +109,19 @@ jobs:
 
       - name: Setup toolchain (mise)
         uses: jdx/mise-action@v4
+        with:
+          # mise selbst gepinnt, nicht nur die Tools darin. Ohne `version`
+          # fragt die Action nach „latest" — und mise' Versions-Endpunkt kann
+          # eine Version melden, deren GitHub-Release noch gar nicht
+          # veröffentlicht ist. Genau das ist am 2026-09-08 passiert: Der
+          # Endpunkt nannte 2026.9.3, das Release existierte nicht, und alle
+          # drei Jobs starben nach 15 Sekunden an einem 404 beim Download —
+          # vor der ersten Zeile Projektcode. Ein Pin macht diesen Workflow
+          # gegen fremde Release-Rennen immun und passt zu mise.toml, das
+          # node, bun und java ohnehin exakt festschreibt. Beim Anheben
+          # prüfen, dass das Release wirklich existiert:
+          # https://github.com/jdx/mise/releases
+          version: 2026.9.2
 
       # A wrong JDK fails Gradle with "Unsupported class file major version",
       # which reads like a project bug rather than a toolchain mismatch. The
@@ -186,6 +212,19 @@ jobs:
 
       - name: Setup toolchain (mise)
         uses: jdx/mise-action@v4
+        with:
+          # mise selbst gepinnt, nicht nur die Tools darin. Ohne `version`
+          # fragt die Action nach „latest" — und mise' Versions-Endpunkt kann
+          # eine Version melden, deren GitHub-Release noch gar nicht
+          # veröffentlicht ist. Genau das ist am 2026-09-08 passiert: Der
+          # Endpunkt nannte 2026.9.3, das Release existierte nicht, und alle
+          # drei Jobs starben nach 15 Sekunden an einem 404 beim Download —
+          # vor der ersten Zeile Projektcode. Ein Pin macht diesen Workflow
+          # gegen fremde Release-Rennen immun und passt zu mise.toml, das
+          # node, bun und java ohnehin exakt festschreibt. Beim Anheben
+          # prüfen, dass das Release wirklich existiert:
+          # https://github.com/jdx/mise/releases
+          version: 2026.9.2
 
       # mise.toml pins RCT_USE_PREBUILT_RNCORE=0 to force React Native to build
       # from source: CocoaPods has resolved a stale, version-mismatched
