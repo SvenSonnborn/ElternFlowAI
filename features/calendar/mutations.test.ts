@@ -44,6 +44,7 @@ function makeMaster(overrides: Partial<EventRow> = {}): EventRow {
     start_at: MASTER_START.toISOString(),
     end_at: new Date(MASTER_START.getTime() + 3600_000).toISOString(),
     all_day: false,
+    timezone: "Europe/Berlin",
     rrule_freq: "weekly",
     rrule_interval: 1,
     rrule_byweekday: [1],
