@@ -276,7 +276,7 @@ Alle stehen in `TODO.md` → [Calendar](./TODO.md#calendar-v1--siehe-adr-008) bz
 
 Reihenfolge innerhalb des Blocks ist nach _Verhältnis Schaden zu Aufwand_ sortiert, nicht nach Datei.
 
-### 1.1 `insertSplitEvent` verliert `parent_id` — **S, sofort**
+### 1.1 `insertSplitEvent` verliert `parent_id` — **erledigt**
 
 **„`insertSplitEvent` verliert `parent_id` — stiller Datenverlust"**
 · [features/calendar/recurrence.ts:316](../features/calendar/recurrence.ts) ✅ verifiziert
