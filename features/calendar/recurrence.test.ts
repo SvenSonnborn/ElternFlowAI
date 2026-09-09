@@ -13,6 +13,7 @@ import {
   type EventOps,
   type RecurrenceChanges,
 } from "./recurrence";
+import { allOccurrences } from "./rrule";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
@@ -118,7 +119,7 @@ describe("applyDeleteScope", () => {
       isRecurring: true,
       master: makeMaster(),
     });
-    expect(ops.setRruleUntil).toHaveBeenCalledWith("evt-1", "2026-06-14");
+    expect(ops.setRruleUntil).toHaveBeenCalledWith("evt-1", "2026-06-14T21:59:59.999Z");
     expect(ops.deleteExceptionsFromDate).toHaveBeenCalledWith("evt-1", "2026-06-15");
     expect(ops.deleteMaster).not.toHaveBeenCalled();
     expect(ops.setRruleCount).not.toHaveBeenCalled();
@@ -285,7 +286,7 @@ describe("applyEditScope", () => {
       master,
       changes: CHANGES,
     });
-    expect(ops.setRruleUntil).toHaveBeenCalledWith("evt-1", "2026-06-14");
+    expect(ops.setRruleUntil).toHaveBeenCalledWith("evt-1", "2026-06-14T21:59:59.999Z");
     // Unbounded series → the tail stays unbounded.
     expect(ops.insertSplitEvent).toHaveBeenCalledWith(master, CHANGES, null);
     expect(ops.deleteExceptionsFromDate).toHaveBeenCalledWith("evt-1", "2026-06-15");
@@ -834,5 +835,49 @@ describe("applyEditScope — Serienanker", () => {
     });
 
     expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", ANCHOR_CHANGES, MASTER_UPDATED_AT, none);
+  });
+});
+
+describe("setRruleUntil bekommt einen Tagesende-Instant", () => {
+  test("tägliche Serie, forward gelöscht ab dem 15.06. → der 14.06. bleibt vollständig", async () => {
+    const ops = makeOps();
+    const master = makeMaster({
+      rrule_freq: "daily",
+      rrule_byweekday: null,
+      // 01.06.2026, 18:00 Berlin.
+      start_at: "2026-06-01T16:00:00.000Z",
+      end_at: "2026-06-01T17:00:00.000Z",
+      timezone: "Europe/Berlin",
+    });
+
+    await applyDeleteScope({
+      ops,
+      scope: "forward",
+      eventId: "evt-1",
+      occurrenceDate: "2026-06-15",
+      isRecurring: true,
+      master,
+    });
+
+    // 14.06. 23:59:59.999 Berlin = 21:59:59.999 UTC — nicht 2026-06-14T00:00:00Z,
+    // und erst recht nicht der nackte Datumsstring.
+    expect(ops.setRruleUntil).toHaveBeenCalledWith("evt-1", "2026-06-14T21:59:59.999Z");
+  });
+
+  test("das Vorkommen am Cutoff-Tag überlebt die Grenze", () => {
+    // Gegenprobe auf der Auswertungsseite: mit dem Tagesende-UNTIL liefert die
+    // Regel den 14.06. noch, mit Mitternacht-UTC nicht.
+    const truncated = {
+      ...makeMaster({
+        rrule_freq: "daily",
+        rrule_byweekday: null,
+        start_at: "2026-06-01T16:00:00.000Z",
+        end_at: "2026-06-01T17:00:00.000Z",
+        timezone: "Europe/Berlin",
+      }),
+      rrule_until: "2026-06-14T21:59:59.999Z",
+    };
+    const last = allOccurrences(truncated).at(-1);
+    expect(last?.toISOString()).toBe("2026-06-14T16:00:00.000Z");
   });
 });
