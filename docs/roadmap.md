@@ -340,17 +340,40 @@ ab dem 27.10. auf **17:00**. `buildRule` übergibt ein nacktes `Date` an `rrule`
 gelesen wird mit lokalen Gettern. **Betrifft jede Serie, die über eine Zeitumstellung läuft** — also
 in der Praxis fast jede wiederkehrende Familienverabredung, zweimal im Jahr.
 
-Fix: die Regel in Ortszeit auswerten. Bei `rrule@2.8.1` heißt das **nicht**, `Date`-Objekte zu
-ersetzen — `tzid` tritt als zusätzliche Option zur Regel hinzu, `dtstart` und `until` bleiben
-`Date`-Instanzen. Die Bibliothek gibt die Occurrences dann als UTC-repräsentierte `Date`-Werte
-zurück, die bereits die Ortszeit der IANA-Zone tragen; sie dürfen folglich **nicht** mehr mit
-lokalen Gettern gelesen werden, sonst addiert die Maschine ihren eigenen Offset ein zweites Mal.
-Die Grenzen von `between` müssen mitziehen. Der Test muss beide Umstellungsrichtungen abdecken
-(Oktober **und** März) — die Rückstellung ist der Fall, der gern vergessen wird.
+> ⚠️ **Korrektur (2026-09-09):** Dieser Abschnitt empfahl ursprünglich, `rrule` die Option `tzid`
+> mitzugeben. **Das funktioniert in dieser App nicht.** `rrule@2.8.1` rechnet in `dateInTimeZone`
+> ([dist/esm/dateutil.js](../node_modules/rrule/dist/esm/dateutil.js)) `targetOffset − localOffset`
+> und ist damit nur korrekt, wenn die **Prozess-Zeitzone UTC** ist — gemessen mit einer Serie ab
+> `2026-10-06 18:00` und `tzid: "Europe/Berlin"`: unter `TZ=UTC` richtig, unter `TZ=Europe/Berlin`
+> ein reiner No-op, unter `TZ=America/New_York` falsch. Eine React-Native-App läuft in der
+> Gerätezone, der No-op-Zweig ist also der Produktionsfall. Der Absatz unten ist entsprechend
+> ersetzt; die Begründung steht ausführlich in
+> [der Spec](./superpowers/specs/2026-09-09-calendar-silent-data-loss-design.md) §1.1.
 
-Zuletzt im Block, weil es die einzige der fünf Baustellen ist, die eine Fremdbibliothek anders
-konfiguriert statt eigene Logik zu korrigieren — höchstes Risiko, unerwartete Nebeneffekte in die
-bereits gefixten Pfade zu tragen.
+Fix: die Regel in **reiner Wandzeit** auswerten und die Zone selbst auflösen. `events` bekommt dazu
+eine Spalte `timezone` — die Zone, in der die Wanduhrzeit dieses Termins gilt; die Gerätezone wäre
+der falsche Ort, weil sie beschreibt, wo der _Leser_ gerade ist, nicht wo die Serie verankert wurde
+(zwei Geräte zeigten sonst verschiedene Termine, und ein serverseitiger Reminder-Worker hätte gar
+keine). `rrule.ts` kapselt die Umrechnung vollständig: `dtstart`, `until` und die `between`-Grenzen
+gehen als „floating" hinein (Wandzeit in den UTC-Komponenten), `rrule` rechnet damit DST-frei, und
+die Ergebnisse kommen zonenbewusst als echte Instants zurück — `tzid` wird **nicht** gesetzt. Nach
+außen gehen `occurrencesBetween` und `allOccurrences`; `buildRule` wird modulintern.
+
+Der Test muss beide Umstellungsrichtungen abdecken (Oktober **und** März — die Rückstellung ist der
+Fall, der gern vergessen wird) und unter mehreren Runner-Zonen dasselbe liefern. Genau das ist die
+Eigenschaft, die `tzid` nicht hat.
+
+Zwei Dinge, die dabei mit erledigt werden müssen: die Dauer eines Vorkommens gehört ebenfalls in
+Wandzeit gerechnet (sonst verschiebt sich das Ende eines mehrtägigen Termins über die Umstellung),
+und `setRruleUntil` schreibt heute ein nacktes `yyyy-MM-dd` in eine `timestamptz`-Spalte — unter der
+neuen Zonenauswertung läge der Serienschnitt bei 02:00 Ortszeit statt am Tagesende.
+
+> **Reihenfolge:** Die Spec zieht 1.4 **vor** 1.3, entgegen der ursprünglichen Sortierung hier.
+> Grund: 1.4 schreibt den Vertrag von `rrule.ts` neu, und 1.3 baut seine Kandidatenmenge darauf auf.
+> Andersherum entstünde die Kandidaten-Logik gegen Regel-Daten, die noch eine Stunde falsch sind.
+> Erster Schritt der Iteration ist eine Gegenprobe, ob `Intl.DateTimeFormat` mit `timeZone` und
+> `formatToParts` unter Hermes auf iOS **und** Android trägt — das Repo nutzt heute nirgends `Intl`
+> zur Laufzeit, und ein bestandener `bun test` beweist dafür nichts.
 
 **Definition of done Block 1:** Für jeden der vier PRs ein Regressionstest, der **vor** dem Fix rot
 ist · `bun test` grün · eine Sichtprüfung der Serienbearbeitung am Simulator (Web reicht hier nicht,
