@@ -196,9 +196,12 @@ function ruleDiffers(master: EventRow, next: RecurrenceChanges): boolean {
  *   löschen, und die Anzeige verspricht das Verworfene ohnehin schon. Ein
  *   sichtbarer Hinweis bräuchte einen Copy-Key — siehe `docs/TODO.md`.
  * - Wird eine Serie zum **Einzeltermin** (`recurrence.rrule_freq === null`),
- *   behält sie das Datum des Serienbeginns statt das der bearbeiteten
- *   Occurrence. Eine Regel gibt es dann nicht mehr, verloren geht also nichts;
- *   die Alternative wäre eine dritte Sonderregel für einen seltenen Fall.
+ *   wendet der `recurrence`-Zweig in `applyEditScope` diese Funktion gar nicht
+ *   erst an — die Eingabe gilt literal, landet also auf dem Datum der
+ *   bearbeiteten Occurrence. Ohne Regel gibt es kein `dtstart` mehr zu
+ *   schützen, verloren gehen kann also nichts; `isRecurring` allein reicht
+ *   dafür nicht, weil es den Master *vor* dem Schreiben beschreibt und bei
+ *   „Keine Wiederholung" noch `true` ist.
  *
  * Gerechnet wird mit lokalen Gettern, wie `withTimeOfDay` es tut. Sobald
  * `events` eine eigene Zone trägt, gehört die Tageszeit in dieser Zone
@@ -236,10 +239,14 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
     }
     // Derselbe Anker wie unten: Dass die Serie ohnehin neu definiert wird,
     // rettet die Vorkommen vor der bearbeiteten Occurrence nicht — sie
-    // verschwinden mit dem wandernden `dtstart` genauso.
+    // verschwinden mit dem wandernden `dtstart` genauso. Ausnahme: `isRecurring`
+    // beschreibt den Master *vor* diesem Schreiben und ist bei „Keine
+    // Wiederholung" noch true, obwohl `recurrence.rrule_freq` bereits null ist.
+    // Ohne Regel gibt es kein `dtstart` mehr zu schützen, also gilt die
+    // Eingabe literal (ADR-032 Decision 3).
     await ops.updateMaster(
       eventId,
-      isRecurring ? anchoredChanges(master, changes) : changes,
+      isRecurring && recurrence.rrule_freq !== null ? anchoredChanges(master, changes) : changes,
       master.updated_at,
       recurrence,
     );

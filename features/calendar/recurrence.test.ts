@@ -565,12 +565,9 @@ describe("applyEditScope", () => {
       changes: CHANGES,
       recurrence: none,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith(
-      "evt-1",
-      CHANGES_ANCHORED,
-      MASTER_UPDATED_AT,
-      none,
-    );
+    // rrule_freq: null heißt keine Regel mehr und damit kein `dtstart` zu
+    // schützen — die Eingabe gilt literal, nicht verankert (ADR-032 Decision 3).
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT, none);
     expect(ops.deleteAllExceptions).toHaveBeenCalledWith("evt-1");
   });
 
@@ -809,5 +806,33 @@ describe("applyEditScope — Serienanker", () => {
     });
 
     expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", ANCHOR_CHANGES, MASTER_UPDATED_AT);
+  });
+
+  test("recurrence → Einzeltermin (rrule_freq null) auf einer Serie schreibt die Eingabe literal", async () => {
+    // „Keine Wiederholung" wählen erzwingt Scope `all` und schickt eine
+    // RecurrenceChanges mit rrule_freq: null. isRecurring beschreibt den Master
+    // *vor* dem Schreiben und ist hier noch true — der Anker darf trotzdem
+    // nicht greifen, denn ohne Regel gibt es kein `dtstart` mehr zu schützen.
+    const ops = makeOps();
+    const none: RecurrenceChanges = {
+      rrule_freq: null,
+      rrule_interval: 1,
+      rrule_byweekday: null,
+      rrule_count: null,
+      rrule_until: null,
+    };
+
+    await applyEditScope({
+      ops,
+      scope: "all",
+      eventId: "evt-1",
+      occurrenceDate: "2026-06-15",
+      isRecurring: true,
+      master: anchorMaster(),
+      changes: ANCHOR_CHANGES,
+      recurrence: none,
+    });
+
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", ANCHOR_CHANGES, MASTER_UPDATED_AT, none);
   });
 });
