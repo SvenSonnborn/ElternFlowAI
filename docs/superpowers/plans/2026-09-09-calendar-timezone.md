@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **Handoff-Bundle ist gesperrt** (CLAUDE.md Non-Negotiable 1): `design-system/{colors,typography,spacing,themes,components,index}.ts`, `docs/{HANDOFF,COPY,ICONS,README}.md`, `patterns/*.md` werden **nicht** angefasst.
-- **Keine neuen Copy-Keys.** Die Zone ist im Formular unsichtbar; V1 nimmt an, dass der Anlegende in der Zone lebt, in der der Termin stattfindet. Ein Zonen-Picker wäre ein eigenes Feature (TODO-Eintrag in Task 7).
+- **Keine neuen Copy-Keys.** Die Zone ist im Formular unsichtbar; V1 nimmt an, dass der Anlegende in der Zone lebt, in der der Termin stattfindet. Ein Zonen-Picker wäre ein eigenes Feature (TODO-Eintrag in Task 6).
 - **`tzid` wird nirgends gesetzt.** Begründung in Spec §1.1, nachgemessen. Wer es einbaut, macht den Fix zum No-op.
 - **Docstrings** (CLAUDE.md → Documentation discipline): jede neue exportierte Funktion und jedes neue Modul bekommt einen JSDoc-Block **im selben Commit**. Inhalt ist das Nicht-Offensichtliche — Warum, Grenzfall, ADR-Verweis —, nicht die Wiederholung des Namens. Lokale Helfer in Testdateien sind ausgenommen.
 - **Commits:** Conventional-Commits-Präfix, scoped, deutsch. **Niemals** ein `Co-Authored-By: Claude`-Trailer — Repo-Policy, ausnahmslos. `--no-verify` ist verboten.
@@ -145,17 +145,24 @@ Run: `git status --porcelain` — erwartet: **leer**. Dieser Task hinterlässt k
 
 ---
 
-## Task 1: Migration — `events.timezone`
+## Task 1: Die Spalte anlegen und den ganzen Code darauf ziehen
 
 **Files:**
 
 - Create: `supabase/migrations/<zeitstempel>_events_timezone.sql`
+- Create: `features/calendar/deviceTimeZone.ts` + `.test.ts`
 - Modify: `features/supabase/database.types.ts` (generiert, nicht von Hand)
+- Modify: `features/calendar/createMutation.ts` — `CreateEventVars`, `createEvent`, `optimisticEventRow`
+- Modify: `app-sections/event/EventCreateScreen.tsx`
+- Modify: `features/calendar/index.ts` (Barrel)
+- Modify: die acht Dateien, die ein `EventRow`-Literal bauen (Step 5)
 
 **Interfaces:**
 
 - Consumes: nichts.
-- Produces: `EventRow.timezone: string` — ab Task 3 von `rrule.ts` gelesen, ab Task 6 von den Schreibern gesetzt.
+- Produces: `EventRow.timezone: string` (ab Task 3 von `rrule.ts` gelesen) · `deviceTimeZone(): string` · `CreateEventVars.timezone: string`.
+
+**Warum Schema und Schreibpfad in einem Task liegen:** `features/calendar/eventColumns.test.ts` bindet seine Spaltenliste über `Record<keyof EventRow, true>` an den generierten Datenbank-Typ — genau dafür wurde es in PR A gebaut. In dem Moment, in dem die Migration die Spalte anlegt und die Types neu generiert sind, ist `bun run typecheck` **rot**, und zwar an neun Stellen: der Spaltenliste selbst plus acht Dateien, die ein vollständiges `EventRow`-Literal bauen. Ein Task, der nur die Migration macht, könnte deshalb nicht grün committen. Der Test macht hier seine Arbeit — er zwingt dazu, die Spalte in einem Zug durch den ganzen Code zu ziehen.
 
 **Zum Dateinamen:** Der Zeitstempel folgt dem Bestand (`20260904075041_conflict_detection.sql`), also `yyyyMMddHHmmss`. Nimm die aktuelle UTC-Zeit; sie muss größer sein als die der letzten vorhandenen Migration.
 
@@ -206,22 +213,138 @@ select count(*) from public.events where timezone is null or timezone = '';
 
 Erwartet: `0`.
 
-- [ ] **Step 4: Types neu generieren**
+- [ ] **Step 4: Types neu generieren und das Rot ansehen**
 
 Über den MCP-Server (`generate_typescript_types`), Ergebnis nach `features/supabase/database.types.ts`. **Nicht von Hand editieren.**
 
 Run: `bun run typecheck`
-Erwartet: **grün** — die Spalte ist `not null` mit Default, also in `Insert` optional; kein Aufrufer bricht.
 
-- [ ] **Step 5: Commit**
+Erwartet: **rot**, mit `timezone` als fehlender Property. Schreib die vollständige Fehlerliste in den Report — sie ist die Arbeitsliste für Step 5 und zugleich der Beleg, dass die Spaltenprüfung aus PR A greift.
+
+- [ ] **Step 5: `deviceTimeZone` anlegen**
+
+`features/calendar/deviceTimeZone.ts`:
+
+```ts
+import { getCalendars } from "expo-localization";
+
+/** Letzter Ausweg, wenn weder Expo noch `Intl` eine Zone nennen. DE-primäre App. */
+const FALLBACK = "Europe/Berlin";
+
+/**
+ * Die IANA-Zone des Geräts — die Zone, in der ein neu angelegter Termin
+ * verankert wird.
+ *
+ * Drei Stufen, weil jede für sich ausfallen kann: `expo-localization` liefert
+ * `timeZone` als `string | null`, und `Intl.DateTimeFormat().resolvedOptions()`
+ * kann in einer ICU-losen Umgebung einen leeren Wert melden. V1 nimmt an, dass
+ * der Anlegende in der Zone lebt, in der der Termin stattfindet — ein
+ * Zonen-Picker wäre ein eigenes Feature (siehe `docs/TODO.md`).
+ *
+ * Eigenes Modul statt eines Exports aus `timezone.ts`: `expo-localization` ist
+ * ein natives Modul, und `timezone.test.ts` soll unter `bun test` ohne
+ * Modul-Mock laufen.
+ */
+export function deviceTimeZone(): string {
+  const fromExpo = getCalendars()[0]?.timeZone;
+  if (fromExpo) return fromExpo;
+  const fromIntl = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return fromIntl || FALLBACK;
+}
+```
+
+`features/calendar/deviceTimeZone.test.ts` — `mock.module` für das native Modul, gleiches Muster wie `features/calendar/reminders.test.ts`:
+
+```ts
+import { describe, expect, mock, test } from "bun:test";
+
+let calendars: { timeZone: string | null }[] = [{ timeZone: "Europe/Berlin" }];
+
+void mock.module("expo-localization", () => ({ getCalendars: () => calendars }));
+
+// Nach dem Modul-Mock importiert — ein statischer Import würde darüber
+// hochgezogen. Gleiches Muster wie in `reminders.test.ts`.
+const { deviceTimeZone } = await import("./deviceTimeZone");
+
+describe("deviceTimeZone", () => {
+  test("nimmt die Zone von expo-localization", () => {
+    calendars = [{ timeZone: "America/New_York" }];
+    expect(deviceTimeZone()).toBe("America/New_York");
+  });
+
+  test("fällt auf Intl zurück, wenn Expo nichts liefert", () => {
+    calendars = [{ timeZone: null }];
+    expect(deviceTimeZone()).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  });
+
+  test("eine leere Kalenderliste wirft nicht", () => {
+    calendars = [];
+    expect(deviceTimeZone()).toBeTruthy();
+  });
+});
+```
+
+`deviceTimeZone` zusätzlich aus `features/calendar/index.ts` exportieren.
+
+- [ ] **Step 6: Die drei Schreiber und den Aufrufer versorgen**
+
+In `features/calendar/createMutation.ts` — `CreateEventVars`, direkt nach `allDay`:
+
+```ts
+/** IANA-Zone, in der die Wanduhrzeit dieses Termins gilt. Siehe `deviceTimeZone`. */
+timezone: string;
+```
+
+In `createEvent`, im `insert`-Objekt direkt nach `all_day: vars.allDay,`, und in `optimisticEventRow` an derselben Stelle der Feldliste:
+
+```ts
+    timezone: vars.timezone,
+```
+
+In `app-sections/event/EventCreateScreen.tsx`, im `vars`-Literal nach `allDay,`:
+
+```tsx
+      timezone: deviceTimeZone(),
+```
+
+`deviceTimeZone` in die bestehende `@/features/calendar`-Importliste dieses Screens aufnehmen.
+
+- [ ] **Step 7: Die acht `EventRow`-Fabriken nachziehen**
+
+Diese Dateien bauen ein vollständiges `EventRow`-Literal und brauchen `timezone` in ihrer **Fabrik** (nicht in jeder einzelnen Erwartung):
+
+```
+features/calendar/expand.test.ts          features/calendar/optimisticEvents.test.ts
+features/calendar/mutations.test.ts       features/calendar/recurrence.test.ts
+features/calendar/createMutation.test.ts  features/calendar/eventColumns.test.ts
+features/calendar/version.test.ts         app-sections/event/EventEditScreen.tsx
+```
+
+Wert überall `"Europe/Berlin"`, außer wo ein Test ausdrücklich etwas anderes prüft. In `eventColumns.test.ts` kommt zusätzlich `timezone: true` in `EVENT_ROW_COLUMNS` — **das ist die Stelle, an der die Prüfung aus PR A ihren Zweck erfüllt**: ohne sie bleibt der Typecheck rot, und ohne Step 6 bliebe der Laufzeit-Vergleich rot.
+
+`EventEditScreen.tsx` ist der einzige Nicht-Test in der Liste — sieh nach, wofür es dort ein `EventRow` baut, und setz den Wert entsprechend statt blind `Europe/Berlin`.
+
+- [ ] **Step 8: Grün bestätigen**
 
 ```bash
-git add supabase/migrations features/supabase/database.types.ts
-git commit -m "feat(calendar): Spalte events.timezone anlegen
+bun run typecheck && bun lint && bun format:check && bun test
+```
+
+Erwartet: alles grün, insbesondere die beiden Tests in `eventColumns.test.ts`.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add supabase/migrations features/supabase/database.types.ts features/calendar app-sections/event/EventCreateScreen.tsx
+git commit -m "feat(calendar): Spalte events.timezone anlegen und durchziehen
 
 Die Zone, in der die Wanduhrzeit eines Termins und seiner RRULE gilt. Die
 Geraetezone waere der falsche Ort — sie beschreibt, wo der Leser gerade ist,
-nicht wo die Serie verankert wurde. Default backfillt die Bestandszeilen."
+nicht wo die Serie verankert wurde. Default backfillt die Bestandszeilen.
+
+Schema und Schreibpfad liegen in einem Commit, weil eventColumns.test.ts die
+Spaltenliste an keyof EventRow bindet: die Migration allein liesse den Typecheck
+an neun Stellen rot."
 ```
 
 ---
@@ -235,7 +358,7 @@ nicht wo die Serie verankert wurde. Default backfillt die Bestandszeilen."
 
 **Interfaces:**
 
-- Consumes: nichts. Das Modul hat **keine** Abhängigkeit außer `Intl` — insbesondere **nicht** `expo-localization` (das kommt in Task 6 in ein eigenes Modul, damit diese Tests unter Bun ohne native Module laufen).
+- Consumes: nichts. Das Modul hat **keine** Abhängigkeit außer `Intl` — insbesondere **nicht** `expo-localization` (das liegt seit Task 1 in `deviceTimeZone.ts`, damit diese Tests unter Bun ohne Modul-Mock laufen).
 - Produces:
   ```ts
   zoneOffsetMs(instant: Date, timeZone: string): number
@@ -1039,146 +1162,7 @@ Wandzeit ausgewertet wird, verschwaende damit das Vorkommen des Cutoff-Tages
 einer taeglichen Serie."
 ```
 
----
-
-## Task 6: Der Create-Pfad schreibt die Zone
-
-**Files:**
-
-- Create: `features/calendar/deviceTimeZone.ts`
-- Create: `features/calendar/deviceTimeZone.test.ts`
-- Modify: `features/calendar/createMutation.ts` — `CreateEventVars`, `createEvent`, `optimisticEventRow`
-- Modify: `features/calendar/createMutation.test.ts`
-- Modify: `app-sections/event/EventCreateScreen.tsx`
-- Modify: `features/calendar/index.ts` (Barrel), falls `deviceTimeZone` von dort exportiert werden soll
-
-**Interfaces:**
-
-- Consumes: `EventRow.timezone` aus Task 1.
-- Produces: `deviceTimeZone(): string`; `CreateEventVars.timezone: string`.
-
-**Warum ein eigenes Modul:** `deviceTimeZone` importiert `expo-localization`, also ein natives Modul. In `timezone.ts` würde das dessen Tests unter Bun mitziehen. Der Schnitt hält `timezone.ts` abhängigkeitsfrei.
-
-- [ ] **Step 1: Das Modul schreiben**
-
-`features/calendar/deviceTimeZone.ts`:
-
-```ts
-import { getCalendars } from "expo-localization";
-
-/** Letzter Ausweg, wenn weder Expo noch `Intl` eine Zone nennen. DE-primäre App. */
-const FALLBACK = "Europe/Berlin";
-
-/**
- * Die IANA-Zone des Geräts — die Zone, in der ein neu angelegter Termin
- * verankert wird.
- *
- * Drei Stufen, weil jede für sich ausfallen kann: `expo-localization` liefert
- * `timeZone` als `string | null`, und `Intl.DateTimeFormat().resolvedOptions()`
- * kann in einer ICU-losen Umgebung einen leeren Wert melden. V1 nimmt an, dass
- * der Anlegende in der Zone lebt, in der der Termin stattfindet — ein
- * Zonen-Picker wäre ein eigenes Feature (siehe `docs/TODO.md`).
- */
-export function deviceTimeZone(): string {
-  const fromExpo = getCalendars()[0]?.timeZone;
-  if (fromExpo) return fromExpo;
-  const fromIntl = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return fromIntl || FALLBACK;
-}
-```
-
-- [ ] **Step 2: Den Test schreiben**
-
-`features/calendar/deviceTimeZone.test.ts` — mit `mock.module` für das native Modul, gleiches Muster wie `features/calendar/reminders.test.ts`:
-
-```ts
-import { describe, expect, mock, test } from "bun:test";
-
-let calendars: { timeZone: string | null }[] = [{ timeZone: "Europe/Berlin" }];
-
-void mock.module("expo-localization", () => ({ getCalendars: () => calendars }));
-
-// Nach dem Modul-Mock importiert — ein statischer Import würde darüber
-// hochgezogen. Gleiches Muster wie in `reminders.test.ts`.
-const { deviceTimeZone } = await import("./deviceTimeZone");
-
-describe("deviceTimeZone", () => {
-  test("nimmt die Zone von expo-localization", () => {
-    calendars = [{ timeZone: "America/New_York" }];
-    expect(deviceTimeZone()).toBe("America/New_York");
-  });
-
-  test("fällt auf Intl zurück, wenn Expo nichts liefert", () => {
-    calendars = [{ timeZone: null }];
-    expect(deviceTimeZone()).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
-  });
-
-  test("fällt auf Europe/Berlin zurück, wenn auch die Liste leer ist", () => {
-    calendars = [];
-    // Unter Bun liefert `Intl` immer eine Zone; geprüft wird hier nur, dass ein
-    // leeres Expo-Ergebnis nicht wirft.
-    expect(deviceTimeZone()).toBeTruthy();
-  });
-});
-```
-
-- [ ] **Step 3: `createMutation.ts` erweitern**
-
-`CreateEventVars` bekommt das Feld — direkt nach `allDay`:
-
-```ts
-/** IANA-Zone, in der die Wanduhrzeit dieses Termins gilt. Siehe `deviceTimeZone`. */
-timezone: string;
-```
-
-In `createEvent`, im `insert`-Objekt direkt nach `all_day: vars.allDay,`:
-
-```ts
-    timezone: vars.timezone,
-```
-
-In `optimisticEventRow`, an derselben Stelle der Feldliste:
-
-```ts
-    timezone: vars.timezone,
-```
-
-- [ ] **Step 4: Den Aufrufer versorgen**
-
-In `app-sections/event/EventCreateScreen.tsx`, im `vars`-Literal (nach `allDay,`):
-
-```tsx
-      timezone: deviceTimeZone(),
-```
-
-Import ergänzen — aus dem Kalender-Barrel, wie die übrigen Kalender-Importe dieses Screens: `deviceTimeZone` in die bestehende `@/features/calendar`-Importliste aufnehmen und in `features/calendar/index.ts` exportieren.
-
-- [ ] **Step 5: Die Fixtures der Bestandstests nachziehen**
-
-`createMutation.test.ts` und `eventColumns.test.ts` bauen `CreateEventVars`. Beide brauchen `timezone` in ihrer Fabrik. **`eventColumns.test.ts` ist dabei die eigentliche Prüfung:** Sein Spaltenvergleich schlägt fehl, solange einer der drei Schreiber das Feld nicht setzt — genau dafür wurde er in PR A gebaut.
-
-- [ ] **Step 6: Grün bestätigen**
-
-```bash
-bun test features/calendar/
-TZ=UTC bun test features/calendar/
-```
-
-- [ ] **Step 7: Gates und Commit**
-
-```bash
-bun run typecheck && bun lint && bun format:check && bun test
-git add features/calendar/deviceTimeZone.ts features/calendar/deviceTimeZone.test.ts features/calendar/createMutation.ts features/calendar/createMutation.test.ts features/calendar/eventColumns.test.ts features/calendar/index.ts app-sections/event/EventCreateScreen.tsx
-git commit -m "feat(calendar): neue Termine tragen die Zone des Geraets
-
-CreateEventVars bekommt timezone, gespeist aus expo-localization mit Intl- und
-Europe/Berlin-Fallback. createEvent und optimisticEventRow schreiben sie beide —
-die Spaltenpruefung aus eventColumns.test.ts erzwingt das."
-```
-
----
-
-## Task 7: ADR-033 und die Doku
+## Task 6: ADR-033 und die Doku
 
 **Files:**
 
