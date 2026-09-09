@@ -1206,7 +1206,7 @@ Accepted. Ergänzt [ADR-008](#adr-008--kalender-v1-abgeschlossen-reminder-recurr
 
 ### Context
 
-`events.start_at` trägt zwei Bedeutungen: die Startzeit des Termins und den Anker `dtstart` der Serie (`buildRule` in [features/calendar/rrule.ts](../features/calendar/rrule.ts)). `EventEditScreen` hydriert sein Formular aus der angetippten Occurrence; `changes.start_at` trägt deshalb deren Datum, nicht das des Serienbeginns.
+`events.start_at` trägt zwei Bedeutungen: die Startzeit des Termins und den Anker `dtstart` der Serie (`buildFloatingRule` in [features/calendar/rrule.ts](../features/calendar/rrule.ts)). `EventEditScreen` hydriert sein Formular aus der angetippten Occurrence; `changes.start_at` trägt deshalb deren Datum, nicht das des Serienbeginns.
 
 `applyEditScope` schrieb den Wert bei Scope „alle" unbedingt auf die Master-Zeile — `dtstart` wanderte mit, und jedes Vorkommen davor fiel aus `rule.between()`. Nachgemessen an einer wöchentlichen Serie ab 01.06.2026, bearbeitet an der Occurrence vom 03.08.: **9 von 14 Vorkommen verschwanden**, serverseitig, ohne Fehler oder Meldung. Trug die Serie ein `rrule_count`, verschob sich zusätzlich das ganze Zählfenster, weil COUNT relativ zu `dtstart` läuft.
 
@@ -1236,7 +1236,7 @@ Accepted. Ergänzt [ADR-008](#adr-008--kalender-v1-abgeschlossen-reminder-recurr
 
 Serientermine sprangen über eine Zeitumstellung um eine Stunde. Gemessen unter `TZ=Europe/Berlin`: eine wöchentliche Serie ab `2026-10-06 18:00` (CEST) stand ab dem 27.10. auf **17:00**; in der Gegenrichtung stand eine Serie ab `2026-03-09 08:00` ab dem 30.03. auf **09:00**. Ursache: `buildRule` in [features/calendar/rrule.ts](../features/calendar/rrule.ts) übergab ein nacktes `Date` an `rrule`, das absolut — im gleichbleibenden UTC-Abstand — rechnet; gelesen wurde das Ergebnis danach mit lokalen Gettern.
 
-Der naheliegende Fix, `rrule`s eigene `tzid`-Option, schied aus. `rrule@2.8.1` rechnet in `dateInTimeZone` `targetOffset − localOffset` und ist damit nur korrekt, wenn die **Prozess-Zeitzone UTC** ist. Nachgemessen mit einer Serie ab `2026-10-06 18:00` und `tzid: "Europe/Berlin"`:
+Der naheliegende Fix, `rrule`s eigene `tzid`-Option, schied aus. `rrule@2.8.1` rechnet in `dateInTimeZone` ([dateutil.js, an die Version gepinnt](https://unpkg.com/rrule@2.8.1/dist/esm/dateutil.js)) `targetOffset − localOffset` und ist damit nur korrekt, wenn die **Prozess-Zeitzone UTC** ist. Nachgemessen mit einer Serie ab `2026-10-06 18:00` und `tzid: "Europe/Berlin"`:
 
 | Prozess-TZ         | Ergebnis                                 |
 | ------------------ | ---------------------------------------- |
@@ -1263,3 +1263,4 @@ Vor der ersten Zeile Code stand deshalb eine Gegenprobe: Trägt natives `Intl.Da
 - Ein Zonen-Picker fehlt weiterhin ([docs/TODO.md](./TODO.md)) — die anlegende Person muss in der Zone sein, in der der Termin stattfindet.
 - Termine, die vor dieser Migration angelegt wurden, tragen alle den Spalten-Default `Europe/Berlin`, unabhängig davon, in welcher Zone sie tatsächlich gemeint waren.
 - Von den 235 bestehenden Kalender-Assertions wurde **keine einzige** rot, weil keine Bestands-Fixture eine Serie über eine Umstellung führt. Der Beleg für den Fix sind ausschließlich die neu geschriebenen Tests — die laufen dafür unter drei Runner-Zonen (`Europe/Berlin`, `UTC`, `America/New_York`) mit identischer Erwartung.
+- [ADR-032](#adr-032--alle-termine-verankert-die-serie-nicht-neu-2026-09-09) hatte angekündigt, `anchoredChanges` nehme die Tageszeit „sobald `events` eine eigene Zeitzone trägt" in dieser Zone. Sie trägt sie jetzt — der Schreibpfad zieht aber noch nicht nach: `anchoredChanges` (`recurrence.ts`), `withTimeOfDay` (`optimisticEvents.ts`) und `recurrenceToRrule` (`createMutation.ts`) rechnen weiterhin mit lokalen Gettern, also der Zone des **Lesers**, nicht mit `events.timezone`. Ein reines Öffnen-und-Speichern mit Scope „alle" von einem Gerät, dessen Zone davon abweicht, verschiebt die ganze Serie dauerhaft um eine Stunde — die Asymmetrie zum jetzt zonenbewussten Lesepfad ist neu und in [docs/TODO.md](./TODO.md) verzeichnet.
