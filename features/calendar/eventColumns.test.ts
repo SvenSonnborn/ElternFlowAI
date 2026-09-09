@@ -1,12 +1,36 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 
 import type { Database } from "@/features/supabase/database.types";
 
 import type { EventChanges } from "./recurrence";
 
 import { createSupabaseEventOps } from "./recurrence";
+
+let inserted: { table: string; payload: Record<string, unknown> | undefined } = {
+  table: "",
+  payload: undefined,
+};
+
+const supabase = {
+  from(table: string) {
+    inserted.table = table;
+    return {
+      insert(payload: Record<string, unknown>) {
+        inserted.payload = payload;
+        return Promise.resolve({ error: null });
+      },
+    };
+  },
+};
+
+void mock.module("@/features/supabase", () => ({ supabase }));
+
+// Nach dem Modul-Mock importiert: ein statischer Import würde darüber
+// hochgezogen und `createMutation.ts` griffe den echten Client ab.
+// Gleiches Muster wie in `reminders.test.ts`.
+const { createEvent, optimisticEventRow } = await import("./createMutation");
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
@@ -132,5 +156,61 @@ describe("insertSplitEvent — Spaltenvollzähligkeit", () => {
     );
 
     expect(calls.payload?.parent_id).toBe("par-7");
+  });
+});
+
+type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
+
+function createVars(): Parameters<typeof createEvent>[0] {
+  return {
+    familyId: "fam-1",
+    typeId: "type-1",
+    childId: "child-1",
+    parentId: null,
+    title: "Elternabend",
+    startAt: "2026-10-01T19:00:00.000Z",
+    endAt: "2026-10-01T20:30:00.000Z",
+    allDay: false,
+    location: "Schule",
+    description: "Raum 12",
+    recurrence: "weekly",
+    recurrenceCount: 5,
+    createdBy: "par-1",
+  };
+}
+
+/** Die acht Spalten von `event_types.Row`, Stand `database.types.ts`. */
+function eventType(): EventTypeRow {
+  return {
+    id: "type-1",
+    family_id: "fam-1",
+    slug: "family",
+    color: "primary",
+    icon: "users",
+    label: { de: "Familie", en: "Family" },
+    created_at: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+describe("createEvent und optimisticEventRow — dieselbe Spaltenmenge", () => {
+  test("createEvent schreibt jede Spalte, die der Server nicht selbst füllt", async () => {
+    inserted = { table: "", payload: undefined };
+
+    await createEvent(createVars());
+
+    expect(inserted.table).toBe("events");
+    expect(Object.keys(inserted.payload ?? {}).sort()).toEqual(requiredInsertColumns());
+  });
+
+  test("optimisticEventRow deckt jede Spalte von EventRow ab", () => {
+    // Die synthetische Zeile geht durch dasselbe `expandEvents` wie die echten
+    // und muss deshalb eine vollständige `EventRow` sein — inklusive der drei
+    // servergefüllten Spalten, die `createEvent` bewusst auslässt.
+    const row = optimisticEventRow(createVars(), eventType());
+    const columns = Object.keys(row).filter(
+      (key) => key !== "event_types" && key !== "event_exceptions",
+    );
+
+    expect(columns.sort()).toEqual(Object.keys(EVENT_ROW_COLUMNS).sort());
   });
 });
