@@ -172,6 +172,55 @@ function ruleDiffers(master: EventRow, next: RecurrenceChanges): boolean {
   );
 }
 
+/**
+ * `changes`, so umgeschrieben, dass der **Serienanker stehen bleibt**.
+ *
+ * `events.start_at` ist doppelt belegt: Startzeit des Termins *und* `dtstart`
+ * der Serie (`buildRule` in `rrule.ts`). Das Bearbeiten-Formular hydriert aus
+ * der angetippten Occurrence, `changes.start_at` trägt also deren Datum.
+ * Unbedingt geschrieben, wandert `dtstart` dorthin, und jedes Vorkommen davor
+ * fällt aus `rule.between()` — serverseitig, ohne Fehler oder Meldung.
+ * Nachgemessen: eine Serie ab 01.06., bearbeitet am 03.08., verliert 9 von 14
+ * Vorkommen. Trägt sie ein `rrule_count`, verschiebt sich zusätzlich das ganze
+ * Zählfenster, weil COUNT relativ zu `dtstart` läuft.
+ *
+ * Übernommen wird deshalb nur die **Tageszeit**; das Datum bleibt das des
+ * Masters, die Dauer kommt aus der Eingabe. Das ist Zeile für Zeile, was
+ * `applyOptimisticChanges` (`optimisticEvents.ts`) für die Anzeige längst tut —
+ * Anzeige und Schreibpfad sagen damit dasselbe, was sie vorher nicht taten.
+ *
+ * Zwei bewusste Grenzen (ADR-032):
+ *
+ * - Eine **Datumsänderung** unter Scope „alle" wird verworfen. Eine Angabe
+ *   stumm fallen zu lassen ist ungleich billiger als stumm neun Vorkommen zu
+ *   löschen, und die Anzeige verspricht das Verworfene ohnehin schon. Ein
+ *   sichtbarer Hinweis bräuchte einen Copy-Key — siehe `docs/TODO.md`.
+ * - Wird eine Serie zum **Einzeltermin** (`recurrence.rrule_freq === null`),
+ *   behält sie das Datum des Serienbeginns statt das der bearbeiteten
+ *   Occurrence. Eine Regel gibt es dann nicht mehr, verloren geht also nichts;
+ *   die Alternative wäre eine dritte Sonderregel für einen seltenen Fall.
+ *
+ * Gerechnet wird mit lokalen Gettern, wie `withTimeOfDay` es tut. Sobald
+ * `events` eine eigene Zone trägt, gehört die Tageszeit in dieser Zone
+ * genommen — das ist der nächste PR dieses Blocks.
+ */
+function anchoredChanges(master: EventRow, changes: EventChanges): EventChanges {
+  const newStart = new Date(changes.start_at);
+  const start = new Date(master.start_at);
+  start.setHours(
+    newStart.getHours(),
+    newStart.getMinutes(),
+    newStart.getSeconds(),
+    newStart.getMilliseconds(),
+  );
+  const durationMs = new Date(changes.end_at).getTime() - newStart.getTime();
+  return {
+    ...changes,
+    start_at: start.toISOString(),
+    end_at: new Date(start.getTime() + durationMs).toISOString(),
+  };
+}
+
 export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
   const { ops, scope, eventId, occurrenceDate, isRecurring, master, changes, recurrence } = args;
 
@@ -185,7 +234,15 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
     if (ruleDiffers(master, recurrence)) {
       await ops.deleteAllExceptions(eventId);
     }
-    await ops.updateMaster(eventId, changes, master.updated_at, recurrence);
+    // Derselbe Anker wie unten: Dass die Serie ohnehin neu definiert wird,
+    // rettet die Vorkommen vor der bearbeiteten Occurrence nicht — sie
+    // verschwinden mit dem wandernden `dtstart` genauso.
+    await ops.updateMaster(
+      eventId,
+      isRecurring ? anchoredChanges(master, changes) : changes,
+      master.updated_at,
+      recurrence,
+    );
     return;
   }
 
@@ -231,8 +288,16 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
     return;
   }
 
-  // scope === "all" (or "forward" on a non-recurring event — same outcome)
-  await ops.updateMaster(eventId, changes, master.updated_at);
+  // scope === "all" (or "forward" on a non-recurring event — same outcome).
+  // Der Anker greift nur bei einer Serie; beim Einzeltermin verschiebt eine
+  // Datumsänderung den Termin tatsächlich (siehe `anchoredChanges`). Auf
+  // `isRecurring` allein zu prüfen genügt: „forward" auf einer Serie kehrt in
+  // jedem seiner Zweige oben zurück und erreicht diese Zeile nie.
+  await ops.updateMaster(
+    eventId,
+    isRecurring ? anchoredChanges(master, changes) : changes,
+    master.updated_at,
+  );
 }
 
 export function createSupabaseEventOps(client: SupabaseClient<Database>): EventOps {
