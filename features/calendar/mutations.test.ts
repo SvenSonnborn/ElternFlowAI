@@ -87,7 +87,7 @@ describe("updateEvent", () => {
     await updateEvent({ ...BASE_VARS, scope: "forward" }, { fetchMaster, ops });
 
     expect(fetchMaster).toHaveBeenCalledWith("evt-1");
-    expect(ops.setRruleUntil).toHaveBeenCalledWith("evt-1", "2026-06-14");
+    expect(ops.setRruleUntil).toHaveBeenCalledWith("evt-1", "2026-06-14T21:59:59.999Z");
     expect(ops.insertSplitEvent).toHaveBeenCalledWith(master, CHANGES, null);
     expect(ops.deleteExceptionsFromDate).toHaveBeenCalledWith("evt-1", "2026-06-15");
   });
@@ -200,7 +200,7 @@ describe("deleteEvent", () => {
 
     await deleteEvent({ ...DELETE_VARS, scope: "forward" }, { fetchMaster, ops });
 
-    expect(ops.setRruleUntil).toHaveBeenCalledWith("evt-1", "2026-06-14");
+    expect(ops.setRruleUntil).toHaveBeenCalledWith("evt-1", "2026-06-14T21:59:59.999Z");
     expect(ops.setRruleCount).not.toHaveBeenCalled();
   });
 

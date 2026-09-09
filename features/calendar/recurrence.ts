@@ -6,6 +6,7 @@ import type { Database } from "@/features/supabase/database.types";
 
 import { EventConflictError } from "./errors";
 import { allOccurrences } from "./rrule";
+import { floatingToInstant } from "./timezone";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
@@ -60,7 +61,8 @@ export interface EventOps {
     recurrence?: RecurrenceChanges,
   ) => Promise<void>;
   deleteAllExceptions: (eventId: string) => Promise<void>;
-  setRruleUntil: (eventId: string, until: string) => Promise<void>;
+  /** `untilIso` ist ein **Instant**, kein Datumsstring — siehe `endOfDayInstant`. */
+  setRruleUntil: (eventId: string, untilIso: string) => Promise<void>;
   setRruleCount: (eventId: string, count: number) => Promise<void>;
   deleteExceptionsFromDate: (eventId: string, fromDateInclusive: string) => Promise<void>;
   insertSplitEvent: (
@@ -101,6 +103,21 @@ function dayBefore(isoDate: string): string {
 
 function dateOnly(d: Date): string {
   return format(d, "yyyy-MM-dd");
+}
+
+/**
+ * Das Ende des Tages `isoDate` **in der Zone des Termins**, als ISO-Instant.
+ *
+ * `setRruleUntil` schrieb früher den nackten Datumsstring in eine
+ * `timestamptz`-Spalte; Postgres castet ihn in der Session-Zone (UTC) zu
+ * Mitternacht. Seit die Regel in Wandzeit ausgewertet wird (ADR-033), schnitte
+ * das die Serie um 02:00 Ortszeit statt am Tagesende — bei einer täglichen
+ * Serie verschwände das Vorkommen des Cutoff-Tages.
+ */
+function endOfDayInstant(isoDate: string, timeZone: string): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const floating = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+  return floatingToInstant(floating, timeZone).toISOString();
 }
 
 /**
@@ -148,7 +165,7 @@ export async function applyDeleteScope(args: ApplyDeleteScopeArgs): Promise<void
       await ops.deleteMaster(eventId);
       return;
     }
-    await ops.setRruleUntil(eventId, cutoff);
+    await ops.setRruleUntil(eventId, endOfDayInstant(cutoff, master.timezone));
     await ops.deleteExceptionsFromDate(eventId, occurrenceDate);
     return;
   }
@@ -289,7 +306,7 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
     }
     // Tail first — same durability reasoning as the count path above.
     await ops.insertSplitEvent(master, changes, null);
-    await ops.setRruleUntil(eventId, cutoff);
+    await ops.setRruleUntil(eventId, endOfDayInstant(cutoff, master.timezone));
     await ops.deleteExceptionsFromDate(eventId, occurrenceDate);
     return;
   }
