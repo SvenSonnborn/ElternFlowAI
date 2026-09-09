@@ -119,6 +119,12 @@ export async function createEvent(vars: CreateEventVars): Promise<void> {
     rrule_freq: rrule.rrule_freq,
     rrule_interval: rrule.rrule_interval,
     rrule_byweekday: rrule.rrule_byweekday,
+    // Zum Anlegezeitpunkt gibt es nie ein UNTIL (das entsteht erst beim
+    // Forward-Löschen). Explizit `null` statt ausgelassen, damit die drei
+    // Event-Schreiber — hier, `optimisticEventRow` darunter und
+    // `insertSplitEvent` in `recurrence.ts` — dieselbe Spaltenmenge führen;
+    // `eventColumns.test.ts` hält sie darauf fest.
+    rrule_until: null,
     // A count only means anything on a recurring event; the DB also forbids
     // pairing it with an until (`events_rrule_count_xor_until`), which nothing
     // sets at create time.
