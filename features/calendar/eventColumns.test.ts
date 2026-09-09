@@ -179,7 +179,7 @@ function createVars(): Parameters<typeof createEvent>[0] {
   };
 }
 
-/** Die acht Spalten von `event_types.Row`, Stand `database.types.ts`. */
+/** Die sieben Spalten von `event_types.Row`, Stand `database.types.ts`. */
 function eventType(): EventTypeRow {
   return {
     id: "type-1",

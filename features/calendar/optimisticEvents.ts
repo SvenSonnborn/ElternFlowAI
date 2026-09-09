@@ -48,21 +48,29 @@ export function patchesOccurrence(
 /**
  * Ob eine Änderung überhaupt optimistisch angezeigt werden **darf**.
  *
- * Der Grenzfall ist `all`/`forward` mit geändertem **Datumsanteil**. Dort
- * schreibt der Server `changes.start_at` per `updateMaster` in `events.start_at`
- * — und das ist `dtstart` der RRULE, die ganze Serie wandert also mit. Das
- * Overlay dagegen kann nur die Tageszeit neu verankern (siehe
- * `applyOptimisticChanges`) und lässt jedes Occurrence-Datum stehen.
- * Nachgerechnet an einer monatlichen Serie am 5., verschoben auf den 7.10.:
- * Das Overlay zeigt `[09-05, 10-05, 11-05]`, der Refetch liefert
- * `[10-07, 11-07, 12-07]`.
+ * Der Grenzfall ist `all`/`forward` mit geändertem **Datumsanteil**, und seit
+ * [ADR-032](../../docs/decision-log.md) unterscheiden sich die beiden Scopes:
  *
- * Das ist nicht mehr die Näherung aus Decision 3 des ADR — ein sichtbares
- * Zurechtrücken —, sondern die Anzeige der **Nicht-Änderung genau der
- * Eigenschaft, die der Nutzer gerade geändert hat**: Er verschiebt den
+ * - Bei `all` verwirft `updateMaster` (`anchoredChanges` in `recurrence.ts`)
+ *   die Datumsänderung still und schreibt nur die neue Tageszeit auf die
+ *   Master-Zeile — das Datum bleibt das des Masters. Das Overlay darf diese
+ *   verworfene Änderung also nicht zeigen.
+ * - Bei `forward` verankert die Serie tatsächlich neu: `insertSplitEvent`
+ *   schreibt `changes.start_at` weiterhin wörtlich als `dtstart` der
+ *   Schwanzhälfte, jede Occurrence ab dem Schnitt wandert also mit.
+ *   Nachgerechnet an einer monatlichen Serie am 5., ab dem Schnitt verschoben
+ *   auf den 7.10.: Das Overlay zeigt `[09-05, 10-05, 11-05]`, der Refetch
+ *   liefert `[10-07, 11-07, 12-07]`.
+ *
+ * Bei `forward` wäre die Alternative die Anzeige der **Nicht-Änderung genau
+ * der Eigenschaft, die der Nutzer gerade geändert hat**: Er verschiebt den
  * Elternabend auf den 7., der Kalender zeigt alles unverändert, er hält das
- * Speichern für fehlgeschlagen, und eine Sekunde später springt die ganze
- * Serie. Lieber gar kein optimistischer Eintrag.
+ * Speichern für fehlgeschlagen, und eine Sekunde später springt die
+ * Schwanzhälfte doch auf die neuen Daten. Bei `all` gibt es diesen Sprung
+ * nicht — dort wird schlicht eine Eingabe verworfen, die der Nutzer nicht
+ * sieht. In beiden Fällen gilt: lieber gar kein optimistischer Eintrag als
+ * einer, der von einer Annahme abhängt, die der Server so nicht (mehr)
+ * einlöst.
  *
  * Derselbe Fehler droht bei einer **Regeländerung** (`recurrence`, z. B.
  * wöchentlich → zweiwöchentlich): Der Server schreibt die neue RRULE, das

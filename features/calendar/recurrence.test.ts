@@ -320,9 +320,8 @@ describe("applyEditScope", () => {
       master: makeMaster({ rrule_freq: null, rrule_byweekday: null }),
       changes: CHANGES,
     });
-    // Bleibt literal: „ab diesem Termin" verankert die Serie absichtlich neu —
-    // hier liegt der Schnitt am oder vor dem Serienanfang, die „Schwanzhälfte"
-    // ist die ganze Serie. Siehe `anchoredChanges` in `recurrence.ts`.
+    // Bleibt literal: Hier gibt es weder Serie noch Serienanfang — der Grund
+    // ist schlicht `isRecurring === false`, nicht der Anker aus `anchoredChanges`.
     expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
     expect(ops.setRruleUntil).not.toHaveBeenCalled();
