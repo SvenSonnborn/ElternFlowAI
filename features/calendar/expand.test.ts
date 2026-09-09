@@ -134,3 +134,27 @@ describe("Serienanker", () => {
     expect(anchored[0].startAt.getHours()).toBe(19);
   });
 });
+
+describe("Dauer über eine Zeitumstellung", () => {
+  test("ein mehrtägiges Vorkommen behält seine Wandzeit-Dauer", () => {
+    // Wöchentlich ab Freitag 16.10.2026, 09:00 Berlin bis Montag 19.10., 14:00.
+    // Das Vorkommen ab Freitag 23.10. läuft über die Umstellung am 25.10.
+    const row = makeRow({
+      start_at: "2026-10-16T07:00:00.000Z",
+      end_at: "2026-10-19T12:00:00.000Z",
+      rrule_freq: "weekly",
+      timezone: "Europe/Berlin",
+    });
+    const out = expandEvents(
+      [row],
+      new Date("2026-10-20T00:00:00.000Z"),
+      new Date("2026-10-27T00:00:00.000Z"),
+      lightTheme,
+    );
+    expect(out).toHaveLength(1);
+    // Start bleibt 09:00 Wandzeit (07:00Z, noch Sommerzeit), Ende 14:00 Wandzeit
+    // — und das ist nach der Umstellung 13:00Z, nicht 12:00Z.
+    expect(out[0].startAt.toISOString()).toBe("2026-10-23T07:00:00.000Z");
+    expect(out[0].endAt.toISOString()).toBe("2026-10-26T13:00:00.000Z");
+  });
+});
