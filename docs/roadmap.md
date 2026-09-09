@@ -288,6 +288,12 @@ Master-Zeile halten**, sonst wiederholt sich dieselbe Auslassung bei der nächst
 
 Das ist der billigste echte Datenverlust-Fix im ganzen Backlog — deshalb zuerst und allein.
 
+**Umgesetzt** in [PR #117](https://github.com/SvenSonnborn/ElternFlowAI/pull/117). Der Regressionstest
+hält die Feldliste nicht gegen die Master-Zeile, sondern über `Record<keyof EventRow, true>` gegen den
+generierten Datenbank-Typ — eine neue Spalte lässt damit schon `bun run typecheck` fehlschlagen.
+Mitgenommen: `createEvent` und `optimisticEventRow` hängen an derselben Prüfung
+([eventColumns.test.ts](../features/calendar/eventColumns.test.ts)).
+
 ### 1.2 „Alle Termine"-Scope verschiebt den Serienstart — **erledigt**
 
 **„‚Alle Termine'-Scope verschiebt den Serienstart"**
@@ -299,9 +305,14 @@ nur die Uhrzeit einer späteren Occurrence und wählt „Alle Termine", wandert 
 _dieser_ Occurrence — alle Vorkommen davor fallen serverseitig aus `rule.all()`/`between()` heraus.
 Trägt die Serie ein `rrule_count`, verschiebt sich zusätzlich das Zähl-Fenster.
 
-Fix: bei Scope „alle" das ursprüngliche `start_at`-**Datum** behalten und nur die **Uhrzeit**
-übernehmen — oder `dtstart` ganz vom editierten `start_at` entkoppeln. Zweite Variante ist
-sauberer, aber ein Schema-Gedanke; erst in der Iteration entscheiden.
+**Umgesetzt als [ADR-032](./decision-log.md)** — von den beiden erwogenen Varianten wurde die erste
+gewählt: `anchoredChanges` in [recurrence.ts](../features/calendar/recurrence.ts) behält bei Scope
+„alle" auf einer Serie das `start_at`-**Datum** des Masters und übernimmt nur die **Uhrzeit**; die
+Dauer kommt aus der Eingabe. `dtstart` vom editierten `start_at` zu entkoppeln wäre sauberer, hätte
+aber eine Schemaänderung gebraucht, für die es keinen zweiten Anlass gab. Zwei Grenzen kamen dabei
+heraus: „ab diesem Termin" verankert weiterhin absichtlich neu, und eine **Datumsänderung** unter
+Scope „alle" wird stillschweigend verworfen — der Hinweis dafür braucht einen Copy-Key und steht als
+🎨-Eintrag in [TODO.md](./TODO.md).
 
 ### 1.3 Das Override-Modell: verschwundene Exceptions + Versions-Schlüssel — **L, ein PR**
 
