@@ -67,6 +67,28 @@ current theme.
 - **TanStack Query** — server state (Supabase reads, Edamam reads, etc.). Will
   be wired once Supabase is added.
 
+## Kalender
+
+`events.timezone` (IANA-Zone, Default `Europe/Berlin`, seit [ADR-033](./decision-log.md)) legt fest,
+in welcher Zone die Wanduhrzeit eines Termins und seiner Wiederholungsregel gilt. Der Datenfluss:
+
+```
+events.timezone → rrule.ts (Regel läuft in Wandzeit) → echte Instants → Anzeige in der Zone des Lesers
+```
+
+[features/calendar/rrule.ts](../features/calendar/rrule.ts) wertet die Regel vollständig in dieser
+Zone aus — `dtstart`, `until` und die Fenstergrenzen laufen als „floating" Zeit (Wandzeit in den
+UTC-Feldern eines `Date`) durch `rrule`, das damit DST-frei rechnet, statt über die eigene
+`tzid`-Option, die nur bei Prozess-Zeitzone UTC korrekt wäre.
+[features/calendar/timezone.ts](../features/calendar/timezone.ts) übernimmt die Umrechnung an den
+Rändern (`instantToFloating`/`floatingToInstant`) und liefert `occurrencesBetween`/`allOccurrences`
+echte Instants zurück. Die Anzeige formatiert diese Instants mit lokalen `Date`-Gettern und rechnet
+sie damit automatisch in die **Zone des Lesers** um, nicht in die des Termins — zwei Geräte in
+verschiedenen Zonen zeigen denselben Termin also zu unterschiedlicher Ortszeit, aber zur selben
+absoluten Zeit. Neue Termine bekommen ihre Zone unsichtbar von
+[features/calendar/deviceTimeZone.ts](../features/calendar/deviceTimeZone.ts) — ein Zonen-Picker
+fehlt (siehe [docs/TODO.md](./TODO.md)).
+
 ## Realtime
 
 Änderungen an `events` und `event_exceptions` gehen **nicht** mehr über die

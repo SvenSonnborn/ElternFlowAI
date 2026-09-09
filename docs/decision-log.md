@@ -1225,3 +1225,41 @@ Die Anzeige hatte den Fall längst richtig: `applyOptimisticChanges` nimmt bei `
 - Anzeige und Schreibpfad sagen dasselbe. Der Widerspruch, der `canApplyOptimistically` zu seiner Ausnahme für datumsändernde `all`/`forward`-Edits gezwungen hat, ist damit einseitig aufgelöst — die Ausnahme bleibt trotzdem richtig, weil das Overlay eine verworfene Änderung nicht zeigen soll.
 - Wird eine Serie zum Einzeltermin gemacht (`recurrence.rrule_freq === null`), gilt die Eingabe literal und landet auf dem Datum der bearbeiteten Occurrence — Decision 3, nicht Decision 1. `isRecurring` allein unterscheidet die beiden Fälle nicht, weil es den Master vor dem Schreiben beschreibt und bei „Keine Wiederholung" noch `true` ist; der `recurrence`-Zweig in `applyEditScope` prüft deshalb zusätzlich `recurrence.rrule_freq !== null`, bevor er ankert. Ohne Regel gibt es kein `dtstart` mehr zu schützen, verloren geht also nichts.
 - `anchoredChanges` rechnet mit lokalen Gettern, wie `withTimeOfDay` es tut. Sobald `events` eine eigene Zeitzone trägt (ADR-033), gehört die Tageszeit in dieser Zone genommen — das ist der nächste PR desselben Blocks und der einzige bekannte Folgeschritt.
+
+## ADR-033 — Serien werten in Wandzeit aus: `events.timezone`, kein `tzid` (2026-09-09)
+
+### Status
+
+Accepted. Ergänzt [ADR-008](#adr-008--kalender-v1-abgeschlossen-reminder-recurrence-editor-multi-day-2026-07-28) (Recurrence-V1) und [ADR-032](#adr-032--alle-termine-verankert-die-serie-nicht-neu-2026-09-09) (Serienanker). Löst nichts ab. Zweiter von drei ADRs aus Block 1 der Roadmap (032 Anker → 033 Zonenmodell → 034 Occurrence-Schlüssel).
+
+### Context
+
+Serientermine sprangen über eine Zeitumstellung um eine Stunde. Gemessen unter `TZ=Europe/Berlin`: eine wöchentliche Serie ab `2026-10-06 18:00` (CEST) stand ab dem 27.10. auf **17:00**; in der Gegenrichtung stand eine Serie ab `2026-03-09 08:00` ab dem 30.03. auf **09:00**. Ursache: `buildRule` in [features/calendar/rrule.ts](../features/calendar/rrule.ts) übergab ein nacktes `Date` an `rrule`, das absolut — im gleichbleibenden UTC-Abstand — rechnet; gelesen wurde das Ergebnis danach mit lokalen Gettern.
+
+Der naheliegende Fix, `rrule`s eigene `tzid`-Option, schied aus. `rrule@2.8.1` rechnet in `dateInTimeZone` `targetOffset − localOffset` und ist damit nur korrekt, wenn die **Prozess-Zeitzone UTC** ist. Nachgemessen mit einer Serie ab `2026-10-06 18:00` und `tzid: "Europe/Berlin"`:
+
+| Prozess-TZ         | Ergebnis                                 |
+| ------------------ | ---------------------------------------- |
+| `UTC`              | 18:00 Berlin durchgehend ✔               |
+| `Europe/Berlin`    | reiner No-op ✘ — **der Produktionsfall** |
+| `America/New_York` | 14:00 Berlin ✘                           |
+
+Eine React-Native-App läuft in der Gerätezone — der No-op-Zweig ist also genau der Fall, der zählt.
+
+Vor der ersten Zeile Code stand deshalb eine Gegenprobe: Trägt natives `Intl.DateTimeFormat` mit einer `timeZone`-Option und `formatToParts` unter Hermes die Sommerzeitregel, oder nur einen festen Offset? Das Repo hatte bis dahin an keiner Stelle zur Laufzeit `Intl` benutzt — `features/auth/avatarColor.ts` erwähnt `Intl.Segmenter` nur in einem Kommentar. Bestanden auf **beiden** Plattformen: iOS (Apples ICU) und Android (Java-ICU) lieferten für `Europe/Berlin` je `02:00` (1. Juli) und `01:00` (1. Januar) — also die echte Sommerzeitregel, nicht ein fester Offset. Kein Polyfill nötig.
+
+### Decisions
+
+1. Die Zone ist eine **Spalte** auf `events` (`supabase/migrations/20260909115403_events_timezone.sql`), nicht die Gerätezone des Lesers — sonst wertete dasselbe Ereignis auf zwei Geräten verschieden aus, und ein serverseitiger Reminder-Worker könnte es gar nicht.
+2. Die Regel wird vollständig in **Wandzeit** ausgewertet; das Floating verlässt [features/calendar/rrule.ts](../features/calendar/rrule.ts) nicht. `dtstart`, `until` und die `between`-Grenzen gehen als floating hinein (Wandzeit in den UTC-Feldern eines `Date`), `rrule` rechnet damit DST-frei, und [features/calendar/timezone.ts](../features/calendar/timezone.ts) rechnet die Ergebnisse zonenbewusst zu echten Instants zurück. `tzid` wird nirgends gesetzt.
+3. Die **doppelte Stunde** (Berlin, 25.10., 02:30 existiert zweimal) nimmt den **früheren** Zeitpunkt, die **Sprung-Lücke** (Berlin, 29.03., 02:30 existiert nicht) den **späteren**. `floatingToInstant` sondiert dafür **zwei Stellen ±26 Stunden** außerhalb jedes Umstellungsfensters statt eines Zweipasses am Wert selbst — ein Zweipass (Offset an der Wandzeit schätzen, dann am Ergebnis korrigieren) konvergiert in der doppelten Stunde nachweislich auf den _zweiten_ Zeitpunkt, weil beide Zwischenschritte schon hinter der Umstellung landen.
+4. Die **Dauer** eines Vorkommens ist eine Wandzeit-Dauer, nicht die Differenz zweier Instants — sonst endete ein mehrtägiger Termin über eine Umstellung hinweg eine Stunde zu früh. Das **Suchfenster**, mit dem `expandRecurrence` Kandidaten holt, bleibt dagegen absolut: dort geht es um eine echte Zeitspanne, nicht um eine Wanduhr.
+5. `setRruleUntil` schreibt einen **Tagesende-Instant** in der Zone des Termins statt eines nackten `yyyy-MM-dd` — Postgres castete den Datumsstring sonst in der Session-Zone (UTC) zu Mitternacht, also 02:00 Ortszeit, und eine tägliche Serie verlor damit ihr Vorkommen am Cutoff-Tag.
+6. Die Zone ist im Termin-Formular **unsichtbar** und kommt von `deviceTimeZone()` ([features/calendar/deviceTimeZone.ts](../features/calendar/deviceTimeZone.ts)) — ein eigenes Modul statt eines Exports aus `timezone.ts`, damit dessen Tests unter `bun test` ohne Modul-Mock für `expo-localization` laufen.
+
+### Consequences
+
+- **Erste Laufzeit-Abhängigkeit von `Intl`** im gesamten Repo, belegt durch die Gegenprobe oben — bislang kam die Funktion nur in einem Kommentar vor. Kein Polyfill eingebaut; sollte eine künftige Plattform die Gegenprobe nicht bestehen, ist `@formatjs/intl-datetimeformat` der von Expo dokumentierte Ausweg.
+- Ein Zonen-Picker fehlt weiterhin ([docs/TODO.md](./TODO.md)) — die anlegende Person muss in der Zone sein, in der der Termin stattfindet.
+- Termine, die vor dieser Migration angelegt wurden, tragen alle den Spalten-Default `Europe/Berlin`, unabhängig davon, in welcher Zone sie tatsächlich gemeint waren.
+- Von den 235 bestehenden Kalender-Assertions wurde **keine einzige** rot, weil keine Bestands-Fixture eine Serie über eine Umstellung führt. Der Beleg für den Fix sind ausschließlich die neu geschriebenen Tests — die laufen dafür unter drei Runner-Zonen (`Europe/Berlin`, `UTC`, `America/New_York`) mit identischer Erwartung.
