@@ -1197,3 +1197,31 @@ Der Umbau auf einen **dreiwertigen** Vergleich wurde deshalb dem Nutzer vorgeleg
 - **Der Dialog selbst bleibt ungetestet.** `ConflictDialog` und `ConflictDialogHost` rendern React — derselbe fehlende Render-Pfad wie oben. Der Schnitt ist genau darauf gelegt: Store (`conflictStore.test.ts`) und Vergleichsfunktionen (`conflict.test.ts` je Feature) sind reine, geprüfte Logik, die Komponente ist stumpf und zeichnet `{ label, theirs, mine }[]`.
 - **Diese Iteration löst keinen Konflikt auf, sie meldet ihn.** Kein Feld-Merge — der Nutzer wählt eine Fassung ganz, nicht Zeile für Zeile. Keine Anzeige, _wer_ geändert hat: `events` trägt `created_by`, aber kein `updated_by`; das wären eine weitere Spalte, ein weiterer Trigger und ein Join auf `parents`, deshalb sagt die Copy bewusst „jemand anderes". Kein Guard auf `useToggleTaskDone`/`useToggleReminder` — beide schreiben genau ein Feld, das der Nutzer unmittelbar vor sich sieht; ein Konflikt dort ist ein doppelter Haken, kein Datenverlust. Und kein Guard beim Anlegen: Zwei gleichzeitig angelegte Termine sind zwei Termine. Die Überschneidungs-Warnung im Anlegen-Formular (`patterns/calendar.md`, „Conflict detection") ist ein anderes Feature mit demselben deutschen Wort — dort geht es um Zeitkollisionen.
 - **Damit sind die drei Realtime-Iterationen abgeschlossen** (#50 Fundament → #51 Live-Sync → #52 Conflict-Detection). Client-Broadcasts auf `realtime.messages` haben sich als unnötig erwiesen: Die Erkennung läuft vollständig über `updated_at` und die beiden Schreibpfade, es gibt weiterhin bewusst **keine** `insert`-Policy auf dieser Tabelle, und alle Nachrichten kommen aus dem `security definer`-Trigger.
+
+## ADR-032 — „Alle Termine" verankert die Serie nicht neu (2026-09-09)
+
+### Status
+
+Accepted. Ergänzt [ADR-008](#adr-008--kalender-v1-abgeschlossen-reminder-recurrence-editor-multi-day-2026-07-28) um die Schreibseite des Scope-Modells und zieht die Schreibrichtung an das nach, was [ADR-027](#adr-027--optimistische-kalender-updates-ein-occurrence-overlay-auf-der-anzeige-keine-cache-patches-2026-08-31) für die Anzeige längst tut. Löst nichts ab. Erster von drei ADRs aus Block 1 der Roadmap (032 Anker → 033 Zonenmodell → 034 Occurrence-Schlüssel).
+
+### Context
+
+`events.start_at` trägt zwei Bedeutungen: die Startzeit des Termins und den Anker `dtstart` der Serie (`buildRule` in [features/calendar/rrule.ts](../features/calendar/rrule.ts)). `EventEditScreen` hydriert sein Formular aus der angetippten Occurrence; `changes.start_at` trägt deshalb deren Datum, nicht das des Serienbeginns.
+
+`applyEditScope` schrieb den Wert bei Scope „alle" unbedingt auf die Master-Zeile — `dtstart` wanderte mit, und jedes Vorkommen davor fiel aus `rule.between()`. Nachgemessen an einer wöchentlichen Serie ab 01.06.2026, bearbeitet an der Occurrence vom 03.08.: **9 von 14 Vorkommen verschwanden**, serverseitig, ohne Fehler oder Meldung. Trug die Serie ein `rrule_count`, verschob sich zusätzlich das ganze Zählfenster, weil COUNT relativ zu `dtstart` läuft.
+
+Die Anzeige hatte den Fall längst richtig: `applyOptimisticChanges` nimmt bei `all`/`forward` auf einer Serie nur die **Tageszeit** und lässt jeder Occurrence ihr Datum. Anzeige und Schreibpfad widersprachen sich also, und die Anzeige hatte recht.
+
+### Decisions
+
+1. **Bei Scope „alle" auf einer Serie übernimmt der Master nur die Tageszeit.** Das Datum bleibt seines, die Dauer kommt aus der Eingabe (`anchoredChanges` in [features/calendar/recurrence.ts](../features/calendar/recurrence.ts)).
+2. **Bei Scope „ab diesem Termin" bleibt es beim Neu-Verankern.** Das ist die Bedeutung des Scopes, kein Fehler — auch in den beiden Zweigen, in denen der Schnitt am oder vor dem Serienanfang liegt und die Schwanzhälfte deshalb die ganze Serie ist.
+3. **Beim Einzeltermin gilt die Eingabe literal.** Dort verschiebt eine Datumsänderung den Termin tatsächlich, und es gibt keine Serie, die etwas verlieren könnte.
+4. **Eine Regeländerung folgt derselben Regel.** Dass die Serie ohnehin neu definiert wird, rettet die Vorkommen vor der bearbeiteten Occurrence nicht — sie verschwinden mit dem wandernden `dtstart` genauso.
+5. **Eine Datumsänderung unter Scope „alle" wird verworfen** — stumm. Eine Angabe fallen zu lassen ist ungleich billiger als neun Vorkommen zu löschen, und die Anzeige verspricht das Verworfene ohnehin schon. Ein sichtbarer Hinweis braucht einen Copy-Key und damit den Designer; der Eintrag steht in [docs/TODO.md](./TODO.md).
+
+### Consequences
+
+- Anzeige und Schreibpfad sagen dasselbe. Der Widerspruch, der `canApplyOptimistically` zu seiner Ausnahme für datumsändernde `all`/`forward`-Edits gezwungen hat, ist damit einseitig aufgelöst — die Ausnahme bleibt trotzdem richtig, weil das Overlay eine verworfene Änderung nicht zeigen soll.
+- Wird eine Serie zum Einzeltermin gemacht, behält sie das Datum des Serienbeginns statt das der bearbeiteten Occurrence. Eine Regel gibt es dann nicht mehr, verloren geht nichts; die Alternative wäre eine dritte Sonderregel für einen seltenen Fall.
+- `anchoredChanges` rechnet mit lokalen Gettern, wie `withTimeOfDay` es tut. Sobald `events` eine eigene Zeitzone trägt (ADR-033), gehört die Tageszeit in dieser Zone genommen — das ist der nächste PR desselben Blocks und der einzige bekannte Folgeschritt.
