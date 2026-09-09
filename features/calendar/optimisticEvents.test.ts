@@ -193,6 +193,7 @@ function row(partial: Partial<EventWithRelations> = {}): EventWithRelations {
     start_at: new Date("2026-10-01T19:00:00").toISOString(),
     end_at: new Date("2026-10-01T20:30:00").toISOString(),
     all_day: false,
+    timezone: "Europe/Berlin",
     rrule_freq: "weekly",
     rrule_interval: 1,
     // Bewusst `null`: Die Tests prüfen die Overlay-Komposition, nicht die

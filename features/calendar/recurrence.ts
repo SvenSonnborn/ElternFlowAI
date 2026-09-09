@@ -401,6 +401,7 @@ export function createSupabaseEventOps(client: SupabaseClient<Database>): EventO
         start_at: changes.start_at,
         end_at: changes.end_at,
         all_day: master.all_day,
+        timezone: master.timezone,
         rrule_freq: master.rrule_freq,
         rrule_interval: master.rrule_interval,
         rrule_byweekday: master.rrule_byweekday,

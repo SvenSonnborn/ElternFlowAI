@@ -23,6 +23,7 @@ function vars(partial: Partial<CreateEventVars> = {}): CreateEventVars {
     startAt: "2026-10-01T19:00:00.000Z",
     endAt: "2026-10-01T20:30:00.000Z",
     allDay: false,
+    timezone: "Europe/Berlin",
     location: "Schule",
     description: "Raum 12",
     recurrence: "weekly",
@@ -164,12 +165,12 @@ describe("parseRecurrenceCount", () => {
 });
 
 describe("optimisticEventRow", () => {
-  test("spiegelt alle 19 Spalten von events.Row plus event_types/event_exceptions", () => {
+  test("spiegelt alle 20 Spalten von events.Row plus event_types/event_exceptions", () => {
     const v = vars();
     const t = type();
     const row = optimisticEventRow(v, t);
 
-    // Deckt alle 19 Spalten von events.Row ab (id/created_at/updated_at unten
+    // Deckt alle 20 Spalten von events.Row ab (id/created_at/updated_at unten
     // gesondert, weil sie nicht deterministisch sind) plus die beiden
     // Relationsfelder aus EventWithRelations. Weicht eine Spalte hier vom
     // `insert` in `createEvent` ab, zeigt der Kalender etwas anderes an, als
@@ -186,6 +187,7 @@ describe("optimisticEventRow", () => {
       start_at: v.startAt,
       end_at: v.endAt,
       all_day: v.allDay,
+      timezone: v.timezone,
       rrule_freq: "weekly",
       rrule_interval: 1,
       // 2026-10-01 ist ein Donnerstag → ISO-Wochentag 4.

@@ -20,6 +20,7 @@ export {
   type CalendarErrorKey,
 } from "./errors";
 export { setCalendarLocale } from "./locale";
+export { deviceTimeZone } from "./deviceTimeZone";
 export { useFamilyEvents, useEvent, useEventTypes, useMarkedDates } from "./hooks";
 export { buildCalendarTheme } from "./calendarTheme";
 export { eventColorFor, eventIconFor, typeLabelsForSlug } from "./palette";

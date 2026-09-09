@@ -22,6 +22,7 @@ import { Button, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
 import {
   applyRangePick,
+  deviceTimeZone,
   eventColorFor,
   isDateRangeInvalid,
   isTimeRangeInvalid,
@@ -179,6 +180,7 @@ export function EventCreateScreen() {
       startAt: final.startAt.toISOString(),
       endAt: final.endAt.toISOString(),
       allDay,
+      timezone: deviceTimeZone(),
       location: location.trim() || null,
       description: notes.trim() || null,
       recurrence,

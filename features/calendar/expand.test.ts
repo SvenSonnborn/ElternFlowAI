@@ -23,6 +23,7 @@ function makeRow(overrides: Partial<EventRow> = {}): EventWithRelations {
     start_at: new Date("2026-06-10T09:00:00").toISOString(),
     end_at: new Date("2026-06-10T10:00:00").toISOString(),
     all_day: false,
+    timezone: "Europe/Berlin",
     rrule_freq: null,
     rrule_interval: 1,
     rrule_byweekday: null,

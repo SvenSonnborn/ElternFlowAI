@@ -162,6 +162,7 @@ export type Database = {
           rrule_interval: number;
           rrule_until: string | null;
           start_at: string;
+          timezone: string;
           title: string;
           type_id: string;
           updated_at: string;
@@ -183,6 +184,7 @@ export type Database = {
           rrule_interval?: number;
           rrule_until?: string | null;
           start_at: string;
+          timezone?: string;
           title: string;
           type_id: string;
           updated_at?: string;
@@ -204,6 +206,7 @@ export type Database = {
           rrule_interval?: number;
           rrule_until?: string | null;
           start_at?: string;
+          timezone?: string;
           title?: string;
           type_id?: string;
           updated_at?: string;

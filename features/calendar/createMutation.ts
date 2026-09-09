@@ -92,6 +92,8 @@ export interface CreateEventVars {
   startAt: string;
   endAt: string;
   allDay: boolean;
+  /** IANA-Zone, in der die Wanduhrzeit dieses Termins gilt. Siehe `deviceTimeZone`. */
+  timezone: string;
   location: string | null;
   description: string | null;
   recurrence: RecurrenceOption;
@@ -116,6 +118,7 @@ export async function createEvent(vars: CreateEventVars): Promise<void> {
     start_at: vars.startAt,
     end_at: vars.endAt,
     all_day: vars.allDay,
+    timezone: vars.timezone,
     rrule_freq: rrule.rrule_freq,
     rrule_interval: rrule.rrule_interval,
     rrule_byweekday: rrule.rrule_byweekday,
@@ -173,6 +176,7 @@ export function optimisticEventRow(vars: CreateEventVars, type: EventTypeRow): E
     start_at: vars.startAt,
     end_at: vars.endAt,
     all_day: vars.allDay,
+    timezone: vars.timezone,
     rrule_freq: rrule.rrule_freq,
     rrule_interval: rrule.rrule_interval,
     rrule_byweekday: rrule.rrule_byweekday,

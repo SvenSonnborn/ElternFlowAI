@@ -17,6 +17,7 @@ function row(exceptions: EventWithRelations["event_exceptions"]): EventWithRelat
     start_at: "2026-06-15T15:00:00.000Z",
     end_at: "2026-06-15T16:00:00.000Z",
     all_day: false,
+    timezone: "Europe/Berlin",
     rrule_freq: "weekly",
     rrule_interval: 1,
     rrule_byweekday: [1],
