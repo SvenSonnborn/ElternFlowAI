@@ -318,6 +318,11 @@ export function createSupabaseEventOps(client: SupabaseClient<Database>): EventO
         family_id: master.family_id,
         type_id: master.type_id,
         child_id: master.child_id,
+        // Die Zuordnung wandert mit. Ohne sie wurde die abgespaltene Hälfte
+        // stillschweigend zum familienweiten Termin — kein Fehler, keine
+        // Meldung, auffallen konnte es erst, wenn die Ansicht nach Person den
+        // Termin nicht mehr fand.
+        parent_id: master.parent_id,
         title: changes.title,
         description: changes.description,
         location: changes.location,
