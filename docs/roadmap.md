@@ -288,7 +288,7 @@ Master-Zeile halten**, sonst wiederholt sich dieselbe Auslassung bei der nächst
 
 Das ist der billigste echte Datenverlust-Fix im ganzen Backlog — deshalb zuerst und allein.
 
-### 1.2 „Alle Termine"-Scope verschiebt den Serienstart — **M**
+### 1.2 „Alle Termine"-Scope verschiebt den Serienstart — **erledigt**
 
 **„‚Alle Termine'-Scope verschiebt den Serienstart"**
 · [features/calendar/recurrence.ts](../features/calendar/recurrence.ts) — `applyEditScope`, Zweig `scope === "all"`
@@ -954,7 +954,7 @@ Dazu die EN-Gegenlese von `sample.*` ([ADR-020](./decision-log.md)) und `dash.to
 · „Stattdessen kochen"? für den Meal-Hero-Tausch (→ [Block 6](#block-6--meal-plan-mutationen-der-größte-feature-unlock))
 · `set.logoutConfirm` (Body-Text, auf Android heute sichtbar leer) · „Rezept nicht verfügbar" ·
 `hw.dueRelative.today`/`tomorrow` (relative Wörter statt nacktem Datum — der gelöschte Mock konnte
-das besser).
+das besser) · Hinweistext für die bei Scope „alle Termine" verworfene Datumsänderung (→ [Block 1](#block-1--stiller-datenverlust-im-kalender), Vorbild `cal.edit.recurrenceAppliesToAll`, [ADR-032](./decision-log.md)).
 
 **Pattern-Docs, die vom Code abweichen** (`patterns/` ist off-limits, Abweichung ist freigegeben,
 der Doc muss nachziehen): `homework.md` (kennt weder Filterleiste noch fünf Sektionen noch die
