@@ -3,7 +3,7 @@
 **Status:** Approved (Brainstorming Phase)
 **Date:** 2026-09-09
 **Auftrag:** [docs/roadmap.md](../../roadmap.md) → [Block 1 — Stiller Datenverlust im Kalender](../../roadmap.md#block-1--stiller-datenverlust-im-kalender)
-**Decision-Log:** wird als ADR-032 referenziert nach Implementation; ergänzt [ADR-008](../../decision-log.md) (Recurrence-V1) und [ADR-031](../../decision-log.md) (Conflict-Detection), löst nichts ab
+**Decision-Log:** drei ADRs nach Implementation — **032** Serienanker (PR 2), **033** Zonenmodell (PR 3), **034** Occurrence-Schlüssel (PR 4). Drei getrennte Verträge, die nichts miteinander zu tun haben; sie in einen ADR zu pressen hieße, den Grund des einen im Text des anderen zu verstecken. Alle drei ergänzen [ADR-008](../../decision-log.md) (Recurrence-V1) und [ADR-031](../../decision-log.md) (Conflict-Detection), lösen nichts ab
 
 ---
 
@@ -223,7 +223,7 @@ alter table public.events
 comment on column public.events.timezone is
   'IANA-Zone, in der die Wanduhrzeit dieses Termins und seiner RRULE gilt. '
   'Bestimmt die Auswertung über Zeitumstellungen hinweg; die Anzeige rechnet '
-  'daraus in die Zone des Lesers um. Siehe ADR-032.';
+  'daraus in die Zone des Lesers um. Siehe ADR-033.';
 ```
 
 Zum Check: eine Prüfung gegen `pg_timezone_names` wäre genauer, aber als Subquery in einem `CHECK` nicht erlaubt und als Funktion nicht `immutable`. Der Regex fängt Tippfehler und leere Strings; die eigentliche Gültigkeit garantiert der Client, der die Zone aus dem Betriebssystem liest. Diese Begründung gehört als Kommentar neben den Constraint.
@@ -445,7 +445,7 @@ Alle fünf gehen als Einträge nach `docs/TODO.md`.
 
 | Datei                                                             | Änderung                                                                                                                                                                                                                                                               |
 | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [docs/decision-log.md](../../decision-log.md)                     | **ADR-032** — Zonenmodell (Spalte statt Gerätezone, Floating-Auswertung, warum `tzid` ausscheidet) und Occurrence-Schlüssel (`occurrenceKey` vs. `occurrenceDate`)                                                                                                     |
+| [docs/decision-log.md](../../decision-log.md)                     | **ADR-032** — „Alle Termine" verankert nicht neu (PR 2) · **ADR-033** — Zonenmodell (Spalte statt Gerätezone, Floating-Auswertung, warum `tzid` ausscheidet, PR 3) · **ADR-034** — Occurrence-Schlüssel (`occurrenceKey` vs. `occurrenceDate`, PR 4)                   |
 | [CLAUDE.md](../../../CLAUDE.md)                                   | `features/calendar/`-Beschreibung: `timezone.ts` ergänzen, `rrule.ts`-Vertrag nennen                                                                                                                                                                                   |
 | [docs/architecture.md](../../architecture.md)                     | Kalender-Datenfluss: die zwei Datumsbegriffe benennen                                                                                                                                                                                                                  |
 | [docs/TODO.md](../../TODO.md)                                     | fünf Einträge entfernen, fünf neue anlegen (§7)                                                                                                                                                                                                                        |
