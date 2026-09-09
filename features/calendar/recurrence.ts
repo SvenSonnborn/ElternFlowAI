@@ -5,7 +5,7 @@ import { addDays, format, parseISO } from "date-fns";
 import type { Database } from "@/features/supabase/database.types";
 
 import { EventConflictError } from "./errors";
-import { buildRule } from "./rrule";
+import { allOccurrences } from "./rrule";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
@@ -115,10 +115,9 @@ function dateOnly(d: Date): string {
  * how `expand.ts` derives the `occurrenceDate` the caller hands us.
  */
 function consumedBefore(master: EventRow, occurrenceDate: string): number {
-  const rule = buildRule(master);
-  if (!rule) return 0;
-  // `all()` is safe here: only ever called for count-bounded series.
-  return rule.all().filter((d) => dateOnly(d) < occurrenceDate).length;
+  if (!master.rrule_freq) return 0;
+  // `allOccurrences` ist hier sicher: nur für zählbegrenzte Serien aufgerufen.
+  return allOccurrences(master).filter((d) => dateOnly(d) < occurrenceDate).length;
 }
 
 export async function applyDeleteScope(args: ApplyDeleteScopeArgs): Promise<void> {
@@ -176,7 +175,7 @@ function ruleDiffers(master: EventRow, next: RecurrenceChanges): boolean {
  * `changes`, so umgeschrieben, dass der **Serienanker stehen bleibt**.
  *
  * `events.start_at` ist doppelt belegt: Startzeit des Termins *und* `dtstart`
- * der Serie (`buildRule` in `rrule.ts`). Das Bearbeiten-Formular hydriert aus
+ * der Serie (`buildFloatingRule` in `rrule.ts`). Das Bearbeiten-Formular hydriert aus
  * der angetippten Occurrence, `changes.start_at` trägt also deren Datum.
  * Unbedingt geschrieben, wandert `dtstart` dorthin, und jedes Vorkommen davor
  * fällt aus `rule.between()` — serverseitig, ohne Fehler oder Meldung.
