@@ -58,12 +58,36 @@ describe("floatingToInstant", () => {
     expect(instantToFloating(instant, BERLIN).toISOString()).toBe("2026-03-29T03:30:00.000Z");
   });
 
+  test("Umstellungswochenende, aber außerhalb der Sprung-Lücke: 29.03. 09:00 (valid.length === 1)", () => {
+    // Der eigentliche Normalfall am Umstellungswochenende: Die ±26h-Sonde
+    // spannt über den Sprung (01:00 UTC), offsetBefore/offsetAfter weichen
+    // also voneinander ab und der Code betritt den Kandidaten-Zweig — aber nur
+    // *einer* der beiden Kandidaten rundet auf dieselbe Wandzeit zurück, weil
+    // 09:00 selbst nicht in der Lücke liegt. Genau dieser `valid.length === 1`-
+    // Zweig war vor diesem Test unbelegt, obwohl er jeden Termin am
+    // Umstellungssonntag außerhalb 02:00–03:00 trifft (nachgemessen, Befund 3
+    // des Task-6-Reviews).
+    expect(floatingToInstant(wall("2026-03-29T09:00:00"), BERLIN).toISOString()).toBe(
+      "2026-03-29T07:00:00.000Z",
+    );
+  });
+
   test("doppelte Stunde: 25.10. 02:30 gibt es zweimal → der erste zählt", () => {
     // 00:30Z ist noch Sommerzeit (+2), 01:30Z schon Winterzeit (+1). Genommen
     // wird der frühere: ein Termin, der vor der Umstellung angelegt wurde, war
     // in deren Regime gemeint.
     expect(floatingToInstant(wall("2026-10-25T02:30:00"), BERLIN).toISOString()).toBe(
       "2026-10-25T00:30:00.000Z",
+    );
+  });
+
+  test("Umstellungswochenende, aber außerhalb der doppelten Stunde: 24.10. 18:00 (valid.length === 1)", () => {
+    // Derselbe Zweig wie beim März-Test oben, hier für die Oktober-Richtung:
+    // Samstagabend vor der Umstellung liegt außerhalb 02:00–03:00, die
+    // ±26h-Sonde reicht aber schon über den Umstellungsinstant (25.10., 01:00
+    // UTC) hinaus, also weichen die Offsets ab und nur ein Kandidat ist gültig.
+    expect(floatingToInstant(wall("2026-10-24T18:00:00"), BERLIN).toISOString()).toBe(
+      "2026-10-24T16:00:00.000Z",
     );
   });
 
