@@ -83,3 +83,52 @@ describe("expandEvents window", () => {
     expect(out[0].occurrenceDate).toBe("2026-06-10");
   });
 });
+
+describe("Serienanker", () => {
+  test("die verankerte Fassung behält alle Vorkommen, die naive verliert sie", () => {
+    // Wöchentliche Serie ab Montag, 01.06.2026, 18:00 Ortszeit.
+    const series = makeRow({
+      start_at: new Date(2026, 5, 1, 18, 0).toISOString(),
+      end_at: new Date(2026, 5, 1, 19, 0).toISOString(),
+      rrule_freq: "weekly",
+    });
+    const windowStart = new Date(2026, 5, 1);
+    const windowEnd = new Date(2026, 7, 31, 23, 59, 59);
+
+    const before = expandEvents([series], windowStart, windowEnd, lightTheme);
+
+    // Was ein unbedingtes `updateMaster` geschrieben hätte: das Datum der am
+    // 03.08. bearbeiteten Occurrence wandert in `start_at` und damit in dtstart.
+    const naive = expandEvents(
+      [
+        {
+          ...series,
+          start_at: new Date(2026, 7, 3, 19, 0).toISOString(),
+          end_at: new Date(2026, 7, 3, 20, 0).toISOString(),
+        },
+      ],
+      windowStart,
+      windowEnd,
+      lightTheme,
+    );
+
+    // Was `anchoredChanges` schreibt: Datum des Masters, Uhrzeit der Eingabe.
+    const anchored = expandEvents(
+      [
+        {
+          ...series,
+          start_at: new Date(2026, 5, 1, 19, 0).toISOString(),
+          end_at: new Date(2026, 5, 1, 20, 0).toISOString(),
+        },
+      ],
+      windowStart,
+      windowEnd,
+      lightTheme,
+    );
+
+    expect(naive.length).toBeLessThan(before.length);
+    expect(anchored.length).toBe(before.length);
+    // Und die neue Uhrzeit ist tatsächlich angekommen.
+    expect(anchored[0].startAt.getHours()).toBe(19);
+  });
+});
