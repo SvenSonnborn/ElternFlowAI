@@ -61,8 +61,9 @@ describe("expandEvents window", () => {
 
   test("keeps a recurring occurrence that started before the window and runs into it", () => {
     // Weekly series from Mon 2026-05-25, each occurrence lasting three days.
-    // Explicit UTC timestamps, like `recurrence.test.ts` — rrule computes in
-    // UTC, so a local-time fixture would drift with the runner's timezone.
+    // Explicit UTC timestamps, like `recurrence.test.ts` — these are absolute
+    // instants; `rrule.ts` evaluates them against `row.timezone` (Europe/Berlin
+    // from `makeRow`'s default), not against the runner's timezone.
     const row = makeRow({
       start_at: "2026-05-25T09:00:00.000Z",
       end_at: "2026-05-27T14:00:00.000Z",

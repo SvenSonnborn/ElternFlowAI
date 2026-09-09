@@ -6,7 +6,7 @@ import type { Database, Json } from "@/features/supabase/database.types";
 import type { CalendarOccurrence } from "./types";
 
 import { eventColorFor, eventIconFor, typeLabelsForSlug } from "./palette";
-import { buildRule } from "./rrule";
+import { occurrencesBetween } from "./rrule";
 import { occurrenceVersion } from "./version";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
@@ -46,12 +46,7 @@ function expandRecurrence(
   durationMs: number,
 ): Date[] {
   const searchStart = new Date(rangeStart.getTime() - Math.max(0, durationMs));
-  const rule = buildRule(row);
-  if (!rule) {
-    const start = new Date(row.start_at);
-    return start >= searchStart && start <= rangeEnd ? [start] : [];
-  }
-  return rule.between(searchStart, rangeEnd, true);
+  return occurrencesBetween(row, searchStart, rangeEnd);
 }
 
 interface Resolved {
