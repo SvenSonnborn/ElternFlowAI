@@ -342,7 +342,8 @@ in der Praxis fast jede wiederkehrende Familienverabredung, zweimal im Jahr.
 
 > ⚠️ **Korrektur (2026-09-09):** Dieser Abschnitt empfahl ursprünglich, `rrule` die Option `tzid`
 > mitzugeben. **Das funktioniert in dieser App nicht.** `rrule@2.8.1` rechnet in `dateInTimeZone`
-> ([dist/esm/dateutil.js](../node_modules/rrule/dist/esm/dateutil.js)) `targetOffset − localOffset`
+> ([dateutil.js, an die Version gepinnt](https://unpkg.com/rrule@2.8.1/dist/esm/dateutil.js))
+> `targetOffset − localOffset`
 > und ist damit nur korrekt, wenn die **Prozess-Zeitzone UTC** ist — gemessen mit einer Serie ab
 > `2026-10-06 18:00` und `tzid: "Europe/Berlin"`: unter `TZ=UTC` richtig, unter `TZ=Europe/Berlin`
 > ein reiner No-op, unter `TZ=America/New_York` falsch. Eine React-Native-App läuft in der
@@ -357,7 +358,10 @@ der falsche Ort, weil sie beschreibt, wo der _Leser_ gerade ist, nicht wo die Se
 keine). `rrule.ts` kapselt die Umrechnung vollständig: `dtstart`, `until` und die `between`-Grenzen
 gehen als „floating" hinein (Wandzeit in den UTC-Komponenten), `rrule` rechnet damit DST-frei, und
 die Ergebnisse kommen zonenbewusst als echte Instants zurück — `tzid` wird **nicht** gesetzt. Nach
-außen gehen `occurrencesBetween` und `allOccurrences`; `buildRule` wird modulintern.
+außen gehen `occurrencesBetween` und `allOccurrences`; `buildRule` wird modulintern — **erst**,
+nachdem seine beiden heutigen Aufrufer umgestellt sind: `expandRecurrence` in
+[expand.ts](../features/calendar/expand.ts) (`between`) und `consumedBefore` in
+[recurrence.ts](../features/calendar/recurrence.ts) (`all`). Andere Aufrufer gibt es nicht.
 
 Der Test muss beide Umstellungsrichtungen abdecken (Oktober **und** März — die Rückstellung ist der
 Fall, der gern vergessen wird) und unter mehreren Runner-Zonen dasselbe liefern. Genau das ist die
