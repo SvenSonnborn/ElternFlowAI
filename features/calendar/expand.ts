@@ -7,6 +7,7 @@ import type { CalendarOccurrence } from "./types";
 
 import { eventColorFor, eventIconFor, typeLabelsForSlug } from "./palette";
 import { occurrencesBetween } from "./rrule";
+import { floatingToInstant, instantToFloating } from "./timezone";
 import { occurrenceVersion } from "./version";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
@@ -77,7 +78,13 @@ export function expandEvents(
   for (const row of rows) {
     const masterStart = new Date(row.start_at);
     const masterEnd = new Date(row.end_at);
+    // Absolut für das Suchfenster (dort geht es um echte Zeitspannen), in
+    // Wandzeit für das Ende jeder Occurrence: ein mehrtägiger Termin über eine
+    // Umstellung soll seine Wanduhrzeit behalten, nicht seine Millisekunden.
     const durationMs = masterEnd.getTime() - masterStart.getTime();
+    const floatingDurationMs =
+      instantToFloating(masterEnd, row.timezone).getTime() -
+      instantToFloating(masterStart, row.timezone).getTime();
 
     const occurrences = expandRecurrence(row, rangeStart, rangeEnd, durationMs);
     if (!occurrences.length) continue;
@@ -106,7 +113,10 @@ export function expandEvents(
         title: row.title,
         location: row.location,
         startAt: occurrenceStart,
-        endAt: new Date(occurrenceStart.getTime() + durationMs),
+        endAt: floatingToInstant(
+          new Date(instantToFloating(occurrenceStart, row.timezone).getTime() + floatingDurationMs),
+          row.timezone,
+        ),
       };
       if (ex?.action === "modified") {
         resolved = applyOverride(resolved, ex.override ?? null);
