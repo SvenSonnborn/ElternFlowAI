@@ -212,6 +212,21 @@ const CHANGES: EventChanges = {
   description: null,
 };
 
+/**
+ * `CHANGES`, verankert am Datum von `MASTER_START` — was `applyEditScope` seit
+ * ADR-032 bei Scope „alle" auf einer Serie schreibt.
+ *
+ * Die UTC-Werte sind offsetunabhängig: Anker und Eingabe liegen beide in der
+ * Sommerzeit, die Umrechnung „Datum des Masters + Tageszeit der Eingabe" kürzt
+ * den Offset dann heraus. Deshalb stimmt die Erwartung unter `Europe/Berlin`
+ * (lokal) wie unter `UTC` (CI).
+ */
+const CHANGES_ANCHORED: EventChanges = {
+  ...CHANGES,
+  start_at: "2026-05-04T15:00:00.000Z",
+  end_at: "2026-05-04T16:00:00.000Z",
+};
+
 describe("applyEditScope", () => {
   test("scope=this on recurring → modifyOccurrence with full override", async () => {
     const ops = makeOps();
@@ -253,7 +268,7 @@ describe("applyEditScope", () => {
       master: makeMaster(),
       changes: CHANGES,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES_ANCHORED, MASTER_UPDATED_AT);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
   });
 
@@ -287,6 +302,9 @@ describe("applyEditScope", () => {
       master: makeMaster(),
       changes: CHANGES,
     });
+    // Bleibt literal: „ab diesem Termin" verankert die Serie absichtlich neu —
+    // hier liegt der Schnitt am oder vor dem Serienanfang, die „Schwanzhälfte"
+    // ist die ganze Serie. Siehe `anchoredChanges` in `recurrence.ts`.
     expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
   });
@@ -302,6 +320,9 @@ describe("applyEditScope", () => {
       master: makeMaster({ rrule_freq: null, rrule_byweekday: null }),
       changes: CHANGES,
     });
+    // Bleibt literal: „ab diesem Termin" verankert die Serie absichtlich neu —
+    // hier liegt der Schnitt am oder vor dem Serienanfang, die „Schwanzhälfte"
+    // ist die ganze Serie. Siehe `anchoredChanges` in `recurrence.ts`.
     expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
     expect(ops.setRruleUntil).not.toHaveBeenCalled();
@@ -340,6 +361,9 @@ describe("applyEditScope", () => {
       master: makeMaster({ rrule_count: 10 }),
       changes: CHANGES,
     });
+    // Bleibt literal: „ab diesem Termin" verankert die Serie absichtlich neu —
+    // hier liegt der Schnitt am oder vor dem Serienanfang, die „Schwanzhälfte"
+    // ist die ganze Serie. Siehe `anchoredChanges` in `recurrence.ts`.
     expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
     expect(ops.setRruleCount).not.toHaveBeenCalled();
@@ -440,7 +464,12 @@ describe("applyEditScope", () => {
       changes: CHANGES,
       recurrence: NEW_RULE,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT, NEW_RULE);
+    expect(ops.updateMaster).toHaveBeenCalledWith(
+      "evt-1",
+      CHANGES_ANCHORED,
+      MASTER_UPDATED_AT,
+      NEW_RULE,
+    );
     expect(ops.deleteAllExceptions).toHaveBeenCalledWith("evt-1");
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
   });
@@ -457,7 +486,12 @@ describe("applyEditScope", () => {
       changes: CHANGES,
       recurrence: NEW_RULE,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT, NEW_RULE);
+    expect(ops.updateMaster).toHaveBeenCalledWith(
+      "evt-1",
+      CHANGES_ANCHORED,
+      MASTER_UPDATED_AT,
+      NEW_RULE,
+    );
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
     expect(ops.setRruleUntil).not.toHaveBeenCalled();
   });
@@ -481,7 +515,12 @@ describe("applyEditScope", () => {
       changes: CHANGES,
       recurrence: unchanged,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT, unchanged);
+    expect(ops.updateMaster).toHaveBeenCalledWith(
+      "evt-1",
+      CHANGES_ANCHORED,
+      MASTER_UPDATED_AT,
+      unchanged,
+    );
     expect(ops.deleteAllExceptions).not.toHaveBeenCalled();
   });
 
@@ -526,7 +565,12 @@ describe("applyEditScope", () => {
       changes: CHANGES,
       recurrence: none,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT, none);
+    expect(ops.updateMaster).toHaveBeenCalledWith(
+      "evt-1",
+      CHANGES_ANCHORED,
+      MASTER_UPDATED_AT,
+      none,
+    );
     expect(ops.deleteAllExceptions).toHaveBeenCalledWith("evt-1");
   });
 
@@ -562,7 +606,11 @@ describe("applyEditScope", () => {
       changes: CHANGES,
     });
 
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, "2026-05-09T08:00:00.000Z");
+    expect(ops.updateMaster).toHaveBeenCalledWith(
+      "evt-1",
+      CHANGES_ANCHORED,
+      "2026-05-09T08:00:00.000Z",
+    );
   });
 });
 
@@ -662,5 +710,104 @@ describe("createSupabaseEventOps", () => {
       .catch((err: unknown) => err);
 
     expect(error).toBe(pgError);
+  });
+});
+
+// ── Serienanker ───────────────────────────────────────────────────────────
+// Aus lokalen Komponenten gebaut, nicht aus UTC-Strings: Die Anker-Regel
+// rechnet mit lokalen Gettern (wie `withTimeOfDay` in `optimisticEvents.ts`),
+// eine UTC-Fixture ließe die Erwartung mit der Runner-Zone wandern. 04.05. und
+// 15.06. liegen in jeder gängigen Zone im selben Sommerzeit-Regime — genau die
+// Bedingung, unter der die Umrechnung offsetunabhängig ist.
+
+/** Montag, 04.05.2026, 18:30 Ortszeit. */
+const ANCHOR_MASTER_START = new Date(2026, 4, 4, 18, 30);
+
+function anchorMaster(overrides: Partial<EventRow> = {}): EventRow {
+  return makeMaster({
+    start_at: ANCHOR_MASTER_START.toISOString(),
+    end_at: new Date(2026, 4, 4, 19, 30).toISOString(),
+    ...overrides,
+  });
+}
+
+/** Der Nutzer bearbeitet die Occurrence vom 15.06. und stellt sie auf 17:00–18:00. */
+const ANCHOR_CHANGES: EventChanges = {
+  title: "Neuer Titel",
+  start_at: new Date(2026, 5, 15, 17, 0).toISOString(),
+  end_at: new Date(2026, 5, 15, 18, 0).toISOString(),
+  location: "Sportplatz Nord",
+  description: null,
+};
+
+/** Datum des Masters, Uhrzeit aus der Eingabe, Dauer aus der Eingabe. */
+const ANCHOR_EXPECTED: EventChanges = {
+  ...ANCHOR_CHANGES,
+  start_at: new Date(2026, 4, 4, 17, 0).toISOString(),
+  end_at: new Date(2026, 4, 4, 18, 0).toISOString(),
+};
+
+describe("applyEditScope — Serienanker", () => {
+  test("scope=all auf einer Serie behält das Datum des Masters und übernimmt nur die Uhrzeit", async () => {
+    const ops = makeOps();
+
+    await applyEditScope({
+      ops,
+      scope: "all",
+      eventId: "evt-1",
+      occurrenceDate: "2026-06-15",
+      isRecurring: true,
+      master: anchorMaster(),
+      changes: ANCHOR_CHANGES,
+    });
+
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", ANCHOR_EXPECTED, MASTER_UPDATED_AT);
+  });
+
+  test("die Dauer aus der Eingabe gewinnt, nicht die des Masters", async () => {
+    const ops = makeOps();
+    // Master läuft eine Stunde, die Eingabe zweieinhalb.
+    const longer: EventChanges = {
+      ...ANCHOR_CHANGES,
+      end_at: new Date(2026, 5, 15, 19, 30).toISOString(),
+    };
+
+    await applyEditScope({
+      ops,
+      scope: "all",
+      eventId: "evt-1",
+      occurrenceDate: "2026-06-15",
+      isRecurring: true,
+      master: anchorMaster(),
+      changes: longer,
+    });
+
+    expect(ops.updateMaster).toHaveBeenCalledWith(
+      "evt-1",
+      {
+        ...longer,
+        start_at: new Date(2026, 4, 4, 17, 0).toISOString(),
+        end_at: new Date(2026, 4, 4, 19, 30).toISOString(),
+      },
+      MASTER_UPDATED_AT,
+    );
+  });
+
+  test("scope=all auf einem Einzeltermin schreibt die Eingabe literal", async () => {
+    // Dort verschiebt eine Datumsänderung den Termin tatsächlich — es gibt
+    // keine Serie, die dabei etwas verlieren könnte.
+    const ops = makeOps();
+
+    await applyEditScope({
+      ops,
+      scope: "all",
+      eventId: "evt-1",
+      occurrenceDate: "2026-05-04",
+      isRecurring: false,
+      master: anchorMaster({ rrule_freq: null, rrule_byweekday: null }),
+      changes: ANCHOR_CHANGES,
+    });
+
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", ANCHOR_CHANGES, MASTER_UPDATED_AT);
   });
 });
