@@ -1199,7 +1199,7 @@ Den erledigten Eintrag **vollständig entfernen**:
 
 Und die neuen Grenzen anlegen — je ein Bullet, mit Datei-/Bereichsbezug und Begründung, warum vertagt:
 
-- **Kein Zonen-Picker im Termin-Formular** (`app-sections/event/EventCreateScreen.tsx`, `features/calendar/deviceTimeZone.ts`): Die Zone kommt unsichtbar vom Gerät. Wer einen Termin in einer anderen Zone anlegt (Urlaub, Reise), bekommt die falsche. Braucht ein Feld, einen Copy-Key und eine Anzeige der Zone am Termin — eigenes Feature.
+- ~~Kein Zonen-Picker im Termin-Formular~~ — **bereits in Task 1 angelegt.** Der Docstring von `deviceTimeZone` verweist darauf, und CLAUDE.md verlangt den Eintrag in dem Commit, der die Einschränkung einführt; er kann hier nicht nachgereicht werden. Nur prüfen, dass er dasteht.
 - **Bestandstermine tragen pauschal `Europe/Berlin`** (`supabase/migrations/<ts>_events_timezone.sql`): Der Default backfillt alle vorhandenen Zeilen. Für eine DE-primäre App die einzige nicht geratene Wahl, aber falsch für jeden Termin, der in einer anderen Zone gemeint war. Ohne Zonen-Picker gibt es keinen Weg, das zu korrigieren.
 - **`events.timezone` wird nicht validiert** (dieselbe Migration): Der Check ist ein Formregex, keine Prüfung gegen `pg_timezone_names` — die wäre als Subquery in einem `CHECK` nicht erlaubt. Ein Client, der eine formal gültige, real unbekannte Zone schreibt, fällt erst zur Laufzeit auf (`Intl` wirft dann `RangeError`).
 
