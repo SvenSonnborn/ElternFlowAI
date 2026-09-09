@@ -300,7 +300,7 @@ Mitgenommen: `createEvent` und `optimisticEventRow` hängen an derselben Prüfun
 · [features/calendar/recurrence.ts](../features/calendar/recurrence.ts) — `applyEditScope`, Zweig `scope === "all"`
 
 `start_at` ist zugleich Termin-Startzeit **und** Serienanker (`dtstart` via
-[rrule.ts](../features/calendar/rrule.ts) → `buildRule`). Ändert jemand bei einer laufenden Serie
+[rrule.ts](../features/calendar/rrule.ts) → `buildFloatingRule`). Ändert jemand bei einer laufenden Serie
 nur die Uhrzeit einer späteren Occurrence und wählt „Alle Termine", wandert `dtstart` auf das Datum
 _dieser_ Occurrence — alle Vorkommen davor fallen serverseitig aus `rule.all()`/`between()` heraus.
 Trägt die Serie ein `rrule_count`, verschiebt sich zusätzlich das Zähl-Fenster.
@@ -348,7 +348,7 @@ konsistent, aber nur, solange man es weiß.
 
 Nachgemessen unter `TZ=Europe/Berlin`: eine wöchentliche Serie ab `2026-10-06 18:00` (CEST) stand ab
 dem 27.10. auf **17:00**; in der Gegenrichtung stand eine Serie ab `2026-03-09 08:00` ab dem 30.03.
-auf **09:00**. `buildRule` übergab ein nacktes `Date` an `rrule`, das absolut — im gleichbleibenden
+auf **09:00**. `buildFloatingRule` übergab ein nacktes `Date` an `rrule`, das absolut — im gleichbleibenden
 UTC-Abstand — rechnet; gelesen wurde das Ergebnis danach mit lokalen Gettern. Betraf jede Serie, die
 über eine Zeitumstellung läuft — also in der Praxis fast jede wiederkehrende Familienverabredung,
 zweimal im Jahr.

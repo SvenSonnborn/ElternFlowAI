@@ -219,9 +219,16 @@ function ruleDiffers(master: EventRow, next: RecurrenceChanges): boolean {
  *   dafür nicht, weil es den Master *vor* dem Schreiben beschreibt und bei
  *   „Keine Wiederholung" noch `true` ist.
  *
- * Gerechnet wird mit lokalen Gettern, wie `withTimeOfDay` es tut. Sobald
- * `events` eine eigene Zone trägt, gehört die Tageszeit in dieser Zone
- * genommen — das ist der nächste PR dieses Blocks.
+ * `events` trägt inzwischen eine eigene Zone (`events.timezone`, ADR-033) —
+ * gerechnet wird hier trotzdem noch mit **lokalen Gettern** (der Zone des
+ * Lesers), genau wie `withTimeOfDay` es tut. Der Lesepfad ist seit ADR-033
+ * zonenbewusst, dieser Schreibpfad nicht: Ein reines Öffnen-und-Speichern mit
+ * Scope „alle" von einem Gerät, dessen Zone von `events.timezone` abweicht,
+ * verschiebt die ganze Serie dauerhaft um eine Stunde. Betrifft neben dieser
+ * Funktion auch `withTimeOfDay` (`optimisticEvents.ts`) und
+ * `recurrenceToRrule` (`createMutation.ts`, wo `startAt.getDay()` das
+ * `rrule_byweekday` bestimmt). Der Fix ist eine eigene Iteration — Eintrag in
+ * `docs/TODO.md`.
  */
 function anchoredChanges(master: EventRow, changes: EventChanges): EventChanges {
   const newStart = new Date(changes.start_at);
