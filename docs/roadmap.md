@@ -341,54 +341,40 @@ konsistent, aber nur, solange man es weiß.
 > nicht umschaltbar"** (beide Calendar-Sektion) — beide erweitern denselben Override-Vertrag. Wenn
 > der ohnehin aufgemacht wird, gehören sie hier mit hinein statt in zwei spätere Einzeliterationen.
 
-### 1.4 Zeitumstellung: Serien laufen eine Stunde falsch — **M–L**
+### 1.4 Zeitumstellung: Serien laufen eine Stunde falsch — **erledigt**
 
 **„Serientermine zeigen nach der Zeitumstellung eine Stunde falsch"**
-· [expand.ts](../features/calendar/expand.ts) + [rrule.ts](../features/calendar/rrule.ts)
+· [features/calendar/rrule.ts](../features/calendar/rrule.ts) + [features/calendar/timezone.ts](../features/calendar/timezone.ts) ✅ verifiziert
 
-Nachgemessen im TODO unter `TZ=Europe/Berlin`: wöchentliche Serie ab `2026-10-06 18:00` (CEST) steht
-ab dem 27.10. auf **17:00**. `buildRule` übergibt ein nacktes `Date` an `rrule`, das absolut rechnet;
-gelesen wird mit lokalen Gettern. **Betrifft jede Serie, die über eine Zeitumstellung läuft** — also
-in der Praxis fast jede wiederkehrende Familienverabredung, zweimal im Jahr.
+Nachgemessen unter `TZ=Europe/Berlin`: eine wöchentliche Serie ab `2026-10-06 18:00` (CEST) stand ab
+dem 27.10. auf **17:00**; in der Gegenrichtung stand eine Serie ab `2026-03-09 08:00` ab dem 30.03.
+auf **09:00**. `buildRule` übergab ein nacktes `Date` an `rrule`, das absolut — im gleichbleibenden
+UTC-Abstand — rechnet; gelesen wurde das Ergebnis danach mit lokalen Gettern. Betraf jede Serie, die
+über eine Zeitumstellung läuft — also in der Praxis fast jede wiederkehrende Familienverabredung,
+zweimal im Jahr.
 
-> ⚠️ **Korrektur (2026-09-09):** Dieser Abschnitt empfahl ursprünglich, `rrule` die Option `tzid`
-> mitzugeben. **Das funktioniert in dieser App nicht.** `rrule@2.8.1` rechnet in `dateInTimeZone`
-> ([dateutil.js, an die Version gepinnt](https://unpkg.com/rrule@2.8.1/dist/esm/dateutil.js))
-> `targetOffset − localOffset`
-> und ist damit nur korrekt, wenn die **Prozess-Zeitzone UTC** ist — gemessen mit einer Serie ab
-> `2026-10-06 18:00` und `tzid: "Europe/Berlin"`: unter `TZ=UTC` richtig, unter `TZ=Europe/Berlin`
-> ein reiner No-op, unter `TZ=America/New_York` falsch. Eine React-Native-App läuft in der
-> Gerätezone, der No-op-Zweig ist also der Produktionsfall. Der Absatz unten ist entsprechend
-> ersetzt; die Begründung steht ausführlich in
-> [der Spec](./superpowers/specs/2026-09-09-calendar-silent-data-loss-design.md) §1.1.
+**Umgesetzt als [ADR-033](./decision-log.md)** — der ursprünglich hier vorgeschlagene Weg über
+`rrule`s `tzid`-Option schied aus: Die Bibliothek (`2.8.1`) rechnet in `dateInTimeZone`
+`targetOffset − localOffset` und ist damit nur bei Prozess-Zeitzone UTC korrekt; unter der
+Gerätezone einer React-Native-App — dem Produktionsfall — ist die Option ein reiner No-op.
+Stattdessen wertet [rrule.ts](../features/calendar/rrule.ts) die Regel vollständig in **Wandzeit**
+aus:
+`dtstart`, `until` und die `between`-Grenzen laufen als „floating" (Wandzeit in den UTC-Feldern eines
+`Date`) durch `rrule`, das damit DST-frei rechnet; [timezone.ts](../features/calendar/timezone.ts)
+rechnet an den Rändern zwischen Instant und Wandzeit um und behandelt die doppelte Oktoberstunde
+(früherer Zeitpunkt gewinnt) und die März-Sprung-Lücke (späterer Zeitpunkt gewinnt) explizit über
+zwei Sonden ±26 Stunden statt eines Zweipasses, der auf den falschen Zeitpunkt konvergiert. `events`
+bekam dafür die Spalte `timezone` (Default `Europe/Berlin`); `deviceTimeZone()` füllt sie beim
+Anlegen unsichtbar aus der Gerätezone. Mitgenommen: die Dauer eines Vorkommens wird jetzt in
+Wandzeit gerechnet (sonst verschiebt eine Umstellung das Ende eines mehrtägigen Termins), und
+`setRruleUntil` schreibt einen Tagesende-Instant in der Zone des Termins statt eines nackten
+Datumsstrings, den Postgres zu Mitternacht UTC gecastet hätte.
 
-Fix: die Regel in **reiner Wandzeit** auswerten und die Zone selbst auflösen. `events` bekommt dazu
-eine Spalte `timezone` — die Zone, in der die Wanduhrzeit dieses Termins gilt; die Gerätezone wäre
-der falsche Ort, weil sie beschreibt, wo der _Leser_ gerade ist, nicht wo die Serie verankert wurde
-(zwei Geräte zeigten sonst verschiedene Termine, und ein serverseitiger Reminder-Worker hätte gar
-keine). `rrule.ts` kapselt die Umrechnung vollständig: `dtstart`, `until` und die `between`-Grenzen
-gehen als „floating" hinein (Wandzeit in den UTC-Komponenten), `rrule` rechnet damit DST-frei, und
-die Ergebnisse kommen zonenbewusst als echte Instants zurück — `tzid` wird **nicht** gesetzt. Nach
-außen gehen `occurrencesBetween` und `allOccurrences`; `buildRule` wird modulintern — **erst**,
-nachdem seine beiden heutigen Aufrufer umgestellt sind: `expandRecurrence` in
-[expand.ts](../features/calendar/expand.ts) (`between`) und `consumedBefore` in
-[recurrence.ts](../features/calendar/recurrence.ts) (`all`). Andere Aufrufer gibt es nicht.
-
-Der Test muss beide Umstellungsrichtungen abdecken (Oktober **und** März — die Rückstellung ist der
-Fall, der gern vergessen wird) und unter mehreren Runner-Zonen dasselbe liefern. Genau das ist die
-Eigenschaft, die `tzid` nicht hat.
-
-Zwei Dinge, die dabei mit erledigt werden müssen: die Dauer eines Vorkommens gehört ebenfalls in
-Wandzeit gerechnet (sonst verschiebt sich das Ende eines mehrtägigen Termins über die Umstellung),
-und `setRruleUntil` schreibt heute ein nacktes `yyyy-MM-dd` in eine `timestamptz`-Spalte — unter der
-neuen Zonenauswertung läge der Serienschnitt bei 02:00 Ortszeit statt am Tagesende.
-
-> **Reihenfolge:** Die Spec zieht 1.4 **vor** 1.3, entgegen der ursprünglichen Sortierung hier.
-> Grund: 1.4 schreibt den Vertrag von `rrule.ts` neu, und 1.3 baut seine Kandidatenmenge darauf auf.
-> Andersherum entstünde die Kandidaten-Logik gegen Regel-Daten, die noch eine Stunde falsch sind.
-> Erster Schritt der Iteration ist eine Gegenprobe, ob `Intl.DateTimeFormat` mit `timeZone` und
-> `formatToParts` unter Hermes auf iOS **und** Android trägt — das Repo nutzt heute nirgends `Intl`
-> zur Laufzeit, und ein bestandener `bun test` beweist dafür nichts.
+Erster Schritt der Iteration war eine Gegenprobe, ob natives `Intl.DateTimeFormat` mit `timeZone` und
+`formatToParts` unter Hermes die Sommerzeitregel trägt oder nur einen festen Offset liefert — das
+Repo hatte bis dahin nirgends zur Laufzeit `Intl` benutzt. **Bestanden auf beiden Plattformen:** iOS
+(Apples ICU) und Android (Java-ICU) lieferten für `Europe/Berlin` je `02:00` (1. Juli) und `01:00`
+(1. Januar), also die echte Regel. Kein Polyfill nötig.
 
 **Definition of done Block 1:** Für jeden der vier PRs ein Regressionstest, der **vor** dem Fix rot
 ist · `bun test` grün · eine Sichtprüfung der Serienbearbeitung am Simulator (Web reicht hier nicht,
