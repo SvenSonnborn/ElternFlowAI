@@ -429,6 +429,41 @@ Zeilen, die unter dem alten Verhalten entstanden sind — eine zweite, wirkungsl
 
 ---
 
+### 6.7 Nachtrag nach PR 3: der Schlüssel braucht auch eine Zone
+
+**Geschrieben am 2026-09-10, nachdem die Zeitumstellung (§5, ADR-033) gemergt war.** Diese Sektion entstand davor und konnte die Zonenfrage nicht kennen.
+
+Seit ADR-033 sind die Occurrence-**Instants** zonenkorrekt: `rrule.ts` wertet die Regel in der Zone des Termins aus. Die beiden Datumsschlüssel in `expandEvents` entstehen aber weiterhin mit **lokalen Gettern**, also in der Zone des _Lesers_:
+
+```ts
+const lookupDate = format(occurrenceStart, "yyyy-MM-dd"); // Regel-Datum
+const occurrenceDate = format(resolved.startAt, "yyyy-MM-dd"); // aufgelöstes Datum
+```
+
+Nachgemessen an einem täglichen Berliner Termin um 00:30 Ortszeit — derselbe Datensatz, zwei Gerätezonen:
+
+```
+TZ=Europe/Berlin    → occurrenceDates: 2026-06-02, 2026-06-03, …
+TZ=America/New_York → occurrenceDates: 2026-06-01, 2026-06-02, …
+```
+
+Das ist folgenreich, weil dieses Datum nicht nur anzeigt: es ist **Persistenz-Schlüssel** (`event_exceptions.occurrence_date`), Route-Parameter und Eingabe für `consumedBefore`, `dayBefore` und `endOfDayInstant`. Eine Absage, die ein Berliner Gerät schreibt, greift auf einem westlichen Gerät am falschen Tag — oder gar nicht.
+
+**Entscheidung: `occurrenceKey` wird in `row.timezone` gebildet, nicht in der Gerätezone.** Er benennt eine Zeile in `event_exceptions`, und die gehört dem Termin, nicht dem Leser. `occurrenceDate` bleibt dagegen in der Zone des Lesers — es beschreibt, an welchem Tag der Termin _für diesen Leser_ im Raster erscheint, und das ist die richtige Frage für die Anzeige. Genau deshalb sind es zwei Felder und nicht eines.
+
+**Der Schreibpfad zieht mit.** [docs/TODO.md](../../TODO.md) führt drei Stellen, die Wanduhrkomponenten in der Gerätezone nehmen und in eine Zeile schreiben, deren Regel in `events.timezone` ausgewertet wird: `anchoredChanges` ([recurrence.ts](../../../features/calendar/recurrence.ts)), `withTimeOfDay` ([optimisticEvents.ts](../../../features/calendar/optimisticEvents.ts)) und `recurrenceToRrule` ([createMutation.ts](../../../features/calendar/createMutation.ts), wo `startAt.getDay()` das `rrule_byweekday` bestimmt). Der TODO-Eintrag begründet, warum sie nicht einzeln umzustellen sind: `consumedBefore` und der Startdatums-Vergleich arbeiten bewusst auf demselben Geräte-Datumsraum wie `occurrenceDate`. **Diese Bindung löst sich auf, sobald der Schlüssel zonenkorrekt ist** — dann liegen alle drei im selben Raum, dem des Termins. Deshalb gehören sie hierher und nicht in eine spätere Iteration.
+
+### 6.8 Zuschnitt: zwei PRs statt einem
+
+Mit §6.7 ist §6 zu groß für einen PR geworden. Der Schnitt läuft zwischen **Identität** und **Sichtbarkeit**:
+
+| PR     | Inhalt                                                                      | Behebt                                                                                                 |
+| ------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **D1** | `occurrenceKey` (§6.1), in `row.timezone` gebildet (§6.7), samt Schreibpfad | Versions-Token · zweites Bearbeiten wirkungslos · Löschen wirkungslos · Zonen-Fehlgriff des Schlüssels |
+| **D2** | Kandidatenmenge (§6.2) · `description` im Override-Vertrag (§6.3)           | Verschobene Occurrence unsichtbar · geänderte Beschreibung unsichtbar                                  |
+
+D1 zuerst, weil D2s Deduplizierung auf `occurrenceKey` schlüsselt — dieselbe Begründung, aus der §5 vor §6 kam. Jeder der beiden ist für sich lauffähig und prüfbar: D1 macht eine verschobene Occurrence _adressierbar_, D2 macht sie _sichtbar_.
+
 ## 7. Was diese Iteration nicht liefert
 
 - **Keine Transaktionalität.** `deleteAllExceptions` vor `updateMaster` bleibt ein Verlustfenster, die fünf unbedingten Schreib-Ops bleiben unbedingt. Das ist Block 7 (Transaktions-RPC) und hat eine eigene Spec verdient.
