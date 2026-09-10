@@ -97,3 +97,19 @@ describe("floatingToInstant", () => {
     );
   });
 });
+
+describe("zoneOffsetMs mit unbekannter Zone (Befund D)", () => {
+  test("eine zur Laufzeit unbekannte Zone liefert den UTC-Offset statt zu werfen", () => {
+    // "Foo/Bar" besteht den rein syntaktischen IANA-Regex-Constraint in
+    // supabase/migrations/20260909131523_events_timezone_iana_widen.sql
+    // (gemessen), ist aber keine `Intl`-bekannte Zone — `new
+    // Intl.DateTimeFormat({ timeZone: "Foo/Bar" })` wirft einen `RangeError`.
+    // Ohne Fallback reißt das den gesamten `expandEvents`-Aufruf mit sich statt
+    // nur den einen kaputten Termin.
+    expect(zoneOffsetMs(new Date("2026-07-01T00:00:00.000Z"), "Foo/Bar")).toBe(0);
+  });
+
+  test("die verworfene Zone wird gecacht — ein zweiter Aufruf wirft ebenfalls nicht", () => {
+    expect(zoneOffsetMs(new Date("2026-01-01T00:00:00.000Z"), "Foo/Bar")).toBe(0);
+  });
+});
