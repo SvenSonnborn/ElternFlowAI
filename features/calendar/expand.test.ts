@@ -219,3 +219,24 @@ describe("Suchfenster deckt die tatsächliche Vorkommen-Dauer ab (Befund A)", ()
     expect(occ?.endAt.toISOString()).toBe("2026-10-25T08:00:00.000Z");
   });
 });
+describe("Kaputte Zone reißt nicht den ganzen Kalender mit (Befund D)", () => {
+  test("eine Zeile mit unbekannter Zone wirft nicht — die intakte Nachbarzeile erscheint weiterhin", () => {
+    const broken = makeRow({
+      id: "evt-broken",
+      start_at: "2026-06-10T09:00:00.000Z",
+      end_at: "2026-06-10T10:00:00.000Z",
+      timezone: "Foo/Bar",
+    });
+    const healthy = makeRow({
+      id: "evt-healthy",
+      start_at: "2026-06-11T09:00:00.000Z",
+      end_at: "2026-06-11T10:00:00.000Z",
+      timezone: "Europe/Berlin",
+    });
+    let out: ReturnType<typeof expandEvents> = [];
+    expect(() => {
+      out = expandEvents([broken, healthy], WINDOW_START, WINDOW_END, lightTheme);
+    }).not.toThrow();
+    expect(out.map((o) => o.eventId)).toContain("evt-healthy");
+  });
+});

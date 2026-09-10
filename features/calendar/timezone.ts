@@ -21,19 +21,52 @@
  */
 const FORMATTERS = new Map<string, Intl.DateTimeFormat>();
 
+const FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
+  hour12: false,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+};
+
+/**
+ * Fällt für eine zur Laufzeit unbekannte Zone auf UTC zurück, statt den
+ * `RangeError` von `Intl.DateTimeFormat` durchzureichen (Befund D, PR #119).
+ *
+ * `events.timezone` ist nur syntaktisch validiert (Regex-Constraint,
+ * `supabase/migrations/20260909131523_events_timezone_iana_widen.sql`) — eine
+ * Prüfung gegen `pg_timezone_names` scheidet aus: Diese Liste kennt
+ * `Europe/Berlin`, aber nicht die Offset-Form `+00:00`, die
+ * `deviceTimeZone()`s `Intl`-Fallback unter `TZ=GMT` legitim liefert
+ * (gemessen — 1196 Einträge, `+00:00` nicht darunter). Eine DB-Validierung
+ * gegen diese Liste brächte also denselben harten Anlege-Fehler zurück, den
+ * die zweite Migration gerade behoben hat.
+ *
+ * Ohne diesen Fallback wirft `formatterFor` für jede syntaktisch gültige,
+ * aber real unbekannte Zone (Tippfehler, veralteter Alias) einen
+ * `RangeError`, den `expandEvents` nicht fängt — eine einzige kaputte Zeile
+ * würde damit den gesamten Kalenderbereich leer ausgeben statt nur den einen
+ * Termin falsch darzustellen. Ein Termin zur falschen Uhrzeit ist ungleich
+ * besser als ein leerer Kalender.
+ */
+function buildFormatter(timeZone: string): Intl.DateTimeFormat {
+  try {
+    return new Intl.DateTimeFormat("en-US", { ...FORMAT_OPTIONS, timeZone });
+  } catch (err) {
+    if (!(err instanceof RangeError)) throw err;
+    if (typeof __DEV__ !== "undefined" && __DEV__) {
+      console.warn(`[calendar/timezone] unbekannte Zone "${timeZone}", falle auf UTC zurück`, err);
+    }
+    return new Intl.DateTimeFormat("en-US", { ...FORMAT_OPTIONS, timeZone: "UTC" });
+  }
+}
+
 function formatterFor(timeZone: string): Intl.DateTimeFormat {
   const cached = FORMATTERS.get(timeZone);
   if (cached) return cached;
-  const created = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+  const created = buildFormatter(timeZone);
   FORMATTERS.set(timeZone, created);
   return created;
 }
