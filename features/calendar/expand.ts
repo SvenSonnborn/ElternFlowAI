@@ -35,18 +35,39 @@ function readLabel(slug: string, label: Json | null | undefined): { de: string; 
 }
 
 /**
+ * Größte reale Verschiebung, die eine Zonenregel an einem Umstellungstag
+ * erzeugen kann. Die meisten Zonen schalten um eine Stunde, einzelne
+ * historisch um zwei (z. B. Doppelte Sommerzeit) — 2 h ist die sichere
+ * Obergrenze für jede Zone, die `Intl` kennt.
+ *
+ * Der Puffer existiert, weil `durationMs`/`floatingDurationMs` **am Master**
+ * gemessen werden, aber für **jede** Occurrence der Serie gelten (Befund A,
+ * PR #119): Läuft der Master selbst über keine Umstellung, sind beide Werte
+ * gleich — eine spätere Occurrence kann trotzdem über eine Umstellung laufen
+ * und dadurch absolut bis zu eine Stunde länger sein als beide. `max(...)`
+ * allein deckt genau diesen Fall nicht ab, siehe den zweiten Test in
+ * `expand.test.ts` ("Oktober-Rückstellung").
+ */
+const MAX_DST_SHIFT_MS = 2 * 3600_000;
+
+/**
  * Occurrence starts inside the window — widened backwards by the event's own
  * duration, because a span that began before `rangeStart` still paints days
- * inside it. Nothing is guessed: shifting by exactly the duration is the
- * smallest window that cannot miss an intersecting occurrence.
+ * inside it, plus `MAX_DST_SHIFT_MS` (Befund A): the widened window must
+ * cover the occurrence's **wall-clock** duration, not just its absolute one,
+ * or an occurrence whose floating end lands inside the window can fall out of
+ * the search entirely before the filter below ever sees it. Over-widening is
+ * free — the filter drops excess candidates — under-widening loses events.
  */
 function expandRecurrence(
   row: EventRow,
   rangeStart: Date,
   rangeEnd: Date,
-  durationMs: number,
+  maxDurationMs: number,
 ): Date[] {
-  const searchStart = new Date(rangeStart.getTime() - Math.max(0, durationMs));
+  const searchStart = new Date(
+    rangeStart.getTime() - Math.max(0, maxDurationMs) - MAX_DST_SHIFT_MS,
+  );
   return occurrencesBetween(row, searchStart, rangeEnd);
 }
 
@@ -78,15 +99,21 @@ export function expandEvents(
   for (const row of rows) {
     const masterStart = new Date(row.start_at);
     const masterEnd = new Date(row.end_at);
-    // Absolut für das Suchfenster (dort geht es um echte Zeitspannen), in
-    // Wandzeit für das Ende jeder Occurrence: ein mehrtägiger Termin über eine
-    // Umstellung soll seine Wanduhrzeit behalten, nicht seine Millisekunden.
+    // Zwei Dauern: die absolute (für das Suchfenster, Befund A — s.u.) und die
+    // Wandzeit-Dauer (für das Ende jeder Occurrence): ein mehrtägiger Termin
+    // über eine Umstellung soll seine Wanduhrzeit behalten, nicht seine
+    // Millisekunden.
     const durationMs = masterEnd.getTime() - masterStart.getTime();
     const floatingDurationMs =
       instantToFloating(masterEnd, row.timezone).getTime() -
       instantToFloating(masterStart, row.timezone).getTime();
 
-    const occurrences = expandRecurrence(row, rangeStart, rangeEnd, durationMs);
+    const occurrences = expandRecurrence(
+      row,
+      rangeStart,
+      rangeEnd,
+      Math.max(durationMs, floatingDurationMs),
+    );
     if (!occurrences.length) continue;
 
     const typeRow = row.event_types;

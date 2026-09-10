@@ -158,3 +158,64 @@ describe("Dauer über eine Zeitumstellung", () => {
     expect(out[0].endAt.toISOString()).toBe("2026-10-26T13:00:00.000Z");
   });
 });
+
+describe("Suchfenster deckt die tatsächliche Vorkommen-Dauer ab (Befund A)", () => {
+  test("ein Vorkommen, dessen absolutes Ende erst durch die Wandzeit-Dauer ins Fenster fällt, wird gefunden", () => {
+    // Wöchentliche Serie ab Fr 27.03.2026 09:00 Berlin (CET, 08:00Z) bis
+    // Mo 30.03. 14:00 Berlin (CEST, 12:00Z) — der Master selbst läuft über die
+    // Frühjahrs-Umstellung am 29.03.: absolut 76 h, in Wandzeit 77 h.
+    const row = makeRow({
+      start_at: "2026-03-27T08:00:00.000Z",
+      end_at: "2026-03-30T12:00:00.000Z",
+      rrule_freq: "weekly",
+      timezone: "Europe/Berlin",
+    });
+    // Das Vorkommen der Folgewoche (03.04.–06.04.) liegt komplett nach der
+    // Umstellung; seine Wandzeit-Dauer (77 h, uniform für die ganze Serie)
+    // schiebt sein Ende auf 06.04. 14:00 Berlin = 12:00Z. rangeStart liegt
+    // knapp davor — nur ein Suchfenster, das um die Wandzeit-Dauer (nicht nur
+    // die absolute) geweitet ist, holt den Start (03.04. 09:00 = 07:00Z) noch
+    // herein.
+    const out = expandEvents(
+      [row],
+      new Date("2026-04-06T11:30:00.000Z"),
+      new Date("2026-04-06T23:59:59.000Z"),
+      lightTheme,
+    );
+    const occ = out.find((o) => o.occurrenceDate === "2026-04-03");
+    expect(occ).toBeDefined();
+    expect(occ?.startAt.toISOString()).toBe("2026-04-03T07:00:00.000Z");
+    expect(occ?.endAt.toISOString()).toBe("2026-04-06T12:00:00.000Z");
+  });
+
+  test("eine spätere Occurrence kann absolut länger sein als max(durationMs, floatingDurationMs) — Oktober-Rückstellung", () => {
+    // Der Master selbst läuft über KEINE Umstellung: Sa 05.09.2026 09:00
+    // Berlin bis So 06.09. 09:00 Berlin, 24 h absolut wie in Wandzeit —
+    // durationMs === floatingDurationMs, das Maximum der beiden bringt hier
+    // also nichts zusätzlich.
+    const row = makeRow({
+      start_at: "2026-09-05T07:00:00.000Z",
+      end_at: "2026-09-06T07:00:00.000Z",
+      rrule_freq: "weekly",
+      timezone: "Europe/Berlin",
+    });
+    // Sieben Wochen später fällt ein Vorkommen auf Sa 24.10., 09:00 Berlin
+    // (noch CEST) — dieselbe uniforme 24h-Wandzeit-Dauer landet auf So 25.10.,
+    // 09:00 Berlin, nach der Rückstellung (CET). Dieses eine Vorkommen läuft
+    // also über die Umstellung und dauert absolut 25 h — eine Stunde mehr als
+    // sowohl durationMs als auch floatingDurationMs (beide 24 h, am Master
+    // gemessen, der keine Umstellung sieht). rangeStart liegt knapp vor dem
+    // absoluten Ende (25.10. 08:00Z); nur ein zusätzlicher DST-Puffer im
+    // Suchfenster holt den Start (24.10. 07:00Z) noch herein.
+    const out = expandEvents(
+      [row],
+      new Date("2026-10-25T07:30:00.000Z"),
+      new Date("2026-10-25T23:59:59.000Z"),
+      lightTheme,
+    );
+    const occ = out.find((o) => o.occurrenceDate === "2026-10-24");
+    expect(occ).toBeDefined();
+    expect(occ?.startAt.toISOString()).toBe("2026-10-24T07:00:00.000Z");
+    expect(occ?.endAt.toISOString()).toBe("2026-10-25T08:00:00.000Z");
+  });
+});
