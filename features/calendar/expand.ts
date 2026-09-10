@@ -36,24 +36,32 @@ function readLabel(slug: string, label: Json | null | undefined): { de: string; 
 
 /**
  * Größte reale Verschiebung, die eine Zonenregel an einem Umstellungstag
- * erzeugen kann. Die meisten Zonen schalten um eine Stunde, einzelne
- * historisch um zwei (z. B. Doppelte Sommerzeit) — 2 h ist die sichere
- * Obergrenze für jede Zone, die `Intl` kennt.
+ * erzeugen kann — nachgemessen gegen `Intl`, nicht geschätzt. Reine
+ * DST-Umstellungen (Sommer-/Winterzeit) liegen bei ein bis zwei Stunden.
+ * Zonen, die dabei die Datumsgrenze verschieben, springen dagegen um volle
+ * **24 Stunden** (`Pacific/Kwajalein` 1993: −12 h → +12 h; `Pacific/Apia`
+ * 2011: −10 h → +14 h — beide beim Wechsel von der West- auf die Ostseite
+ * der Datumsgrenze, um mit den Nachbarn gleichzuziehen). 24 h ist damit die
+ * gemessene Grenze; 26 h legt Luft drauf und deckt sich mit `PROBE_MS` in
+ * `timezone.ts`, das aus verwandtem Grund (Sonden weit genug vor/hinter der
+ * gesuchten Wandzeit) dieselbe Spanne wählt. Der Name trägt bewusst nicht
+ * mehr „DST", weil der Datumsgrenzen-Fall die eigentliche Obergrenze setzt.
  *
  * Der Puffer existiert, weil `durationMs`/`floatingDurationMs` **am Master**
  * gemessen werden, aber für **jede** Occurrence der Serie gelten (Befund A,
  * PR #119): Läuft der Master selbst über keine Umstellung, sind beide Werte
  * gleich — eine spätere Occurrence kann trotzdem über eine Umstellung laufen
- * und dadurch absolut bis zu eine Stunde länger sein als beide. `max(...)`
- * allein deckt genau diesen Fall nicht ab, siehe den zweiten Test in
- * `expand.test.ts` ("Oktober-Rückstellung").
+ * und dadurch absolut länger sein als beide. `max(...)` allein deckt genau
+ * diesen Fall nicht ab, siehe den zweiten Test in `expand.test.ts`
+ * ("Oktober-Rückstellung"). Zu weit zu suchen kostet nichts — der Filter
+ * weiter unten verwirft überschüssige Kandidaten ohnehin.
  */
-const MAX_DST_SHIFT_MS = 2 * 3600_000;
+const MAX_ZONE_SHIFT_MS = 26 * 3600_000;
 
 /**
  * Occurrence starts inside the window — widened backwards by the event's own
  * duration, because a span that began before `rangeStart` still paints days
- * inside it, plus `MAX_DST_SHIFT_MS` (Befund A): the widened window must
+ * inside it, plus `MAX_ZONE_SHIFT_MS` (Befund A/E): the widened window must
  * cover the occurrence's **wall-clock** duration, not just its absolute one,
  * or an occurrence whose floating end lands inside the window can fall out of
  * the search entirely before the filter below ever sees it. Over-widening is
@@ -66,7 +74,7 @@ function expandRecurrence(
   maxDurationMs: number,
 ): Date[] {
   const searchStart = new Date(
-    rangeStart.getTime() - Math.max(0, maxDurationMs) - MAX_DST_SHIFT_MS,
+    rangeStart.getTime() - Math.max(0, maxDurationMs) - MAX_ZONE_SHIFT_MS,
   );
   return occurrencesBetween(row, searchStart, rangeEnd);
 }
