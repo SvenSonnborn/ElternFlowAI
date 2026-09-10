@@ -238,5 +238,16 @@ describe("Kaputte Zone reißt nicht den ganzen Kalender mit (Befund D)", () => {
       out = expandEvents([broken, healthy], WINDOW_START, WINDOW_END, lightTheme);
     }).not.toThrow();
     expect(out.map((o) => o.eventId)).toContain("evt-healthy");
+
+    // Befund F: der Zweck des Fixes ist ein UTC-Fallback für die kaputte Zeile
+    // selbst, nicht nur, dass die Nachbarzeile überlebt — ein stillschweigend
+    // verworfenes `evt-broken` bestünde den obigen Assert ebenso. UTC-Fallback
+    // heißt Offset 0: Wandzeit und Instant fallen zusammen, die Occurrence
+    // trägt also exakt die `start_at`/`end_at`-Instants der Fixture, ungeraten
+    // aus ihr abgeleitet.
+    const brokenOcc = out.find((o) => o.eventId === "evt-broken");
+    expect(brokenOcc).toBeDefined();
+    expect(brokenOcc?.startAt.toISOString()).toBe(new Date(broken.start_at).toISOString());
+    expect(brokenOcc?.endAt.toISOString()).toBe(new Date(broken.end_at).toISOString());
   });
 });
