@@ -219,6 +219,51 @@ describe("Suchfenster deckt die tatsächliche Vorkommen-Dauer ab (Befund A)", ()
     expect(occ?.endAt.toISOString()).toBe("2026-10-25T08:00:00.000Z");
   });
 });
+describe("Zonen-Puffer deckt auch den Datumsgrenzen-Sprung ab (Befund E)", () => {
+  test("eine Occurrence über den Alaska-Kauf (America/Sitka, 1867) bleibt trotz 24h-Sprung im Fenster", () => {
+    // Warum 1867: America/Sitka wechselt beim Alaska-Kauf von asiatischer auf
+    // amerikanische Datierung (nachgemessen gegen Intl: 1867-10-19T00:31:13Z,
+    // +14:58:47 → −9:01:13, Δoffset = −24 h exakt). Warum die Richtung zählt:
+    // nur ein Offset-**Rückgang** verlängert die absolute Spanne einer
+    // kreuzenden Occurrence (Spanne = Wandzeit-Dauer − Δoffset) — bei
+    // Δoffset < 0 wird sie länger als angenommen, bei Δoffset > 0 (Kwajalein,
+    // Apia — beide springen ostwärts über die Datumsgrenze, siehe
+    // pr119-fixes-2.md) nur kürzer oder gleich. Deshalb können Kwajalein/Apia
+    // diesen Bug nie zeigen, Sitka als Gegenrichtung schon — dasselbe Muster
+    // wie "Oktober-Rückstellung" oben, nur mit 24 h statt 1 h Sprung.
+    //
+    // Master: Sa 03.08.1867 09:00 Sitka → So 04.08. 09:00 Sitka, wöchentlich,
+    // läuft über KEINE Umstellung (beide Zeitpunkte vor dem Sprung, gleicher
+    // Offset) — durationMs === floatingDurationMs === 24 h, das Maximum
+    // bringt hier also nichts zusätzlich.
+    const row = makeRow({
+      start_at: "1867-08-02T18:01:13.000Z",
+      end_at: "1867-08-03T18:01:13.000Z",
+      rrule_freq: "weekly",
+      timezone: "America/Sitka",
+    });
+    // Elf Wochen später (03.08. + 77 Tage) fällt ein Vorkommen auf die
+    // Wandzeit Fr 19.10.1867 09:00 — die vom Sprung verdoppelte Stunde
+    // (18.10. 15:30 bis 19.10. 15:30 existierte lokal zweimal). Nach der
+    // "früherer Zeitpunkt gewinnt"-Regel in floatingToInstant startet die
+    // Occurrence unter dem ALTEN Offset (18.10. 18:01:13Z); ihr Ende
+    // (dieselbe uniforme 24h-Wandzeit-Dauer) landet auf Wandzeit 20.10. 09:00,
+    // eindeutig nach dem Sprung, unter dem NEUEN Offset (20.10. 18:01:13Z).
+    // Absolut sind das 48 h — 24 h mehr als max(durationMs,
+    // floatingDurationMs), doppelt so viel wie der alte 2h-Puffer deckt und
+    // knapp innerhalb des neuen 26h-Puffers.
+    const out = expandEvents(
+      [row],
+      new Date("1867-10-19T22:00:00.000Z"),
+      new Date("1867-10-25T00:00:00.000Z"),
+      lightTheme,
+    );
+    const occ = out.find((o) => o.occurrenceDate === "1867-10-18");
+    expect(occ).toBeDefined();
+    expect(occ?.startAt.toISOString()).toBe("1867-10-18T18:01:13.000Z");
+    expect(occ?.endAt.toISOString()).toBe("1867-10-20T18:01:13.000Z");
+  });
+});
 describe("Kaputte Zone reißt nicht den ganzen Kalender mit (Befund D)", () => {
   test("eine Zeile mit unbekannter Zone wirft nicht — die intakte Nachbarzeile erscheint weiterhin", () => {
     const broken = makeRow({
