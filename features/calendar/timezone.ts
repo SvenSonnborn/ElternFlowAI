@@ -139,3 +139,19 @@ export function floatingToInstant(floating: Date, timeZone: string): Date {
   if (valid.length === 1) return new Date(valid[0]);
   return new Date(Math.max(...candidates));
 }
+
+/**
+ * Der Kalendertag eines Zeitpunkts **in dieser Zone**, als `yyyy-MM-dd`.
+ *
+ * Der Schlüssel von `event_exceptions.occurrence_date` — er benennt eine Zeile
+ * in der Datenbank und gehört deshalb dem Termin, nicht dem Leser (ADR-034).
+ * Für die Anzeige ist er der falsche Wert: dort zählt, an welchem Tag der
+ * Termin *für diesen Leser* im Raster erscheint.
+ *
+ * Gelesen wird aus den **UTC**-Komponenten des floating `Date`. `date-fns`
+ * `format` läse hier mit lokalen Gettern und lieferte erneut das Datum des
+ * Lesers — der Fehler wäre nur eine Ebene tiefer gerutscht.
+ */
+export function zonedDateKey(instant: Date, timeZone: string): string {
+  return instantToFloating(instant, timeZone).toISOString().slice(0, 10);
+}
