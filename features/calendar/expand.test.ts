@@ -358,5 +358,10 @@ describe("occurrenceKey", () => {
     );
     const moved = out.find((o) => o.occurrenceKey === "2026-06-15");
     expect(moved?.occurrenceDate).toBe("2026-06-18");
+    // Das Token muss die Exception am Regel-Datum (06-15) sehen, nicht das
+    // aufgelöste Datum (06-18) — dort liegt keine Exception-Zeile. Ein Rückbau
+    // auf `occurrenceVersion(row, occurrenceDate)` fände dort nichts und
+    // lieferte `${row.updated_at}|-` statt des Exception-Stempels (ADR-034).
+    expect(moved?.version).toBe(`${row.updated_at}|2026-06-02T00:00:00.000Z`);
   });
 });

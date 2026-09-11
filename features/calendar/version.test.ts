@@ -75,13 +75,3 @@ describe("occurrenceVersion", () => {
     expect(after).not.toBe(before);
   });
 });
-
-test("das Token einer verschobenen Occurrence sieht ihre Exception", () => {
-  // Vor ADR-034 schlüsselte `occurrenceVersion` auf das aufgelöste Datum und
-  // fand die Exception am Regel-Datum nicht — eine fremde Änderung daran blieb
-  // beim Vergleich unsichtbar.
-  const rows = row([exception("2026-06-15", "2026-06-02T09:00:00.000Z")]);
-  expect(occurrenceVersion(rows, "2026-06-15")).toBe(
-    "2026-06-01T10:00:00.000Z|2026-06-02T09:00:00.000Z",
-  );
-});
