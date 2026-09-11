@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { floatingToInstant, instantToFloating, zoneOffsetMs } from "./timezone";
+import { floatingToInstant, instantToFloating, zonedDateKey, zoneOffsetMs } from "./timezone";
 
 const BERLIN = "Europe/Berlin";
 
@@ -111,5 +111,27 @@ describe("zoneOffsetMs mit unbekannter Zone (Befund D)", () => {
 
   test("die verworfene Zone wird gecacht — ein zweiter Aufruf wirft ebenfalls nicht", () => {
     expect(zoneOffsetMs(new Date("2026-01-01T00:00:00.000Z"), "Foo/Bar")).toBe(0);
+  });
+});
+
+describe("zonedDateKey", () => {
+  test("nimmt das Datum der Zone, nicht das des Lesers", () => {
+    // 2026-06-02T22:30Z ist in Berlin bereits der 3. Juni (00:30 MESZ),
+    // in New York noch der 2. (18:30 EDT).
+    const instant = new Date("2026-06-02T22:30:00.000Z");
+    expect(zonedDateKey(instant, "Europe/Berlin")).toBe("2026-06-03");
+    expect(zonedDateKey(instant, "America/New_York")).toBe("2026-06-02");
+    expect(zonedDateKey(instant, "UTC")).toBe("2026-06-02");
+  });
+
+  test("die Umstellung verschiebt den Schlüssel nicht", () => {
+    // 25.10.2026, 00:30Z — Berlin steht auf 02:30 MESZ, der Tag ist derselbe.
+    expect(zonedDateKey(new Date("2026-10-25T00:30:00.000Z"), "Europe/Berlin")).toBe("2026-10-25");
+  });
+
+  test("über die Datumsgrenze hinweg", () => {
+    const silvester = new Date("2026-12-31T23:00:00.000Z");
+    expect(zonedDateKey(silvester, "Europe/Berlin")).toBe("2027-01-01");
+    expect(zonedDateKey(silvester, "America/New_York")).toBe("2026-12-31");
   });
 });
