@@ -25,7 +25,9 @@ function makeOccurrence(
 ): CalendarOccurrence {
   return {
     eventId: `evt-${startIso}`,
+    occurrenceKey: startIso.slice(0, 10),
     occurrenceDate: startIso.slice(0, 10),
+    timezone: "Europe/Berlin",
     startAt: new Date(startIso),
     endAt: new Date(endIso),
     title: "Elternabend",

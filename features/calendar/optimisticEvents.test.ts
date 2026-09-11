@@ -21,7 +21,9 @@ import { withoutPendingDeletes } from "./pendingDeletes";
 function occ(partial: Partial<CalendarOccurrence> = {}): CalendarOccurrence {
   return {
     eventId: "e1",
+    occurrenceKey: "2026-09-10",
     occurrenceDate: "2026-09-10",
+    timezone: "Europe/Berlin",
     startAt: new Date("2026-09-10T16:00:00"),
     endAt: new Date("2026-09-10T17:30:00"),
     title: "Fußballtraining",
@@ -219,8 +221,8 @@ function row(partial: Partial<EventWithRelations> = {}): EventWithRelations {
  */
 function expandStub(rows: EventWithRelations[]): CalendarOccurrence[] {
   return rows.flatMap((r) => [
-    occ({ eventId: r.id, occurrenceDate: "2026-10-01" }),
-    occ({ eventId: r.id, occurrenceDate: "2026-10-08" }),
+    occ({ eventId: r.id, occurrenceKey: "2026-10-01", occurrenceDate: "2026-10-01" }),
+    occ({ eventId: r.id, occurrenceKey: "2026-10-08", occurrenceDate: "2026-10-08" }),
   ]);
 }
 

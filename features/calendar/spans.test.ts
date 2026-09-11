@@ -16,7 +16,9 @@ function makeOccurrence(
   const startAt = new Date(startIso);
   return {
     eventId: "evt-1",
+    occurrenceKey: startIso.slice(0, 10),
     occurrenceDate: startIso.slice(0, 10),
+    timezone: "Europe/Berlin",
     startAt,
     endAt: new Date(endIso),
     title: "Klassenfahrt",

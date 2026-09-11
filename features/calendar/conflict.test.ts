@@ -11,7 +11,9 @@ const END = new Date("2026-06-15T16:00:00.000Z");
 function theirs(overrides: Partial<CalendarOccurrence> = {}): CalendarOccurrence {
   return {
     eventId: "evt-1",
+    occurrenceKey: "2026-06-15",
     occurrenceDate: "2026-06-15",
+    timezone: "Europe/Berlin",
     startAt: START,
     endAt: END,
     title: "Zahnarzt",

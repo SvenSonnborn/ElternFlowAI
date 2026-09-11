@@ -16,7 +16,25 @@ export interface OccurrenceRrule {
 
 export interface CalendarOccurrence {
   eventId: string;
+  /**
+   * Das Datum, das die **Regel** erzeugt hat, gebildet in `timezone` — der
+   * Schlüssel von `event_exceptions.occurrence_date`.
+   *
+   * Ohne Override gleich `occurrenceDate`; das ist der Normalfall. Verschiebt
+   * eine Exception die Occurrence auf einen anderen Tag, fallen beide
+   * auseinander, und **dieser** Wert benennt weiterhin die Zeile, die den
+   * Inhalt bestimmt. Alles, was schreibt oder eine Exception meint, schlüsselt
+   * hierauf (ADR-034).
+   */
+  occurrenceKey: string;
+  /**
+   * Das **aufgelöste** Datum, in der Zone des Lesers — an welchem Tag dieser
+   * Termin für ihn im Raster erscheint. Für Anzeige und Rasterplatzierung, nie
+   * als Schlüssel.
+   */
   occurrenceDate: string;
+  /** Die Zone, in der die Wanduhrzeit dieses Termins gilt (`events.timezone`). */
+  timezone: string;
   startAt: Date;
   endAt: Date;
   title: string;
