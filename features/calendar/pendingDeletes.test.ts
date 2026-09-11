@@ -11,7 +11,9 @@ function pending(partial: Partial<PendingEventDelete> = {}): PendingEventDelete 
 function occ(occurrenceDate: string, eventId = "e1"): CalendarOccurrence {
   return {
     eventId,
+    occurrenceKey: occurrenceDate,
     occurrenceDate,
+    timezone: "Europe/Berlin",
     startAt: new Date(occurrenceDate),
     endAt: new Date(occurrenceDate),
     title: "Test",

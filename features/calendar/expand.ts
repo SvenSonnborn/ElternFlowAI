@@ -7,7 +7,7 @@ import type { CalendarOccurrence } from "./types";
 
 import { eventColorFor, eventIconFor, typeLabelsForSlug } from "./palette";
 import { occurrencesBetween } from "./rrule";
-import { floatingToInstant, instantToFloating } from "./timezone";
+import { floatingToInstant, instantToFloating, zonedDateKey } from "./timezone";
 import { occurrenceVersion } from "./version";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
@@ -140,8 +140,11 @@ export function expandEvents(
     };
 
     for (const occurrenceStart of occurrences) {
-      const lookupDate = format(occurrenceStart, "yyyy-MM-dd");
-      const ex = exceptions.get(lookupDate);
+      // Der Schlüssel der Exception-Zeile: das Regel-Datum in der Zone des
+      // Termins. `format` läse hier in der Zone des Lesers und griffe auf einem
+      // Gerät westlich des Termins einen Tag daneben (ADR-034).
+      const occurrenceKey = zonedDateKey(occurrenceStart, row.timezone);
+      const ex = exceptions.get(occurrenceKey);
       if (ex?.action === "cancelled") continue;
 
       let resolved: Resolved = {
@@ -162,13 +165,16 @@ export function expandEvents(
       // rather than letting the grid deal with off-window days.
       if (resolved.endAt < rangeStart || resolved.startAt > rangeEnd) continue;
 
-      // Date may shift if a modified exception overrode start_at to a different day —
-      // recompute from the resolved value so the returned record reflects the actual date.
+      // Das Anzeigedatum folgt dem aufgelösten Start und der Zone des Lesers:
+      // es beantwortet, an welchem Tag der Termin hier im Raster erscheint.
+      // Der Schlüssel oben tut das ausdrücklich nicht.
       const occurrenceDate = format(resolved.startAt, "yyyy-MM-dd");
 
       out.push({
         eventId: row.id,
+        occurrenceKey,
         occurrenceDate,
+        timezone: row.timezone,
         startAt: resolved.startAt,
         endAt: resolved.endAt,
         title: resolved.title,
@@ -179,7 +185,7 @@ export function expandEvents(
         parentId: row.parent_id,
         isException: !!ex,
         isRecurring: !!row.rrule_freq,
-        version: occurrenceVersion(row, occurrenceDate),
+        version: occurrenceVersion(row, occurrenceKey),
         rrule,
         type: { slug, color, iconName, labelDe: labels.de, labelEn: labels.en },
       });

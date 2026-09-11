@@ -178,7 +178,11 @@ function seedToOccurrence(seed: Seed, base: Date, translate: Translate): Calenda
     // Built from the schedule, never the copy — ids stay stable across a
     // language switch, so a detail route opened in DE still resolves in EN.
     eventId: `sample-${seed.slug}-${seed.dayOffset}-${seed.hour}`,
+    // Keine Overrides in diesen Fixtures — Schlüssel und Anzeigedatum sind
+    // deshalb identisch (ADR-034).
+    occurrenceKey: format(startAt, "yyyy-MM-dd"),
     occurrenceDate: format(startAt, "yyyy-MM-dd"),
+    timezone: "Europe/Berlin",
     startAt,
     endAt,
     title: translate(`sample.event.${seed.titleKey}`, seed.titleParams),

@@ -296,3 +296,67 @@ describe("Kaputte Zone reißt nicht den ganzen Kalender mit (Befund D)", () => {
     expect(brokenOcc?.endAt.toISOString()).toBe(new Date(broken.end_at).toISOString());
   });
 });
+
+describe("occurrenceKey", () => {
+  test("ohne Override sind Schlüssel und Anzeigedatum gleich", () => {
+    const out = expandEvents([makeRow()], WINDOW_START, WINDOW_END, lightTheme);
+    expect(out[0].occurrenceKey).toBe(out[0].occurrenceDate);
+  });
+
+  test("der Schlüssel folgt der Zone des Termins, das Anzeigedatum der des Lesers", () => {
+    // Täglicher Berliner Termin um 00:30 Ortszeit. Unter einer westlichen
+    // Runner-Zone liegt derselbe Zeitpunkt noch am Vortag.
+    const row = makeRow({
+      start_at: "2026-06-01T22:30:00.000Z",
+      end_at: "2026-06-01T23:00:00.000Z",
+      rrule_freq: "daily",
+      timezone: "Europe/Berlin",
+    });
+    const out = expandEvents(
+      [row],
+      new Date("2026-06-01T00:00:00.000Z"),
+      new Date("2026-06-05T00:00:00.000Z"),
+      lightTheme,
+    );
+    // Der Schlüssel ist unabhängig von der Runner-Zone.
+    expect(out.map((o) => o.occurrenceKey)).toEqual([
+      "2026-06-02",
+      "2026-06-03",
+      "2026-06-04",
+      "2026-06-05",
+    ]);
+    // Und er trägt die Zone des Termins mit.
+    expect(out[0].timezone).toBe("Europe/Berlin");
+  });
+
+  test("ein Override auf einen anderen Tag trennt die beiden", () => {
+    const row = makeRow({
+      start_at: "2026-06-01T09:00:00.000Z",
+      end_at: "2026-06-01T10:00:00.000Z",
+      rrule_freq: "weekly",
+      timezone: "Europe/Berlin",
+    });
+    row.event_exceptions = [
+      {
+        id: "ex-1",
+        event_id: row.id,
+        occurrence_date: "2026-06-15",
+        action: "modified",
+        override: {
+          start_at: "2026-06-18T09:00:00.000Z",
+          end_at: "2026-06-18T10:00:00.000Z",
+        },
+        created_at: "2026-06-01T00:00:00.000Z",
+        updated_at: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+    const out = expandEvents(
+      [row],
+      new Date("2026-06-14T00:00:00.000Z"),
+      new Date("2026-06-20T00:00:00.000Z"),
+      lightTheme,
+    );
+    const moved = out.find((o) => o.occurrenceKey === "2026-06-15");
+    expect(moved?.occurrenceDate).toBe("2026-06-18");
+  });
+});
