@@ -17,6 +17,7 @@ import {
   withOptimistic,
 } from "./optimisticEvents";
 import { withoutPendingDeletes } from "./pendingDeletes";
+import { instantToFloating } from "./timezone";
 
 function occ(partial: Partial<CalendarOccurrence> = {}): CalendarOccurrence {
   return {
@@ -100,18 +101,34 @@ describe("patchesOccurrence", () => {
 });
 
 describe("applyOptimisticChanges · Serie mit Scope `all`", () => {
+  // Zonenexplizit gebaut (UTC-Strings, nicht lokale Date-Komponenten):
+  // `withTimeOfDay` rechnet seit ADR-034 in `occurrence.timezone`, eine
+  // ambiente Fixture (ohne "Z") ließe die Erwartung mit der Runner-Zone
+  // wandern — genau das hat diese beiden Tests unter `TZ=America/New_York`
+  // reißen lassen, bevor sie zonenexplizit wurden. Gelesen wird das Ergebnis
+  // deshalb über `instantToFloating(…, "Europe/Berlin")`, nicht über lokale
+  // Getter.
+
   test("verschiebt die Tageszeit und behält das Datum jeder Occurrence", () => {
     // Die naheliegende Fehlimplementierung schreibt `changes.start_at` stumpf in
     // jede Occurrence — dann zöge sich die ganze Serie auf einen Tag zusammen.
     const later = occ({
       occurrenceDate: "2026-09-17",
-      startAt: new Date("2026-09-17T16:00:00"),
-      endAt: new Date("2026-09-17T17:30:00"),
+      startAt: new Date("2026-09-17T14:00:00.000Z"), // 16:00 Europe/Berlin
+      endAt: new Date("2026-09-17T15:30:00.000Z"), // 17:30 Europe/Berlin
     });
-    const out = applyOptimisticChanges(later, "all", changes());
+    const out = applyOptimisticChanges(
+      later,
+      "all",
+      changes({
+        start_at: "2026-09-10T16:00:00.000Z", // 18:00 Europe/Berlin
+        end_at: "2026-09-10T17:30:00.000Z", // 19:30 Europe/Berlin
+      }),
+    );
     expect(out.occurrenceDate).toBe("2026-09-17");
-    expect(out.startAt.getHours()).toBe(18);
-    expect(out.startAt.getDate()).toBe(17);
+    const berlinStart = instantToFloating(out.startAt, "Europe/Berlin");
+    expect(berlinStart.getUTCHours()).toBe(18);
+    expect(berlinStart.getUTCDate()).toBe(17);
   });
 
   test("erhält die Dauer und verankert endAt am Occurrence-Datum, nicht am changes-Datum", () => {
@@ -121,17 +138,66 @@ describe("applyOptimisticChanges · Serie mit Scope `all`", () => {
     // aber Datum von startAt bewahren.
     const later = occ({
       occurrenceDate: "2026-09-17",
-      startAt: new Date("2026-09-17T16:00:00"),
-      endAt: new Date("2026-09-17T17:30:00"),
+      startAt: new Date("2026-09-17T14:00:00.000Z"), // 16:00 Europe/Berlin
+      endAt: new Date("2026-09-17T15:30:00.000Z"), // 17:30 Europe/Berlin
     });
-    const out = applyOptimisticChanges(later, "all", changes());
+    const out = applyOptimisticChanges(
+      later,
+      "all",
+      changes({
+        start_at: "2026-09-10T16:00:00.000Z", // 18:00 Europe/Berlin
+        end_at: "2026-09-10T17:30:00.000Z", // 19:30 Europe/Berlin
+      }),
+    );
     expect(out.endAt.getTime() - out.startAt.getTime()).toBe(90 * 60 * 1000);
-    expect(out.endAt.getDate()).toBe(17);
+    expect(instantToFloating(out.endAt, "Europe/Berlin").getUTCDate()).toBe(17);
   });
 
   test("patcht auch die Beschreibung — der Server schreibt sie auf den Master", () => {
     const out = applyOptimisticChanges(occ(), "all", changes({ description: "Neue Notiz" }));
     expect(out.description).toBe("Neue Notiz");
+  });
+});
+
+// ── Schreibpfad rechnet in der Zone des Termins (ADR-034) ──────────────────
+// `withTimeOfDay` nahm die Tageszeit bisher mit lokalen Gettern. Dieselbe
+// Konstellation wie beim `anchoredChanges`-Pendant in `recurrence.test.ts`:
+// die angezeigte Occurrence liegt am 27.10.2026 (nach Berlins
+// Zeitumstellung, CET), die soeben gespeicherte Eingabe stammt vom 06.10.
+// (davor, CEST) — beide 18:00 Ortszeit, „unveränderte Eingabe" beim
+// Bearbeiten der ersten Occurrence mit Scope „alle". Unter
+// `TZ=Europe/Berlin` blieb das zufällig richtig, unter
+// `TZ=America/New_York` (kein Wechsel im Umrechnungszeitraum) rutschte die
+// angezeigte Occurrence eine Stunde. Nachgerechnet und belegt (siehe
+// `task-4-report.md`) — dieser Test hält nur noch die grüne (gefixte) Seite
+// fest.
+describe("applyOptimisticChanges · Serie mit Scope `all` über eine Zeitumstellung hinweg (ADR-034)", () => {
+  test("die angezeigte Occurrence behält ihre Berliner Wandzeit", () => {
+    const displayed = occ({
+      occurrenceDate: "2026-10-27",
+      // Di, 27.10.2026, 18:00–19:00 Europe/Berlin (CET, +1 h — nach der
+      // Umstellung).
+      startAt: new Date("2026-10-27T17:00:00.000Z"),
+      endAt: new Date("2026-10-27T18:00:00.000Z"),
+    });
+    // Der Nutzer hat die Occurrence vom 06.10. geöffnet und ohne Änderung mit
+    // Scope „alle" gespeichert: 18:00–19:00 Europe/Berlin (CEST, +2 h — vor
+    // der Umstellung).
+    const out = applyOptimisticChanges(
+      displayed,
+      "all",
+      changes({
+        start_at: "2026-10-06T16:00:00.000Z",
+        end_at: "2026-10-06T17:00:00.000Z",
+      }),
+    );
+    // Datum bleibt das der angezeigten Occurrence (27.10.), Uhrzeit bleibt
+    // 18:00–19:00 Berlin — unter jeder Runner-Zone. Vor dem Fix lieferte das
+    // nur unter `TZ=Europe/Berlin` diesen Wert; unter `TZ=America/New_York`
+    // kam `"2026-10-27T16:00:00.000Z"` (17:00 statt 18:00 Berlin) heraus.
+    expect(out.occurrenceDate).toBe("2026-10-27");
+    expect(out.startAt.toISOString()).toBe("2026-10-27T17:00:00.000Z");
+    expect(out.endAt.toISOString()).toBe("2026-10-27T18:00:00.000Z");
   });
 });
 

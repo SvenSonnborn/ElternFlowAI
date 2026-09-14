@@ -8,6 +8,7 @@ import type { EventWithRelations } from "./expand";
 
 import { OPTIMISTIC_EVENT_ID_PREFIX, useOptimisticEventsStore } from "./optimisticEvents";
 import { calendarKeys } from "./queries";
+import { instantToFloating } from "./timezone";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
@@ -20,7 +21,21 @@ export interface RruleFields {
   rrule_byweekday: number[] | null;
 }
 
-export function recurrenceToRrule(opt: RecurrenceOption, startAt: Date): RruleFields {
+/**
+ * Baut die fünf V1-Optionen auf `RruleFields`, für `"weekly"` inklusive
+ * `rrule_byweekday`.
+ *
+ * `timeZone` ist die Zone des Termins (`vars.timezone` beim Anlegen, die Zone
+ * der bearbeiteten Occurrence beim Bearbeiten) — die Regel wird dort auch
+ * ausgewertet (ADR-033). `startAt.getDay()` läse den Wochentag in der Zone
+ * des **Lesers** und träfe für einen Termin nahe Mitternacht den falschen Tag,
+ * sobald sich Leser- und Terminzone unterscheiden (ADR-034).
+ */
+export function recurrenceToRrule(
+  opt: RecurrenceOption,
+  startAt: Date,
+  timeZone: string,
+): RruleFields {
   switch (opt) {
     case "none":
       return { rrule_freq: null, rrule_interval: 1, rrule_byweekday: null };
@@ -29,8 +44,12 @@ export function recurrenceToRrule(opt: RecurrenceOption, startAt: Date): RruleFi
     case "weekdays":
       return { rrule_freq: "weekly", rrule_interval: 1, rrule_byweekday: [1, 2, 3, 4, 5] };
     case "weekly": {
+      // Der Wochentag gilt in der Zone des Termins — dort wird die Regel auch
+      // ausgewertet. `startAt.getDay()` läse ihn in der Zone des Lesers und
+      // träfe für einen Termin nahe Mitternacht den falschen Tag (ADR-034).
+      // `getUTCDay()` auf dem floating `Date` ist der Wochentag der Wandzeit.
       // JS getDay(): 0=Sun … 6=Sat. ISO: 1=Mon … 7=Sun. Map: (n+6) % 7 + 1.
-      const isoWeekday = ((startAt.getDay() + 6) % 7) + 1;
+      const isoWeekday = ((instantToFloating(startAt, timeZone).getUTCDay() + 6) % 7) + 1;
       return { rrule_freq: "weekly", rrule_interval: 1, rrule_byweekday: [isoWeekday] };
     }
     case "monthly":
@@ -106,7 +125,7 @@ export async function createEvent(vars: CreateEventVars): Promise<void> {
   if (vars.childId !== null && vars.parentId !== null) {
     throw new Error("Event can be assigned to either a child or a parent, not both.");
   }
-  const rrule = recurrenceToRrule(vars.recurrence, new Date(vars.startAt));
+  const rrule = recurrenceToRrule(vars.recurrence, new Date(vars.startAt), vars.timezone);
   const { error } = await supabase.from("events").insert({
     family_id: vars.familyId,
     type_id: vars.typeId,
@@ -161,7 +180,7 @@ let sequence = 0;
  * anderes an, als gleich gespeichert wird.
  */
 export function optimisticEventRow(vars: CreateEventVars, type: EventTypeRow): EventWithRelations {
-  const rrule = recurrenceToRrule(vars.recurrence, new Date(vars.startAt));
+  const rrule = recurrenceToRrule(vars.recurrence, new Date(vars.startAt), vars.timezone);
   const now = new Date().toISOString();
   sequence += 1;
   return {

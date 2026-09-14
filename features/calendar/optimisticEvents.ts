@@ -7,6 +7,7 @@ import type { EditScope, EventChanges, RecurrenceChanges } from "./recurrence";
 import type { CalendarOccurrence } from "./types";
 
 import { withoutPendingDeletes } from "./pendingDeletes";
+import { floatingToInstant, instantToFloating } from "./timezone";
 
 /**
  * Das Occurrence-Overlay für optimistische Kalender-Änderungen.
@@ -96,6 +97,17 @@ export function patchesOccurrence(
  * Der Vergleich läuft gegen `occurrenceKey` statt gegen die alte Startzeit,
  * weil genau dieser Wert die Identität der bearbeiteten Occurrence trägt
  * (ADR-034) und `EventEditScreen` ihn unverändert aus `useEvent` durchreicht.
+ *
+ * Offene Flanke (ADR-034): Das `format(…, "yyyy-MM-dd")` unten liest
+ * `changes.start_at` weiterhin in der Zone des **Geräts**, während
+ * `occurrenceKey` eine Zone-des-Termins-Angabe ist. Vor diesem Task war das
+ * folgenlos, weil `anchoredChanges` dieselbe Geräte-Zone benutzte — Client und
+ * Server waren gleich falsch und stimmten deshalb überein. Seit `anchoredChanges`
+ * in `master.timezone` rechnet, kann dieser Client-seitige Check auf einem
+ * Gerät in einer anderen Zone als der des Termins vom tatsächlichen
+ * Server-Ergebnis abweichen — höchstens für eine Sekunde, bis der Refetch
+ * korrigiert (dieselbe Näherung wie im Modul-Docstring oben), aber nicht mehr
+ * durch Symmetrie gedeckt.
  */
 export function canApplyOptimistically(args: {
   scope: EditScope;
@@ -114,11 +126,22 @@ export function canApplyOptimistically(args: {
   return format(new Date(args.changes.start_at), "yyyy-MM-dd") === args.occurrenceKey;
 }
 
-/** Nimmt das Datum von `day` und die Uhrzeit von `time`. */
-function withTimeOfDay(day: Date, time: Date): Date {
-  const out = new Date(day);
-  out.setHours(time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds());
-  return out;
+/**
+ * Nimmt das Datum von `day` und die Uhrzeit von `time` — beides als Wandzeit in
+ * `timeZone` gelesen, nicht in der Zone des Lesers. Sonst verschöbe ein
+ * Speichern von einem Gerät in einer anderen Zone die ganze Serie (ADR-034).
+ */
+function withTimeOfDay(day: Date, time: Date, timeZone: string): Date {
+  const floatingDay = instantToFloating(day, timeZone);
+  const floatingTime = instantToFloating(time, timeZone);
+  const merged = new Date(floatingDay);
+  merged.setUTCHours(
+    floatingTime.getUTCHours(),
+    floatingTime.getUTCMinutes(),
+    floatingTime.getUTCSeconds(),
+    floatingTime.getUTCMilliseconds(),
+  );
+  return floatingToInstant(merged, timeZone);
 }
 
 /**
@@ -152,7 +175,9 @@ export function applyOptimisticChanges(
   const viaException = occurrence.isRecurring && scope === "this";
   const literalTimes = !occurrence.isRecurring || viaException;
 
-  const startAt = literalTimes ? newStart : withTimeOfDay(occurrence.startAt, newStart);
+  const startAt = literalTimes
+    ? newStart
+    : withTimeOfDay(occurrence.startAt, newStart, occurrence.timezone);
   const endAt = literalTimes
     ? newEnd
     : new Date(startAt.getTime() + (newEnd.getTime() - newStart.getTime()));

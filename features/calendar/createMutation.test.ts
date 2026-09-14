@@ -48,41 +48,58 @@ function type(partial: Partial<EventTypeRow> = {}): EventTypeRow {
 
 describe("recurrenceToRrule", () => {
   test("none → all-null rrule", () => {
-    const r = recurrenceToRrule("none", new Date("2026-06-03T16:00:00Z"));
+    const r = recurrenceToRrule("none", new Date("2026-06-03T16:00:00Z"), "Europe/Berlin");
     expect(r.rrule_freq).toBeNull();
     expect(r.rrule_interval).toBe(1);
     expect(r.rrule_byweekday).toBeNull();
   });
 
   test("daily → freq=daily, no byweekday filter", () => {
-    const r = recurrenceToRrule("daily", new Date("2026-06-03T16:00:00Z"));
+    const r = recurrenceToRrule("daily", new Date("2026-06-03T16:00:00Z"), "Europe/Berlin");
     expect(r.rrule_freq).toBe("daily");
     expect(r.rrule_byweekday).toBeNull();
   });
 
   test("weekdays → weekly with Mon–Fri (ISO 1..5)", () => {
-    const r = recurrenceToRrule("weekdays", new Date("2026-06-03T16:00:00Z"));
+    const r = recurrenceToRrule("weekdays", new Date("2026-06-03T16:00:00Z"), "Europe/Berlin");
     expect(r.rrule_freq).toBe("weekly");
     expect(r.rrule_byweekday).toEqual([1, 2, 3, 4, 5]);
   });
 
   test("weekly on a Wednesday (2026-06-03) → byweekday=[3]", () => {
     // 2026-06-03 is a Wednesday.
-    const r = recurrenceToRrule("weekly", new Date("2026-06-03T16:00:00Z"));
+    const r = recurrenceToRrule("weekly", new Date("2026-06-03T16:00:00Z"), "Europe/Berlin");
     expect(r.rrule_freq).toBe("weekly");
     expect(r.rrule_byweekday).toEqual([3]);
   });
 
   test("weekly on a Sunday → byweekday=[7] (ISO Sunday=7, not 0)", () => {
     // 2026-06-07 is a Sunday.
-    const r = recurrenceToRrule("weekly", new Date("2026-06-07T16:00:00Z"));
+    const r = recurrenceToRrule("weekly", new Date("2026-06-07T16:00:00Z"), "Europe/Berlin");
     expect(r.rrule_byweekday).toEqual([7]);
   });
 
   test("monthly → freq=monthly, no byweekday", () => {
-    const r = recurrenceToRrule("monthly", new Date("2026-06-03T16:00:00Z"));
+    const r = recurrenceToRrule("monthly", new Date("2026-06-03T16:00:00Z"), "Europe/Berlin");
     expect(r.rrule_freq).toBe("monthly");
     expect(r.rrule_byweekday).toBeNull();
+  });
+
+  // ── Schreibpfad rechnet in der Zone des Termins (ADR-034) ─────────────────
+  // `startAt.getDay()` las den Wochentag bisher in der Zone des **Lesers**.
+  // `2027-01-03T23:30:00.000Z` ist Montag, 00:30 Europe/Berlin, aber noch
+  // Sonntag, 18:30 America/New_York — ein Zeitpunkt, der in Berlin auf einen
+  // anderen Wochentag fällt als sechs Zeitzonen weiter westlich, ohne dass
+  // eine Zeitumstellung im Spiel ist (reiner Offset-Unterschied, Berlin
+  // Std.-Zeit UTC+1 im Januar, New York UTC-5). Unter `TZ=Europe/Berlin` las
+  // der alte Code zufällig richtig (`getDay()` = 1, Montag), unter
+  // `TZ=America/New_York` las er den Vortag (`getDay()` = 0, Sonntag →
+  // `rrule_byweekday: [7]` statt `[1]`). Nachgerechnet und belegt (siehe
+  // `task-4-report.md`) — dieser Test hält nur noch die grüne (gefixte)
+  // Seite fest.
+  test("weekly nahe Mitternacht → der Wochentag gilt in der Zone des Termins, nicht des Runners", () => {
+    const r = recurrenceToRrule("weekly", new Date("2027-01-03T23:30:00.000Z"), "Europe/Berlin");
+    expect(r.rrule_byweekday).toEqual([1]);
   });
 });
 
@@ -92,7 +109,9 @@ const WEDNESDAY = new Date("2026-06-03T16:00:00");
 describe("rruleToRecurrence", () => {
   test("round-trips every option the create form can produce", () => {
     for (const opt of ["none", "daily", "weekdays", "weekly", "monthly"] as const) {
-      expect(rruleToRecurrence(recurrenceToRrule(opt, WEDNESDAY), WEDNESDAY)).toBe(opt);
+      expect(rruleToRecurrence(recurrenceToRrule(opt, WEDNESDAY, "Europe/Berlin"), WEDNESDAY)).toBe(
+        opt,
+      );
     }
   });
 

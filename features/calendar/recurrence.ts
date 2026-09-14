@@ -6,7 +6,7 @@ import type { Database } from "@/features/supabase/database.types";
 
 import { EventConflictError } from "./errors";
 import { allOccurrences } from "./rrule";
-import { floatingToInstant, zonedDateKey } from "./timezone";
+import { floatingToInstant, instantToFloating, zonedDateKey } from "./timezone";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
@@ -225,26 +225,29 @@ function ruleDiffers(master: EventRow, next: RecurrenceChanges): boolean {
  *   dafür nicht, weil es den Master *vor* dem Schreiben beschreibt und bei
  *   „Keine Wiederholung" noch `true` ist.
  *
- * `events` trägt inzwischen eine eigene Zone (`events.timezone`, ADR-033) —
- * gerechnet wird hier trotzdem noch mit **lokalen Gettern** (der Zone des
- * Lesers), genau wie `withTimeOfDay` es tut. Der Lesepfad ist seit ADR-033
- * zonenbewusst, dieser Schreibpfad nicht: Ein reines Öffnen-und-Speichern mit
- * Scope „alle" von einem Gerät, dessen Zone von `events.timezone` abweicht,
- * verschiebt die ganze Serie dauerhaft um eine Stunde. Betrifft neben dieser
- * Funktion auch `withTimeOfDay` (`optimisticEvents.ts`) und
- * `recurrenceToRrule` (`createMutation.ts`, wo `startAt.getDay()` das
- * `rrule_byweekday` bestimmt). Der Fix ist eine eigene Iteration — Eintrag in
- * `docs/TODO.md`.
+ * `events` trägt eine eigene Zone (`events.timezone`, ADR-033), und seit
+ * ADR-034 rechnet auch dieser Schreibpfad darin statt mit lokalen Gettern
+ * (der Zone des **Lesers**): Master und Eingabe gehen in den Floating-Raum
+ * von `master.timezone`, dort mischt sich Datum und Tageszeit, zurück geht es
+ * über `floatingToInstant`. Ohne das verschöbe ein reines Öffnen-und-Speichern
+ * mit Scope „alle" von einem Gerät, dessen Zone von `events.timezone`
+ * abweicht, die ganze Serie dauerhaft um eine Stunde — genau der Fehler, den
+ * `withTimeOfDay` (`optimisticEvents.ts`) für die Anzeige und
+ * `recurrenceToRrule` (`createMutation.ts`) für den Wochentag im selben Zug
+ * beheben.
  */
 function anchoredChanges(master: EventRow, changes: EventChanges): EventChanges {
   const newStart = new Date(changes.start_at);
-  const start = new Date(master.start_at);
-  start.setHours(
-    newStart.getHours(),
-    newStart.getMinutes(),
-    newStart.getSeconds(),
-    newStart.getMilliseconds(),
+  const floatingMaster = instantToFloating(new Date(master.start_at), master.timezone);
+  const floatingNew = instantToFloating(newStart, master.timezone);
+  const merged = new Date(floatingMaster);
+  merged.setUTCHours(
+    floatingNew.getUTCHours(),
+    floatingNew.getUTCMinutes(),
+    floatingNew.getUTCSeconds(),
+    floatingNew.getUTCMilliseconds(),
   );
+  const start = floatingToInstant(merged, master.timezone);
   const durationMs = new Date(changes.end_at).getTime() - newStart.getTime();
   return {
     ...changes,
