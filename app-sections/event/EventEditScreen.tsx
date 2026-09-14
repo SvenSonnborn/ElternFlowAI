@@ -142,7 +142,11 @@ export function EventEditScreen() {
     if (!source) return null;
     // The weekday check in `rruleToRecurrence` runs against this occurrence's
     // start rather than the master's dtstart — equivalent here, because a
-    // byweekday rule only ever yields occurrences on the days it names.
+    // byweekday rule only ever yields occurrences on the days it names. It
+    // also needs this occurrence's zone (`source.timezone`), not the device's
+    // — `recurrenceToRrule` wrote `rrule_byweekday` there, and reading it back
+    // in a different zone can land on the wrong weekday for a start near
+    // midnight (ADR-034 follow-up, Befund 1 of the final review).
     const rrule = source.rrule;
     return {
       // Mitgeführt, damit die Hydration unten genau die Occurrence einfriert,
@@ -165,6 +169,7 @@ export function EventEditScreen() {
           rrule_byweekday: rrule.byweekday,
         },
         source.startAt,
+        source.timezone,
       ),
       countText: rrule.count == null ? "" : String(rrule.count),
       rruleUntil: rrule.until,
