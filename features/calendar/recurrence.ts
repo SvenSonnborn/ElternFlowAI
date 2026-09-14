@@ -6,7 +6,7 @@ import type { Database } from "@/features/supabase/database.types";
 
 import { EventConflictError } from "./errors";
 import { allOccurrences } from "./rrule";
-import { floatingToInstant, instantToFloating, zonedDateKey } from "./timezone";
+import { floatingToInstant, mergeDateAndTimeOfDay, zonedDateKey } from "./timezone";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
@@ -227,27 +227,17 @@ function ruleDiffers(master: EventRow, next: RecurrenceChanges): boolean {
  *
  * `events` trägt eine eigene Zone (`events.timezone`, ADR-033), und seit
  * ADR-034 rechnet auch dieser Schreibpfad darin statt mit lokalen Gettern
- * (der Zone des **Lesers**): Master und Eingabe gehen in den Floating-Raum
- * von `master.timezone`, dort mischt sich Datum und Tageszeit, zurück geht es
- * über `floatingToInstant`. Ohne das verschöbe ein reines Öffnen-und-Speichern
- * mit Scope „alle" von einem Gerät, dessen Zone von `events.timezone`
- * abweicht, die ganze Serie dauerhaft um eine Stunde — genau der Fehler, den
- * `withTimeOfDay` (`optimisticEvents.ts`) für die Anzeige und
- * `recurrenceToRrule` (`createMutation.ts`) für den Wochentag im selben Zug
- * beheben.
+ * (der Zone des **Lesers**): `mergeDateAndTimeOfDay` ([timezone.ts](./timezone.ts))
+ * übernimmt Datum und Tageszeit im Floating-Raum von `master.timezone`. Ohne
+ * das verschöbe ein reines Öffnen-und-Speichern mit Scope „alle" von einem
+ * Gerät, dessen Zone von `events.timezone` abweicht, die ganze Serie
+ * dauerhaft um eine Stunde — genau der Fehler, den derselbe Helfer für
+ * `applyOptimisticChanges` (`optimisticEvents.ts`) auf der Anzeigeseite und
+ * `recurrenceToRrule` (`createMutation.ts`) für den Wochentag behebt.
  */
 function anchoredChanges(master: EventRow, changes: EventChanges): EventChanges {
   const newStart = new Date(changes.start_at);
-  const floatingMaster = instantToFloating(new Date(master.start_at), master.timezone);
-  const floatingNew = instantToFloating(newStart, master.timezone);
-  const merged = new Date(floatingMaster);
-  merged.setUTCHours(
-    floatingNew.getUTCHours(),
-    floatingNew.getUTCMinutes(),
-    floatingNew.getUTCSeconds(),
-    floatingNew.getUTCMilliseconds(),
-  );
-  const start = floatingToInstant(merged, master.timezone);
+  const start = mergeDateAndTimeOfDay(new Date(master.start_at), newStart, master.timezone);
   const durationMs = new Date(changes.end_at).getTime() - newStart.getTime();
   return {
     ...changes,

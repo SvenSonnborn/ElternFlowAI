@@ -7,7 +7,7 @@ import type { EditScope, EventChanges, RecurrenceChanges } from "./recurrence";
 import type { CalendarOccurrence } from "./types";
 
 import { withoutPendingDeletes } from "./pendingDeletes";
-import { floatingToInstant, instantToFloating } from "./timezone";
+import { mergeDateAndTimeOfDay } from "./timezone";
 
 /**
  * Das Occurrence-Overlay für optimistische Kalender-Änderungen.
@@ -127,24 +127,6 @@ export function canApplyOptimistically(args: {
 }
 
 /**
- * Nimmt das Datum von `day` und die Uhrzeit von `time` — beides als Wandzeit in
- * `timeZone` gelesen, nicht in der Zone des Lesers. Sonst verschöbe ein
- * Speichern von einem Gerät in einer anderen Zone die ganze Serie (ADR-034).
- */
-function withTimeOfDay(day: Date, time: Date, timeZone: string): Date {
-  const floatingDay = instantToFloating(day, timeZone);
-  const floatingTime = instantToFloating(time, timeZone);
-  const merged = new Date(floatingDay);
-  merged.setUTCHours(
-    floatingTime.getUTCHours(),
-    floatingTime.getUTCMinutes(),
-    floatingTime.getUTCSeconds(),
-    floatingTime.getUTCMilliseconds(),
-  );
-  return floatingToInstant(merged, timeZone);
-}
-
-/**
  * Wendet eine Änderung auf eine Occurrence an — so, wie `expandEvents` sie nach
  * dem Refetch **anzeigen** wird, nicht wie der Server sie schreibt.
  *
@@ -177,7 +159,7 @@ export function applyOptimisticChanges(
 
   const startAt = literalTimes
     ? newStart
-    : withTimeOfDay(occurrence.startAt, newStart, occurrence.timezone);
+    : mergeDateAndTimeOfDay(occurrence.startAt, newStart, occurrence.timezone);
   const endAt = literalTimes
     ? newEnd
     : new Date(startAt.getTime() + (newEnd.getTime() - newStart.getTime()));
