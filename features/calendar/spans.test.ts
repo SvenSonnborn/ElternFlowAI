@@ -296,13 +296,16 @@ describe("groupSpans key identity (ADR-034)", () => {
     });
     const segments = toDaySegments([a, b], WINDOW_START, WINDOW_END);
     const marks = toDayMarkings(segments, "2026-06-01", "#E8F7F5");
-    // Both spans must survive as their own group and claim their own lane.
+    // Both spans must survive as their own group and claim their own lane —
+    // over their **whole** length, both shared days, not just the first one.
     // Grouping by the resolved `occurrenceDate` alone collapses them into a
     // single group — only one lane gets used, and the later segment silently
     // overwrites the earlier one's bar on every shared day.
-    expect(marks["2026-06-15"].bars).toHaveLength(2);
-    const keys = (marks["2026-06-15"].bars ?? []).map((bar) => bar?.key);
-    expect(keys).toContain("serie-2026-06-15");
-    expect(keys).toContain("serie-2026-06-18");
+    for (const date of ["2026-06-15", "2026-06-16"]) {
+      expect(marks[date].bars).toHaveLength(2);
+      const keys = (marks[date].bars ?? []).map((bar) => bar?.key);
+      expect(keys).toContain("serie-2026-06-15");
+      expect(keys).toContain("serie-2026-06-18");
+    }
   });
 });

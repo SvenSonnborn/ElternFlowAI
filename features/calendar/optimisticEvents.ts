@@ -409,9 +409,13 @@ export function withOptimistic(
  * Löschung trägt — die Löschung griffe nicht mehr. Seit `hidesOccurrence` und
  * `patchesOccurrence` beide gegen `occurrenceKey` vergleichen — ein Wert, den
  * `applyOptimisticChanges` nie neu berechnet — kommutieren Filter und Patch für
- * diesen Fall inzwischen; die Reihenfolge bleibt trotzdem verbindlich, weil ein
- * optimistischer Create-Eintrag den Filter strukturell umgeht (siehe unten) —
- * für den zählt sie weiterhin.
+ * diesen Fall inzwischen: Filtern-vor-Patchen und Patchen-vor-Filtern liefern
+ * dasselbe Ergebnis. Ehrlich zu Ende gedacht (siehe „Was die Reihenfolge
+ * kostet" unten): Auch der zweite denkbare Grund, die Reihenfolge festzuhalten
+ * — ein optimistischer Create-Eintrag könnte den Filter umgehen —, trägt
+ * nicht, weil dieser Fall strukturell unerreichbar ist. Die Reihenfolge ist
+ * damit für keinen der beiden Overlay-Typen mehr folgenreich; sie bleibt
+ * stehen als Gürtel und Hosenträger, nicht weil ein Test sie verlangt.
  *
  * **Was die Reihenfolge kostet:** Die Occurrences eines optimistischen
  * **Creates** umgehen den Löschfilter strukturell — sie entstehen erst hinter

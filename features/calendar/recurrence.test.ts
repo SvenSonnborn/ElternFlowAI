@@ -881,3 +881,80 @@ describe("setRruleUntil bekommt einen Tagesende-Instant", () => {
     expect(last?.toISOString()).toBe("2026-06-14T16:00:00.000Z");
   });
 });
+
+// ── Zonenfeste `dateOnly` → `zonedDateKey`-Vergleiche (ADR-034) ────────────
+// Alle bisherigen Fixtures in dieser Datei liegen zeitlich weit von jeder
+// Zonengrenze entfernt (`Europe/Berlin`, Mittagszeiten) — dort liefern ein
+// lokaler `format(d, "yyyy-MM-dd")` und `zonedDateKey(d, master.timezone)`
+// zufällig dasselbe Ergebnis, egal welche Zone der Runner fährt. Die beiden
+// Fälle hier wählen bewusst `master.timezone: "Pacific/Auckland"` (UTC+12 im
+// Juni, keine Sommerzeit zu dieser Jahreszeit) und einen Serienanker knapp
+// nach lokaler Mitternacht: `2026-06-01T13:00:00.000Z` ist in Auckland bereits
+// der 02.06., in Berlin, UTC und New York noch der 01.06. — ein lokaler
+// Vergleich liefert in **allen drei** Runner-Zonen dasselbe, aber falsche,
+// Datum (einen Tag zu früh), weil er nie in `master.timezone` rechnet.
+
+describe("Zonenfeste `dateOnly` → `zonedDateKey`-Vergleiche (ADR-034)", () => {
+  test("consumedBefore zählt nach der Zone des Termins, nicht nach der des Runners", async () => {
+    const ops = makeOps();
+    const master = makeMaster({
+      rrule_freq: "daily",
+      rrule_byweekday: null,
+      rrule_count: 10,
+      // 2026-06-01T13:00 UTC = 2026-06-02, 01:00 in Auckland — die Serie läuft
+      // dort täglich um 01:00, an Berlin/UTC/NY vorbei immer einen Tag später.
+      start_at: "2026-06-01T13:00:00.000Z",
+      end_at: "2026-06-01T14:00:00.000Z",
+      timezone: "Pacific/Auckland",
+    });
+    // Auckland-Daten der ersten vier Vorkommen: 06-02, 06-03, 06-04, 06-05.
+    // Ein lokaler Vergleich (Berlin/UTC/NY) läse dieselben Instants als
+    // 06-01, 06-02, 06-03, 06-04 — einen Tag zu früh, aber identisch in allen
+    // drei Zonen, weil der Offset zu Auckland (10–16 h) in keiner von ihnen
+    // eine zweite Tagesgrenze überschreitet (nachgemessen).
+    await applyDeleteScope({
+      ops,
+      scope: "forward",
+      eventId: "evt-1",
+      occurrenceKey: "2026-06-05",
+      isRecurring: true,
+      master,
+    });
+    // Korrekt (Auckland-Zone): nur 06-02, 06-03, 06-04 liegen vor 06-05 → 3.
+    // Falsch (lokale Getter, jede der drei Runner-Zonen): auch das vierte
+    // Vorkommen läse noch als "06-04" < "06-05" → 4.
+    expect(ops.setRruleCount).toHaveBeenCalledWith("evt-1", 3);
+    expect(ops.deleteExceptionsFromDate).toHaveBeenCalledWith("evt-1", "2026-06-05");
+    expect(ops.deleteMaster).not.toHaveBeenCalled();
+  });
+
+  test("der dtstart-Cutoff-Vergleich läuft in der Zone des Termins, nicht der des Runners", async () => {
+    const ops = makeOps();
+    const master = makeMaster({
+      rrule_freq: "daily",
+      rrule_byweekday: null,
+      rrule_count: null,
+      start_at: "2026-06-01T13:00:00.000Z",
+      end_at: "2026-06-01T14:00:00.000Z",
+      timezone: "Pacific/Auckland",
+    });
+    // occurrenceKey trifft exakt das Auckland-Datum des Serienanfangs
+    // (06-02) — „ab diesem Termin löschen" ist damit „ab dem Serienanfang",
+    // der Schnitt muss also auf die ganze Serie fallen (deleteMaster).
+    await applyDeleteScope({
+      ops,
+      scope: "forward",
+      eventId: "evt-1",
+      occurrenceKey: "2026-06-02",
+      isRecurring: true,
+      master,
+    });
+    // Korrekt (Auckland-Zone): dayBefore("06-02") = "06-01" < zonedDateKey(dtstart) = "06-02"
+    // → Schnitt liegt am/vor dem Serienanfang → deleteMaster.
+    // Falsch (lokale Getter, jede der drei Runner-Zonen): dtstart läse als
+    // "06-01" statt "06-02" → "06-01" < "06-01" ist falsch → setRruleUntil
+    // liefe stattdessen, obwohl ab dem ersten Vorkommen gelöscht wird.
+    expect(ops.deleteMaster).toHaveBeenCalledWith("evt-1");
+    expect(ops.setRruleUntil).not.toHaveBeenCalled();
+  });
+});
