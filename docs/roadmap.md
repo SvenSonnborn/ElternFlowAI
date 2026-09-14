@@ -266,7 +266,8 @@ die Issue-Liste zeigt nur noch echte Offene.
 
 ## Block 1 — Stiller Datenverlust im Kalender
 
-**Aufwand M–L · 4 PRs · die Einträge, bei denen Daten ohne jede Meldung verschwinden**
+**Aufwand M–L · 5 PRs (1.3 zählt doppelt: D1 gelandet, D2 offen) · die Einträge, bei denen Daten ohne
+jede Meldung verschwinden**
 
 Alle fünf liegen in `features/calendar/`, alle sind unblockiert, alle haben eine bestehende
 Testsuite ([recurrence.test.ts](../features/calendar/recurrence.test.ts),
@@ -314,30 +315,36 @@ heraus: „ab diesem Termin" verankert weiterhin absichtlich neu, und eine **Dat
 Scope „alle" wird stillschweigend verworfen — der Hinweis dafür braucht einen Copy-Key und steht als
 🎨-Eintrag in [TODO.md](./TODO.md).
 
-### 1.3 Das Override-Modell: verschwundene Exceptions + Versions-Schlüssel — **L, ein PR**
+### 1.3 Das Override-Modell: verschwundene Exceptions + Versions-Schlüssel — **D1 erledigt, D2 offen**
 
-Zwei Einträge, **eine** Ursache — beide schlüsseln auf ein Datum, das der jeweils andere Pfad anders
-auflöst. Getrennt zu fixen hieße, dieselbe Stelle zweimal anzufassen:
+Zwei Einträge, ursprünglich **eine** vermutete Ursache — beide schlüsselten auf ein Datum, das der
+jeweils andere Pfad anders auflöste. Der Versions-Schlüssel-Teil (D1) ist mit diesem PR behoben; die
+Kandidatenmenge (D2) hat sich dabei als eigenständiges Problem am Override-Modell selbst
+herausgestellt, nicht als dieselbe Stelle zweimal anzufassen — sie bleibt offen und bekommt einen
+eigenen PR.
 
-- **„Aus dem Fenster verschobene `modified`-Exceptions verschwinden"**
-  · [expand.ts](../features/calendar/expand.ts) — `expandRecurrence`
-  Kandidaten kommen ausschließlich aus `rule.between(...)`. Verschiebt ein Override eine Occurrence
-  in einen Monat, in dem ihr _ursprüngliches_ `occurrence_date` nicht liegt, entsteht der Kandidat
-  nie — der Termin ist **an beiden Daten unsichtbar**. Über `EventEditScreen` mit Scope „Nur diesen"
-  erreichbar.
-- **„Eine auf einen anderen Tag verschobene Occurrence fällt aus dem Versions-Schlüssel"**
+- **D1 — „Eine auf einen anderen Tag verschobene Occurrence fällt aus dem Versions-Schlüssel"**
   · [version.ts](../features/calendar/version.ts) — `occurrenceVersion`
-  Das Token schlüsselt auf das _aufgelöste_ `occurrenceDate`, `expandEvents` löst den Inhalt über
-  das regelerzeugte `lookupDate` auf. Fallen beide auseinander, wird eine fremde Änderung an der
-  inhaltsgebenden Exception beim Konfliktvergleich **übersehen**.
+  **Erledigt, umgesetzt als
+  [ADR-034](./decision-log.md#adr-034--der-occurrence-schlüssel-occurrencekey-trennt-regel-datum-von-anzeigedatum-2026-09-14).**
+  `CalendarOccurrence` trägt jetzt zwei Datumsfelder statt eines: `occurrenceKey` (das von der Regel
+  erzeugte, in `row.timezone` gebildete Datum — benennt die Zeile in `event_exceptions`) und
+  `occurrenceDate` (das aufgelöste Anzeigedatum in der Zone des Lesers). Versionsvergleich,
+  React-Keys, der Route-Parameter `occ` und der gesamte Schreibpfad schlüsseln jetzt auf
+  `occurrenceKey`. Mitbehoben: der vorbestehende Fehler, dass `expand.ts` `occurrenceVersion` mit dem
+  aufgelösten statt dem Regel-Datum aufrief, sowie eine erst beim Umbau benannte zweite Vermischung im
+  Forward-Schnitt (`endOfDayInstant` interpretierte ein gerätezonen-gebildetes Datum in
+  `master.timezone`) und im Schreibpfad selbst (`anchoredChanges`, `withTimeOfDay`/
+  `mergeDateAndTimeOfDay`, `recurrenceToRrule` rechneten in der Geräte- statt der Terminzone).
+- **D2 — „Aus dem Fenster verschobene `modified`-Exceptions verschwinden"**
+  · [expand.ts](../features/calendar/expand.ts) — `expandRecurrence`
+  **Offen.** Kandidaten kommen weiterhin ausschließlich aus `rule.between(...)`. Verschiebt ein
+  Override eine Occurrence in einen Monat, in dem ihr _ursprüngliches_ `occurrence_date` nicht liegt,
+  entsteht der Kandidat nie — der Termin ist **an beiden Daten unsichtbar**. Über `EventEditScreen`
+  mit Scope „Nur diesen" erreichbar. Fix: die Kandidatenmenge muss `event_exceptions` einbeziehen und
+  gegen die regulär expandierten Vorkommen dedupliziert werden — eigener PR, eigener ADR.
 
-Fix: die Kandidatenmenge muss `event_exceptions` einbeziehen und gegen die regulär expandierten
-Vorkommen dedupliziert werden. Danach ist zu entscheiden, ob der Versions-Schlüssel dem aufgelösten
-oder dem Regel-Datum folgt — `modifyOccurrence` schreibt heute in diesem Fall eine **zweite**
-Exception-Zeile am neuen Datum, der Schlüssel folgt also dem, was der Schreibvorgang tut. Das ist
-konsistent, aber nur, solange man es weiß.
-
-> Berührt außerdem **„`applyOverride` kennt `description` nicht"** und **„Ganztägig ist im Edit-Form
+> D2 berührt außerdem **„`applyOverride` kennt `description` nicht"** und **„Ganztägig ist im Edit-Form
 > nicht umschaltbar"** (beide Calendar-Sektion) — beide erweitern denselben Override-Vertrag. Wenn
 > der ohnehin aufgemacht wird, gehören sie hier mit hinein statt in zwei spätere Einzeliterationen.
 
@@ -376,7 +383,7 @@ Repo hatte bis dahin nirgends zur Laufzeit `Intl` benutzt. **Bestanden auf beide
 (Apples ICU) und Android (Java-ICU) lieferten für `Europe/Berlin` je `02:00` (1. Juli) und `01:00`
 (1. Januar), also die echte Regel. Kein Polyfill nötig.
 
-**Definition of done Block 1:** Für jeden der vier PRs ein Regressionstest, der **vor** dem Fix rot
+**Definition of done Block 1:** Für jeden der fünf PRs ein Regressionstest, der **vor** dem Fix rot
 ist · `bun test` grün · eine Sichtprüfung der Serienbearbeitung am Simulator (Web reicht hier nicht,
 siehe Block 3).
 
