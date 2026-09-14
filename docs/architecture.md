@@ -85,11 +85,17 @@ Rändern (`instantToFloating`/`floatingToInstant`) und liefert `occurrencesBetwe
 echte Instants zurück. Die Anzeige formatiert diese Instants mit lokalen `Date`-Gettern und rechnet
 sie damit automatisch in die **Zone des Lesers** um, nicht in die des Termins — zwei Geräte in
 verschiedenen Zonen zeigen denselben Termin also zu unterschiedlicher Ortszeit, aber zur selben
-absoluten Zeit. Das aus dieser Umrechnung abgeleitete `occurrenceDate` ist dabei nicht nur Anzeige,
-sondern zugleich Persistenz-Schlüssel (`event_exceptions.occurrence_date`), Routing-Parameter und
-Eingabe für die Scope-Arithmetik (`applyEditScope`/`applyDeleteScope`) — es trägt dieselbe
-Zonenabhängigkeit wie die Anzeige, dort aber ist sie nicht harmlos. Bekannt, siehe
-[Roadmap 1.3](./roadmap.md). Neue Termine bekommen ihre Zone unsichtbar von
+absoluten Zeit. Seit [ADR-034](./decision-log.md) trägt jede Occurrence deshalb **zwei** Datumsfelder
+statt eines: `occurrenceKey` entsteht über `zonedDateKey(instant, row.timezone)` — in der Zone des
+**Termins** — und ist der Persistenz-Schlüssel (`event_exceptions.occurrence_date`), der
+Konflikt-Versionsvergleich, der Routing-Parameter `occ` und die Eingabe für die Scope-Arithmetik
+(`applyEditScope`/`applyDeleteScope`); `occurrenceDate` bleibt das aus demselben Instant in der Zone
+des Lesers abgeleitete Anzeigedatum. Ohne Override sind beide identisch — erst eine per Scope „Nur
+diesen" auf einen anderen Tag verschobene Occurrence trennt sie, und nur dort war die frühere
+Vermischung beider Rollen in einem Feld nicht harmlos (falscher Versions-Treffer, wirkungslose
+Zweit-Exception, ins Leere laufende Einzel-Löschung). Offen bleibt die Kandidatenmenge für aus dem
+Fenster verschobene `modified`-Exceptions, siehe [Roadmap 1.3](./roadmap.md). Neue Termine bekommen
+ihre Zone unsichtbar von
 [features/calendar/deviceTimeZone.ts](../features/calendar/deviceTimeZone.ts) — ein Zonen-Picker
 fehlt (siehe [docs/TODO.md](./TODO.md)).
 
