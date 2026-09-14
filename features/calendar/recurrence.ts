@@ -38,10 +38,11 @@ export interface RecurrenceChanges {
 }
 
 export interface EventOps {
-  cancelOccurrence: (eventId: string, occurrenceDate: string) => Promise<void>;
+  /** `occurrenceKey` ist die Zeile in `event_exceptions.occurrence_date` (ADR-034). */
+  cancelOccurrence: (eventId: string, occurrenceKey: string) => Promise<void>;
   modifyOccurrence: (
     eventId: string,
-    occurrenceDate: string,
+    occurrenceKey: string,
     override: Partial<EventChanges>,
   ) => Promise<void>;
   deleteMaster: (eventId: string) => Promise<void>;
@@ -337,11 +338,11 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
 
 export function createSupabaseEventOps(client: SupabaseClient<Database>): EventOps {
   return {
-    cancelOccurrence: async (eventId, occurrenceDate) => {
+    cancelOccurrence: async (eventId, occurrenceKey) => {
       const { error } = await client.from("event_exceptions").upsert(
         {
           event_id: eventId,
-          occurrence_date: occurrenceDate,
+          occurrence_date: occurrenceKey,
           action: "cancelled",
           override: null,
         },
@@ -350,11 +351,11 @@ export function createSupabaseEventOps(client: SupabaseClient<Database>): EventO
       if (error) throw error;
     },
 
-    modifyOccurrence: async (eventId, occurrenceDate, override) => {
+    modifyOccurrence: async (eventId, occurrenceKey, override) => {
       const { error } = await client.from("event_exceptions").upsert(
         {
           event_id: eventId,
-          occurrence_date: occurrenceDate,
+          occurrence_date: occurrenceKey,
           action: "modified",
           override,
         },
