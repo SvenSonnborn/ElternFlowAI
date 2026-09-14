@@ -6,9 +6,9 @@ import type { CalendarOccurrence, MarkedDates, MarkedDot, SpanBar } from "./type
  * One calendar day covered by an occurrence. A single-day event yields exactly
  * one segment, a three-day event yields three.
  *
- * `occurrence.occurrenceDate` stays the series anchor — it is the key behind
+ * `occurrence.occurrenceKey` stays the series anchor — it is the key behind
  * `event_exceptions.occurrence_date`, so routing and mutations must keep using
- * it. `date` is only the day this segment paints on.
+ * it (ADR-034). `date` is only the day this segment paints on.
  */
 export interface DaySegment {
   occurrence: CalendarOccurrence;
@@ -95,9 +95,13 @@ interface SpanGroup {
 function groupSpans(segments: DaySegment[]): SpanGroup[] {
   const byKey = new Map<string, SpanGroup>();
   for (const segment of segments) {
-    // Two occurrences of the same series can share a day once a span is longer
-    // than its recurrence interval — the anchor date keeps keys unique.
-    const key = `${segment.occurrence.eventId}-${segment.occurrence.occurrenceDate}`;
+    // Two occurrences of the same series can share a resolved display day —
+    // either because a span is longer than its recurrence interval, or
+    // because an override moved one occurrence onto a day the series already
+    // occupies. `occurrenceKey` (the rule date, one per `event_exceptions`
+    // row) stays unique in both cases; `occurrenceDate` (the resolved display
+    // date) would collide in the second one (ADR-034).
+    const key = `${segment.occurrence.eventId}-${segment.occurrence.occurrenceKey}`;
     const group = byKey.get(key);
     if (group) {
       group.segments.push(segment);

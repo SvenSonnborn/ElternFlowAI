@@ -6,7 +6,7 @@ import type { Database } from "@/features/supabase/database.types";
 
 import { EventConflictError } from "./errors";
 import { allOccurrences } from "./rrule";
-import { floatingToInstant } from "./timezone";
+import { floatingToInstant, zonedDateKey } from "./timezone";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
@@ -76,7 +76,8 @@ export interface ApplyDeleteScopeArgs {
   ops: EventOps;
   scope: EditScope;
   eventId: string;
-  occurrenceDate: string;
+  /** Der Schlüssel der Occurrence, von der aus gelöscht wird (ADR-034). */
+  occurrenceKey: string;
   isRecurring: boolean;
   master: EventRow;
 }
@@ -85,7 +86,8 @@ export interface ApplyEditScopeArgs {
   ops: EventOps;
   scope: EditScope;
   eventId: string;
-  occurrenceDate: string;
+  /** Der Schlüssel der bearbeiteten Occurrence (ADR-034). */
+  occurrenceKey: string;
   isRecurring: boolean;
   master: EventRow;
   changes: EventChanges;
@@ -97,12 +99,8 @@ export interface ApplyEditScopeArgs {
   recurrence?: RecurrenceChanges | null;
 }
 
-function dayBefore(isoDate: string): string {
-  return format(addDays(parseISO(isoDate), -1), "yyyy-MM-dd");
-}
-
-function dateOnly(d: Date): string {
-  return format(d, "yyyy-MM-dd");
+function dayBefore(occurrenceKey: string): string {
+  return format(addDays(parseISO(occurrenceKey), -1), "yyyy-MM-dd");
 }
 
 /**
@@ -121,28 +119,35 @@ function endOfDayInstant(isoDate: string, timeZone: string): string {
 }
 
 /**
- * How many occurrences of a series fall strictly before `occurrenceDate`.
+ * How many occurrences of a series fall strictly before `occurrenceKey`.
  *
  * iCal COUNT is relative to dtstart, so a bounded series cannot be truncated by
  * writing an UNTIL (the DB even forbids it — `events_rrule_count_xor_until`).
  * Splitting one means re-deriving both halves: the head keeps what it has
  * already consumed, the tail gets `count - consumed`.
  *
- * Occurrences are compared as local `yyyy-MM-dd` keys because that is exactly
- * how `expand.ts` derives the `occurrenceDate` the caller hands us.
+ * Occurrences are compared as `yyyy-MM-dd` keys **in the event's own zone**
+ * (`zonedDateKey(d, master.timezone)`), not the caller's local zone — that is
+ * exactly how `expand.ts` derives the `occurrenceKey` this function receives
+ * (`zonedDateKey(occurrenceStart, row.timezone)`, ADR-034). A local-getter
+ * comparison compares two different date spaces the moment the reader's
+ * device zone differs from the event's: an occurrence near local midnight in
+ * one of the two zones could be counted as consumed on one device and not on
+ * another, purely because of where the phone is set.
  */
-function consumedBefore(master: EventRow, occurrenceDate: string): number {
+function consumedBefore(master: EventRow, occurrenceKey: string): number {
   if (!master.rrule_freq) return 0;
   // `allOccurrences` ist hier sicher: nur für zählbegrenzte Serien aufgerufen.
-  return allOccurrences(master).filter((d) => dateOnly(d) < occurrenceDate).length;
+  return allOccurrences(master).filter((d) => zonedDateKey(d, master.timezone) < occurrenceKey)
+    .length;
 }
 
 export async function applyDeleteScope(args: ApplyDeleteScopeArgs): Promise<void> {
-  const { ops, scope, eventId, occurrenceDate, isRecurring, master } = args;
+  const { ops, scope, eventId, occurrenceKey, isRecurring, master } = args;
 
   if (scope === "this") {
     if (isRecurring) {
-      await ops.cancelOccurrence(eventId, occurrenceDate);
+      await ops.cancelOccurrence(eventId, occurrenceKey);
       return;
     }
     await ops.deleteMaster(eventId);
@@ -151,22 +156,22 @@ export async function applyDeleteScope(args: ApplyDeleteScopeArgs): Promise<void
 
   if (scope === "forward" && isRecurring) {
     if (master.rrule_count != null) {
-      const consumed = consumedBefore(master, occurrenceDate);
+      const consumed = consumedBefore(master, occurrenceKey);
       if (consumed === 0) {
         await ops.deleteMaster(eventId);
         return;
       }
       await ops.setRruleCount(eventId, consumed);
-      await ops.deleteExceptionsFromDate(eventId, occurrenceDate);
+      await ops.deleteExceptionsFromDate(eventId, occurrenceKey);
       return;
     }
-    const cutoff = dayBefore(occurrenceDate);
-    if (cutoff < dateOnly(new Date(master.start_at))) {
+    const cutoff = dayBefore(occurrenceKey);
+    if (cutoff < zonedDateKey(new Date(master.start_at), master.timezone)) {
       await ops.deleteMaster(eventId);
       return;
     }
     await ops.setRruleUntil(eventId, endOfDayInstant(cutoff, master.timezone));
-    await ops.deleteExceptionsFromDate(eventId, occurrenceDate);
+    await ops.deleteExceptionsFromDate(eventId, occurrenceKey);
     return;
   }
 
@@ -248,7 +253,7 @@ function anchoredChanges(master: EventRow, changes: EventChanges): EventChanges 
 }
 
 export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
-  const { ops, scope, eventId, occurrenceDate, isRecurring, master, changes, recurrence } = args;
+  const { ops, scope, eventId, occurrenceKey, isRecurring, master, changes, recurrence } = args;
 
   if (recurrence) {
     // Exceptions are keyed by the occurrence dates the *old* rule produced, so a
@@ -278,7 +283,7 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
 
   if (scope === "this") {
     if (isRecurring) {
-      await ops.modifyOccurrence(eventId, occurrenceDate, changes);
+      await ops.modifyOccurrence(eventId, occurrenceKey, changes);
       return;
     }
     await ops.updateMaster(eventId, changes, master.updated_at);
@@ -287,7 +292,7 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
 
   if (scope === "forward" && isRecurring) {
     if (master.rrule_count != null) {
-      const consumed = consumedBefore(master, occurrenceDate);
+      const consumed = consumedBefore(master, occurrenceKey);
       if (consumed === 0) {
         await ops.updateMaster(eventId, changes, master.updated_at);
         return;
@@ -303,18 +308,18 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
         await ops.insertSplitEvent(master, changes, remaining);
       }
       await ops.setRruleCount(eventId, consumed);
-      await ops.deleteExceptionsFromDate(eventId, occurrenceDate);
+      await ops.deleteExceptionsFromDate(eventId, occurrenceKey);
       return;
     }
-    const cutoff = dayBefore(occurrenceDate);
-    if (cutoff < dateOnly(new Date(master.start_at))) {
+    const cutoff = dayBefore(occurrenceKey);
+    if (cutoff < zonedDateKey(new Date(master.start_at), master.timezone)) {
       await ops.updateMaster(eventId, changes, master.updated_at);
       return;
     }
     // Tail first — same durability reasoning as the count path above.
     await ops.insertSplitEvent(master, changes, null);
     await ops.setRruleUntil(eventId, endOfDayInstant(cutoff, master.timezone));
-    await ops.deleteExceptionsFromDate(eventId, occurrenceDate);
+    await ops.deleteExceptionsFromDate(eventId, occurrenceKey);
     return;
   }
 

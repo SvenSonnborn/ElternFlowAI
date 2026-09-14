@@ -106,7 +106,7 @@ export function EventDetailScreen() {
     if (!data) return;
     router.push({
       pathname: "/event/edit/[id]",
-      params: { id: data.eventId, occ: data.occurrenceDate },
+      params: { id: data.eventId, occ: data.occurrenceKey },
     });
   };
 
@@ -154,7 +154,7 @@ export function EventDetailScreen() {
               kind: "event",
               target: {
                 eventId: data.eventId,
-                occurrenceDate: data.occurrenceDate,
+                occurrenceKey: data.occurrenceKey,
                 scope,
               },
               title: t("cal.delete.undoTitle"),
@@ -163,7 +163,7 @@ export function EventDetailScreen() {
                 deleteMutation.mutateAsync({
                   scope,
                   eventId: data.eventId,
-                  occurrenceDate: data.occurrenceDate,
+                  occurrenceKey: data.occurrenceKey,
                   isRecurring,
                   baseVersion: data.version,
                 }),
@@ -184,7 +184,7 @@ export function EventDetailScreen() {
               // eine Rückfrage auf eine Antwort, die schon gegeben ist.
               errorAction: (err) => {
                 if (!(err instanceof EventConflictError) || !err.row) return undefined;
-                const fresh = occurrenceVersion(err.row, data.occurrenceDate);
+                const fresh = occurrenceVersion(err.row, data.occurrenceKey);
                 return {
                   label: t("conflict.deleteAnyway"),
                   onPress: () => {
@@ -203,7 +203,7 @@ export function EventDetailScreen() {
                       .mutateAsync({
                         scope,
                         eventId: data.eventId,
-                        occurrenceDate: data.occurrenceDate,
+                        occurrenceKey: data.occurrenceKey,
                         isRecurring,
                         baseVersion: fresh,
                       })

@@ -14,8 +14,8 @@ import type { CalendarOccurrence } from "./types";
  */
 export interface PendingEventDelete {
   eventId: string;
-  /** `YYYY-MM-DD` der Occurrence, von der aus gelöscht wurde. */
-  occurrenceDate: string;
+  /** Der Schlüssel der Occurrence, von der aus gelöscht wurde (ADR-034). */
+  occurrenceKey: string;
   scope: EditScope;
 }
 
@@ -27,19 +27,25 @@ export interface PendingEventDelete {
  * Zeitzonenfalle. `forward` schließt den Stichtag **ein** — gelöscht wird „ab
  * diesem Termin", nicht „nach ihm".
  *
+ * Verglichen wird `occurrenceKey`, nicht das aufgelöste Anzeigedatum: „ab
+ * diesem Termin" meint denselben regelbasierten Ausschnitt, den der Server
+ * über `consumedBefore`/`dayBefore` bestimmt (`recurrence.ts`) — und der
+ * rechnet in Regel-Daten. Eine bereits verschobene Occurrence würde, gegen das
+ * Anzeigedatum verglichen, den falschen Ausschnitt treffen (ADR-034).
+ *
  * Ein Einzeltermin braucht keinen Sonderfall: er hat nur eine Occurrence, auf
  * die alle drei Scopes gleich zutreffen.
  */
 export function hidesOccurrence(
   pending: PendingEventDelete,
-  occurrence: { eventId: string; occurrenceDate: string },
+  occurrence: { eventId: string; occurrenceKey: string },
 ): boolean {
   if (pending.eventId !== occurrence.eventId) return false;
   switch (pending.scope) {
     case "this":
-      return pending.occurrenceDate === occurrence.occurrenceDate;
+      return pending.occurrenceKey === occurrence.occurrenceKey;
     case "forward":
-      return occurrence.occurrenceDate >= pending.occurrenceDate;
+      return occurrence.occurrenceKey >= pending.occurrenceKey;
     case "all":
       return true;
   }

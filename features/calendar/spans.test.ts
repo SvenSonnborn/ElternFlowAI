@@ -278,3 +278,31 @@ describe("toDayMarkings", () => {
     expect(marks["2026-06-10"].dots).toHaveLength(1);
   });
 });
+
+describe("groupSpans key identity (ADR-034)", () => {
+  test("two occurrences of the same series that resolve onto the same days still get distinct lanes", () => {
+    // Occurrence A: its own rule date is 2026-06-15, no override — key and
+    // display date match.
+    const a = makeOccurrence("2026-06-15T09:00:00", "2026-06-16T10:00:00", { eventId: "serie" });
+    // Occurrence B: rule date 2026-06-18, but an exception moved it to display
+    // on the same two days as A — the real case ADR-034 exists for: an
+    // override can shift an occurrence onto a day the series already
+    // occupies, so `occurrenceDate` collides even though the occurrences are
+    // distinct rows in `event_exceptions`.
+    const b = makeOccurrence("2026-06-15T09:00:00", "2026-06-16T10:00:00", {
+      eventId: "serie",
+      occurrenceKey: "2026-06-18",
+      isException: true,
+    });
+    const segments = toDaySegments([a, b], WINDOW_START, WINDOW_END);
+    const marks = toDayMarkings(segments, "2026-06-01", "#E8F7F5");
+    // Both spans must survive as their own group and claim their own lane.
+    // Grouping by the resolved `occurrenceDate` alone collapses them into a
+    // single group — only one lane gets used, and the later segment silently
+    // overwrites the earlier one's bar on every shared day.
+    expect(marks["2026-06-15"].bars).toHaveLength(2);
+    const keys = (marks["2026-06-15"].bars ?? []).map((bar) => bar?.key);
+    expect(keys).toContain("serie-2026-06-15");
+    expect(keys).toContain("serie-2026-06-18");
+  });
+});

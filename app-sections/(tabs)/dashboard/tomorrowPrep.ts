@@ -47,14 +47,19 @@ export interface PrepTaskEntry extends PrepEntryBase {
 
 export interface PrepEventEntry extends PrepEntryBase {
   kind: "event";
-  /** Der Serien-Anker für `/event/[id]?occ=…`, nicht der Tag des Segments. */
-  occurrenceDate: string;
+  /**
+   * Der Schlüssel der Occurrence für `/event/[id]?occ=…` (ADR-034) — nicht der
+   * Tag des Segments und nicht das aufgelöste Anzeigedatum: eine per Override
+   * verschobene Occurrence würde sonst über den falschen (oder gar keinen)
+   * Deep-Link angesprungen.
+   */
+  occurrenceKey: string;
 }
 
 /**
- * Union statt eines optionalen `occurrenceDate`: der Termin-Zweig gibt den
- * Anker damit als *garantiert* an den Deep-Link weiter, statt ein `undefined`
- * in die Route-Parameter zu lassen, das dort nichts zu suchen hat.
+ * Union statt eines optionalen `occurrenceKey`: der Termin-Zweig gibt den
+ * Schlüssel damit als *garantiert* an den Deep-Link weiter, statt ein
+ * `undefined` in die Route-Parameter zu lassen, das dort nichts zu suchen hat.
  */
 export type PrepEntry = PrepTaskEntry | PrepEventEntry;
 
@@ -148,10 +153,14 @@ function eventEntry(
   const untimed = occurrence.allDay || !segment.isStart;
   return {
     entry: {
-      key: `event-${occurrence.eventId}-${occurrence.occurrenceDate}`,
+      // `occurrenceKey`, nicht `occurrenceDate`: Zwei Occurrences derselben
+      // Serie können auf denselben Tag aufgelöst werden, sobald ein Override
+      // eine von ihnen dorthin verschiebt — nur der Schlüssel bleibt dann
+      // eindeutig (ADR-034), wie in `groupSpans` (`features/calendar/spans.ts`).
+      key: `event-${occurrence.eventId}-${occurrence.occurrenceKey}`,
       kind: "event",
       id: occurrence.eventId,
-      occurrenceDate: occurrence.occurrenceDate,
+      occurrenceKey: occurrence.occurrenceKey,
       title: occurrence.title,
       meta: joinMeta([
         segmentTimeLabel(segment, t),

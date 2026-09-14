@@ -265,7 +265,12 @@ describe("buildTomorrowPrep · Zeilen", () => {
     expect(entry).toMatchObject({ kind: "task", id: "abc", title: "Milch kaufen" });
   });
 
-  test("carries an event's series anchor for the occurrence deep-link", () => {
+  test("carries the occurrence's rule key for the occurrence deep-link, not its resolved display date", () => {
+    // Regel-Datum 2026-06-08, aber ein Override hat die Occurrence auf den
+    // 11.06. verschoben (`startAt`/`occurrenceDate`) — den Tag, für den diese
+    // Karte gebaut wird. Der Deep-Link muss trotzdem den Schlüssel (08.06.)
+    // tragen: Nur der benennt die Zeile in `event_exceptions`, die ein
+    // zweites Bearbeiten oder Löschen träfe (ADR-034).
     const [entry] = build({
       segments: segmentsOf(
         makeOccurrence("2026-06-08T09:00:00", "2026-06-08T10:00:00", {
@@ -277,7 +282,7 @@ describe("buildTomorrowPrep · Zeilen", () => {
       ),
     }).visible;
 
-    expect(entry).toMatchObject({ kind: "event", id: "serie", occurrenceDate: "2026-06-11" });
+    expect(entry).toMatchObject({ kind: "event", id: "serie", occurrenceKey: "2026-06-08" });
   });
 
   test("resolves a task's icon and colour from its type", () => {
@@ -375,16 +380,20 @@ describe("buildTomorrowPrep · Meta-Zeile", () => {
 describe("buildTomorrowPrep · React-Keys", () => {
   test("gives two occurrences of the same series distinct keys", () => {
     // Der Deckel liegt bei drei, beide Occurrences müssen trotzdem
-    // unterscheidbar sein — `id` allein ist es bei einer Serie nicht.
+    // unterscheidbar sein — `id` allein ist es bei einer Serie nicht. Beide
+    // lösen morgen auf denselben Tag auf (`startAt` ist für beide der 11.06.);
+    // unterschieden werden sie über `occurrenceKey` — eine der beiden simuliert
+    // damit eine per Override auf den 11.06. verschobene Occurrence, deren
+    // Regel-Datum eigentlich der 04.06. ist (ADR-034).
     const result = build({
       segments: segmentsOf(
         makeOccurrence("2026-06-11T09:00:00", "2026-06-11T10:00:00", {
           eventId: "serie",
-          occurrenceDate: "2026-06-11",
+          occurrenceKey: "2026-06-11",
         }),
         makeOccurrence("2026-06-11T15:00:00", "2026-06-11T16:00:00", {
           eventId: "serie",
-          occurrenceDate: "2026-06-04",
+          occurrenceKey: "2026-06-04",
         }),
       ),
     });

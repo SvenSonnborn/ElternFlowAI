@@ -129,8 +129,8 @@ export function EventEditScreen() {
    *   Ausnahmen der Serie, um die alte Regel zurückzuschreiben.
    * - Fällt die angeforderte Occurrence durch eine fremde Regeländerung weg,
    *   liefert `useEvent` `expanded[0]` — eine **andere** Occurrence. Ein live
-   *   gelesenes `occurrenceDate` schriebe die Exception bei Scope „Nur diesen"
-   *   dann auf ein fremdes Datum.
+   *   gelesenes `occurrenceKey` schriebe die Exception bei Scope „Nur diesen"
+   *   dann auf eine fremde Zeile.
    *
    * ADR-031 Decision 6 fasst die Invariante zusammen: `baseVersion` ist die
    * Version, aus der der Formular-State entstand — und der Formular-State ist
@@ -150,7 +150,7 @@ export function EventEditScreen() {
       // auseinanderlaufen.
       occurrence: source,
       eventId: source.eventId,
-      occurrenceDate: source.occurrenceDate,
+      occurrenceKey: source.occurrenceKey,
       isRecurring: source.isRecurring,
       allDay: source.allDay,
       title: source.title,
@@ -345,7 +345,11 @@ export function EventEditScreen() {
         // Dieselbe Begründung wie dort: eine weit in der Zukunft liegende
         // Occurrence (>1 Jahr) würde sonst abgeschnitten.
         const rowStart = new Date(row.start_at);
-        const requested = parseISO(vars.occurrenceDate);
+        // `vars.occurrenceKey` nur als grober Fensterrand: er grenzt hier
+        // lediglich das Expansions-Fenster ein, benennt keine Zeile — anders
+        // als der `find` unten braucht dieser Vergleich keine Zonen-genaue
+        // Behandlung (ADR-034).
+        const requested = parseISO(vars.occurrenceKey);
         const windowStart = dateMin([addDays(rowStart, -1), requested]);
         // `endOfDay`, nicht `requested` selbst: `parseISO("2026-09-08")` ist
         // Mitternacht, und `expandEvents` verwirft `startAt > rangeEnd`. Ohne
@@ -355,9 +359,13 @@ export function EventEditScreen() {
         // `windowStart` gibt es kein Gegenstück: Dort ist Mitternacht bereits
         // die frühere Grenze, und verglichen wird gegen `endAt`.
         const windowEnd = dateMax([addDays(rowStart, 366), endOfDay(requested)]);
+        // Match auf `occurrenceKey`: Nur der Schlüssel identifiziert dieselbe
+        // Occurrence zuverlässig, wenn eine Verschiebung ihn vom aufgelösten
+        // Anzeigedatum hat auseinanderlaufen lassen (ADR-034) — derselbe Grund
+        // wie beim `find` in `useEvent` (`features/calendar/hooks.ts`).
         theirs =
           expandEvents([row], windowStart, windowEnd, theme).find(
-            (o) => o.occurrenceDate === vars.occurrenceDate,
+            (o) => o.occurrenceKey === vars.occurrenceKey,
           ) ?? null;
       }
 
@@ -421,7 +429,7 @@ export function EventEditScreen() {
             // bekannt) aber nicht mehr auf denselben toten Wert zurück.
             baseVersion:
               theirs?.version ??
-              (row ? occurrenceVersion(row, vars.occurrenceDate) : vars.baseVersion),
+              (row ? occurrenceVersion(row, vars.occurrenceKey) : vars.baseVersion),
           });
         },
       });
@@ -490,7 +498,7 @@ export function EventEditScreen() {
     const vars = {
       scope,
       eventId: initial.eventId,
-      occurrenceDate: initial.occurrenceDate,
+      occurrenceKey: initial.occurrenceKey,
       isRecurring,
       changes: {
         title: title.trim(),

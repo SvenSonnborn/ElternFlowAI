@@ -31,7 +31,8 @@ export {
 export interface DeleteEventVars {
   scope: EditScope;
   eventId: string;
-  occurrenceDate: string;
+  /** Der Schlüssel der betroffenen Occurrence — die Zeile in `event_exceptions` (ADR-034). */
+  occurrenceKey: string;
   isRecurring: boolean;
   /**
    * Der Stand, den der Screen beim Laden gesehen hat (`CalendarOccurrence.version`).
@@ -64,13 +65,13 @@ export async function updateEvent(vars: UpdateEventVars, deps: UpdateEventDeps):
   if (!master) {
     throw new EventNotFoundError(vars.eventId);
   }
-  if (occurrenceVersion(master, vars.occurrenceDate) !== vars.baseVersion) {
+  if (occurrenceVersion(master, vars.occurrenceKey) !== vars.baseVersion) {
     throw new EventConflictError(master);
   }
   await applyEditScope({
     scope: vars.scope,
     eventId: vars.eventId,
-    occurrenceDate: vars.occurrenceDate,
+    occurrenceKey: vars.occurrenceKey,
     isRecurring: vars.isRecurring,
     master,
     changes: vars.changes,
@@ -88,13 +89,13 @@ export async function deleteEvent(vars: DeleteEventVars, deps: UpdateEventDeps):
   if (!master) {
     throw new EventNotFoundError(vars.eventId);
   }
-  if (occurrenceVersion(master, vars.occurrenceDate) !== vars.baseVersion) {
+  if (occurrenceVersion(master, vars.occurrenceKey) !== vars.baseVersion) {
     throw new EventConflictError(master);
   }
   await applyDeleteScope({
     scope: vars.scope,
     eventId: vars.eventId,
-    occurrenceDate: vars.occurrenceDate,
+    occurrenceKey: vars.occurrenceKey,
     isRecurring: vars.isRecurring,
     master,
     ops: deps.ops,
@@ -156,7 +157,7 @@ export function useUpdateEvent() {
       return add({
         kind: "update",
         eventId: vars.eventId,
-        occurrenceDate: vars.occurrenceDate,
+        occurrenceKey: vars.occurrenceKey,
         scope: vars.scope,
         changes: vars.changes,
       });

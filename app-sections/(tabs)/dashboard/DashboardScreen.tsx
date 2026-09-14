@@ -234,7 +234,7 @@ export function DashboardScreen() {
             const isOptimistic = isOptimisticEventId(occ.eventId);
             return (
               <EventRow
-                key={`${occ.eventId}-${occ.occurrenceDate}-${seg.date}`}
+                key={`${occ.eventId}-${occ.occurrenceKey}-${seg.date}`}
                 time={timeLabel}
                 timeCompact={isSpan && !occ.allDay}
                 title={occ.title}
@@ -256,7 +256,7 @@ export function DashboardScreen() {
                   if (isOptimistic) return;
                   router.push({
                     pathname: "/event/[id]",
-                    params: { id: occ.eventId, occ: occ.occurrenceDate },
+                    params: { id: occ.eventId, occ: occ.occurrenceKey },
                   });
                 }}
               />
@@ -336,7 +336,7 @@ export function DashboardScreen() {
                     if (isOptimistic) return;
                     router.push({
                       pathname: "/event/[id]",
-                      params: { id: entry.id, occ: entry.occurrenceDate },
+                      params: { id: entry.id, occ: entry.occurrenceKey },
                     });
                   }}
                 />
