@@ -37,14 +37,14 @@
 | `features/calendar/hooks.ts`                      | `useEvent` findet über den Schlüssel                     | 3    |
 | `features/calendar/mutations.ts`                  | `UpdateEventVars`/`DeleteEventVars`                      | 3    |
 | `features/calendar/recurrence.ts`                 | Scope-Arithmetik auf dem Schlüssel, `dateOnly` zonenfest | 3    |
-| `features/calendar/optimisticEvents.ts`           | Overlay schlüsselt auf `occurrenceKey`                   | 3, 5 |
+| `features/calendar/optimisticEvents.ts`           | Overlay schlüsselt auf `occurrenceKey`                   | 3, 4 |
 | `features/calendar/pendingDeletes.ts`             | dito                                                     | 3    |
 | `features/calendar/spans.ts`                      | Gruppierungs-Key + `DaySegment`-Docstring                | 3    |
-| `app-sections/(tabs)/{kalender,dashboard}/`       | React-Keys, Route-Parameter                              | 4    |
-| `app-sections/(tabs)/dashboard/tomorrowPrep.ts`   | Key + durchgereichter Schlüssel                          | 4    |
-| `app-sections/event/Event{Detail,Edit}Screen.tsx` | Route-Parameter, Schreibvariablen                        | 4    |
-| `features/calendar/createMutation.ts`             | `recurrenceToRrule` in der Zone des Termins              | 5    |
-| `docs/decision-log.md` u. a.                      | **ADR-034** + Doku                                       | 6    |
+| `app-sections/(tabs)/{kalender,dashboard}/`       | React-Keys, Route-Parameter                              | 3    |
+| `app-sections/(tabs)/dashboard/tomorrowPrep.ts`   | Key + durchgereichter Schlüssel                          | 3    |
+| `app-sections/event/Event{Detail,Edit}Screen.tsx` | Route-Parameter, Schreibvariablen                        | 3    |
+| `features/calendar/createMutation.ts`             | `recurrenceToRrule` in der Zone des Termins              | 4    |
+| `docs/decision-log.md` u. a.                      | **ADR-034** + Doku                                       | 5    |
 
 ---
 
@@ -330,14 +330,16 @@ Override sind beide gleich — das ist der Normalfall."
 
 ---
 
-## Task 3: Die Feature-Schicht schlüsselt um
+## Task 3: Feature-Schicht **und** Oberfläche schlüsseln um
 
-**Files:** `features/calendar/{hooks,mutations,recurrence,optimisticEvents,pendingDeletes,spans}.ts` und ihre Testdateien.
+> **Korrektur vom 2026-09-14.** Dieser Task war ursprünglich in zwei geteilt — erst die Feature-Schicht, dann die Oberfläche. Das geht nicht: Die Umbenennung von `UpdateEventVars.occurrenceDate` zu `occurrenceKey` ist eine **Interface-Änderung**, die beide Seiten zugleich erzwingt. Ein erster Lauf endete folgerichtig mit grünen Tests und vier `tsc`-Fehlern in `EventEditScreen.tsx` — ein Zustand, den die Gate-Regel nicht committen lässt. Die Arbeit wurde verworfen und die beiden Tasks zusammengelegt. Der Commit wird dadurch größer; das ist der Preis dafür, dass er überhaupt grün sein kann.
+
+**Files:** `features/calendar/{hooks,mutations,recurrence,optimisticEvents,pendingDeletes,spans}.ts` und ihre Testdateien · `app-sections/(tabs)/kalender/KalenderScreen.tsx` · `app-sections/(tabs)/dashboard/DashboardScreen.tsx` · `app-sections/(tabs)/dashboard/tomorrowPrep.ts` (+ Test) · `app-sections/event/EventDetailScreen.tsx` · `app-sections/event/EventEditScreen.tsx`
 
 **Interfaces:**
 
 - Consumes: `CalendarOccurrence.occurrenceKey` aus Task 2, `zonedDateKey` aus Task 1.
-- Produces: `UpdateEventVars.occurrenceKey` und `DeleteEventVars.occurrenceKey` (umbenannt von `occurrenceDate`); `ApplyEditScopeArgs.occurrenceKey`, `ApplyDeleteScopeArgs.occurrenceKey`.
+- Produces: `UpdateEventVars.occurrenceKey` und `DeleteEventVars.occurrenceKey` (umbenannt von `occurrenceDate`); `ApplyEditScopeArgs.occurrenceKey`, `ApplyDeleteScopeArgs.occurrenceKey`; der Route-Parameter `occ` trägt ab hier den **Schlüssel**.
 
 **Die Umbenennung ist nicht mechanisch — für jede Stelle gilt die Frage aus den Global Constraints.** Diese Tabelle beantwortet sie vorab:
 
@@ -352,6 +354,13 @@ Override sind beide gleich — das ist der Normalfall."
 | `spans.ts` → `groupSpans`-Key                          | `occurrenceKey` | **Identität**, siehe unten                       |
 | `spans.ts` → `DaySegment.date`                         | **bleibt**      | der Tag, den das Segment malt                    |
 | `undoDeleteMessage.ts` → `formatDate(occurrenceDate)`  | **bleibt**      | zeigt dem Nutzer ein Datum an                    |
+| React-Keys in beiden Tab-Screens                       | `occurrenceKey` | **Identität**, siehe unten                       |
+| Route-Parameter `occ` beim Navigieren (3 Screens)      | `occurrenceKey` | benennt die Exception-Zeile                      |
+| `tomorrowPrep.ts` → `key` und durchgereichtes Feld     | `occurrenceKey` | dito                                             |
+| `EventDetailScreen` → Schreib- und Konfliktpfad        | `occurrenceKey` | Schreibpfad                                      |
+| `EventEditScreen` → `initial`, `vars`, `find`, Version | `occurrenceKey` | Schreibpfad                                      |
+| `EventDetailScreen` → `formatDate(…)` im Undo-Text     | **bleibt**      | zeigt dem Nutzer ein Datum an                    |
+| `EventEditScreen` → `parseISO(…)` als Fensterrand      | **bleibt**      | grenzt ein Fenster ab, benennt keine Zeile       |
 
 **Warum `groupSpans` die Identität braucht:** Ein Override kann eine Occurrence auf einen Tag schieben, an dem die Serie **ohnehin stattfindet** — die verschobene 15.06. landet auf dem 18.06., wo das reguläre Vorkommen schon liegt. Beide trügen dann dasselbe `occurrenceDate`, der Gruppierungs-Key kollidierte, und eine der beiden verschwände aus der Liste. Der Kommentar dort nennt diese Klasse bereits („Two occurrences of the same series can share a day…") und verlässt sich für die Eindeutigkeit auf `occurrenceDate` — was nach diesem PR nicht mehr trägt.
 
@@ -363,7 +372,7 @@ In `features/calendar/spans.test.ts`: zwei Occurrences derselben Serie mit **gle
 
 `consumedBefore` vergleicht `dateOnly(d) < occurrenceKey`, und `dateOnly` liest lokal. Sobald der Schlüssel in der Zone des Termins entsteht, vergleicht diese Zeile zwei verschiedene Datumsräume. Ersetze `dateOnly(d)` durch `zonedDateKey(d, master.timezone)` — an **beiden** Stellen, also auch beim `cutoff < dateOnly(new Date(master.start_at))`-Vergleich. Der Docstring von `consumedBefore` sagt heute ausdrücklich, verglichen werde „als local `yyyy-MM-dd`, weil `expand.ts` den Schlüssel so bildet" — das wird unrichtig und muss mit.
 
-- [ ] **Step 3: Die sechs Module umschlüsseln**
+- [ ] **Step 3: Die sechs Feature-Module umschlüsseln**
 
 Nach der Tabelle oben. `applyOptimisticChanges` verdient dabei besondere Aufmerksamkeit: Es schreibt heute `occurrenceDate: format(startAt, "yyyy-MM-dd")` neu — das bleibt richtig (eine optimistisch verschobene Occurrence wandert im Raster). Der **`occurrenceKey` darf dabei nicht neu berechnet werden**; er kommt über den Spread und bleibt, was er war: dieselbe Exception-Zeile. Ein Kommentar soll das festhalten.
 
@@ -377,11 +386,23 @@ TZ=America/New_York bun test features/calendar/
 
 Bestandstests, die rot werden, **einzeln beurteilen**: Eine Fixture, die nur ein Feld ergänzen muss, ist Nacharbeit; eine Erwartung, die sich inhaltlich ändert, ist ein Befund und gehört in den Report.
 
-- [ ] **Step 5: Gates und Commit**
+- [ ] **Step 5: Die Oberfläche nachziehen**
+
+Nach den UI-Zeilen der Tabelle oben. **Zum Route-Parameter:** Ein Deep-Link aus der Zeit vor diesem PR trägt ein aufgelöstes Datum. `useEvent` findet dann nichts und fällt auf `expanded[0]` zurück — dasselbe Verhalten wie heute bei einem unbekannten `occ`. Kein Datenverlust, aber der Nutzer landet auf einer anderen Occurrence. Halte das als Kommentar am Fallback fest; der TODO-Eintrag dazu kommt in Task 5.
+
+- [ ] **Step 6: Prüfen, dass im Schreibpfad kein `occurrenceDate` übrig ist**
+
+```bash
+grep -rn "occurrenceDate" --include="*.tsx" --include="*.ts" app-sections | grep -v "\.test\."
+```
+
+Jede verbleibende Stelle muss sich mit „zeigt einem Menschen ein Datum" oder „grenzt ein Fenster ab" begründen lassen. Liste samt Begründung in den Report.
+
+- [ ] **Step 7: Gates und Commit**
 
 ```bash
 bun run typecheck && bun lint && bun format:check && bun test
-git add features/calendar
+git add features/calendar app-sections
 git commit -m "refactor(calendar): Schreibpfad und Identitaet schluesseln auf occurrenceKey
 
 Alles, was eine Zeile in event_exceptions meint, benutzt jetzt das Regel-Datum;
@@ -389,53 +410,7 @@ das aufgeloeste Datum bleibt der Anzeige. Damit trifft ein zweites Bearbeiten
 oder Loeschen einer verschobenen Occurrence wieder ihre eigene Exception."
 ```
 
----
-
-## Task 4: Die Oberfläche zieht nach
-
-**Files:** `app-sections/(tabs)/kalender/KalenderScreen.tsx` · `app-sections/(tabs)/dashboard/DashboardScreen.tsx` · `app-sections/(tabs)/dashboard/tomorrowPrep.ts` · `app-sections/event/EventDetailScreen.tsx` · `app-sections/event/EventEditScreen.tsx`
-
-**Interfaces:**
-
-- Consumes: alles aus Task 2 und 3.
-- Produces: der Route-Parameter `occ` trägt ab hier den **Schlüssel**.
-
-| Stelle                                                                                                                 | wird                                                      |
-| ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| React-Keys `${eventId}-${occurrenceDate}-${date}` (beide Screens)                                                      | `occurrenceKey`                                           |
-| Route-Parameter `occ` beim Navigieren (beide Screens, Detail)                                                          | `occurrenceKey`                                           |
-| `tomorrowPrep.ts` — `key` und das durchgereichte Feld                                                                  | `occurrenceKey`                                           |
-| `EventDetailScreen` — alle `data.occurrenceDate` im Schreib- und Konfliktpfad                                          | `occurrenceKey`                                           |
-| `EventEditScreen` — `initial.occurrenceDate`, `vars.occurrenceDate`, der `find` in `showConflict`, `occurrenceVersion` | `occurrenceKey`                                           |
-| `EventDetailScreen` — `formatDate(occurrenceDate)` im Undo-Text                                                        | **bleibt** — zeigt dem Nutzer ein Datum                   |
-| `EventEditScreen` — `parseISO(vars.occurrenceDate)` als Fensterrand in `showConflict`                                  | **bleibt** — grenzt ein Expansionsfenster ab, keine Zeile |
-
-**Zum Route-Parameter:** Ein Deep-Link aus der Zeit vor diesem PR trägt ein aufgelöstes Datum. `useEvent` findet dann nichts und fällt auf `expanded[0]` zurück — dasselbe Verhalten wie heute bei einem unbekannten `occ`. Kein Datenverlust, aber der Nutzer landet auf einer anderen Occurrence. Halte das als Kommentar am Fallback fest und als Eintrag in `docs/TODO.md` (Task 6).
-
-- [ ] **Step 1: Die Stellen umstellen** — nach der Tabelle.
-
-- [ ] **Step 2: Prüfen, dass keine `occurrenceDate` im Schreibpfad übrig ist**
-
-```bash
-grep -rn "occurrenceDate" --include="*.tsx" --include="*.ts" app-sections | grep -v "\.test\."
-```
-
-Jede verbleibende Stelle muss sich mit „zeigt einem Menschen ein Datum" oder „grenzt ein Fenster ab" begründen lassen. Schreib die Liste samt Begründung in den Report.
-
-- [ ] **Step 3: Gates und Commit**
-
-```bash
-bun run typecheck && bun lint && bun format:check && bun test
-git add app-sections
-git commit -m "refactor(calendar): Screens und Route-Parameter tragen den Occurrence-Schluessel
-
-Der occ-Parameter benennt jetzt die Exception-Zeile statt des Anzeigetags.
-Anzeige-Datumsangaben und Fenstergrenzen bleiben, wo sie waren."
-```
-
----
-
-## Task 5: Der Schreibpfad rechnet in der Zone des Termins
+## Task 4: Der Schreibpfad rechnet in der Zone des Termins
 
 **Files:** `features/calendar/recurrence.ts` (`anchoredChanges`) · `features/calendar/optimisticEvents.ts` (`withTimeOfDay`) · `features/calendar/createMutation.ts` (`recurrenceToRrule`) und die zugehörigen Testdateien.
 
@@ -544,7 +519,7 @@ anderen Zone verschob damit die ganze Serie um eine Stunde."
 
 ---
 
-## Task 6: ADR-034 und die Doku
+## Task 5: ADR-034 und die Doku
 
 **Files:** `docs/decision-log.md` · `docs/TODO.md` · `docs/roadmap.md` · `CLAUDE.md` · `docs/architecture.md`
 
