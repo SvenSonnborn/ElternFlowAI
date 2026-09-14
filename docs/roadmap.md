@@ -751,12 +751,16 @@ Importpfad und den Barrel — deshalb eine eigene, sonst leere Änderung, damit 
   Dashboard auf September: der neue Termin erscheint **zweimal**, bis auch die zweite Query durch
   ist. Selbstheilend, aber „die auffälligste denkbare Fehlanzeige für ein Feature, das gerade
   Vertrauen in die Sofortanzeige aufbauen soll".
-- **„Kein Kompositions-Test für die Kalender-Filterkette"** + **„Der `forward`-Filter vergleicht
-  aufgelöste Daten, der Server rechnet auf Regel-Daten"** ([Undo-Delete](./TODO.md#undo-delete-siehe-adr-026))
-  — zwei Einträge, ein Test. `TODO.md` sagt ausdrücklich: **„Braucht keine neue Infrastruktur"** —
-  eine Event-Zeile durch `expandEvents` schicken und das Ergebnis filtern, also genau die Kette aus
-  `useFamilyEvents`. Genau der Test, der die Divergenz gefunden hätte. **Nach Block 1.3 einplanen**,
-  weil sich das Override-Modell dort ändert.
+- **„Kein Kompositions-Test für die Kalender-Filterkette"** ([Undo-Delete](./TODO.md#undo-delete-siehe-adr-026))
+  — ursprünglich zwei Einträge, einer davon erledigt: Die Divergenz zwischen Filter und Server (der
+  Filter verglich das aufgelöste Anzeigedatum, der Server rechnete auf Regel-Daten) ist mit
+  [ADR-034](./decision-log.md) weg — `hidesOccurrence` und `patchesOccurrence` vergleichen jetzt beide
+  `occurrenceKey`. Der verbliebene Eintrag bleibt trotzdem sinnvoll, nur mit anderer Begründung: `TODO.md`
+  sagt ausdrücklich **„Braucht keine neue Infrastruktur"** — eine Event-Zeile durch `expandEvents`
+  schicken und das Ergebnis filtern, also genau die Kette aus `useFamilyEvents`, finge einen
+  Feldnamen-Mismatch oder eine vertauschte Filter-/Expand-Reihenfolge ab, für die die heutigen, gegen
+  handgebaute Occurrence-Objekte laufenden Tests blind sind. **Nach Block 1.3 einplanen**, weil sich
+  das Override-Modell dort ändert.
 - **„`typeLabelsForSlug` liefert `undefined`, solange i18next nicht initialisiert ist"**
   ([Weitere](./TODO.md#weitere-out-of-scope-items)) · [palette.ts](../features/calendar/palette.ts)
   — In der App unauffällig, in einem `bun test` ohne i18n-Setup nicht. Die Lösung ist ein
