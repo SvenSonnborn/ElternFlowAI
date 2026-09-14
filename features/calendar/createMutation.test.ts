@@ -109,9 +109,13 @@ const WEDNESDAY = new Date("2026-06-03T16:00:00");
 describe("rruleToRecurrence", () => {
   test("round-trips every option the create form can produce", () => {
     for (const opt of ["none", "daily", "weekdays", "weekly", "monthly"] as const) {
-      expect(rruleToRecurrence(recurrenceToRrule(opt, WEDNESDAY, "Europe/Berlin"), WEDNESDAY)).toBe(
-        opt,
-      );
+      expect(
+        rruleToRecurrence(
+          recurrenceToRrule(opt, WEDNESDAY, "Europe/Berlin"),
+          WEDNESDAY,
+          "Europe/Berlin",
+        ),
+      ).toBe(opt);
     }
   });
 
@@ -120,6 +124,7 @@ describe("rruleToRecurrence", () => {
     const opt = rruleToRecurrence(
       { rrule_freq: "weekly", rrule_interval: 1, rrule_byweekday: null },
       WEDNESDAY,
+      "Europe/Berlin",
     );
     expect(opt).toBe("weekly");
   });
@@ -132,6 +137,7 @@ describe("rruleToRecurrence", () => {
       rruleToRecurrence(
         { rrule_freq: "weekly", rrule_interval: 2, rrule_byweekday: [3] },
         WEDNESDAY,
+        "Europe/Berlin",
       ),
     ).toBeNull();
   });
@@ -141,6 +147,7 @@ describe("rruleToRecurrence", () => {
       rruleToRecurrence(
         { rrule_freq: "yearly", rrule_interval: 1, rrule_byweekday: null },
         WEDNESDAY,
+        "Europe/Berlin",
       ),
     ).toBeNull();
   });
@@ -150,6 +157,7 @@ describe("rruleToRecurrence", () => {
       rruleToRecurrence(
         { rrule_freq: "weekly", rrule_interval: 1, rrule_byweekday: [2, 4] },
         WEDNESDAY,
+        "Europe/Berlin",
       ),
     ).toBeNull();
   });
@@ -159,8 +167,31 @@ describe("rruleToRecurrence", () => {
       rruleToRecurrence(
         { rrule_freq: "weekly", rrule_interval: 1, rrule_byweekday: [1] },
         WEDNESDAY,
+        "Europe/Berlin",
       ),
     ).toBeNull();
+  });
+
+  // ── Rückrichtung muss denselben Zonenraum lesen wie die Hinrichtung ───────
+  // Gegenstück zum `recurrenceToRrule`-Test oben, derselbe Zeitpunkt:
+  // `2027-01-03T23:30:00.000Z` ist Montag, 00:30 Europe/Berlin (ISO-Wochentag
+  // 1), aber noch Sonntag, 18:30 America/New_York (ISO-Wochentag 7). Vor dem
+  // Fix las `rruleToRecurrence` den Wochentag über `startAt.getDay()` in der
+  // Zone des **Runners** statt in `timeZone` — unter `TZ=Europe/Berlin` traf
+  // das zufällig, unter `TZ=America/New_York` verglich es ISO-Wochentag 7
+  // gegen die gespeicherten `[1]` und gab `null` zurück statt `"weekly"`.
+  // Befund 1 der Schluss-Review; PROTOKOLL vor dem Fix (Stand vor diesem
+  // Commit) — dieser Test war:
+  //   TZ=Europe/Berlin bun test  → GRÜN (zufällig richtig)
+  //   TZ=America/New_York bun test → ROT ("null" statt "weekly")
+  test("weekly nahe Mitternacht → der Wochentag gilt in der Zone des Termins, nicht des Runners", () => {
+    const startAt = new Date("2027-01-03T23:30:00.000Z");
+    const opt = rruleToRecurrence(
+      { rrule_freq: "weekly", rrule_interval: 1, rrule_byweekday: [1] },
+      startAt,
+      "Europe/Berlin",
+    );
+    expect(opt).toBe("weekly");
   });
 });
 

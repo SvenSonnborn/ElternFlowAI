@@ -65,8 +65,23 @@ export function recurrenceToRrule(
  * series, an interval > 1, or a weekly rule on days the option set has no name
  * for. Callers hide the editor in that case rather than let the radio silently
  * rewrite a rule it cannot represent.
+ *
+ * `timeZone` must be the **same** zone `recurrenceToRrule` used to write
+ * `rrule_byweekday` (the event's zone, not the reader's) — the round-trip only
+ * holds if both directions read the weekday in the same wall-clock space. Until
+ * this fix, this side still read `startAt.getDay()` in the **device's** zone
+ * while `recurrenceToRrule` had already moved to `instantToFloating(startAt,
+ * timeZone)`: for a start near midnight the two disagreed, the weekly option
+ * came back `null`, and `EventEditScreen` hid the recurrence editor for a
+ * perfectly representable rule (ADR-034 follow-up, Befund 1 of the final
+ * review — see the round-trip test in `createMutation.test.ts` for the
+ * concrete case).
  */
-export function rruleToRecurrence(fields: RruleFields, startAt: Date): RecurrenceOption | null {
+export function rruleToRecurrence(
+  fields: RruleFields,
+  startAt: Date,
+  timeZone: string,
+): RecurrenceOption | null {
   if (!fields.rrule_freq) return "none";
   if ((fields.rrule_interval || 1) !== 1) return null;
   const days = fields.rrule_byweekday;
@@ -80,7 +95,7 @@ export function rruleToRecurrence(fields: RruleFields, startAt: Date): Recurrenc
       // is exactly what the "weekly" option produces.
       if (!days?.length) return "weekly";
       if (days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d))) return "weekdays";
-      const isoWeekday = ((startAt.getDay() + 6) % 7) + 1;
+      const isoWeekday = ((instantToFloating(startAt, timeZone).getUTCDay() + 6) % 7) + 1;
       if (days.length === 1 && days[0] === isoWeekday) return "weekly";
       return null;
     }
