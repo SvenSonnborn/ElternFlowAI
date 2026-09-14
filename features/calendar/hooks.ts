@@ -141,12 +141,23 @@ export function useEvent(id: string, occurrenceKey?: string): UseEventResult {
       // Schlüssel und Anzeigedatum hat auseinanderlaufen lassen (ADR-034).
       //
       // Ein Deep-Link aus der Zeit vor ADR-034 trägt noch ein aufgelöstes
-      // Datum statt eines Schlüssels. Für eine Occurrence ohne eigene
-      // Verschiebung sind beide gleich, der Link trifft also weiterhin. Nur
-      // bei einer verschobenen Occurrence findet `find` nichts und fällt auf
-      // `expanded[0]` zurück — dasselbe Verhalten wie heute bei jedem
-      // unbekannten `occ`. Kein Datenverlust, der Nutzer landet nur auf einer
-      // anderen Occurrence der Serie. Der Fallback ist alt, kein neuer Bug.
+      // Datum statt eines Schlüssels — gebildet in der **Gerätezone** des
+      // Erstellers. Für eine Occurrence ohne eigene Verschiebung sind Datum
+      // und Schlüssel gleich, der Link trifft also weiterhin.
+      //
+      // Bei einer verschobenen Occurrence ist der Fall nicht so harmlos, wie
+      // „findet nichts, fällt zurück" klingt: Weicht die Gerätezone des
+      // Öffners von `row.timezone` über eine Tagesgrenze hinweg ab (täglicher
+      // Berliner Termin um 00:30, Leser in `America/New_York`), kann das alte
+      // Datum zufällig mit dem `occurrenceKey` der **Nachbar-Occurrence**
+      // übereinstimmen. `find` trifft dann still die falsche Zeile statt gar
+      // keine — der Nutzer landet auf einem plausiblen, aber falschen Termin,
+      // und ein anschließendes „Nur diesen" schriebe oder löschte die
+      // Exception des Nachbarn statt der gemeinten. Nur ein echter
+      // Nicht-Treffer fällt auf `expanded[0]` zurück — dasselbe Verhalten wie
+      // bei jedem unbekannten `occ`. Schmaler Vektor (keine Push- oder
+      // Mail-Deep-Links, nur Browser-Tab oder Lesezeichen); kein Fix hier,
+      // siehe docs/TODO.md.
       return expanded.find((o) => o.occurrenceKey === occurrenceKey) ?? expanded[0] ?? null;
     }
     return expanded[0] ?? null;
