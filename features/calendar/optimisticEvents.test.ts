@@ -425,6 +425,13 @@ describe("Reihenfolge der beiden Overlays", () => {
     // Umgekehrte Reihenfolge (Patch vor Filter) — kommt seit ADR-034 zum
     // selben Ergebnis, weil `occurrenceKey` den Patch unverändert übersteht.
     const patchedFirst = withOptimistic([single], optimistic, expandStub);
+    // Belegt die Step-3-Invariante direkt an dieser Stelle: der Patch hat das
+    // Anzeigedatum verschoben, aber `occurrenceKey` unangetastet gelassen —
+    // ohne das wäre der Filter-Aufruf direkt darunter kein Beleg für
+    // Kommutativität, sondern liefe blind ins Leere, falls `withOptimistic`
+    // aus irgendeinem Grund gar nichts mehr patchte.
+    expect(patchedFirst[0].occurrenceDate).toBe("2026-09-20");
+    expect(patchedFirst[0].occurrenceKey).toBe("2026-09-10");
     const patchedThenFiltered = withoutPendingDeletes(patchedFirst, pending);
     expect(patchedThenFiltered).toHaveLength(0);
   });
