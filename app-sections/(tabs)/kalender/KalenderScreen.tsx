@@ -165,12 +165,12 @@ export function KalenderScreen() {
             const isOptimistic = isOptimisticEventId(occ.eventId);
             return (
               <Pressable
-                key={`${occ.eventId}-${occ.occurrenceDate}-${seg.date}`}
+                key={`${occ.eventId}-${occ.occurrenceKey}-${seg.date}`}
                 onPress={() => {
                   if (isOptimistic) return;
                   router.push({
                     pathname: "/event/[id]",
-                    params: { id: occ.eventId, occ: occ.occurrenceDate },
+                    params: { id: occ.eventId, occ: occ.occurrenceKey },
                   });
                 }}
                 disabled={isOptimistic}

@@ -70,30 +70,30 @@ function recurrenceChanges(partial: Partial<RecurrenceChanges> = {}): Recurrence
 }
 
 describe("patchesOccurrence", () => {
-  const entry = { eventId: "e1", occurrenceDate: "2026-09-10", scope: "this" as const };
+  const entry = { eventId: "e1", occurrenceKey: "2026-09-10", scope: "this" as const };
 
   test("`this` trifft genau diese Occurrence", () => {
-    expect(patchesOccurrence(entry, { eventId: "e1", occurrenceDate: "2026-09-10" })).toBe(true);
-    expect(patchesOccurrence(entry, { eventId: "e1", occurrenceDate: "2026-09-17" })).toBe(false);
+    expect(patchesOccurrence(entry, { eventId: "e1", occurrenceKey: "2026-09-10" })).toBe(true);
+    expect(patchesOccurrence(entry, { eventId: "e1", occurrenceKey: "2026-09-17" })).toBe(false);
   });
 
   test("`forward` schließt den Stichtag ein und lässt alles davor", () => {
     const fwd = { ...entry, scope: "forward" as const };
-    expect(patchesOccurrence(fwd, { eventId: "e1", occurrenceDate: "2026-09-10" })).toBe(true);
-    expect(patchesOccurrence(fwd, { eventId: "e1", occurrenceDate: "2026-09-17" })).toBe(true);
-    expect(patchesOccurrence(fwd, { eventId: "e1", occurrenceDate: "2026-09-03" })).toBe(false);
+    expect(patchesOccurrence(fwd, { eventId: "e1", occurrenceKey: "2026-09-10" })).toBe(true);
+    expect(patchesOccurrence(fwd, { eventId: "e1", occurrenceKey: "2026-09-17" })).toBe(true);
+    expect(patchesOccurrence(fwd, { eventId: "e1", occurrenceKey: "2026-09-03" })).toBe(false);
   });
 
   test("`all` trifft jede Occurrence des Events", () => {
     const all = { ...entry, scope: "all" as const };
-    expect(patchesOccurrence(all, { eventId: "e1", occurrenceDate: "2020-01-01" })).toBe(true);
-    expect(patchesOccurrence(all, { eventId: "e1", occurrenceDate: "2030-12-31" })).toBe(true);
+    expect(patchesOccurrence(all, { eventId: "e1", occurrenceKey: "2020-01-01" })).toBe(true);
+    expect(patchesOccurrence(all, { eventId: "e1", occurrenceKey: "2030-12-31" })).toBe(true);
   });
 
   test("kein Scope greift auf ein fremdes Event über", () => {
     for (const scope of ["this", "forward", "all"] as const) {
       expect(
-        patchesOccurrence({ ...entry, scope }, { eventId: "e2", occurrenceDate: "2026-09-10" }),
+        patchesOccurrence({ ...entry, scope }, { eventId: "e2", occurrenceKey: "2026-09-10" }),
       ).toBe(false);
     }
   });
@@ -242,7 +242,7 @@ describe("withOptimistic", () => {
           id: "o1",
           kind: "update",
           eventId: "e1",
-          occurrenceDate: "2026-09-10",
+          occurrenceKey: "2026-09-10",
           scope: "this",
           changes: changes({ title: "Geändert" }),
         },
@@ -259,15 +259,19 @@ describe("withOptimistic", () => {
     expect(out.map((o) => o.occurrenceDate)).toEqual(["2026-10-01", "2026-10-08"]);
   });
 
-  test("mehrere Update-Einträge wirken nacheinander: spätere können Matches von früheren treffen", () => {
-    // Eine Serie, wenn o1 sie auf allen Vorkommen ändert, verschiebt `occurrenceDate`
-    // nicht — es behält das Datum jeder Occurrence. Bei einem Einzeltermin mit
-    // `scope: "this"` aber ändert sich `occurrenceDate` ins neue Datum.
+  test("mehrere Update-Einträge auf derselben Occurrence wirken nacheinander", () => {
+    // Vor ADR-034 matchte dieser Test über das (bei jedem Patch wandernde)
+    // Anzeige-Datum: o1 verschob den Einzeltermin auf ein neues Datum, o2 trug
+    // exakt dieses neue Datum und fand die Occurrence dadurch wieder. Das war
+    // genau die Verwechslungsgefahr, die ADR-034 behebt — zwei verschiedene
+    // Occurrences könnten zufällig auf demselben Anzeige-Datum landen.
     //
-    // Deshalb: o1 verschiebt den Einzeltermin vom 10.09. auf den 24.09., o2 mit
-    // `occurrenceDate: "2026-09-24"` matcht die verschobene Occurrence und ändert
-    // den Titel. Ein falsches „nur den letzten anwenden" findet o2 nicht, weil die
-    // ursprüngliche Occurrence noch am 10.09. liegt.
+    // Jetzt tragen beide Einträge denselben `occurrenceKey` — dieselbe
+    // Occurrence, zweimal bearbeitet, bevor die erste Mutation abgeschlossen
+    // ist (derselbe Fall, den `EventEditScreen` erzeugt, wenn der Nutzer die
+    // gerade optimistisch verschobene Occurrence sofort erneut öffnet: der
+    // Route-Parameter `occ` trägt weiterhin ihren unveränderten Schlüssel).
+    // o2 findet sie über die stabile Identität, nicht über die Position.
     const single = occ({
       isRecurring: false,
       rrule: { freq: null, interval: 1, byweekday: null, count: null, until: null },
@@ -279,7 +283,7 @@ describe("withOptimistic", () => {
           id: "o1",
           kind: "update",
           eventId: "e1",
-          occurrenceDate: "2026-09-10",
+          occurrenceKey: "2026-09-10",
           scope: "this",
           changes: changes({
             title: "Teste nach o1",
@@ -291,19 +295,26 @@ describe("withOptimistic", () => {
           id: "o2",
           kind: "update",
           eventId: "e1",
-          occurrenceDate: "2026-09-24",
+          occurrenceKey: "2026-09-10",
           scope: "this",
-          changes: changes({ title: "o2 hat gematcht" }),
+          changes: changes({
+            title: "o2 hat gematcht",
+            start_at: new Date("2026-09-30T18:00:00").toISOString(),
+            end_at: new Date("2026-09-30T19:30:00").toISOString(),
+          }),
         },
       ],
       expandStub,
     );
-    // Wenn sequenziell: o1 setzt Titel auf "Teste nach o1", o2 findet und ändert
-    // auf "o2 hat gematcht", occurrenceDate wird "2026-09-24".
-    // Wenn nur o2: o2 findet die Occurrence nicht (sie ist noch am 10.09.), Titel
-    // bleibt "Fußballtraining", occurrenceDate bleibt "2026-09-10".
+    // Wenn sequenziell: o1 verschiebt auf den 24.09. und setzt den Titel, o2
+    // findet dieselbe Occurrence über `occurrenceKey` wieder (unabhängig davon,
+    // wohin o1 sie optisch verschoben hat) und verschiebt sie ein zweites Mal,
+    // auf den 30.09. — ein falsches „nur den letzten anwenden" träfe hier
+    // dieselbe Occurrence, ein falsches „o2 findet sie nicht mehr" ließe sie
+    // am 24.09. stehen.
     const found = out.find((o) => o.eventId === "e1");
     expect(found?.title).toBe("o2 hat gematcht");
+    expect(found?.occurrenceDate).toBe("2026-09-30");
   });
 });
 
@@ -354,7 +365,7 @@ describe("Reihenfolge der beiden Overlays", () => {
           id: "o1",
           kind: "update",
           eventId: "e1",
-          occurrenceDate: "2026-09-10",
+          occurrenceKey: "2026-09-10",
           scope: "all",
           changes: changes({ title: "Geändert" }),
         },
@@ -363,73 +374,59 @@ describe("Reihenfolge der beiden Overlays", () => {
     );
     expect(patched).toHaveLength(1);
     const out = withoutPendingDeletes(patched, [
-      { eventId: "e1", occurrenceDate: "2026-09-10", scope: "all" },
+      { eventId: "e1", occurrenceKey: "2026-09-10", scope: "all" },
     ]);
     expect(out).toHaveLength(0);
   });
 
-  test("eine verschobene und gleichzeitig gelöschte Occurrence: Filtern → Patchen ist korrekt", () => {
-    // Ein `this`-Scope-Update auf einem Einzeltermin verschiebt `occurrenceDate`.
-    // Die Löschung trägt die **alte** Date (2026-09-10).
+  test("eine verschobene und gleichzeitig gelöschte Occurrence bleibt verdeckt, gleich in welcher Reihenfolge", () => {
+    // Vor ADR-034 verglich `hidesOccurrence` gegen das aufgelöste Anzeigedatum,
+    // und ein `this`-Scope-Update, das den Termin verschiebt, schrieb genau
+    // dieses Feld neu — der Filter musste deshalb **vor** dem Patch laufen,
+    // sonst hätte er das neue Datum gegen das alte verglichen, das die offene
+    // Löschung trägt, und die Löschung hätte nicht mehr gegriffen.
     //
-    // Diese Reihenfolge-Abhängigkeit wird durch `visibleOccurrences` erzwungen —
-    // der Test prüft sie direkt, nicht nachgebaut. Ein Flip der Reihenfolge in
-    // der Funktion selbst wird den Test red machen.
+    // Seit `hidesOccurrence` und `patchesOccurrence` beide gegen `occurrenceKey`
+    // vergleichen — ein Wert, den `applyOptimisticChanges` nie neu berechnet —
+    // kommutieren Filter und Patch für diesen Fall: beide Reihenfolgen kommen
+    // zum selben Ergebnis. `visibleOccurrences` filtert trotzdem weiterhin vor
+    // dem Patchen (ein optimistischer **Create**-Eintrag umgeht den Filter
+    // strukturell, siehe der Test oben) — dieser Test hält beide Reihenfolgen
+    // als Regression fest, nicht nur die, die die Pipeline tatsächlich fährt.
 
     const single = occ({
       isRecurring: false,
       rrule: { freq: null, interval: 1, byweekday: null, count: null, until: null },
     });
+    const pending = [{ eventId: "e1", occurrenceKey: "2026-09-10", scope: "this" as const }];
+    const optimistic = [
+      {
+        id: "o1",
+        kind: "update" as const,
+        eventId: "e1",
+        occurrenceKey: "2026-09-10",
+        scope: "this" as const,
+        changes: changes({
+          start_at: new Date("2026-09-20T18:00:00").toISOString(),
+          end_at: new Date("2026-09-20T19:30:00").toISOString(),
+        }),
+      },
+    ];
 
-    // KORREKTE Reihenfolge (Filter vor Patch) — über `visibleOccurrences`
+    // Tatsächliche Pipeline (Filter vor Patch) — über `visibleOccurrences`.
     const result = visibleOccurrences({
       expanded: [single],
-      pending: [{ eventId: "e1", occurrenceDate: "2026-09-10", scope: "this" }],
-      optimistic: [
-        {
-          id: "o1",
-          kind: "update",
-          eventId: "e1",
-          occurrenceDate: "2026-09-10",
-          scope: "this",
-          changes: changes({
-            start_at: new Date("2026-09-20T18:00:00").toISOString(),
-            end_at: new Date("2026-09-20T19:30:00").toISOString(),
-          }),
-        },
-      ],
+      pending,
+      optimistic,
       expand: expandStub,
     });
-    // Die Löschung auf "2026-09-10" trifft, weil der Filter **vor** dem Patch läuft.
-    // Ergebnis: die Occurrence ist weg.
     expect(result).toHaveLength(0);
 
-    // KONTRAST: Falsche Reihenfolge (nur zum Dokumentieren, nicht vom Test getrieben)
-    // — zeigt, dass umgekehrte Reihenfolge das Update sichtbar ließe.
-    const falseOrder = withOptimistic(
-      [single],
-      [
-        {
-          id: "o1",
-          kind: "update",
-          eventId: "e1",
-          occurrenceDate: "2026-09-10",
-          scope: "this",
-          changes: changes({
-            start_at: new Date("2026-09-20T18:00:00").toISOString(),
-            end_at: new Date("2026-09-20T19:30:00").toISOString(),
-          }),
-        },
-      ],
-      expandStub,
-    );
-    const falseOrderFiltered = withoutPendingDeletes(falseOrder, [
-      { eventId: "e1", occurrenceDate: "2026-09-10", scope: "this" },
-    ]);
-    // Mit falscher Reihenfolge: occurrenceDate ist jetzt "2026-09-20", die Löschung
-    // auf "2026-09-10" trifft nicht — der Termin wäre sichtbar und verschoben.
-    expect(falseOrderFiltered).toHaveLength(1);
-    expect(falseOrderFiltered[0]?.occurrenceDate).toBe("2026-09-20");
+    // Umgekehrte Reihenfolge (Patch vor Filter) — kommt seit ADR-034 zum
+    // selben Ergebnis, weil `occurrenceKey` den Patch unverändert übersteht.
+    const patchedFirst = withOptimistic([single], optimistic, expandStub);
+    const patchedThenFiltered = withoutPendingDeletes(patchedFirst, pending);
+    expect(patchedThenFiltered).toHaveLength(0);
   });
 });
 
@@ -443,7 +440,7 @@ describe("useOptimisticEventsStore", () => {
     const id = store().add({
       kind: "update",
       eventId: "e1",
-      occurrenceDate: "2026-09-10",
+      occurrenceKey: "2026-09-10",
       scope: "all",
       changes: changes(),
     });
@@ -458,14 +455,14 @@ describe("useOptimisticEventsStore", () => {
     const first = store().add({
       kind: "update",
       eventId: "e1",
-      occurrenceDate: "2026-09-10",
+      occurrenceKey: "2026-09-10",
       scope: "all",
       changes: changes(),
     });
     const second = store().add({
       kind: "update",
       eventId: "e2",
-      occurrenceDate: "2026-09-10",
+      occurrenceKey: "2026-09-10",
       scope: "all",
       changes: changes(),
     });
@@ -478,7 +475,7 @@ describe("useOptimisticEventsStore", () => {
 });
 
 describe("canApplyOptimistically", () => {
-  const base = { isRecurring: true, occurrenceDate: "2026-10-05" };
+  const base = { isRecurring: true, occurrenceKey: "2026-10-05" };
 
   test("`all` mit geändertem Datum bekommt keinen Eintrag", () => {
     // Der Server schreibt `changes.start_at` als neues `dtstart` — die ganze
@@ -566,7 +563,7 @@ describe("Watchdog", () => {
         {
           kind: "update",
           eventId: "e1",
-          occurrenceDate: "2026-09-10",
+          occurrenceKey: "2026-09-10",
           scope: "all",
           changes: changes(),
         },
@@ -588,7 +585,7 @@ describe("Watchdog", () => {
         {
           kind: "update",
           eventId: "e1",
-          occurrenceDate: "2026-09-10",
+          occurrenceKey: "2026-09-10",
           scope: "all",
           changes: changes(),
         },
@@ -614,7 +611,7 @@ describe("Watchdog", () => {
         {
           kind: "update",
           eventId: "e1",
-          occurrenceDate: "2026-09-10",
+          occurrenceKey: "2026-09-10",
           scope: "all",
           changes: changes(),
         },

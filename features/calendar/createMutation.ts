@@ -142,8 +142,8 @@ export async function createEvent(vars: CreateEventVars): Promise<void> {
 // hintereinander ohne Zeit-/Typänderung angelegt werden — `EventCreateScreen`
 // setzt `startAt` bei jedem Öffnen auf 09:00 des Zieldatums und `typeId` auf
 // einen festen Default-Typ. Zwei optimistische Zeilen trügen dann dieselbe Id
-// und, weil `start_at` ebenfalls gleich ist, dasselbe `occurrenceDate` — der
-// React-Key `${eventId}-${occurrenceDate}-${date}` in KalenderScreen.tsx und
+// und, weil `start_at` ebenfalls gleich ist, denselben `occurrenceKey` — der
+// React-Key `${eventId}-${occurrenceKey}-${date}` in KalenderScreen.tsx und
 // DashboardScreen.tsx kollidierte, eine der beiden Occurrences verschwände bis
 // zum nächsten Refetch. Eine Zeile lebt Sekundenbruchteile, eine Kollision über
 // einen App-Lauf hinweg gibt es nicht.

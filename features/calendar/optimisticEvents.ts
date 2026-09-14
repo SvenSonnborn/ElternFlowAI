@@ -29,17 +29,24 @@ import { withoutPendingDeletes } from "./pendingDeletes";
  * und aus demselben Grund derselbe String-Vergleich: `YYYY-MM-DD` ist
  * lexikographisch chronologisch, ein `Date` wäre hier nur eine Zeitzonenfalle.
  * `forward` schließt den Stichtag **ein** — geändert wird „ab diesem Termin".
+ *
+ * Verglichen wird `occurrenceKey`, nicht `occurrenceDate`: „ab diesem Termin"
+ * meint den Ausschnitt, den der Server über die Regel bestimmt
+ * (`consumedBefore`/`dayBefore` in `recurrence.ts`), und der rechnet in
+ * Regel-Daten. Eine bereits verschobene Occurrence hätte mit dem aufgelösten
+ * Datum verglichen den Ausschnitt verfehlen oder zu Unrecht treffen können
+ * (ADR-034).
  */
 export function patchesOccurrence(
-  entry: { eventId: string; occurrenceDate: string; scope: EditScope },
-  occurrence: { eventId: string; occurrenceDate: string },
+  entry: { eventId: string; occurrenceKey: string; scope: EditScope },
+  occurrence: { eventId: string; occurrenceKey: string },
 ): boolean {
   if (entry.eventId !== occurrence.eventId) return false;
   switch (entry.scope) {
     case "this":
-      return entry.occurrenceDate === occurrence.occurrenceDate;
+      return entry.occurrenceKey === occurrence.occurrenceKey;
     case "forward":
-      return occurrence.occurrenceDate >= entry.occurrenceDate;
+      return occurrence.occurrenceKey >= entry.occurrenceKey;
     case "all":
       return true;
   }
@@ -86,14 +93,14 @@ export function patchesOccurrence(
  * Eine eigene reine Funktion statt einer Bedingung im Hook, damit die
  * Fallunterscheidung ohne React testbar ist.
  *
- * Der Vergleich läuft gegen `occurrenceDate` statt gegen die alte Startzeit,
- * weil genau dieser Wert die Identität der bearbeiteten Occurrence trägt und
- * `EventEditScreen` ihn unverändert aus `useEvent` durchreicht.
+ * Der Vergleich läuft gegen `occurrenceKey` statt gegen die alte Startzeit,
+ * weil genau dieser Wert die Identität der bearbeiteten Occurrence trägt
+ * (ADR-034) und `EventEditScreen` ihn unverändert aus `useEvent` durchreicht.
  */
 export function canApplyOptimistically(args: {
   scope: EditScope;
   isRecurring: boolean;
-  occurrenceDate: string;
+  occurrenceKey: string;
   changes: EventChanges;
   recurrence?: RecurrenceChanges | null;
 }): boolean {
@@ -104,7 +111,7 @@ export function canApplyOptimistically(args: {
   // verschiebt eine Datumsänderung den Termin tatsächlich, und das Overlay
   // bildet sie korrekt ab.
   if (!args.isRecurring || args.scope === "this") return true;
-  return format(new Date(args.changes.start_at), "yyyy-MM-dd") === args.occurrenceDate;
+  return format(new Date(args.changes.start_at), "yyyy-MM-dd") === args.occurrenceKey;
 }
 
 /** Nimmt das Datum von `day` und die Uhrzeit von `time`. */
@@ -160,6 +167,13 @@ export function applyOptimisticChanges(
     // `expandEvents` leitet das Datum aus dem aufgelösten Start ab, nicht aus
     // der Regel — eine verschobene Occurrence wandert also mit.
     occurrenceDate: format(startAt, "yyyy-MM-dd"),
+    // `occurrenceKey` wird bewusst NICHT neu berechnet, obwohl `startAt` sich
+    // gerade verschoben haben kann: Er kommt unverändert über den Spread oben
+    // und bleibt, was er war — dieselbe Zeile in `event_exceptions`, nur mit
+    // neuem Inhalt. Ihn hier aus dem neuen `startAt` abzuleiten würde eine
+    // optimistisch verschobene Occurrence beim zweiten Bearbeiten oder Löschen
+    // auf die falsche (oder eine nicht existierende) Exception-Zeile schicken
+    // — genau der Fehler, den ADR-034 behebt.
     isException: viaException ? true : occurrence.isException,
   };
 }
@@ -182,7 +196,8 @@ export interface OptimisticCreate {
 export interface OptimisticUpdate {
   kind: "update";
   eventId: string;
-  occurrenceDate: string;
+  /** Der Schlüssel der bearbeiteten Occurrence (ADR-034), aus `UpdateEventVars.occurrenceKey`. */
+  occurrenceKey: string;
   scope: EditScope;
   changes: EventChanges;
 }
@@ -387,10 +402,16 @@ export function withOptimistic(
  * nachgebauter Test bliebe grün, wenn jemand den Hook zurückdreht. Genau das
  * ist bei der ersten Fassung passiert.
  *
- * Warum die Reihenfolge so herum: Ein Update mit Scope `this`, das den Termin
- * verschiebt, schreibt `occurrenceDate` neu. Liefe der Filter danach, vergliche
- * er das neue Datum gegen das alte, das die offene Löschung trägt — die
- * Löschung griffe nicht mehr.
+ * Warum die Reihenfolge so herum: Vor ADR-034 verglich `hidesOccurrence` gegen
+ * das aufgelöste Anzeigedatum, und ein Update mit Scope `this`, das den Termin
+ * verschiebt, schrieb genau dieses Feld (`occurrenceDate`) neu. Liefe der
+ * Filter danach, vergliche er das neue Datum gegen das alte, das die offene
+ * Löschung trägt — die Löschung griffe nicht mehr. Seit `hidesOccurrence` und
+ * `patchesOccurrence` beide gegen `occurrenceKey` vergleichen — ein Wert, den
+ * `applyOptimisticChanges` nie neu berechnet — kommutieren Filter und Patch für
+ * diesen Fall inzwischen; die Reihenfolge bleibt trotzdem verbindlich, weil ein
+ * optimistischer Create-Eintrag den Filter strukturell umgeht (siehe unten) —
+ * für den zählt sie weiterhin.
  *
  * **Was die Reihenfolge kostet:** Die Occurrences eines optimistischen
  * **Creates** umgehen den Löschfilter strukturell — sie entstehen erst hinter

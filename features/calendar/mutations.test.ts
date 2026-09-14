@@ -72,7 +72,7 @@ const CHANGES: EventChanges = {
 const BASE_VARS: UpdateEventVars = {
   scope: "all",
   eventId: "evt-1",
-  occurrenceDate: "2026-06-15",
+  occurrenceKey: "2026-06-15",
   isRecurring: true,
   changes: CHANGES,
   baseVersion: MASTER_VERSION,
@@ -176,7 +176,7 @@ describe("updateEvent", () => {
 const DELETE_VARS: DeleteEventVars = {
   scope: "all",
   eventId: "evt-1",
-  occurrenceDate: "2026-06-15",
+  occurrenceKey: "2026-06-15",
   isRecurring: true,
   baseVersion: MASTER_VERSION,
 };

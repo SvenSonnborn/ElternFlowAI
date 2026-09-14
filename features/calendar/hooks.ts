@@ -106,7 +106,7 @@ interface UseEventResult {
   error: unknown;
 }
 
-export function useEvent(id: string, occurrenceDate?: string): UseEventResult {
+export function useEvent(id: string, occurrenceKey?: string): UseEventResult {
   const { theme } = useTheme();
 
   const query = useQuery({
@@ -119,9 +119,9 @@ export function useEvent(id: string, occurrenceDate?: string): UseEventResult {
     const row = query.data;
     if (!row) return null;
     const start = new Date(row.start_at);
-    // Ensure the requested occurrenceDate falls inside the expansion window —
+    // Ensure the requested occurrenceKey falls inside the expansion window —
     // a far-future RRULE occurrence (>1y out) would otherwise be cut off.
-    const requested = occurrenceDate ? parseISO(occurrenceDate) : null;
+    const requested = occurrenceKey ? parseISO(occurrenceKey) : null;
     const fallbackStart = requested ? dateMin([addDays(start, -1), requested]) : addDays(start, -1);
     // `endOfDay` auf der Obergrenze: `parseISO("2026-09-08")` ist Mitternacht,
     // und `expandEvents` verwirft `startAt > rangeEnd`. Ohne das fiele eine
@@ -134,11 +134,23 @@ export function useEvent(id: string, occurrenceDate?: string): UseEventResult {
       ? dateMax([addDays(start, 366), endOfDay(requested)])
       : addDays(start, 366);
     const expanded = expandEvents([row], fallbackStart, fallbackEnd, theme);
-    if (occurrenceDate) {
-      return expanded.find((o) => o.occurrenceDate === occurrenceDate) ?? expanded[0] ?? null;
+    if (occurrenceKey) {
+      // Match auf `occurrenceKey`, nicht auf das aufgelöste Anzeigedatum: Der
+      // Routen-Parameter `occ` benennt die Exception-Zeile, und nur der
+      // Schlüssel identifiziert die richtige Occurrence, wenn eine Verschiebung
+      // Schlüssel und Anzeigedatum hat auseinanderlaufen lassen (ADR-034).
+      //
+      // Ein Deep-Link aus der Zeit vor ADR-034 trägt noch ein aufgelöstes
+      // Datum statt eines Schlüssels. Für eine Occurrence ohne eigene
+      // Verschiebung sind beide gleich, der Link trifft also weiterhin. Nur
+      // bei einer verschobenen Occurrence findet `find` nichts und fällt auf
+      // `expanded[0]` zurück — dasselbe Verhalten wie heute bei jedem
+      // unbekannten `occ`. Kein Datenverlust, der Nutzer landet nur auf einer
+      // anderen Occurrence der Serie. Der Fallback ist alt, kein neuer Bug.
+      return expanded.find((o) => o.occurrenceKey === occurrenceKey) ?? expanded[0] ?? null;
     }
     return expanded[0] ?? null;
-  }, [query.data, occurrenceDate, theme]);
+  }, [query.data, occurrenceKey, theme]);
 
   return {
     data: occurrence,

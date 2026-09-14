@@ -5,7 +5,7 @@ import type { CalendarOccurrence } from "./types";
 import { hidesOccurrence, withoutPendingDeletes, type PendingEventDelete } from "./pendingDeletes";
 
 function pending(partial: Partial<PendingEventDelete> = {}): PendingEventDelete {
-  return { eventId: "e1", occurrenceDate: "2026-09-10", scope: "this", ...partial };
+  return { eventId: "e1", occurrenceKey: "2026-09-10", scope: "this", ...partial };
 }
 
 function occ(occurrenceDate: string, eventId = "e1"): CalendarOccurrence {
@@ -120,7 +120,7 @@ describe("withoutPendingDeletes", () => {
   test("zwei offene Löschungen wirken beide", () => {
     const input = [occ("2026-09-09"), occ("2026-09-10"), occ("2026-09-11")];
     const p1 = pending({ scope: "this" });
-    const p2 = pending({ scope: "forward", occurrenceDate: "2026-09-11" });
+    const p2 = pending({ scope: "forward", occurrenceKey: "2026-09-11" });
     const result = withoutPendingDeletes(input, [p1, p2]);
     expect(result).toEqual([occ("2026-09-09")]);
   });
