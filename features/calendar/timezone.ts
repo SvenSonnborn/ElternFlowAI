@@ -141,6 +141,32 @@ export function floatingToInstant(floating: Date, timeZone: string): Date {
 }
 
 /**
+ * Nimmt das **Datum** von `day` und die **Uhrzeit** von `time` — beide als
+ * Wandzeit in `timeZone` gelesen, nicht in der Zone des Lesers.
+ *
+ * Mit lokalen `Date`-Gettern (`getHours`/`setHours`) verschöbe ein
+ * Öffnen-und-Speichern von einem Gerät in einer anderen Zone die ganze Serie:
+ * Der Merge geht deshalb über den Floating-Raum von `timeZone` — dort die
+ * Komponenten mischen, zurückrechnen. `anchoredChanges`
+ * ([recurrence.ts](./recurrence.ts)) und `applyOptimisticChanges`
+ * ([optimisticEvents.ts](./optimisticEvents.ts)) brauchten bislang denselben
+ * Block inline, einmal für den Schreib-, einmal für den Anzeigepfad — hierher
+ * gezogen, damit er nur einmal steht (ADR-034).
+ */
+export function mergeDateAndTimeOfDay(day: Date, time: Date, timeZone: string): Date {
+  const floatingDay = instantToFloating(day, timeZone);
+  const floatingTime = instantToFloating(time, timeZone);
+  const merged = new Date(floatingDay);
+  merged.setUTCHours(
+    floatingTime.getUTCHours(),
+    floatingTime.getUTCMinutes(),
+    floatingTime.getUTCSeconds(),
+    floatingTime.getUTCMilliseconds(),
+  );
+  return floatingToInstant(merged, timeZone);
+}
+
+/**
  * Der Kalendertag eines Zeitpunkts **in dieser Zone**, als `yyyy-MM-dd`.
  *
  * Der Schlüssel von `event_exceptions.occurrence_date` — er benennt eine Zeile

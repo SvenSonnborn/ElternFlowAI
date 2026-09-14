@@ -102,7 +102,7 @@ describe("patchesOccurrence", () => {
 
 describe("applyOptimisticChanges · Serie mit Scope `all`", () => {
   // Zonenexplizit gebaut (UTC-Strings, nicht lokale Date-Komponenten):
-  // `withTimeOfDay` rechnet seit ADR-034 in `occurrence.timezone`, eine
+  // `mergeDateAndTimeOfDay` (`timezone.ts`) rechnet seit ADR-034 in `occurrence.timezone`, eine
   // ambiente Fixture (ohne "Z") ließe die Erwartung mit der Runner-Zone
   // wandern — genau das hat diese beiden Tests unter `TZ=America/New_York`
   // reißen lassen, bevor sie zonenexplizit wurden. Gelesen wird das Ergebnis
@@ -160,7 +160,8 @@ describe("applyOptimisticChanges · Serie mit Scope `all`", () => {
 });
 
 // ── Schreibpfad rechnet in der Zone des Termins (ADR-034) ──────────────────
-// `withTimeOfDay` nahm die Tageszeit bisher mit lokalen Gettern. Dieselbe
+// `mergeDateAndTimeOfDay` (damals noch `withTimeOfDay`, inline in dieser Datei)
+// nahm die Tageszeit bisher mit lokalen Gettern. Dieselbe
 // Konstellation wie beim `anchoredChanges`-Pendant in `recurrence.test.ts`:
 // die angezeigte Occurrence liegt am 27.10.2026 (nach Berlins
 // Zeitumstellung, CET), die soeben gespeicherte Eingabe stammt vom 06.10.

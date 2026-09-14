@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { floatingToInstant, instantToFloating, zonedDateKey, zoneOffsetMs } from "./timezone";
+import {
+  floatingToInstant,
+  instantToFloating,
+  mergeDateAndTimeOfDay,
+  zonedDateKey,
+  zoneOffsetMs,
+} from "./timezone";
 
 const BERLIN = "Europe/Berlin";
 
@@ -111,6 +117,32 @@ describe("zoneOffsetMs mit unbekannter Zone (Befund D)", () => {
 
   test("die verworfene Zone wird gecacht — ein zweiter Aufruf wirft ebenfalls nicht", () => {
     expect(zoneOffsetMs(new Date("2026-01-01T00:00:00.000Z"), "Foo/Bar")).toBe(0);
+  });
+});
+
+describe("mergeDateAndTimeOfDay", () => {
+  test("nimmt das Datum von `day`, die Uhrzeit von `time` — in der Zone, nicht lokal", () => {
+    // 09:15 Europe/Berlin (CET, +1h) am 01.02., 20:45 Europe/Berlin (CEST, +2h)
+    // am 01.08. — zwei verschiedene Offsets, damit ein Rückfall auf lokale
+    // Getter (statt Floating-Raum) hier auffiele.
+    const day = new Date("2026-02-01T08:15:00.000Z");
+    const time = new Date("2026-08-01T18:45:00.000Z");
+    const merged = mergeDateAndTimeOfDay(day, time, "Europe/Berlin");
+    // Datum vom 01.02. (CET) + Uhrzeit 20:45 Berlin ⇒ 19:45 UTC.
+    expect(merged.toISOString()).toBe("2026-02-01T19:45:00.000Z");
+  });
+
+  test("bindet Datum und Uhrzeit an dieselbe Zone, auch über eine Zeitumstellung hinweg", () => {
+    // Dieselbe Konstellation wie der Task-4-Fund: `day` liegt vor Berlins
+    // Herbst-Zeitumstellung (CEST), `time` danach (CET). Ohne den
+    // Floating-Merge läse eine Runner-Zone ungleich Berlin hier einen
+    // anderen Offset für `day` als für `time` und verschöbe das Ergebnis um
+    // eine Stunde — nachgestellt in `recurrence.test.ts` und
+    // `optimisticEvents.test.ts` (ADR-034).
+    const day = new Date("2026-10-06T16:00:00.000Z"); // 18:00 Europe/Berlin, CEST
+    const time = new Date("2026-10-27T17:00:00.000Z"); // 18:00 Europe/Berlin, CET
+    const merged = mergeDateAndTimeOfDay(day, time, "Europe/Berlin");
+    expect(merged.toISOString()).toBe("2026-10-06T16:00:00.000Z");
   });
 });
 
