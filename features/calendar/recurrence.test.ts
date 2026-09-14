@@ -712,28 +712,31 @@ describe("createSupabaseEventOps", () => {
 });
 
 // ── Serienanker ───────────────────────────────────────────────────────────
-// Aus lokalen Komponenten gebaut, nicht aus UTC-Strings: Die Anker-Regel
-// rechnet mit lokalen Gettern (wie `withTimeOfDay` in `optimisticEvents.ts`),
-// eine UTC-Fixture ließe die Erwartung mit der Runner-Zone wandern. 04.05. und
-// 15.06. liegen in jeder gängigen Zone im selben Sommerzeit-Regime — genau die
-// Bedingung, unter der die Umrechnung offsetunabhängig ist.
+// Aus UTC-Strings gebaut, nicht aus lokalen Date-Komponenten: Seit ADR-034
+// rechnet `anchoredChanges` in `master.timezone` ("Europe/Berlin", der
+// `makeMaster`-Default), nicht mehr mit lokalen Gettern — eine Fixture aus
+// `new Date(y, m, d, h, min)` (Wandzeit der **Runner**-Zone) ließ die
+// Erwartung deshalb mit der Runner-Zone wandern, bis sie zonenexplizit wurde.
+// 04.05. und 15.06. liegen in Berlin durchgehend in der Sommerzeit (CEST,
+// +2 h) — die UTC-Werte unten sind das Ergebnis dieser einen Umrechnung, kein
+// Zufall.
 
-/** Montag, 04.05.2026, 18:30 Ortszeit. */
-const ANCHOR_MASTER_START = new Date(2026, 4, 4, 18, 30);
+/** Montag, 04.05.2026, 18:30 Europe/Berlin (CEST, +2 h → 16:30 UTC). */
+const ANCHOR_MASTER_START = new Date("2026-05-04T16:30:00.000Z");
 
 function anchorMaster(overrides: Partial<EventRow> = {}): EventRow {
   return makeMaster({
     start_at: ANCHOR_MASTER_START.toISOString(),
-    end_at: new Date(2026, 4, 4, 19, 30).toISOString(),
+    end_at: new Date("2026-05-04T17:30:00.000Z").toISOString(), // 19:30 Europe/Berlin
     ...overrides,
   });
 }
 
-/** Der Nutzer bearbeitet die Occurrence vom 15.06. und stellt sie auf 17:00–18:00. */
+/** Der Nutzer bearbeitet die Occurrence vom 15.06. und stellt sie auf 17:00–18:00 Europe/Berlin. */
 const ANCHOR_CHANGES: EventChanges = {
   title: "Neuer Titel",
-  start_at: new Date(2026, 5, 15, 17, 0).toISOString(),
-  end_at: new Date(2026, 5, 15, 18, 0).toISOString(),
+  start_at: new Date("2026-06-15T15:00:00.000Z").toISOString(), // 17:00 Europe/Berlin
+  end_at: new Date("2026-06-15T16:00:00.000Z").toISOString(), // 18:00 Europe/Berlin
   location: "Sportplatz Nord",
   description: null,
 };
@@ -741,8 +744,8 @@ const ANCHOR_CHANGES: EventChanges = {
 /** Datum des Masters, Uhrzeit aus der Eingabe, Dauer aus der Eingabe. */
 const ANCHOR_EXPECTED: EventChanges = {
   ...ANCHOR_CHANGES,
-  start_at: new Date(2026, 4, 4, 17, 0).toISOString(),
-  end_at: new Date(2026, 4, 4, 18, 0).toISOString(),
+  start_at: new Date("2026-05-04T15:00:00.000Z").toISOString(), // 17:00 Europe/Berlin, 04.05.
+  end_at: new Date("2026-05-04T16:00:00.000Z").toISOString(), // 18:00 Europe/Berlin, 04.05.
 };
 
 describe("applyEditScope — Serienanker", () => {
@@ -767,7 +770,7 @@ describe("applyEditScope — Serienanker", () => {
     // Master läuft eine Stunde, die Eingabe zweieinhalb.
     const longer: EventChanges = {
       ...ANCHOR_CHANGES,
-      end_at: new Date(2026, 5, 15, 19, 30).toISOString(),
+      end_at: new Date("2026-06-15T17:30:00.000Z").toISOString(), // 19:30 Europe/Berlin
     };
 
     await applyEditScope({
@@ -784,8 +787,8 @@ describe("applyEditScope — Serienanker", () => {
       "evt-1",
       {
         ...longer,
-        start_at: new Date(2026, 4, 4, 17, 0).toISOString(),
-        end_at: new Date(2026, 4, 4, 19, 30).toISOString(),
+        start_at: ANCHOR_EXPECTED.start_at,
+        end_at: new Date("2026-05-04T17:30:00.000Z").toISOString(), // 19:30 Europe/Berlin, 04.05.
       },
       MASTER_UPDATED_AT,
     );
@@ -835,6 +838,63 @@ describe("applyEditScope — Serienanker", () => {
     });
 
     expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", ANCHOR_CHANGES, MASTER_UPDATED_AT, none);
+  });
+});
+
+// ── Schreibpfad rechnet in der Zone des Termins (ADR-034) ──────────────────
+// `anchoredChanges` nahm die Tageszeit bisher mit lokalen Gettern, also der
+// Zone des **Lesers**. Die Fixture unten überbrückt Berlins Zeitumstellung am
+// 25.10.2026 (Master vor der Umstellung am 06.10., bearbeitete Occurrence
+// danach am 27.10., beide 18:00 Ortszeit — „unveränderte Eingabe": der Nutzer
+// öffnet die spätere Occurrence und speichert mit Scope „alle", ohne etwas
+// anzufassen): Unter `TZ=Europe/Berlin` (Runner- und Terminzone fallen
+// zusammen) las der alte Code zufällig richtig, unter `TZ=America/New_York`
+// (kein Wechsel im Umrechnungszeitraum) verschob er die Master-Zeile um eine
+// Stunde. Nachgerechnet und belegt (siehe `task-4-report.md`) — dieser Test
+// hält nur noch die grüne (gefixte) Seite fest.
+describe("applyEditScope — Schreibpfad rechnet in der Zone des Termins (ADR-034)", () => {
+  test("scope=all, unveränderte Eingabe über die Herbst-Zeitumstellung hinweg → Berliner Wanduhrzeit bleibt 18:00", async () => {
+    const ops = makeOps();
+    const master = makeMaster({
+      // Di, 06.10.2026, 18:00 Europe/Berlin (CEST, +2 h).
+      start_at: "2026-10-06T16:00:00.000Z",
+      end_at: "2026-10-06T17:00:00.000Z",
+    });
+    // Die bearbeitete Occurrence: Di, 27.10.2026, 18:00–19:00 Europe/Berlin —
+    // nach der Umstellung, deshalb CET (+1 h) statt CEST. Zeitlich unverändert
+    // gegenüber dem, was der Kalender anzeigt; nur das Datum ist eine andere
+    // Occurrence derselben Serie.
+    const unchanged: EventChanges = {
+      title: master.title,
+      start_at: "2026-10-27T17:00:00.000Z",
+      end_at: "2026-10-27T18:00:00.000Z",
+      location: master.location,
+      description: master.description,
+    };
+
+    await applyEditScope({
+      ops,
+      scope: "all",
+      eventId: "evt-1",
+      occurrenceKey: "2026-10-27",
+      isRecurring: true,
+      master,
+      changes: unchanged,
+    });
+
+    // Datum bleibt das des Masters (06.10.), Uhrzeit bleibt 18:00–19:00 Berlin
+    // — unter jeder Runner-Zone. Vor dem Fix lieferte das nur unter
+    // `TZ=Europe/Berlin` diesen Wert; unter `TZ=America/New_York` kam
+    // `start_at: "2026-10-06T17:00:00.000Z"` (19:00 statt 18:00 Berlin) heraus.
+    expect(ops.updateMaster).toHaveBeenCalledWith(
+      "evt-1",
+      {
+        ...unchanged,
+        start_at: "2026-10-06T16:00:00.000Z",
+        end_at: "2026-10-06T17:00:00.000Z",
+      },
+      MASTER_UPDATED_AT,
+    );
   });
 });
 

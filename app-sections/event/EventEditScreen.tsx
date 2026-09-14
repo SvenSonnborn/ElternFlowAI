@@ -212,9 +212,14 @@ export function EventEditScreen() {
   /**
    * The series rule, rebuilt from the radio. `null` when the user left the
    * recurrence untouched — the update then keeps the stored rule verbatim.
+   *
+   * `recurrenceToRrule` needs the **event's** zone (`source.timezone`), not the
+   * device's, to place `rrule_byweekday` on the day the rule is evaluated in
+   * (ADR-034). `source` cannot be null here: `recurrenceDirty` is only true once
+   * `initial` — derived from the same `source` — has hydrated the form.
    */
   function buildRecurrenceChanges(): RecurrenceChanges | null {
-    if (!recurrenceDirty || parsedCount === "invalid") return null;
+    if (!recurrenceDirty || parsedCount === "invalid" || !source) return null;
     if (recurrence === "none") {
       return {
         rrule_freq: null,
@@ -224,7 +229,7 @@ export function EventEditScreen() {
         rrule_until: null,
       };
     }
-    const rule = recurrenceToRrule(recurrence, startAt);
+    const rule = recurrenceToRrule(recurrence, startAt, source.timezone);
     return {
       ...rule,
       rrule_count: parsedCount,
