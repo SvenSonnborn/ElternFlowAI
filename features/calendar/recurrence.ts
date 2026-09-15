@@ -11,6 +11,7 @@ import {
   instantToFloating,
   mergeDateAndTimeOfDay,
   zonedDateKey,
+  zonedDayBounds,
 } from "./timezone";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
@@ -119,9 +120,15 @@ function dayBefore(occurrenceKey: string): string {
  * Serie verschwände das Vorkommen des Cutoff-Tages.
  */
 function endOfDayInstant(isoDate: string, timeZone: string): string {
-  const [year, month, day] = isoDate.split("-").map(Number);
-  const floating = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
-  return floatingToInstant(floating, timeZone).toISOString();
+  const bounds = zonedDayBounds(isoDate, timeZone);
+  // Hier wird bewusst geworfen statt zurückgefallen — anders als in
+  // `eventLookupWindow`, das denselben Schlüssel bei formwidriger Eingabe auf
+  // sein Standardfenster abbildet: Ein aus Müll abgeleitetes `until` kürzte
+  // eine Serie still am falschen Datum, und das ist die Schadensklasse, gegen
+  // die dieser ganze Block antritt. Vor ADR-035 warf die Rechnung an dieser
+  // Stelle ebenfalls, nur mit einer nichtssagenden Meldung aus `Intl`.
+  if (!bounds) throw new RangeError(`endOfDayInstant: kein Datumsschlüssel — "${isoDate}"`);
+  return bounds.end.toISOString();
 }
 
 /**

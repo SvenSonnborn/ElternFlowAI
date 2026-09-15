@@ -181,3 +181,49 @@ export function mergeDateAndTimeOfDay(day: Date, time: Date, timeZone: string): 
 export function zonedDateKey(instant: Date, timeZone: string): string {
   return instantToFloating(instant, timeZone).toISOString().slice(0, 10);
 }
+
+/**
+ * Die Form, die `zonedDateKey` erzeugt und die `event_exceptions.occurrence_date`
+ * trägt. Bewusst nur ein **Form**-Test: `"2026-13-45"` besteht ihn und rollt in
+ * `Date.UTC` über — das ist Totalität, keine Validierung (siehe unten).
+ */
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Tagesanfang und Tagesende eines `yyyy-MM-dd`-Schlüssels als **Instants** in
+ * dieser Zone — die Umkehrung von `zonedDateKey`.
+ *
+ * Dritte Fundstelle derselben Rechnung, deshalb hier statt bei einem der
+ * Aufrufer: `eventLookupWindow` ([eventWindow.ts](./eventWindow.ts)) braucht
+ * beide Grenzen, `endOfDayInstant` ([recurrence.ts](./recurrence.ts)) nur das
+ * Ende, und die Prüfung „ist dieses `occurrence_date` überhaupt ein Vorkommen
+ * der Regel?" in [expand.ts](./expand.ts) wieder beide (ADR-035, Spec §6.9).
+ * Bei zwei Vorkommen war die Trennung richtig und im Docstring von
+ * `eventWindow.ts` auch so begründet; das dritte kippt sie.
+ *
+ * **`null` statt eines Wurfs**, weil die Aufrufer verschieden auf einen
+ * formwidrigen Schlüssel antworten müssen: `eventLookupWindow` fällt auf sein
+ * Standardfenster zurück — ein kaputter `occ`-Routenparameter soll irgendeine
+ * Occurrence zeigen statt den Screen zu zerlegen —, `endOfDayInstant` wirft,
+ * weil ein aus Müll abgeleitetes `until` eine Serie still am falschen Datum
+ * kürzte. Diese Entscheidung gehört den Aufrufern, nicht dieser Funktion.
+ *
+ * Der Tagesanfang ist nicht durchweg `00:00`: In Zonen, die um Mitternacht
+ * umstellen, existiert die Stunde nicht (nachgemessen: `America/Santiago`
+ * 2026-09-06, `America/Havana` 2026-03-08, `Asia/Beirut` 2026-03-29 — überall
+ * springt die Uhr von 23:59:59 auf 01:00). `floatingToInstant` wählt dort nach
+ * seiner Lücken-Regel den **späteren** Zeitpunkt, also 01:00 desselben Tages;
+ * die Gegenregel ergäbe 23:00 des Vortages und damit eine Grenze, die einen
+ * Tag daneben liegt.
+ */
+export function zonedDayBounds(
+  isoDate: string,
+  timeZone: string,
+): { start: Date; end: Date } | null {
+  if (!DATE_KEY_PATTERN.test(isoDate)) return null;
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return {
+    start: floatingToInstant(new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)), timeZone),
+    end: floatingToInstant(new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)), timeZone),
+  };
+}
