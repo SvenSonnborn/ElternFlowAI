@@ -22,6 +22,7 @@ export {
 export { setCalendarLocale } from "./locale";
 export { deviceTimeZone } from "./deviceTimeZone";
 export { useFamilyEvents, useEvent, useEventTypes, useMarkedDates } from "./hooks";
+export { eventLookupWindow } from "./eventWindow";
 export { buildCalendarTheme } from "./calendarTheme";
 export { eventColorFor, eventIconFor, typeLabelsForSlug } from "./palette";
 export {

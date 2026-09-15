@@ -1,4 +1,4 @@
-import { addDays, endOfDay, format, max as dateMax, min as dateMin, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useRef, useState } from "react";
@@ -19,6 +19,7 @@ import {
   applyRangePick,
   differingEventFields,
   EventConflictError,
+  eventLookupWindow,
   expandEvents,
   isDateRangeInvalid,
   isTimeRangeInvalid,
@@ -355,20 +356,19 @@ export function EventEditScreen() {
         // Dieselbe Begründung wie dort: eine weit in der Zukunft liegende
         // Occurrence (>1 Jahr) würde sonst abgeschnitten.
         const rowStart = new Date(row.start_at);
-        // `vars.occurrenceKey` nur als grober Fensterrand: er grenzt hier
-        // lediglich das Expansions-Fenster ein, benennt keine Zeile — anders
-        // als der `find` unten braucht dieser Vergleich keine Zonen-genaue
-        // Behandlung (ADR-034).
-        const requested = parseISO(vars.occurrenceKey);
-        const windowStart = dateMin([addDays(rowStart, -1), requested]);
-        // `endOfDay`, nicht `requested` selbst: `parseISO("2026-09-08")` ist
-        // Mitternacht, und `expandEvents` verwirft `startAt > rangeEnd`. Ohne
-        // das fiele eine Occurrence um 15:00 am angeforderten Tag aus dem
-        // Fenster, sobald der Serienstart mehr als 366 Tage zurückliegt — und
-        // `theirs` würde `null`, obwohl die fremde Fassung vorliegt. Für
-        // `windowStart` gibt es kein Gegenstück: Dort ist Mitternacht bereits
-        // die frühere Grenze, und verglichen wird gegen `endAt`.
-        const windowEnd = dateMax([addDays(rowStart, 366), endOfDay(requested)]);
+        // Dasselbe Fenster wie `useEvent` (`features/calendar/hooks.ts`):
+        // `eventLookupWindow` bildet Tagesanfang und -ende des angeforderten
+        // Regel-Tags in `row.timezone`, nicht in der Zone des Lesers. Hier
+        // stand vorher der gegenteilige (falsche) Kommentar, dieser Vergleich
+        // brauche keine zonen-genaue Behandlung: Ein lokal gebildetes Fenster
+        // kann eine Occurrence nahe Mitternacht in `row.timezone` verfehlen —
+        // `theirs` würde `null`, obwohl die fremde Fassung bekannt ist,
+        // derselbe Fehler wie in `useEvent` (Befund B, PR #121).
+        const { start: windowStart, end: windowEnd } = eventLookupWindow(
+          rowStart,
+          vars.occurrenceKey,
+          row.timezone,
+        );
         // Match auf `occurrenceKey`: Nur der Schlüssel identifiziert dieselbe
         // Occurrence zuverlässig, wenn eine Verschiebung ihn vom aufgelösten
         // Anzeigedatum hat auseinanderlaufen lassen (ADR-034) — derselbe Grund
