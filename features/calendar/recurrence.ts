@@ -6,7 +6,12 @@ import type { Database } from "@/features/supabase/database.types";
 
 import { EventConflictError } from "./errors";
 import { allOccurrences } from "./rrule";
-import { floatingToInstant, mergeDateAndTimeOfDay, zonedDateKey } from "./timezone";
+import {
+  floatingToInstant,
+  instantToFloating,
+  mergeDateAndTimeOfDay,
+  zonedDateKey,
+} from "./timezone";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
@@ -234,15 +239,34 @@ function ruleDiffers(master: EventRow, next: RecurrenceChanges): boolean {
  * dauerhaft um eine Stunde — genau der Fehler, den derselbe Helfer für
  * `applyOptimisticChanges` (`optimisticEvents.ts`) auf der Anzeigeseite und
  * `recurrenceToRrule` (`createMutation.ts`) für den Wochentag behebt.
+ *
+ * Die **Dauer** zwischen `changes.start_at` und `changes.end_at` muss aus
+ * demselben Grund in Wandzeit gerechnet werden, nicht absolut (Befund D,
+ * PR #121): Der Start wird über `mergeDateAndTimeOfDay` korrekt in
+ * `master.timezone` verankert, eine absolute Millisekunden-Differenz kennt
+ * diese Zone aber nicht. Überquert die **bearbeitete** Spanne eine
+ * Zeitumstellung, die verankerte Spanne (an einem meist ganz anderen Datum)
+ * aber nicht — oder umgekehrt —, weichen Wandzeit- und absolute Dauer um den
+ * DST-Offset voneinander ab, und eine absolute Addition auf den Anker
+ * verschiebt die vom Nutzer gewählte End-Uhrzeit. Dasselbe Muster wie
+ * `floatingDurationMs` in [expand.ts](./expand.ts) (ADR-033), dort für die
+ * Occurrence-Dauer bereits gelöst.
  */
 function anchoredChanges(master: EventRow, changes: EventChanges): EventChanges {
   const newStart = new Date(changes.start_at);
+  const newEnd = new Date(changes.end_at);
   const start = mergeDateAndTimeOfDay(new Date(master.start_at), newStart, master.timezone);
-  const durationMs = new Date(changes.end_at).getTime() - newStart.getTime();
+  const floatingDurationMs =
+    instantToFloating(newEnd, master.timezone).getTime() -
+    instantToFloating(newStart, master.timezone).getTime();
+  const end = floatingToInstant(
+    new Date(instantToFloating(start, master.timezone).getTime() + floatingDurationMs),
+    master.timezone,
+  );
   return {
     ...changes,
     start_at: start.toISOString(),
-    end_at: new Date(start.getTime() + durationMs).toISOString(),
+    end_at: end.toISOString(),
   };
 }
 
