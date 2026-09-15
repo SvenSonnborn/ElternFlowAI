@@ -478,3 +478,165 @@ describe("Override-Vertrag (ADR-035)", () => {
     expect(affected?.title).toBe("Trotzdem da");
   });
 });
+
+describe("Kandidatenmenge aus event_exceptions (ADR-035)", () => {
+  const JUNI_START = new Date("2026-06-01T00:00:00.000Z");
+  const JUNI_END = new Date("2026-06-30T23:59:59.000Z");
+  const JULI_START = new Date("2026-07-01T00:00:00.000Z");
+  const JULI_END = new Date("2026-07-31T23:59:59.000Z");
+
+  /**
+   * Wöchentliche Montagsserie ab 01.06.2026, 09:00 Berlin. Die Occurrence vom
+   * 29.06. ist per Override auf den 20.07. verschoben — einen Montag, an dem
+   * die Serie ohnehin stattfindet.
+   */
+  function movedSeries(): EventWithRelations {
+    const row = makeRow({
+      id: "evt-series",
+      description: "Master-Notiz",
+      start_at: "2026-06-01T07:00:00.000Z",
+      end_at: "2026-06-01T08:00:00.000Z",
+      rrule_freq: "weekly",
+      timezone: "Europe/Berlin",
+    });
+    row.event_exceptions = [
+      {
+        id: "ex-moved",
+        event_id: row.id,
+        occurrence_date: "2026-06-29",
+        action: "modified",
+        override: {
+          start_at: "2026-07-20T07:00:00.000Z",
+          end_at: "2026-07-20T08:00:00.000Z",
+          title: "Verschoben",
+          description: "Override-Notiz",
+          location: null,
+        },
+        created_at: "2026-06-01T00:00:00.000Z",
+        updated_at: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+    return row;
+  }
+
+  test("ROT VOR DEM FIX: sie erscheint im Fenster ihres aufgelösten Datums", () => {
+    const row = movedSeries();
+    const out = expandEvents([row], JULI_START, JULI_END, lightTheme);
+    const moved = out.find((o) => o.occurrenceKey === "2026-06-29");
+    expect(moved).toBeDefined();
+    expect(moved?.occurrenceDate).toBe("2026-07-20");
+    expect(moved?.title).toBe("Verschoben");
+    // Der Kandidat läuft durch dieselbe Auflösung wie ein Regel-Vorkommen —
+    // Exception-Flag und Versions-Token inklusive (ADR-034).
+    expect(moved?.isException).toBe(true);
+    expect(moved?.version).toBe(`${row.updated_at}|2026-06-02T00:00:00.000Z`);
+  });
+
+  test("ROT VOR DEM FIX: der Kollisionsfall — zwei Einträge am selben Anzeigetag", () => {
+    // Die verschobene Occurrence (Schlüssel 29.06.) landet auf dem 20.07., an
+    // dem die Serie ohnehin ein reguläres Vorkommen hat (Schlüssel 20.07.).
+    // Beide müssen überleben und sich im Schlüssel unterscheiden — das ist
+    // genau der Grund, aus dem `occurrenceKey` in ADR-034 die Identität wurde.
+    const out = expandEvents([movedSeries()], JULI_START, JULI_END, lightTheme);
+    const sameDay = out.filter((o) => o.occurrenceDate === "2026-07-20");
+    expect(sameDay.map((o) => o.occurrenceKey).sort()).toEqual(["2026-06-29", "2026-07-20"]);
+  });
+
+  test("GRENZWÄCHTER (vor dem Fix bereits grün): sie erscheint NICHT im Fenster ihres Regel-Datums", () => {
+    // Heute grün, weil der Fensterfilter die verschobene Occurrence verwirft.
+    // Der Test hält fest, dass die neue Kandidatenmenge sie nicht zusätzlich
+    // an ihrem alten Datum zurückbringt — „an beiden Daten sichtbar" wäre
+    // derselbe Fehler mit umgekehrtem Vorzeichen.
+    const out = expandEvents([movedSeries()], JUNI_START, JUNI_END, lightTheme);
+    expect(out.map((o) => o.occurrenceKey)).not.toContain("2026-06-29");
+  });
+
+  test("GRENZWÄCHTER (vor dem Fix bereits grün): in einem Fenster über beide Daten genau einmal", () => {
+    // Hier liegt das Regel-Datum bereits in der Regel-Menge; die Deduplizierung
+    // muss verhindern, dass der Kandidatenpfad eine zweite Kopie beisteuert.
+    const out = expandEvents([movedSeries()], JUNI_START, JULI_END, lightTheme);
+    expect(out.filter((o) => o.occurrenceKey === "2026-06-29")).toHaveLength(1);
+  });
+
+  test("eine verwaiste Exception an einem Nicht-Vorkommen erzeugt keinen Phantom-Termin", () => {
+    // 30.06.2026 ist ein DIENSTAG — kein Vorkommen der Montagsserie. Solche
+    // Zeilen überleben den Löschpfad (`deleteAllExceptions` läuft nur bei
+    // `ruleDiffers`, `deleteExceptionsFromDate` nur ab dem Schnitt). Ohne die
+    // Prüfung „ist das überhaupt ein Vorkommen der Regel?" erschiene hier ein
+    // Termin an einem Tag, an dem die Serie nie stattfand (Spec §6.2).
+    const row = movedSeries();
+    row.event_exceptions = [
+      ...(row.event_exceptions ?? []),
+      {
+        id: "ex-orphan",
+        event_id: row.id,
+        occurrence_date: "2026-06-30",
+        action: "modified",
+        override: {
+          start_at: "2026-07-21T07:00:00.000Z",
+          end_at: "2026-07-21T08:00:00.000Z",
+          title: "Phantom",
+        },
+        created_at: "2026-06-01T00:00:00.000Z",
+        updated_at: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+    const out = expandEvents([row], JULI_START, JULI_END, lightTheme);
+    expect(out.map((o) => o.title)).not.toContain("Phantom");
+    expect(out.map((o) => o.occurrenceKey)).not.toContain("2026-06-30");
+  });
+
+  test("eine cancelled-Exception erzeugt keinen Kandidaten", () => {
+    const row = movedSeries();
+    row.event_exceptions = [
+      {
+        id: "ex-cancelled",
+        event_id: row.id,
+        occurrence_date: "2026-06-29",
+        action: "cancelled",
+        override: null,
+        created_at: "2026-06-01T00:00:00.000Z",
+        updated_at: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+    const out = expandEvents([row], JULI_START, JULI_END, lightTheme);
+    expect(out.map((o) => o.occurrenceKey)).not.toContain("2026-06-29");
+  });
+
+  test("eine Serie, deren einziges sichtbares Vorkommen ein Kandidat ist, verschwindet nicht", () => {
+    // Das `if (!occurrences.length) continue;` stand vor dem Fix VOR der
+    // Kandidatenberechnung. Eine Serie ohne Regel-Vorkommen im Fenster wurde
+    // damit übersprungen, bevor die verschobene Occurrence überhaupt in Frage
+    // kam. Fenster: nur der 20.07. selbst, an dem kein Regel-Vorkommen der
+    // Dienstagsserie liegt.
+    const row = makeRow({
+      id: "evt-lonely",
+      start_at: "2026-06-02T07:00:00.000Z", // Dienstag
+      end_at: "2026-06-02T08:00:00.000Z",
+      rrule_freq: "weekly",
+      timezone: "Europe/Berlin",
+    });
+    row.event_exceptions = [
+      {
+        id: "ex-lonely",
+        event_id: row.id,
+        occurrence_date: "2026-06-30", // Dienstag, echtes Vorkommen
+        action: "modified",
+        override: {
+          start_at: "2026-07-20T07:00:00.000Z", // Montag — kein Regel-Tag
+          end_at: "2026-07-20T08:00:00.000Z",
+          title: "Einzelgänger",
+        },
+        created_at: "2026-06-01T00:00:00.000Z",
+        updated_at: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+    const out = expandEvents(
+      [row],
+      new Date("2026-07-20T00:00:00.000Z"),
+      new Date("2026-07-20T23:59:59.000Z"),
+      lightTheme,
+    );
+    expect(out.map((o) => o.title)).toEqual(["Einzelgänger"]);
+  });
+});

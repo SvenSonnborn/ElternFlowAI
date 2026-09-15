@@ -5,10 +5,10 @@ import type { Database, Json } from "@/features/supabase/database.types";
 
 import type { CalendarOccurrence } from "./types";
 
-import { isJsonObject, overrideDate } from "./override";
+import { isJsonObject, overrideDate, overrideInterval } from "./override";
 import { eventColorFor, eventIconFor, typeLabelsForSlug } from "./palette";
 import { occurrencesBetween } from "./rrule";
-import { floatingToInstant, instantToFloating, zonedDateKey } from "./timezone";
+import { floatingToInstant, instantToFloating, zonedDateKey, zonedDayBounds } from "./timezone";
 import { occurrenceVersion } from "./version";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
@@ -76,6 +76,61 @@ function expandRecurrence(
   return occurrencesBetween(row, searchStart, rangeEnd);
 }
 
+/**
+ * Die Regel-Vorkommen zu den `modified`-Exceptions, die per Override **in**
+ * dieses Fenster geschoben wurden, ihr eigenes Regel-Datum aber außerhalb
+ * haben.
+ *
+ * Ohne sie ist eine so verschobene Occurrence **an beiden Daten unsichtbar**:
+ * am Regel-Datum verwirft sie der Fensterfilter (sie liegt dort nicht mehr), am
+ * neuen Datum entsteht sie nie, weil `rule.between(...)` nur Regel-Daten kennt
+ * (nachgemessen, Spec §6.2). Erreichbar über `EventEditScreen` mit Scope „Nur
+ * diesen".
+ *
+ * Zurückgegeben wird das **Regel**-Vorkommen, nicht der Override-Start: Der
+ * Aufrufer schickt es durch dieselbe Auflösung wie jedes andere Vorkommen, und
+ * nur so trägt die Occurrence hinterher denselben `occurrenceKey`, dasselbe
+ * Versions-Token und dieselbe Exception-Kennzeichnung wie auf dem regulären
+ * Weg (ADR-034).
+ *
+ * Die Reihenfolge der Prüfungen ist Absicht — billig vor teuer: Der
+ * Fensterschnitt und die Deduplizierung kosten nichts, der abschließende
+ * `occurrencesBetween`-Aufruf einen zusätzlichen rrule-Durchlauf. Der ist
+ * unverzichtbar: Verwaiste Exceptions überleben den Löschpfad
+ * (`deleteAllExceptions` läuft nur bei `ruleDiffers`, `deleteExceptionsFromDate`
+ * nur ab dem Schnitt), und ohne die Prüfung erzeugte eine solche Zeile einen
+ * Phantom-Termin an einem Datum, an dem die Serie gar nicht stattfindet. Er
+ * kostet auch selten etwas: Verschobene Exceptions sind die Ausnahme, und die
+ * Regel-Schlüsselmenge wird erst gebaut, wenn die erste eine Prüfung braucht.
+ */
+function movedExceptionOccurrences(
+  row: EventRow,
+  exceptions: EventExceptionRow[],
+  ruleOccurrences: Date[],
+  rangeStart: Date,
+  rangeEnd: Date,
+): Date[] {
+  const out: Date[] = [];
+  let ruleKeys: Set<string> | null = null;
+  for (const ex of exceptions) {
+    if (ex.action !== "modified") continue;
+    const interval = overrideInterval(ex.override);
+    if (!interval) continue;
+    // Derselbe Schnitt, den der Filter in `expandEvents` gleich noch einmal
+    // zieht — hier nur, um den rrule-Aufruf unten zu sparen.
+    if (interval.end < rangeStart || interval.start > rangeEnd) continue;
+    ruleKeys ??= new Set(ruleOccurrences.map((o) => zonedDateKey(o, row.timezone)));
+    if (ruleKeys.has(ex.occurrence_date)) continue;
+    const bounds = zonedDayBounds(ex.occurrence_date, row.timezone);
+    if (!bounds) continue;
+    const onThatDay = occurrencesBetween(row, bounds.start, bounds.end).find(
+      (o) => zonedDateKey(o, row.timezone) === ex.occurrence_date,
+    );
+    if (onThatDay) out.push(onThatDay);
+  }
+  return out;
+}
+
 interface Resolved {
   title: string;
   description: string | null;
@@ -125,12 +180,24 @@ export function expandEvents(
       instantToFloating(masterEnd, row.timezone).getTime() -
       instantToFloating(masterStart, row.timezone).getTime();
 
-    const occurrences = expandRecurrence(
+    const exceptionRows = row.event_exceptions ?? [];
+    const ruleOccurrences = expandRecurrence(
       row,
       rangeStart,
       rangeEnd,
       Math.max(durationMs, floatingDurationMs),
     );
+    // Zwei Quellen statt einer (ADR-035). Sortiert, damit die Ausgabe
+    // unabhängig davon geordnet bleibt, aus welcher Quelle ein Vorkommen kam —
+    // `useEvent`s `expanded[0]`-Fallback liest sonst je nach Exception-Lage ein
+    // anderes Vorkommen.
+    const occurrences = [
+      ...ruleOccurrences,
+      ...movedExceptionOccurrences(row, exceptionRows, ruleOccurrences, rangeStart, rangeEnd),
+    ].sort((a, b) => a.getTime() - b.getTime());
+    // Der Abbruch steht bewusst NACH der Kandidatenberechnung: Eine Serie, die
+    // im Fenster kein Regel-Vorkommen hat, kann trotzdem eine hierher
+    // verschobene Occurrence haben.
     if (!occurrences.length) continue;
 
     const typeRow = row.event_types;
@@ -139,7 +206,7 @@ export function expandEvents(
     const color = eventColorFor(slug, typeRow?.color ?? "primary", theme);
     const iconName = eventIconFor(slug, typeRow?.icon ?? "");
 
-    const exceptions = new Map((row.event_exceptions ?? []).map((ex) => [ex.occurrence_date, ex]));
+    const exceptions = new Map(exceptionRows.map((ex) => [ex.occurrence_date, ex]));
     const rrule = {
       freq: row.rrule_freq,
       interval: row.rrule_interval,
