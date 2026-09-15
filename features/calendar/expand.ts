@@ -5,6 +5,7 @@ import type { Database, Json } from "@/features/supabase/database.types";
 
 import type { CalendarOccurrence } from "./types";
 
+import { isJsonObject, overrideDate } from "./override";
 import { eventColorFor, eventIconFor, typeLabelsForSlug } from "./palette";
 import { occurrencesBetween } from "./rrule";
 import { floatingToInstant, instantToFloating, zonedDateKey } from "./timezone";
@@ -18,10 +19,6 @@ export type EventWithRelations = EventRow & {
   event_types: EventTypeRow | null;
   event_exceptions: EventExceptionRow[] | null;
 };
-
-function isJsonObject(j: Json | null | undefined): j is { [k: string]: Json | undefined } {
-  return typeof j === "object" && j !== null && !Array.isArray(j);
-}
 
 function readLabel(slug: string, label: Json | null | undefined): { de: string; en: string } {
   const fallback = typeLabelsForSlug(slug);
@@ -81,6 +78,7 @@ function expandRecurrence(
 
 interface Resolved {
   title: string;
+  description: string | null;
   location: string | null;
   startAt: Date;
   endAt: Date;
@@ -90,10 +88,21 @@ function applyOverride(base: Resolved, override: Json | null): Resolved {
   if (!isJsonObject(override)) return base;
   const next: Resolved = { ...base };
   if (typeof override.title === "string") next.title = override.title;
+  // `description` und `location` teilen sich dieselbe Form: ein String setzt,
+  // ein explizites `null` löscht, ein fehlender Key lässt den Master-Wert
+  // stehen. Der Spalten-Comment der Migration nennt beide Keys seit dem ersten
+  // Tag; `description` wurde bis ADR-035 trotzdem nie gelesen, eine per „Nur
+  // diesen" geänderte Beschreibung erreichte die Anzeige also nie.
+  if (typeof override.description === "string") next.description = override.description;
+  else if (override.description === null) next.description = null;
   if (typeof override.location === "string") next.location = override.location;
   else if (override.location === null) next.location = null;
-  if (typeof override.start_at === "string") next.startAt = new Date(override.start_at);
-  if (typeof override.end_at === "string") next.endAt = new Date(override.end_at);
+  // Unparsbare Datumswerte werden verworfen statt als Invalid Date
+  // weitergereicht — siehe `overrideDate`.
+  const start = overrideDate(override.start_at);
+  if (start) next.startAt = start;
+  const end = overrideDate(override.end_at);
+  if (end) next.endAt = end;
   return next;
 }
 
@@ -149,6 +158,7 @@ export function expandEvents(
 
       let resolved: Resolved = {
         title: row.title,
+        description: row.description,
         location: row.location,
         startAt: occurrenceStart,
         endAt: floatingToInstant(
@@ -178,7 +188,7 @@ export function expandEvents(
         startAt: resolved.startAt,
         endAt: resolved.endAt,
         title: resolved.title,
-        description: row.description,
+        description: resolved.description,
         location: resolved.location,
         allDay: row.all_day,
         childId: row.child_id,

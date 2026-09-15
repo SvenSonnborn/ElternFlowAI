@@ -365,3 +365,116 @@ describe("occurrenceKey", () => {
     expect(moved?.version).toBe(`${row.updated_at}|2026-06-02T00:00:00.000Z`);
   });
 });
+
+describe("Override-Vertrag (ADR-035)", () => {
+  /** Wöchentliche Montagsserie ab 01.06.2026, 09:00 Berlin, eine Stunde lang. */
+  function weeklySeries(): EventWithRelations {
+    return makeRow({
+      id: "evt-series",
+      description: "Master-Notiz",
+      start_at: "2026-06-01T07:00:00.000Z",
+      end_at: "2026-06-01T08:00:00.000Z",
+      rrule_freq: "weekly",
+      timezone: "Europe/Berlin",
+    });
+  }
+
+  test("eine im Override geänderte Beschreibung gewinnt gegen die Master-Zeile", () => {
+    // Der Spalten-Comment der Migration nennt `description` seit dem ersten
+    // Tag als anerkannten Key, `modifyOccurrence` schreibt ihn auch — gelesen
+    // wurde er bis ADR-035 nie. Eine per „Nur diesen" geänderte Beschreibung
+    // erreichte die Anzeige also nie (Spec §6.3).
+    const row = weeklySeries();
+    row.event_exceptions = [
+      {
+        id: "ex-1",
+        event_id: row.id,
+        occurrence_date: "2026-06-15",
+        action: "modified",
+        override: {
+          start_at: "2026-06-15T07:00:00.000Z",
+          end_at: "2026-06-15T08:00:00.000Z",
+          title: "Sondertermin",
+          description: "Override-Notiz",
+          location: null,
+        },
+        created_at: "2026-06-01T00:00:00.000Z",
+        updated_at: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+    const out = expandEvents(
+      [row],
+      new Date("2026-06-01T00:00:00.000Z"),
+      new Date("2026-06-30T23:59:59.000Z"),
+      lightTheme,
+    );
+    const patched = out.find((o) => o.occurrenceKey === "2026-06-15");
+    expect(patched?.description).toBe("Override-Notiz");
+    // Die Nachbar-Occurrence bleibt bei der Master-Beschreibung.
+    expect(out.find((o) => o.occurrenceKey === "2026-06-08")?.description).toBe("Master-Notiz");
+  });
+
+  test("ein explizites null im Override löscht die Beschreibung", () => {
+    const row = weeklySeries();
+    row.event_exceptions = [
+      {
+        id: "ex-2",
+        event_id: row.id,
+        occurrence_date: "2026-06-15",
+        action: "modified",
+        override: { description: null },
+        created_at: "2026-06-01T00:00:00.000Z",
+        updated_at: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+    const out = expandEvents(
+      [row],
+      new Date("2026-06-01T00:00:00.000Z"),
+      new Date("2026-06-30T23:59:59.000Z"),
+      lightTheme,
+    );
+    expect(out.find((o) => o.occurrenceKey === "2026-06-15")?.description).toBeNull();
+  });
+
+  test("ein kaputtes Override-Datum leert nicht den ganzen Kalender", () => {
+    // Gemessen vor dem Fix: `applyOverride` nahm `new Date("kein-datum")`
+    // unbesehen, `format(resolved.startAt, …)` quittierte die Invalid Date mit
+    // `RangeError: Invalid time value` — und weil `expandEvents` alle Zeilen
+    // des Fensters in EINER Schleife abarbeitet, blieb der gesamte
+    // Kalenderbereich leer statt nur dieser eine Termin. Dieselbe
+    // Schadensklasse wie eine unbekannte Zone (Befund D, ADR-033), dieselbe
+    // Antwort: der kaputte Wert wird verworfen, die Occurrence erscheint zu
+    // ihrer Regel-Zeit.
+    const row = weeklySeries();
+    row.event_exceptions = [
+      {
+        id: "ex-3",
+        event_id: row.id,
+        occurrence_date: "2026-06-15",
+        action: "modified",
+        override: { start_at: "kein-datum", title: "Trotzdem da" },
+        created_at: "2026-06-01T00:00:00.000Z",
+        updated_at: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+    const healthy = makeRow({ id: "evt-healthy" });
+
+    let out: ReturnType<typeof expandEvents> = [];
+    expect(() => {
+      out = expandEvents(
+        [row, healthy],
+        new Date("2026-06-01T00:00:00.000Z"),
+        new Date("2026-06-30T23:59:59.000Z"),
+        lightTheme,
+      );
+    }).not.toThrow();
+
+    // Die Nachbarzeile überlebt …
+    expect(out.map((o) => o.eventId)).toContain("evt-healthy");
+    // … und die betroffene Occurrence wird nicht stillschweigend verworfen,
+    // sondern zeigt ihre Regel-Zeit mit dem intakten Rest des Overrides.
+    const affected = out.find((o) => o.occurrenceKey === "2026-06-15");
+    expect(affected?.startAt.toISOString()).toBe("2026-06-15T07:00:00.000Z");
+    expect(affected?.title).toBe("Trotzdem da");
+  });
+});
