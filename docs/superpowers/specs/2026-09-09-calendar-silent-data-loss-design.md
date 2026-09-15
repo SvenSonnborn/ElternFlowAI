@@ -457,12 +457,71 @@ Das ist folgenreich, weil dieses Datum nicht nur anzeigt: es ist **Persistenz-Sc
 
 Mit §6.7 ist §6 zu groß für einen PR geworden. Der Schnitt läuft zwischen **Identität** und **Sichtbarkeit**:
 
-| PR     | Inhalt                                                                      | Behebt                                                                                                 |
-| ------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| **D1** | `occurrenceKey` (§6.1), in `row.timezone` gebildet (§6.7), samt Schreibpfad | Versions-Token · zweites Bearbeiten wirkungslos · Löschen wirkungslos · Zonen-Fehlgriff des Schlüssels |
-| **D2** | Kandidatenmenge (§6.2) · `description` im Override-Vertrag (§6.3)           | Verschobene Occurrence unsichtbar · geänderte Beschreibung unsichtbar                                  |
+| PR     | Inhalt                                                                      | Behebt                                                                                                                                                                     |
+| ------ | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **D1** | `occurrenceKey` (§6.1), in `row.timezone` gebildet (§6.7), samt Schreibpfad | Versions-Token · zweites Bearbeiten wirkungslos · Löschen wirkungslos · Zonen-Fehlgriff des Schlüssels                                                                     |
+| **D2** | Kandidatenmenge (§6.2) · `description` im Override-Vertrag (§6.3) · §6.9    | Verschobene Occurrence unsichtbar · geänderte Beschreibung unsichtbar · verschobene Occurrence über ihren Link nicht erreichbar · ein kaputtes Override leert den Kalender |
 
 D1 zuerst, weil D2s Deduplizierung auf `occurrenceKey` schlüsselt — dieselbe Begründung, aus der §5 vor §6 kam. Jeder der beiden ist für sich lauffähig und prüfbar: D1 macht eine verschobene Occurrence _adressierbar_, D2 macht sie _sichtbar_.
+
+### 6.9 Nachtrag vor D2: zwei weitere Befunde und eine dritte Fundstelle
+
+**Geschrieben am 2026-09-15, vor der Umsetzung von D2 — jeder Punkt hier ist
+nachgemessen, nicht hergeleitet.** §6.2 und §6.3 entstanden vor PR 3 und vor D1
+und konnten diese drei Dinge nicht kennen.
+
+**1. Ein kaputtes `override.start_at` leert den gesamten Kalender.** `applyOverride`
+nimmt `new Date(override.start_at)` unbesehen; ist der String kein Datum, trägt die
+Occurrence eine `Invalid Date`, und `format(resolved.startAt, "yyyy-MM-dd")` wirft
+`RangeError: Invalid time value`. Gemessen: ein einziges `{"start_at":"kein-datum"}`
+lässt `expandEvents` werfen — und weil die Funktion **alle** Zeilen des Fensters in
+einer Schleife abarbeitet, bleibt der ganze Kalenderbereich leer, nicht nur der eine
+Termin. Das ist exakt die Schadensklasse von Befund D (unbekannte Zone, ADR-033),
+und sie bekommt dieselbe Antwort: Der kaputte Wert wird ignoriert, die Occurrence
+erscheint zu ihrer Regel-Zeit. Ein Termin zur falschen Uhrzeit ist ungleich besser
+als ein leerer Kalender.
+
+Einordnung: `event_exceptions.override` ist freies `jsonb`, geschrieben wird es heute
+ausschließlich von `modifyOccurrence` mit ISO-Strings. Über den App-eigenen
+Schreibpfad ist der Fall also nicht erreichbar — über direkte DB-Schreibzugriffe,
+einen künftigen serverseitigen Writer oder eine Migration schon. Der Guard kostet
+drei Zeilen und gehört in denselben PR, der `applyOverride` ohnehin anfasst.
+
+**2. Eine weit entfernte verschobene Occurrence ist über ihren eigenen Link nicht
+erreichbar.** Gemessen an einer wöchentlichen Serie ab 2026-06-01 mit einer Exception
+am Regel-Datum 2027-10-18, per Override auf 2027-10-25 verschoben: `eventLookupWindow`
+liefert ein Fenster bis `2027-10-18T21:59:59.999Z` — das Ende des angeforderten
+Regel-Tages. `expandEvents` erzeugt die Occurrence, `applyOverride` schiebt sie
+hinter `rangeEnd`, der Fensterfilter verwirft sie, `find` läuft leer, und der
+`expanded[0]`-Fallback zeigt **das erste Vorkommen der Serie (2026-06-01)** — einen
+anderen Termin, ohne jede Meldung.
+
+Das ist dieselbe Klasse wie Befund B aus D1, der genau diese Funktion für den
+**unverschobenen** Fall repariert hat. D2 schließt sie für den verschobenen: Das
+Fenster muss zusätzlich das vom Override beanspruchte Intervall abdecken,
+`eventLookupWindow` braucht dafür die Exceptions der Zeile. Die Grenze greift erst
+jenseits des 366-Tage-Standardfensters — dort aber zuverlässig.
+
+**3. `zonedDayBounds` — das dritte Vorkommen.** „Tagesanfang und Tagesende als
+Instants in der Zone des Termins" steht nach D1 an drei Stellen: in
+`eventLookupWindow` (beide Grenzen), in `endOfDayInstant` in `recurrence.ts` (nur das
+Ende) und künftig in D2s Prüfung, ob ein `occurrence_date` überhaupt ein Vorkommen
+der Regel ist (beide). Der Docstring in `eventWindow.ts` hält ausdrücklich fest, die
+Rechnung sei mit `endOfDayInstant` „bewusst nicht zusammengelegt" — bei zwei
+Vorkommen war das richtig. Die Regel des Repos (roadmap.md → „Geparkt: wartet auf ein
+drittes Vorkommen") macht das dritte zum Auslöser: Die Rechnung zieht als
+`zonedDayBounds` nach `timezone.ts`, beide Bestandsaufrufer werden darauf umgestellt.
+
+Eine Asymmetrie bleibt dabei erhalten und ist der Grund, warum die Funktion ein
+`null` statt eines Wurfs liefert: `eventLookupWindow` fällt bei einem formwidrigen
+Schlüssel bewusst auf sein Standardfenster zurück (PR #121) — `endOfDayInstant` darf
+das nicht, denn ein aus Müll abgeleitetes `until` kürzt eine Serie still am falschen
+Datum. Jeder Aufrufer entscheidet also selbst, was ein unbrauchbarer Schlüssel
+bedeutet.
+
+**Zuschnitt von D2 damit:** §6.2 (Kandidatenmenge) · §6.3 (`description` im
+Override-Vertrag) · die drei Punkte hier. Alles bleibt innerhalb derselben Frage —
+eine verschobene Occurrence muss sichtbar **und** erreichbar sein.
 
 ## 7. Was diese Iteration nicht liefert
 
