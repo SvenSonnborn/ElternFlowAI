@@ -252,11 +252,15 @@ In `CalendarOccurrence`, direkt vor `occurrenceDate`:
  * Das Datum, das die **Regel** erzeugt hat, gebildet in `timezone` — der
  * Schlüssel von `event_exceptions.occurrence_date`.
  *
- * Ohne Override gleich `occurrenceDate`; das ist der Normalfall. Verschiebt
- * eine Exception die Occurrence auf einen anderen Tag, fallen beide
- * auseinander, und **dieser** Wert benennt weiterhin die Zeile, die den
- * Inhalt bestimmt. Alles, was schreibt oder eine Exception meint, schlüsselt
- * hierauf (ADR-034).
+ * Ohne Override derselbe Instant wie `occurrenceDate`, aber nicht
+ * zwangsläufig dasselbe Datum: Dieser Wert entsteht in `timezone`,
+ * `occurrenceDate` in der Zone des Lesers, und beide sind nur gleich, solange
+ * beide Zonen denselben Kalendertag sehen — fällt die Tagesgrenze dazwischen,
+ * laufen sie trotz fehlenden Overrides auseinander (ADR-034 Decision 4).
+ * Verschiebt eine Exception die Occurrence zusätzlich auf einen anderen Tag,
+ * fallen beide erst recht auseinander, und **dieser** Wert benennt weiterhin
+ * die Zeile, die den Inhalt bestimmt. Alles, was schreibt oder eine Exception
+ * meint, schlüsselt hierauf (ADR-034).
  */
 occurrenceKey: string;
 /**
@@ -325,7 +329,8 @@ git commit -m "feat(calendar): occurrenceKey trennt Regel-Datum von Anzeigedatum
 
 Der Schluessel benennt eine Zeile in event_exceptions und entsteht deshalb in
 der Zone des Termins; das Anzeigedatum bleibt in der Zone des Lesers. Ohne
-Override sind beide gleich — das ist der Normalfall."
+Override sind beide gleich, solange Geraetezone und Terminzone denselben
+Kalendertag sehen — das ist der Normalfall."
 ```
 
 ---
@@ -388,7 +393,7 @@ Bestandstests, die rot werden, **einzeln beurteilen**: Eine Fixture, die nur ein
 
 - [ ] **Step 5: Die Oberfläche nachziehen**
 
-Nach den UI-Zeilen der Tabelle oben. **Zum Route-Parameter:** Ein Deep-Link aus der Zeit vor diesem PR trägt ein aufgelöstes Datum. `useEvent` findet dann nichts und fällt auf `expanded[0]` zurück — dasselbe Verhalten wie heute bei einem unbekannten `occ`. Kein Datenverlust, aber der Nutzer landet auf einer anderen Occurrence. Halte das als Kommentar am Fallback fest; der TODO-Eintrag dazu kommt in Task 5.
+Nach den UI-Zeilen der Tabelle oben. **Zum Route-Parameter:** Ein Deep-Link aus der Zeit vor diesem PR trägt ein aufgelöstes Datum, gebildet in der Gerätezone des Erstellers. Das führt nicht zwingend zu einem Nicht-Treffer: Weicht die Gerätezone des Öffners von der Terminzone über eine Tagesgrenze ab, kann das alte Datum zufällig mit dem `occurrenceKey` der Nachbar-Occurrence übereinstimmen — `find` trifft dann still die falsche Zeile statt gar keine. Nur ein echter Nicht-Treffer fällt auf `expanded[0]` zurück, dasselbe Verhalten wie bei einem unbekannten `occ`. Kein stiller Datenverlust, aber der Nutzer kann auf einer anderen, plausibel aussehenden Occurrence landen. Halte das als Kommentar am Fallback fest; der TODO-Eintrag dazu kommt in Task 5.
 
 - [ ] **Step 6: Prüfen, dass im Schreibpfad kein `occurrenceDate` übrig ist**
 

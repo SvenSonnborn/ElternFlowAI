@@ -20,11 +20,15 @@ export interface CalendarOccurrence {
    * Das Datum, das die **Regel** erzeugt hat, gebildet in `timezone` — der
    * Schlüssel von `event_exceptions.occurrence_date`.
    *
-   * Ohne Override gleich `occurrenceDate`; das ist der Normalfall. Verschiebt
-   * eine Exception die Occurrence auf einen anderen Tag, fallen beide
-   * auseinander, und **dieser** Wert benennt weiterhin die Zeile, die den
-   * Inhalt bestimmt. Alles, was schreibt oder eine Exception meint, schlüsselt
-   * hierauf (ADR-034).
+   * Ohne Override derselbe Instant wie `occurrenceDate`, aber nicht
+   * zwangsläufig dasselbe Datum: Dieser Wert entsteht in `timezone`,
+   * `occurrenceDate` in der Zone des Lesers, und beide sind nur gleich,
+   * solange beide Zonen denselben Kalendertag sehen — fällt die Tagesgrenze
+   * dazwischen, laufen sie trotz fehlenden Overrides auseinander (ADR-034
+   * Decision 4). Verschiebt eine Exception die Occurrence zusätzlich auf
+   * einen anderen Tag, fallen beide erst recht auseinander, und **dieser**
+   * Wert benennt weiterhin die Zeile, die den Inhalt bestimmt. Alles, was
+   * schreibt oder eine Exception meint, schlüsselt hierauf (ADR-034).
    */
   occurrenceKey: string;
   /**
