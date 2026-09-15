@@ -1,5 +1,8 @@
 import { addDays, max as dateMax, min as dateMin } from "date-fns";
 
+import type { EventWithRelations } from "./expand";
+
+import { overrideInterval } from "./override";
 import { zonedDayBounds } from "./timezone";
 
 /**
@@ -27,6 +30,20 @@ import { zonedDayBounds } from "./timezone";
  * Occurrence zu zeigen — gehört an die Route und bleibt offen, siehe
  * `docs/TODO.md`.
  *
+ * Seit ADR-035 deckt das Fenster zusätzlich das Intervall ab, das ein
+ * `modified`-Override der angeforderten Occurrence beansprucht: Ein Override
+ * kann eine Occurrence aus dem um ihr Regel-Datum gebauten Fenster hinaus
+ * verschieben — `expandEvents` erzeugt sie dann zwar, der Fensterfilter
+ * verwirft sie aber wieder, `find` läuft leer, und der `expanded[0]`-Fallback
+ * zeigt stillschweigend eine **andere** Occurrence derselben Serie
+ * (nachgemessen, Spec §6.9 Nr. 2) — dieselbe Klasse wie Befund B aus PR #121,
+ * nur für den verschobenen statt den unverschobenen Fall. Dabei zählt **nur**
+ * der Override der angeforderten Occurrence, sonst zöge eine einzige weit
+ * verschobene Exception das Fenster jedes Detail-Aufrufs derselben Serie mit,
+ * und `expandEvents` expandierte Jahre statt Tage. Und die Weitung wirkt in
+ * **beide** Richtungen, weil ein Override ebenso in die Vergangenheit wie in
+ * die Zukunft verschieben kann.
+ *
  * Als eigenes Modul statt inline in `hooks.ts`: `hooks.ts` importiert über
  * `design-system/ThemeProvider` transitiv `nativewind`, das beim Laden
  * `Appearance` liest — außerhalb eines echten RN/Web-Runtimes wirft das unter
@@ -34,16 +51,40 @@ import { zonedDayBounds } from "./timezone";
  * getrennt und ist ohne Hook-Render-Pfad testbar.
  */
 export function eventLookupWindow(
-  masterStart: Date,
-  occurrenceKey: string | undefined,
-  timeZone: string,
+  row: EventWithRelations,
+  occurrenceKey?: string,
 ): { start: Date; end: Date } {
-  const bounds = occurrenceKey ? zonedDayBounds(occurrenceKey, timeZone) : null;
+  const masterStart = new Date(row.start_at);
+  const bounds = occurrenceKey ? zonedDayBounds(occurrenceKey, row.timezone) : null;
   if (!bounds) {
     return { start: addDays(masterStart, -1), end: addDays(masterStart, 366) };
   }
-  return {
-    start: dateMin([addDays(masterStart, -1), bounds.start]),
-    end: dateMax([addDays(masterStart, 366), bounds.end]),
-  };
+
+  const starts = [addDays(masterStart, -1), bounds.start];
+  const ends = [addDays(masterStart, 366), bounds.end];
+
+  // Ein Override kann genau diese Occurrence aus dem Fenster schieben, das um
+  // ihr Regel-Datum gebaut wurde. `expandEvents` erzeugt sie dann zwar, der
+  // Fensterfilter verwirft sie aber wieder, `find` läuft leer, und der
+  // `expanded[0]`-Fallback zeigt stillschweigend eine ANDERE Occurrence
+  // derselben Serie (nachgemessen, Spec §6.9 Nr. 2) — dieselbe Klasse wie
+  // Befund B aus PR #121, nur für den verschobenen Fall.
+  //
+  // Nur der Override DIESER Occurrence weitet: Sonst zöge eine einzige weit
+  // verschobene Exception das Fenster jedes Detail-Aufrufs derselben Serie mit
+  // sich, und `expandEvents` expandierte Jahre statt Tage.
+  //
+  // Beide Grenzen bekommen beide Werte, weil ein Override in jede Richtung
+  // verschieben kann — `dateMin`/`dateMax` greifen sich das jeweilige Extrem.
+  const interval = overrideInterval(
+    (row.event_exceptions ?? []).find(
+      (ex) => ex.occurrence_date === occurrenceKey && ex.action === "modified",
+    )?.override ?? null,
+  );
+  if (interval) {
+    starts.push(interval.start, interval.end);
+    ends.push(interval.start, interval.end);
+  }
+
+  return { start: dateMin(starts), end: dateMax(ends) };
 }

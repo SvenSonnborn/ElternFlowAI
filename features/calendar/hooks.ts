@@ -111,18 +111,15 @@ export function useEvent(id: string, occurrenceKey?: string): UseEventResult {
   const occurrence = useMemo<CalendarOccurrence | null>(() => {
     const row = query.data;
     if (!row) return null;
-    const start = new Date(row.start_at);
     // Das Suchfenster muss den angeforderten Regel-Tag in `row.timezone`
     // abdecken, nicht in der Zone des Lesers — sonst läuft `find` unten für
     // eine weit in der Zukunft liegende Occurrence (>366 Tage) leer, und der
     // `expanded[0]`-Fallback zeigt stillschweigend eine **andere** Occurrence
-    // (Befund B, PR #121). Siehe `eventWindow.ts` für die Begründung und warum
-    // die Funktion dort statt hier steht.
-    const { start: fallbackStart, end: fallbackEnd } = eventLookupWindow(
-      start,
-      occurrenceKey,
-      row.timezone,
-    );
+    // (Befund B, PR #121). Seit ADR-035 deckt das Fenster außerdem das
+    // Override-Intervall der angeforderten Occurrence ab. Siehe
+    // `eventWindow.ts` für die Begründung und warum die Funktion dort statt
+    // hier steht.
+    const { start: fallbackStart, end: fallbackEnd } = eventLookupWindow(row, occurrenceKey);
     const expanded = expandEvents([row], fallbackStart, fallbackEnd, theme);
     if (occurrenceKey) {
       // Match auf `occurrenceKey`, nicht auf das aufgelöste Anzeigedatum: Der
