@@ -337,7 +337,7 @@ occurrenceKey: string;
 occurrenceDate: string;
 ```
 
-Ohne Override sind beide gleich; das ist der Normalfall und bleibt unverändert.
+Ohne Override sind beide gleich, solange Gerätezone und Terminzone denselben Kalendertag sehen — das ist der Normalfall, aber keine Garantie (ADR-034 Decision 4).
 
 **Auf `occurrenceKey` schlüsseln** — überall dort, wo eine Zeile in `event_exceptions` gemeint ist:
 
