@@ -898,6 +898,63 @@ describe("applyEditScope — Schreibpfad rechnet in der Zone des Termins (ADR-03
   });
 });
 
+// ── Serienanker: die Dauer muss Wandzeit sein, nicht absolut (Befund D, PR #121) ──
+// `anchoredChanges` verankert den Start korrekt in `master.timezone`, nahm die
+// Dauer bisher aber als absolute Millisekunden-Differenz zwischen den beiden
+// Eingabewerten und addierte sie absolut auf den Anker. Überquert die
+// bearbeitete Spanne eine Zeitumstellung, die verankerte Spanne aber nicht (der
+// Normalfall — der Anker sitzt an einem beliebigen anderen Datum), weichen
+// Wandzeit- und absolute Dauer um genau den DST-Offset voneinander ab, und die
+// vom Nutzer gewählte End-Uhrzeit verschiebt sich. Dasselbe Muster wie
+// `floatingDurationMs` in `expand.ts` (ADR-033) — dort für die
+// Occurrence-Dauer bereits gelöst, hier fehlte die Übertragung auf den
+// Schreibpfad.
+describe("applyEditScope — Serienanker rechnet die Dauer in Wandzeit, nicht absolut (Befund D, PR #121)", () => {
+  test("bearbeitete Spanne überquert die Herbst-Rückstellung, der Anker nicht → Wanduhr-Dauer (74h) bleibt erhalten, nicht die absolute (75h)", async () => {
+    const ops = makeOps();
+    const master = makeMaster({
+      // Datum, das der Anker übernimmt: Fr, 05.06.2026 (Uhrzeit irrelevant —
+      // `mergeDateAndTimeOfDay` nimmt sie von `changes.start_at`).
+      start_at: "2026-06-05T07:00:00.000Z",
+      end_at: "2026-06-05T08:00:00.000Z",
+    });
+    // Die bearbeitete Occurrence: Fr, 23.10.2026 18:00 → Mo, 26.10.2026 20:00
+    // Europe/Berlin — eine Wanduhr-Dauer von 74 h, die am 25.10. die
+    // Rückstellung von CEST auf CET überquert (absolute Dauer: 75 h).
+    const changes: EventChanges = {
+      title: "Wochenendfahrt",
+      start_at: "2026-10-23T16:00:00.000Z", // 18:00 Europe/Berlin (CEST, +2 h)
+      end_at: "2026-10-26T19:00:00.000Z", // 20:00 Europe/Berlin (CET, +1 h)
+      location: null,
+      description: null,
+    };
+
+    await applyEditScope({
+      ops,
+      scope: "all",
+      eventId: "evt-1",
+      occurrenceKey: "2026-10-23",
+      isRecurring: true,
+      master,
+      changes,
+    });
+
+    // Verankerter Start: 05.06.2026, Uhrzeit aus der Eingabe (18:00 Berlin).
+    // Verankertes Ende: dieselbe Wanduhr-Dauer (74 h) ab dem Anker — der Anker
+    // selbst überquert keine Umstellung, eine absolute Addition (75 h) läge
+    // fälschlich eine Stunde später (05.06. 21:00 statt der gewählten 20:00).
+    expect(ops.updateMaster).toHaveBeenCalledWith(
+      "evt-1",
+      {
+        ...changes,
+        start_at: "2026-06-05T16:00:00.000Z", // 18:00 Europe/Berlin, 05.06.
+        end_at: "2026-06-08T18:00:00.000Z", // 20:00 Europe/Berlin, 08.06.
+      },
+      MASTER_UPDATED_AT,
+    );
+  });
+});
+
 describe("setRruleUntil bekommt einen Tagesende-Instant", () => {
   test("tägliche Serie, forward gelöscht ab dem 15.06. → der 14.06. bleibt vollständig", async () => {
     const ops = makeOps();
