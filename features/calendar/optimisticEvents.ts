@@ -136,21 +136,21 @@ export function canApplyOptimistically(args: {
  * Wendet eine Änderung auf eine Occurrence an — so, wie `expandEvents` sie nach
  * dem Refetch **anzeigen** wird, nicht wie der Server sie schreibt.
  *
- * Zwei Unterscheidungen tragen die Funktion:
+ * **Eine Unterscheidung trägt die Funktion: literale Zeiten oder neu
+ * verankerte?** Trifft die Änderung die Master-Zeile *einer Serie* (`all`,
+ * `forward`), schreibt der Server dort `start_at`/`end_at`, und `expandEvents`
+ * trägt deren **Tageszeit** in jede Occurrence, während jede ihr eigenes Datum
+ * behält. Ein stumpfes Übernehmen zöge die Serie auf einen Tag zusammen. Beim
+ * Einzeltermin und bei einer Exception (`this` auf einer Serie) gelten dagegen
+ * die Literalwerte — dort verschiebt eine Datumsänderung den Termin
+ * tatsächlich.
  *
- * 1. **Literale Zeiten oder neu verankerte?** Trifft die Änderung die
- *    Master-Zeile *einer Serie* (`all`, `forward`), schreibt der Server dort
- *    `start_at`/`end_at`, und `expandEvents` trägt deren **Tageszeit** in jede
- *    Occurrence, während jede ihr eigenes Datum behält. Ein stumpfes Übernehmen
- *    zöge die Serie auf einen Tag zusammen. Beim Einzeltermin und bei einer
- *    Exception (`this` auf einer Serie) gelten dagegen die Literalwerte — dort
- *    verschiebt eine Datumsänderung den Termin tatsächlich.
- * 2. **Überlebt `description` den Weg?** Nein, wenn eine Exception geschrieben
- *    wird: `expandEvents` liest das Feld **immer** von der Master-Zeile, und
- *    `applyOverride` kennt es nicht. Der Server legt eine geänderte Beschreibung
- *    zwar ins Override-JSON, die Anzeige übernimmt sie nie. Sie hier zu zeigen
- *    hieße, sie eine Sekunde später vom Refetch wegnehmen zu lassen — genau das
- *    Flackern, gegen das dieses Feature antritt.
+ * `description` war bis ADR-035 eine zweite Unterscheidung: `applyOverride`
+ * kannte den Key nicht, `expandEvents` las das Feld immer von der Master-Zeile,
+ * und eine per Exception geänderte Beschreibung hier zu zeigen hieß, sie eine
+ * Sekunde später vom Refetch wegnehmen zu lassen — genau das Flackern, gegen
+ * das dieses Feature antritt. Seit der Override-Vertrag das Feld führt, zeigt
+ * der Refetch denselben Wert, und die Eingabe gilt in beiden Fällen.
  */
 export function applyOptimisticChanges(
   occurrence: CalendarOccurrence,
@@ -174,7 +174,7 @@ export function applyOptimisticChanges(
     ...occurrence,
     title: changes.title,
     location: changes.location,
-    description: viaException ? occurrence.description : changes.description,
+    description: changes.description,
     startAt,
     endAt,
     // `expandEvents` leitet das Datum aus dem aufgelösten Start ab, nicht aus

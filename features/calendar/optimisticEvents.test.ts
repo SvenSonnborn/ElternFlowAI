@@ -209,18 +209,19 @@ describe("applyOptimisticChanges · Serie mit Scope `this`", () => {
     expect(out.isException).toBe(true);
   });
 
-  test("lässt die Beschreibung stehen, obwohl der Server sie schreibt", () => {
-    // `expandEvents` liest `description` immer von der Master-Zeile, auch bei
-    // einer `modified`-Exception — `applyOverride` kennt das Feld nicht. Ein
-    // Patch, der sie zeigte, nähme der Refetch eine Sekunde später wieder weg:
-    // genau das Flackern, das dieses Feature abstellen soll.
+  test("patcht die Beschreibung — seit ADR-035 überlebt sie den Weg", () => {
+    // Bis ADR-035 wurde sie hier bewusst verschluckt: `applyOverride` kannte
+    // den Key nicht, `expandEvents` las `description` immer von der
+    // Master-Zeile, und sie zu zeigen hieß, sie eine Sekunde später vom
+    // Refetch wegnehmen zu lassen. Seit der Override-Vertrag das Feld führt,
+    // zeigt der Refetch denselben Wert — die Ausnahme ist damit hinfällig.
     const out = applyOptimisticChanges(
       occ(),
       "this",
       changes({ title: "Neuer Titel", description: "Neue Notiz" }),
     );
     expect(out.title).toBe("Neuer Titel");
-    expect(out.description).toBe("Trikot einpacken");
+    expect(out.description).toBe("Neue Notiz");
   });
 });
 
