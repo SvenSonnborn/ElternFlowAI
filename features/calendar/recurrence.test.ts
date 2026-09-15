@@ -942,7 +942,7 @@ describe("applyEditScope — Serienanker rechnet die Dauer in Wandzeit, nicht ab
     // Verankerter Start: 05.06.2026, Uhrzeit aus der Eingabe (18:00 Berlin).
     // Verankertes Ende: dieselbe Wanduhr-Dauer (74 h) ab dem Anker — der Anker
     // selbst überquert keine Umstellung, eine absolute Addition (75 h) läge
-    // fälschlich eine Stunde später (05.06. 21:00 statt der gewählten 20:00).
+    // fälschlich eine Stunde später (08.06. 21:00 statt der gewählten 20:00).
     expect(ops.updateMaster).toHaveBeenCalledWith(
       "evt-1",
       {

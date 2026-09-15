@@ -74,7 +74,7 @@ const BASE_VARS: UpdateEventVars = {
   eventId: "evt-1",
   occurrenceKey: "2026-06-15",
   isRecurring: true,
-  // Nur fuer `canApplyOptimistically` relevant (Befund C, PR #121) --
+  // Nur für `canApplyOptimistically` relevant (Befund C, PR #121) --
   // `updateEvent` selbst liest die Zone aus dem frisch geladenen Master, nicht
   // aus `vars`.
   timezone: "Europe/Berlin",
