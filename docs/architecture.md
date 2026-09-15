@@ -90,11 +90,14 @@ statt eines: `occurrenceKey` entsteht über `zonedDateKey(instant, row.timezone)
 **Termins** — und ist der Persistenz-Schlüssel (`event_exceptions.occurrence_date`), der
 Konflikt-Versionsvergleich, der Routing-Parameter `occ` und die Eingabe für die Scope-Arithmetik
 (`applyEditScope`/`applyDeleteScope`); `occurrenceDate` bleibt das aus demselben Instant in der Zone
-des Lesers abgeleitete Anzeigedatum. Ohne Override sind beide identisch — erst eine per Scope „Nur
-diesen" auf einen anderen Tag verschobene Occurrence trennt sie, und nur dort war die frühere
-Vermischung beider Rollen in einem Feld nicht harmlos (falscher Versions-Treffer, wirkungslose
-Zweit-Exception, ins Leere laufende Einzel-Löschung). Offen bleibt die Kandidatenmenge für aus dem
-Fenster verschobene `modified`-Exceptions, siehe [Roadmap 1.3](./roadmap.md). Neue Termine bekommen
+des Lesers abgeleitete Anzeigedatum. Ohne Override beziehen sich beide auf denselben Instant und
+sind identisch, solange Gerätezone und Terminzone denselben Kalendertag sehen — fällt die
+Tagesgrenze dazwischen, trennen sie sich auch ohne Override (ADR-034 Decision 4). Zusätzlich trennt
+sie eine per Scope „Nur diesen" auf einen anderen Tag verschobene Occurrence, und dort war die
+frühere Vermischung beider Rollen in einem Feld nicht harmlos (falscher Versions-Treffer,
+wirkungslose Zweit-Exception, ins Leere laufende Einzel-Löschung). Offen bleibt die
+Kandidatenmenge für aus dem Fenster verschobene `modified`-Exceptions, siehe
+[Roadmap 1.3](./roadmap.md). Neue Termine bekommen
 ihre Zone unsichtbar von
 [features/calendar/deviceTimeZone.ts](../features/calendar/deviceTimeZone.ts) — ein Zonen-Picker
 fehlt (siehe [docs/TODO.md](./TODO.md)).
