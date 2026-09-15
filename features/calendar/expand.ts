@@ -94,14 +94,21 @@ function expandRecurrence(
  * Weg (ADR-034).
  *
  * Die Reihenfolge der Prüfungen ist Absicht — billig vor teuer: Der
- * Fensterschnitt und die Deduplizierung kosten nichts, der abschließende
- * `occurrencesBetween`-Aufruf einen zusätzlichen rrule-Durchlauf. Der ist
- * unverzichtbar: Verwaiste Exceptions überleben den Löschpfad
- * (`deleteAllExceptions` läuft nur bei `ruleDiffers`, `deleteExceptionsFromDate`
- * nur ab dem Schnitt), und ohne die Prüfung erzeugte eine solche Zeile einen
- * Phantom-Termin an einem Datum, an dem die Serie gar nicht stattfindet. Er
- * kostet auch selten etwas: Verschobene Exceptions sind die Ausnahme, und die
- * Regel-Schlüsselmenge wird erst gebaut, wenn die erste eine Prüfung braucht.
+ * Fensterschnitt kostet nichts, die Deduplizierung eine Schlüsselmenge über die
+ * Regel-Vorkommen, der abschließende `occurrencesBetween`-Aufruf einen
+ * zusätzlichen rrule-Durchlauf. Der ist unverzichtbar: Verwaiste Exceptions
+ * überleben den Löschpfad (`deleteAllExceptions` läuft nur bei `ruleDiffers`,
+ * `deleteExceptionsFromDate` nur ab dem Schnitt), und ohne die Prüfung erzeugte
+ * eine solche Zeile einen Phantom-Termin an einem Datum, an dem die Serie gar
+ * nicht stattfindet.
+ *
+ * Die beiden Kosten fallen dabei unterschiedlich oft an. Der teure
+ * `occurrencesBetween`-Aufruf trifft nur eine Exception, die tatsächlich aus der
+ * Regel-Menge heraus verschoben wurde — die Ausnahme. Der Aufbau der
+ * Regel-Schlüsselmenge läuft dagegen schon bei **jeder** `modified`-Exception
+ * mit brauchbarem `start_at` im Fenster, also bei jeder ganz normalen „Nur
+ * diesen"-Änderung; `ruleKeys ??=` hält ihn nur davon ab, mehr als einmal pro
+ * Zeile zu laufen.
  */
 function movedExceptionOccurrences(
   row: EventRow,
@@ -187,10 +194,14 @@ export function expandEvents(
       rangeEnd,
       Math.max(durationMs, floatingDurationMs),
     );
-    // Zwei Quellen statt einer (ADR-035). Sortiert, damit die Ausgabe
-    // unabhängig davon geordnet bleibt, aus welcher Quelle ein Vorkommen kam —
-    // `useEvent`s `expanded[0]`-Fallback liest sonst je nach Exception-Lage ein
-    // anderes Vorkommen.
+    // Zwei Quellen statt einer (ADR-035). Sortiert wird nach dem REGEL-Start —
+    // der Zweck ist eine deterministische Ordnung, unabhängig davon, aus welcher
+    // der beiden Quellen ein Vorkommen stammt; ohne den Schritt hinge die
+    // Reihenfolge daran, dass die Kandidaten hinten angehängt werden.
+    //
+    // Das ist ausdrücklich KEINE Ordnung nach Anzeigedatum: Ein Kandidat, dessen
+    // Regel-Datum vor dem Fenster liegt, steht danach vorn, obwohl er im Fenster
+    // erst später erscheint.
     const occurrences = [
       ...ruleOccurrences,
       ...movedExceptionOccurrences(row, exceptionRows, ruleOccurrences, rangeStart, rangeEnd),
