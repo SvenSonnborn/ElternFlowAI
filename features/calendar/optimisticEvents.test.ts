@@ -548,8 +548,15 @@ describe("useOptimisticEventsStore", () => {
   });
 });
 
+// Aus UTC-Strings gebaut, nicht aus lokalen Date-Komponenten wie im Rest
+// dieser Datei — seit Befund C (PR #121) vergleicht `canApplyOptimistically`
+// in der übergebenen Terminzone (`Europe/Berlin` unten), nicht mehr in der
+// Zone des Runners. Ein `new Date("2026-10-07T19:00:00")`-Literal (Wandzeit
+// der **Runner**-Zone) ließe die Erwartung deshalb mit der Runner-Zone
+// wandern — dasselbe Muster wie die Serienanker-Fixtures in
+// `recurrence.test.ts`.
 describe("canApplyOptimistically", () => {
-  const base = { isRecurring: true, occurrenceKey: "2026-10-05" };
+  const base = { isRecurring: true, occurrenceKey: "2026-10-05", timezone: "Europe/Berlin" };
 
   test("`all` mit geändertem Datum bekommt keinen Eintrag", () => {
     // Der Server schreibt `changes.start_at` als neues `dtstart` — die ganze
@@ -557,8 +564,8 @@ describe("canApplyOptimistically", () => {
     // zeigte damit die Nicht-Änderung genau der Eigenschaft, die der Nutzer
     // gerade geändert hat.
     const moved = changes({
-      start_at: new Date("2026-10-07T19:00:00").toISOString(),
-      end_at: new Date("2026-10-07T20:30:00").toISOString(),
+      start_at: "2026-10-07T17:00:00.000Z", // 19:00 Europe/Berlin, 07.10.
+      end_at: "2026-10-07T18:30:00.000Z", // 20:30 Europe/Berlin, 07.10.
     });
     expect(canApplyOptimistically({ ...base, scope: "all", changes: moved })).toBe(false);
     expect(canApplyOptimistically({ ...base, scope: "forward", changes: moved })).toBe(false);
@@ -566,19 +573,44 @@ describe("canApplyOptimistically", () => {
 
   test("`all` mit reiner Uhrzeit-Änderung bleibt optimistisch", () => {
     const retimed = changes({
-      start_at: new Date("2026-10-05T20:00:00").toISOString(),
-      end_at: new Date("2026-10-05T21:30:00").toISOString(),
+      start_at: "2026-10-05T18:00:00.000Z", // 20:00 Europe/Berlin, 05.10.
+      end_at: "2026-10-05T19:30:00.000Z", // 21:30 Europe/Berlin, 05.10.
     });
     expect(canApplyOptimistically({ ...base, scope: "all", changes: retimed })).toBe(true);
     expect(canApplyOptimistically({ ...base, scope: "forward", changes: retimed })).toBe(true);
+  });
+
+  // Befund C, PR #121: Der Vergleich muss in der **Terminzone** laufen, nicht
+  // in der des Geräts/Runners — genau der Fall, in dem beide auseinanderfallen
+  // können. Die Occurrence liegt Montagabend spät in Los Angeles; die neue
+  // Uhrzeit bleibt in `America/Los_Angeles` auf demselben Kalendertag, faellt
+  // in UTC (und in jeder Zone östlich davon — UTC, Berlin, New York) aber
+  // schon auf den Folgetag. Ein Vergleich in irgendeiner dieser drei
+  // Geräte-/Runner-Zonen verfehlte den Schlüssel "2026-09-10" unter jeder von
+  // ihnen — der Test bleibt trotzdem unter allen dreien identisch grün, weil
+  // die Implementierung die Runner-Zone gar nicht mehr liest.
+  test("Terminzone ungleich Geräte-/Runner-Zone: reine Uhrzeit-Änderung in der Terminzone bleibt optimistisch", () => {
+    const retimedInLA = changes({
+      start_at: "2026-09-11T05:00:00.000Z", // 22:00 America/Los_Angeles, 10.09.
+      end_at: "2026-09-11T06:00:00.000Z", // 23:00 America/Los_Angeles, 10.09.
+    });
+    expect(
+      canApplyOptimistically({
+        isRecurring: true,
+        occurrenceKey: "2026-09-10",
+        timezone: "America/Los_Angeles",
+        scope: "all",
+        changes: retimedInLA,
+      }),
+    ).toBe(true);
   });
 
   test("`this` und Einzeltermin dürfen auch das Datum verschieben", () => {
     // Beide schreiben Literalzeiten — die Exception bzw. die Master-Zeile —,
     // `applyOptimisticChanges` bildet die Verschiebung dort korrekt ab.
     const moved = changes({
-      start_at: new Date("2026-10-07T19:00:00").toISOString(),
-      end_at: new Date("2026-10-07T20:30:00").toISOString(),
+      start_at: "2026-10-07T17:00:00.000Z", // 19:00 Europe/Berlin, 07.10.
+      end_at: "2026-10-07T18:30:00.000Z", // 20:30 Europe/Berlin, 07.10.
     });
     expect(canApplyOptimistically({ ...base, scope: "this", changes: moved })).toBe(true);
     expect(
@@ -592,8 +624,8 @@ describe("canApplyOptimistically", () => {
     // sonst harmlos ist (reine Uhrzeit, gleiches Datum), muss `recurrence`
     // allein schon blocken.
     const retimed = changes({
-      start_at: new Date("2026-10-05T20:00:00").toISOString(),
-      end_at: new Date("2026-10-05T21:30:00").toISOString(),
+      start_at: "2026-10-05T18:00:00.000Z", // 20:00 Europe/Berlin, 05.10.
+      end_at: "2026-10-05T19:30:00.000Z", // 21:30 Europe/Berlin, 05.10.
     });
     expect(
       canApplyOptimistically({
@@ -607,8 +639,8 @@ describe("canApplyOptimistically", () => {
 
   test("fehlendes oder `null` `recurrence` blockt nicht", () => {
     const retimed = changes({
-      start_at: new Date("2026-10-05T20:00:00").toISOString(),
-      end_at: new Date("2026-10-05T21:30:00").toISOString(),
+      start_at: "2026-10-05T18:00:00.000Z", // 20:00 Europe/Berlin, 05.10.
+      end_at: "2026-10-05T19:30:00.000Z", // 21:30 Europe/Berlin, 05.10.
     });
     expect(canApplyOptimistically({ ...base, scope: "all", changes: retimed })).toBe(true);
     expect(

@@ -7,7 +7,7 @@ import type { EditScope, EventChanges, RecurrenceChanges } from "./recurrence";
 import type { CalendarOccurrence } from "./types";
 
 import { withoutPendingDeletes } from "./pendingDeletes";
-import { mergeDateAndTimeOfDay } from "./timezone";
+import { mergeDateAndTimeOfDay, zonedDateKey } from "./timezone";
 
 /**
  * Das Occurrence-Overlay für optimistische Kalender-Änderungen.
@@ -98,21 +98,27 @@ export function patchesOccurrence(
  * weil genau dieser Wert die Identität der bearbeiteten Occurrence trägt
  * (ADR-034) und `EventEditScreen` ihn unverändert aus `useEvent` durchreicht.
  *
- * Offene Flanke (ADR-034): Das `format(…, "yyyy-MM-dd")` unten liest
- * `changes.start_at` weiterhin in der Zone des **Geräts**, während
- * `occurrenceKey` eine Zone-des-Termins-Angabe ist. Vor diesem Task war das
- * folgenlos, weil `anchoredChanges` dieselbe Geräte-Zone benutzte — Client und
- * Server waren gleich falsch und stimmten deshalb überein. Seit `anchoredChanges`
- * in `master.timezone` rechnet, kann dieser Client-seitige Check auf einem
- * Gerät in einer anderen Zone als der des Termins vom tatsächlichen
- * Server-Ergebnis abweichen — höchstens für eine Sekunde, bis der Refetch
- * korrigiert (dieselbe Näherung wie im Modul-Docstring oben), aber nicht mehr
- * durch Symmetrie gedeckt.
+ * Der Vergleich läuft in `timezone` — der Zone des **Termins**, nicht des
+ * Geräts (Befund C, PR #121): `zonedDateKey(new Date(args.changes.start_at),
+ * args.timezone)` liest denselben Kalendertag, den auch `anchoredChanges`
+ * (`recurrence.ts`) beim Schreiben verankert. Vor diesem Fix las der Vergleich
+ * mit `format(…, "yyyy-MM-dd")` in der Zone des Geräts — vor ADR-034 folgenlos,
+ * weil `anchoredChanges` dieselbe Geräte-Zone benutzte und beide Seiten daher
+ * gleich falsch waren. Seit `anchoredChanges` zonenkorrekt rechnet, hätte der
+ * Gerätezonen-Vergleich bei einem Termin nahe Mitternacht in einer anderen
+ * Zone als der des Geräts falsch entscheiden können — der Aufrufer hat die
+ * Zone ohnehin zur Hand (`EventEditScreen` reicht sie bereits an
+ * `recurrenceToRrule` durch), eine Interface-Änderung war also nicht nötig.
+ *
+ * **Einordnung, keine offene Grenze mehr:** Selbst ein falsches Ergebnis hier
+ * träfe nur die **Anzeige** für die eine Sekunde bis zum Refetch — nie den
+ * gespeicherten Wert, den `anchoredChanges` unabhängig davon korrekt schreibt.
  */
 export function canApplyOptimistically(args: {
   scope: EditScope;
   isRecurring: boolean;
   occurrenceKey: string;
+  timezone: string;
   changes: EventChanges;
   recurrence?: RecurrenceChanges | null;
 }): boolean {
@@ -123,7 +129,7 @@ export function canApplyOptimistically(args: {
   // verschiebt eine Datumsänderung den Termin tatsächlich, und das Overlay
   // bildet sie korrekt ab.
   if (!args.isRecurring || args.scope === "this") return true;
-  return format(new Date(args.changes.start_at), "yyyy-MM-dd") === args.occurrenceKey;
+  return zonedDateKey(new Date(args.changes.start_at), args.timezone) === args.occurrenceKey;
 }
 
 /**

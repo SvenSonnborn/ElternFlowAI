@@ -44,6 +44,14 @@ export interface DeleteEventVars {
 export interface UpdateEventVars extends DeleteEventVars {
   changes: EventChanges;
   recurrence?: RecurrenceChanges | null;
+  /**
+   * Die Zone des Termins (`events.timezone`), für `canApplyOptimistically`s
+   * Datumsvergleich (Befund C, PR #121) — nicht für den eigentlichen
+   * Schreibpfad: `updateEvent` liest die Zone dafür aus dem frisch
+   * geladenen `master`, nicht aus `vars`. `onMutate` läuft aber vor diesem
+   * Fetch, der Aufrufer muss die Zone also mitschicken.
+   */
+  timezone: string;
 }
 
 export interface UpdateEventDeps {
