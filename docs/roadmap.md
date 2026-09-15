@@ -266,7 +266,7 @@ die Issue-Liste zeigt nur noch echte Offene.
 
 ## Block 1 — Stiller Datenverlust im Kalender
 
-**Aufwand M–L · 5 PRs (1.3 zählt doppelt: D1 gelandet, D2 offen) · die Einträge, bei denen Daten ohne
+**Aufwand M–L · 5 PRs (1.3 zählt doppelt) · die Einträge, bei denen Daten ohne
 jede Meldung verschwinden**
 
 Alle fünf liegen in `features/calendar/`, alle sind unblockiert, alle haben eine bestehende
@@ -315,13 +315,14 @@ heraus: „ab diesem Termin" verankert weiterhin absichtlich neu, und eine **Dat
 Scope „alle" wird stillschweigend verworfen — der Hinweis dafür braucht einen Copy-Key und steht als
 🎨-Eintrag in [TODO.md](./TODO.md).
 
-### 1.3 Das Override-Modell: verschwundene Exceptions + Versions-Schlüssel — **D1 erledigt, D2 offen**
+### 1.3 Das Override-Modell: verschwundene Exceptions + Versions-Schlüssel — **erledigt**
 
 Zwei Einträge, ursprünglich **eine** vermutete Ursache — beide schlüsselten auf ein Datum, das der
-jeweils andere Pfad anders auflöste. Der Versions-Schlüssel-Teil (D1) ist mit diesem PR behoben; die
-Kandidatenmenge (D2) hat sich dabei als eigenständiges Problem am Override-Modell selbst
-herausgestellt, nicht als dieselbe Stelle zweimal anzufassen — sie bleibt offen und bekommt einen
-eigenen PR.
+jeweils andere Pfad anders auflöste. Der Versions-Schlüssel-Teil (D1) ist mit
+[PR #121](https://github.com/SvenSonnborn/ElternFlowAI/pull/121) behoben; die Kandidatenmenge (D2)
+hatte sich dabei als eigenständiges Problem am Override-Modell selbst herausgestellt, nicht als
+dieselbe Stelle zweimal anzufassen, und bekam deshalb einen eigenen PR. Beide sind erledigt: D1
+macht eine verschobene Occurrence **adressierbar**, D2 macht sie **sichtbar**.
 
 - **D1 — „Eine auf einen anderen Tag verschobene Occurrence fällt aus dem Versions-Schlüssel"**
   · [version.ts](../features/calendar/version.ts) — `occurrenceVersion`
@@ -338,15 +339,30 @@ eigenen PR.
   `mergeDateAndTimeOfDay`, `recurrenceToRrule` rechneten in der Geräte- statt der Terminzone).
 - **D2 — „Aus dem Fenster verschobene `modified`-Exceptions verschwinden"**
   · [expand.ts](../features/calendar/expand.ts) — `expandRecurrence`
-  **Offen.** Kandidaten kommen weiterhin ausschließlich aus `rule.between(...)`. Verschiebt ein
-  Override eine Occurrence in einen Monat, in dem ihr _ursprüngliches_ `occurrence_date` nicht liegt,
-  entsteht der Kandidat nie — der Termin ist **an beiden Daten unsichtbar**. Über `EventEditScreen`
-  mit Scope „Nur diesen" erreichbar. Fix: die Kandidatenmenge muss `event_exceptions` einbeziehen und
-  gegen die regulär expandierten Vorkommen dedupliziert werden — eigener PR, eigener ADR.
+  **Erledigt, umgesetzt als
+  [ADR-035](./decision-log.md#adr-035--der-override-vertrag-kandidaten-aus-event_exceptions-description-im-vertrag-2026-09-15).**
+  Die Kandidatenmenge hat jetzt **zwei** Quellen: die Regel-Vorkommen aus `occurrencesBetween` plus
+  die Regel-Vorkommen jener `modified`-Exceptions, deren Override-Intervall das Fenster schneidet —
+  dedupliziert auf `occurrenceKey` und nur, wenn ihr `occurrence_date` überhaupt ein Vorkommen der
+  Regel ist, damit eine verwaiste Exception keinen Phantom-Termin erzeugt. Nachgemessen an einer
+  Montagsserie ab 01.06.2026, deren Vorkommen vom 29.06. auf den 20.07. verschoben ist: Das
+  Juli-Fenster führte `2026-07-06/13/20/27` **ohne** den Schlüssel `2026-06-29`, das Juni-Fenster
+  `2026-06-01/08/15/22` ebenfalls ohne ihn — an beiden Daten unsichtbar. Jetzt steht sie im
+  Juli-Fenster, neben dem regulären Vorkommen desselben Tages; dass beide überleben, trägt
+  `occurrenceKey` als Identität aus D1. Drei Zusätze aus Spec §6.9 kamen mit: `description` ist
+  seither Teil des Override-Vertrags (eine per „Nur diesen" geänderte Beschreibung erreichte die
+  Anzeige nie), ein unparsbares `override.start_at` wird verworfen statt als `Invalid Date`
+  weitergereicht (ein einziger kaputter Wert leerte über den `RangeError` den **gesamten**
+  Kalenderbereich), und `eventLookupWindow` deckt das Override-Intervall der angeforderten
+  Occurrence mit ab — sonst zeigte ihr eigener Link stillschweigend einen anderen Termin derselben
+  Serie. Der Vertrag liegt jetzt als eigenes Modul in
+  [override.ts](../features/calendar/override.ts), die Tagesgrenzen-Rechnung als `zonedDayBounds` in
+  [timezone.ts](../features/calendar/timezone.ts) (drittes Vorkommen).
 
-> D2 berührt außerdem **„`applyOverride` kennt `description` nicht"** und **„Ganztägig ist im Edit-Form
-> nicht umschaltbar"** (beide Calendar-Sektion) — beide erweitern denselben Override-Vertrag. Wenn
-> der ohnehin aufgemacht wird, gehören sie hier mit hinein statt in zwei spätere Einzeliterationen.
+> D2 hat den Override-Vertrag ohnehin aufgemacht und **„`applyOverride` kennt `description` nicht"**
+> gleich mit erledigt — der Eintrag ist aus `TODO.md` entfernt. **„Ganztägig ist im Edit-Form nicht
+> umschaltbar"** bleibt als einziger Punkt des Vertrags offen und ist 🎨-blockiert: Der Code-Weg ist
+> mit `description` vorgezeichnet, es fehlt allein der `cal.edit.*`-Copy-Key.
 
 ### 1.4 Zeitumstellung: Serien laufen eine Stunde falsch — **erledigt**
 

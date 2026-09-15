@@ -95,9 +95,20 @@ sind identisch, solange Gerätezone und Terminzone denselben Kalendertag sehen �
 Tagesgrenze dazwischen, trennen sie sich auch ohne Override (ADR-034 Decision 4). Zusätzlich trennt
 sie eine per Scope „Nur diesen" auf einen anderen Tag verschobene Occurrence, und dort war die
 frühere Vermischung beider Rollen in einem Feld nicht harmlos (falscher Versions-Treffer,
-wirkungslose Zweit-Exception, ins Leere laufende Einzel-Löschung). Offen bleibt die
-Kandidatenmenge für aus dem Fenster verschobene `modified`-Exceptions, siehe
-[Roadmap 1.3](./roadmap.md). Neue Termine bekommen
+wirkungslose Zweit-Exception, ins Leere laufende Einzel-Löschung). Seit
+[ADR-035](./decision-log.md) kommt die Kandidatenmenge einer Serie deshalb aus **zwei** Quellen
+statt einer: den Regel-Vorkommen aus `occurrencesBetween` **und** den Regel-Vorkommen jener
+`modified`-Exceptions, deren Override-Intervall das Fenster schneidet — dedupliziert auf
+`occurrenceKey` und nur, wenn ihr `occurrence_date` überhaupt ein Vorkommen der Regel ist. Ohne die
+zweite Quelle war eine per Override auf einen anderen Monat verschobene Occurrence **an beiden
+Daten unsichtbar**: am Regel-Datum verwirft sie der Fensterfilter, am neuen entsteht sie nie, weil
+`rule.between(...)` nur Regel-Daten kennt. Zurückgegeben wird dabei das Regel-Vorkommen, nicht der
+Override-Start — nur so läuft der Kandidat durch dieselbe Auflösung wie jedes andere Vorkommen und
+trägt hinterher denselben Schlüssel, dasselbe Versions-Token und dieselbe Exception-Kennzeichnung.
+Derselbe ADR nimmt `description` in den Vertrag von `event_exceptions.override` auf, der jetzt als
+eigenes Modul in [features/calendar/override.ts](../features/calendar/override.ts) liegt, und lässt
+`eventLookupWindow` zusätzlich das Override-Intervall der angeforderten Occurrence abdecken, damit
+eine weit verschobene Occurrence über ihren eigenen Link erreichbar bleibt. Neue Termine bekommen
 ihre Zone unsichtbar von
 [features/calendar/deviceTimeZone.ts](../features/calendar/deviceTimeZone.ts) — ein Zonen-Picker
 fehlt (siehe [docs/TODO.md](./TODO.md)).
