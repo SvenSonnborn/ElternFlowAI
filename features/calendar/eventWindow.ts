@@ -1,6 +1,6 @@
 import { addDays, max as dateMax, min as dateMin } from "date-fns";
 
-import { floatingToInstant } from "./timezone";
+import { zonedDayBounds } from "./timezone";
 
 /**
  * Das Suchfenster, mit dem ein einzelner Master expandiert wird, um eine
@@ -14,63 +14,36 @@ import { floatingToInstant } from "./timezone";
  * Zukunft liegenden Occurrence (>366 Tage) leer, `find` schlägt fehl, und der
  * `expanded[0]`-Fallback zeigt eine **andere** Occurrence derselben Serie.
  *
- * `occurrenceKey` ist ein Regel-Datum in `timeZone` (ADR-034), keine lokale
- * Wanduhrzeit des Lesers: Tagesanfang und -ende werden deshalb als floating in
- * `timeZone` gebildet und über `floatingToInstant` zurückgerechnet, statt mit
- * `parseISO`/`endOfDay` lokal ausgewertet (Befund B, PR #121). Ein früherer
- * Kommentar an einer der beiden Aufrufstellen behauptete, dieser Fensterrand
- * brauche keine zonen-genaue Behandlung — das stimmt nicht: Ein Leser westlich
- * der Terminzone verpasst sonst den frühen Teil des angeforderten Tages (ein
- * Berliner Termin um 23:30 liegt für einen Leser in `America/New_York` schon
- * am Vortag), das Fenster verfehlt die Occurrence, und `find` liefe ins Leere.
+ * Die Tagesgrenzen kommen aus `zonedDayBounds` ([timezone.ts](./timezone.ts))
+ * und entstehen dort in `timeZone`, nicht in der Zone des Lesers (ADR-034,
+ * Befund B aus PR #121): Ein Leser westlich der Terminzone verpasste sonst den
+ * frühen Teil des angeforderten Tages — ein Berliner Termin um 23:30 liegt für
+ * einen Leser in `America/New_York` schon am Vortag —, das Fenster verfehlte
+ * die Occurrence, und `find` liefe ins Leere. Ein Schlüssel, der nicht der Form
+ * `yyyy-MM-dd` entspricht, liefert dort `null` und fällt hier auf dasselbe
+ * Standardfenster zurück wie gar kein Schlüssel. Das ist **keine**
+ * Eingabe-Validierung, sondern nur Totalität: Die eigentliche Validierung —
+ * einen kaputten `occ`-Link als solchen melden, statt still eine andere
+ * Occurrence zu zeigen — gehört an die Route und bleibt offen, siehe
+ * `docs/TODO.md`.
  *
  * Als eigenes Modul statt inline in `hooks.ts`: `hooks.ts` importiert über
  * `design-system/ThemeProvider` transitiv `nativewind`, das beim Laden
  * `Appearance` liest — außerhalb eines echten RN/Web-Runtimes wirft das unter
  * `bun test` (`react-native-css-interop`). Diese reine Funktion bleibt davon
- * getrennt und ist ohne Hook-Render-Pfad testbar — `bun test` hat für Hooks
- * keinen tragfähigen Render-Pfad, siehe `docs/TODO.md`.
- *
- * Verwandt, aber bewusst nicht zusammengelegt: `endOfDayInstant` in
- * `recurrence.ts` bildet dieselbe Tagesende-Rechnung für `setRruleUntil`
- * (ADR-033) — dort für genau einen Tag statt für ein Fenster, und ohne den
- * hier gebrauchten Tagesbeginn.
- *
- * Der `^\d{4}-\d{2}-\d{2}$`-Guard vor dem Zerlegen ist **kein**
- * Eingabe-Validierung — er macht die Funktion nur total. Ein Schlüssel, der
- * nicht passt, fällt auf dasselbe Standardfenster zurück wie gar kein
- * Schlüssel: Ohne den Guard lieferte `"2026-13-45"` (Regex-Form, aber
- * `Date.UTC`-Überlauf) schon zufällig dasselbe Standardfenster, während
- * `"kaputt"` an `split("-").map(Number)`s `NaN`-Komponenten scheiterte und
- * `floatingToInstant` einen `RangeError` werfen ließ — *bevor* der
- * `expanded[0]`-Fallback erreicht wurde, den dieser Docstring für einen nicht
- * gefundenen Schlüssel verspricht. Der Guard vereinheitlicht beide Fälle auf
- * den Fallback-Zweig, den es für „Schlüssel ergibt keinen Treffer" ohnehin
- * schon gibt (PR #121, Review-Nachtrag). Die eigentliche Validierung — einen
- * kaputten `occ`-Link als solchen melden, statt still eine andere Occurrence
- * zu zeigen — gehört an die Route und bleibt offen, siehe `docs/TODO.md`.
+ * getrennt und ist ohne Hook-Render-Pfad testbar.
  */
-const OCCURRENCE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
 export function eventLookupWindow(
   masterStart: Date,
   occurrenceKey: string | undefined,
   timeZone: string,
 ): { start: Date; end: Date } {
-  if (!occurrenceKey || !OCCURRENCE_KEY_PATTERN.test(occurrenceKey)) {
+  const bounds = occurrenceKey ? zonedDayBounds(occurrenceKey, timeZone) : null;
+  if (!bounds) {
     return { start: addDays(masterStart, -1), end: addDays(masterStart, 366) };
   }
-  const [year, month, day] = occurrenceKey.split("-").map(Number);
-  const dayStart = floatingToInstant(
-    new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)),
-    timeZone,
-  );
-  const dayEnd = floatingToInstant(
-    new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)),
-    timeZone,
-  );
   return {
-    start: dateMin([addDays(masterStart, -1), dayStart]),
-    end: dateMax([addDays(masterStart, 366), dayEnd]),
+    start: dateMin([addDays(masterStart, -1), bounds.start]),
+    end: dateMax([addDays(masterStart, 366), bounds.end]),
   };
 }

@@ -5,6 +5,7 @@ import {
   instantToFloating,
   mergeDateAndTimeOfDay,
   zonedDateKey,
+  zonedDayBounds,
   zoneOffsetMs,
 } from "./timezone";
 
@@ -165,5 +166,49 @@ describe("zonedDateKey", () => {
     const silvester = new Date("2026-12-31T23:00:00.000Z");
     expect(zonedDateKey(silvester, "Europe/Berlin")).toBe("2027-01-01");
     expect(zonedDateKey(silvester, "America/New_York")).toBe("2026-12-31");
+  });
+});
+
+describe("zonedDayBounds", () => {
+  test("die Grenzen entstehen in der übergebenen Zone, nicht in der des Lesers", () => {
+    const bounds = zonedDayBounds("2026-06-15", BERLIN);
+    // 00:00 Berlin am 15.06. (CEST, +2 h) = 22:00Z am 14.06.
+    expect(bounds?.start.toISOString()).toBe("2026-06-14T22:00:00.000Z");
+    // 23:59:59.999 Berlin am 15.06. = 21:59:59.999Z am 15.06.
+    expect(bounds?.end.toISOString()).toBe("2026-06-15T21:59:59.999Z");
+  });
+
+  test("an einem Tag ohne lokale Mitternacht beginnt der Tag um 01:00, nicht am Vortag um 23:00", () => {
+    // `America/Santiago` stellt am 2026-09-06 um 00:00 vor — die Stunde
+    // existiert dort nicht (nachgemessen; `America/Havana` 2026-03-08 und
+    // `Asia/Beirut` 2026-03-29 verhalten sich gleich). `floatingToInstant`
+    // nimmt in der Lücke den SPÄTEREN Zeitpunkt, also 01:00 desselben Tages.
+    // Die Gegenregel („früherer gewinnt") ergäbe 23:00 des VORTAGES — die
+    // Tagesgrenze läge dann einen ganzen Tag daneben, und genau das prüft die
+    // zweite Assertion.
+    const bounds = zonedDayBounds("2026-09-06", "America/Santiago");
+    expect(bounds?.start.toISOString()).toBe("2026-09-06T04:00:00.000Z");
+    expect(zonedDateKey(bounds!.start, "America/Santiago")).toBe("2026-09-06");
+  });
+
+  test("ein formwidriger Schlüssel ergibt null, damit der Aufrufer entscheidet", () => {
+    // Kein Wurf und kein Ratewert: `eventLookupWindow` fällt auf sein
+    // Standardfenster zurück, `endOfDayInstant` wirft — die Entscheidung
+    // gehört den Aufrufern, nicht dieser Funktion.
+    expect(zonedDayBounds("kaputt", BERLIN)).toBeNull();
+    expect(zonedDayBounds("2026-6-1", BERLIN)).toBeNull();
+    expect(zonedDayBounds("", BERLIN)).toBeNull();
+  });
+
+  test("ein Date.UTC-Überlauf wird bewusst nicht abgefangen", () => {
+    // `"2026-13-45"` entspricht dem Muster, rollt aber über: Monat 13 =
+    // Januar 2027, Tag 45 = 14. Februar. Das ist keine Eingabe-Validierung,
+    // sondern nur eine Totalitätsgarantie für die Form — dasselbe Verhalten,
+    // das `eventLookupWindow` seit PR #121 hat und das dessen Test
+    // ausdrücklich festhält. Wer echte Validierung braucht, baut sie an der
+    // Route (siehe docs/TODO.md).
+    expect(zonedDayBounds("2026-13-45", BERLIN)?.start.toISOString()).toBe(
+      "2027-02-13T23:00:00.000Z",
+    );
   });
 });
