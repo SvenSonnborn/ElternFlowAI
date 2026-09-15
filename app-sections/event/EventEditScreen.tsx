@@ -510,9 +510,9 @@ export function EventEditScreen() {
       eventId: initial.eventId,
       occurrenceKey: initial.occurrenceKey,
       isRecurring,
-      // Fuer `canApplyOptimistically`s Datumsvergleich (Befund C, PR #121) --
+      // Für `canApplyOptimistically`s Datumsvergleich (Befund C, PR #121) --
       // aus `initial`, nicht aus dem ggf. inzwischen frischeren `source`: Der
-      // Formular-State ist auf `initial` eingefroren, siehe die Begruendung
+      // Formular-State ist auf `initial` eingefroren, siehe die Begründung
       // dort oben.
       timezone: initial.occurrence.timezone,
       changes: {

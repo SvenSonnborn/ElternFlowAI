@@ -30,6 +30,11 @@ import { floatingToInstant } from "./timezone";
  * `bun test` (`react-native-css-interop`). Diese reine Funktion bleibt davon
  * getrennt und ist ohne Hook-Render-Pfad testbar — `bun test` hat für Hooks
  * keinen tragfähigen Render-Pfad, siehe `docs/TODO.md`.
+ *
+ * Verwandt, aber bewusst nicht zusammengelegt: `endOfDayInstant` in
+ * `recurrence.ts` bildet dieselbe Tagesende-Rechnung für `setRruleUntil`
+ * (ADR-033) — dort für genau einen Tag statt für ein Fenster, und ohne den
+ * hier gebrauchten Tagesbeginn.
  */
 export function eventLookupWindow(
   masterStart: Date,

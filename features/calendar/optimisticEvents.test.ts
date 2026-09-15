@@ -583,7 +583,7 @@ describe("canApplyOptimistically", () => {
   // Befund C, PR #121: Der Vergleich muss in der **Terminzone** laufen, nicht
   // in der des Geräts/Runners — genau der Fall, in dem beide auseinanderfallen
   // können. Die Occurrence liegt Montagabend spät in Los Angeles; die neue
-  // Uhrzeit bleibt in `America/Los_Angeles` auf demselben Kalendertag, faellt
+  // Uhrzeit bleibt in `America/Los_Angeles` auf demselben Kalendertag, fällt
   // in UTC (und in jeder Zone östlich davon — UTC, Berlin, New York) aber
   // schon auf den Folgetag. Ein Vergleich in irgendeiner dieser drei
   // Geräte-/Runner-Zonen verfehlte den Schlüssel "2026-09-10" unter jeder von
