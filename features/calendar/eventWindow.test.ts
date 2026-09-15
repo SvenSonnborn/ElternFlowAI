@@ -42,4 +42,44 @@ describe("eventLookupWindow", () => {
     // 00:00:00 Ortszeit = 07:00:00Z.
     expect(start.toISOString()).toBe("2026-09-10T07:00:00.000Z");
   });
+
+  // PR-121-Review-Befund: Ein Routen-Parameter, der nicht dem Muster
+  // `yyyy-MM-dd` entspricht, darf die Funktion nicht zum Werfen bringen —
+  // sonst hielte sie ihr eigenes Docstring-Versprechen (Fallback auf
+  // `expanded[0]` bei Nicht-Treffer) nicht ein. Vor dem Guard verhielten sich
+  // die vier Fälle uneinheitlich: "", "2026-6-1" und "2026-13-45" fielen schon
+  // zufällig (falsy bzw. `Date.UTC`-Überlauf) auf das Standardfenster zurück,
+  // "kaputt" allein warf einen `RangeError` aus `floatingToInstant`, weil
+  // `split("-").map(Number)` dafür `NaN`-Komponenten liefert. Der Guard macht
+  // alle vier zum selben Zweig, statt den Wurf isoliert abzufangen.
+  describe("nicht dem Muster yyyy-MM-dd entsprechender occurrenceKey: Standardfenster statt Wurf oder Zufallsergebnis", () => {
+    test('leerer String ("")', () => {
+      const { start, end } = eventLookupWindow(MASTER_START, "", "Europe/Berlin");
+      expect(start.toISOString()).toBe("2026-05-03T16:30:00.000Z");
+      expect(end.toISOString()).toBe("2027-05-05T16:30:00.000Z");
+    });
+
+    test('fehlende Nullauffüllung ("2026-6-1")', () => {
+      const { start, end } = eventLookupWindow(MASTER_START, "2026-6-1", "Europe/Berlin");
+      expect(start.toISOString()).toBe("2026-05-03T16:30:00.000Z");
+      expect(end.toISOString()).toBe("2027-05-05T16:30:00.000Z");
+    });
+
+    test('Date.UTC-Überlauf ("2026-13-45")', () => {
+      const { start, end } = eventLookupWindow(MASTER_START, "2026-13-45", "Europe/Berlin");
+      expect(start.toISOString()).toBe("2026-05-03T16:30:00.000Z");
+      expect(end.toISOString()).toBe("2027-05-05T16:30:00.000Z");
+    });
+
+    // Vor dem Guard: RangeError aus `floatingToInstant`
+    // ("date value is not finite in DateTimeFormat formatToParts()"), weil
+    // `Number("kaputt")` zu `NaN` wird und `Date.UTC(NaN, ...)` ein Invalid
+    // Date liefert — der einzige der vier Fälle, der tatsächlich wirft statt
+    // ein (zufälliges) Ergebnis zu liefern.
+    test('keine Datumsstruktur ("kaputt")', () => {
+      const { start, end } = eventLookupWindow(MASTER_START, "kaputt", "Europe/Berlin");
+      expect(start.toISOString()).toBe("2026-05-03T16:30:00.000Z");
+      expect(end.toISOString()).toBe("2027-05-05T16:30:00.000Z");
+    });
+  });
 });

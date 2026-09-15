@@ -35,13 +35,29 @@ import { floatingToInstant } from "./timezone";
  * `recurrence.ts` bildet dieselbe Tagesende-Rechnung für `setRruleUntil`
  * (ADR-033) — dort für genau einen Tag statt für ein Fenster, und ohne den
  * hier gebrauchten Tagesbeginn.
+ *
+ * Der `^\d{4}-\d{2}-\d{2}$`-Guard vor dem Zerlegen ist **kein**
+ * Eingabe-Validierung — er macht die Funktion nur total. Ein Schlüssel, der
+ * nicht passt, fällt auf dasselbe Standardfenster zurück wie gar kein
+ * Schlüssel: Ohne den Guard lieferte `"2026-13-45"` (Regex-Form, aber
+ * `Date.UTC`-Überlauf) schon zufällig dasselbe Standardfenster, während
+ * `"kaputt"` an `split("-").map(Number)`s `NaN`-Komponenten scheiterte und
+ * `floatingToInstant` einen `RangeError` werfen ließ — *bevor* der
+ * `expanded[0]`-Fallback erreicht wurde, den dieser Docstring für einen nicht
+ * gefundenen Schlüssel verspricht. Der Guard vereinheitlicht beide Fälle auf
+ * den Fallback-Zweig, den es für „Schlüssel ergibt keinen Treffer" ohnehin
+ * schon gibt (PR #121, Review-Nachtrag). Die eigentliche Validierung — einen
+ * kaputten `occ`-Link als solchen melden, statt still eine andere Occurrence
+ * zu zeigen — gehört an die Route und bleibt offen, siehe `docs/TODO.md`.
  */
+const OCCURRENCE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 export function eventLookupWindow(
   masterStart: Date,
   occurrenceKey: string | undefined,
   timeZone: string,
 ): { start: Date; end: Date } {
-  if (!occurrenceKey) {
+  if (!occurrenceKey || !OCCURRENCE_KEY_PATTERN.test(occurrenceKey)) {
     return { start: addDays(masterStart, -1), end: addDays(masterStart, 366) };
   }
   const [year, month, day] = occurrenceKey.split("-").map(Number);
