@@ -354,18 +354,14 @@ export function EventEditScreen() {
         // `null`, obwohl die fremde Fassung bekannt ist — ausgerechnet beim
         // häufigsten echten Konfliktfall („wir haben beide verschoben").
         // Dieselbe Begründung wie dort: eine weit in der Zukunft liegende
-        // Occurrence (>1 Jahr) würde sonst abgeschnitten.
-        //
-        // Dasselbe Fenster wie `useEvent` (`features/calendar/hooks.ts`):
-        // `eventLookupWindow` bildet Tagesanfang und -ende des angeforderten
-        // Regel-Tags in `row.timezone`, nicht in der Zone des Lesers. Hier
-        // stand vorher der gegenteilige (falsche) Kommentar, dieser Vergleich
-        // brauche keine zonen-genaue Behandlung: Ein lokal gebildetes Fenster
-        // kann eine Occurrence nahe Mitternacht in `row.timezone` verfehlen —
-        // `theirs` würde `null`, obwohl die fremde Fassung bekannt ist,
-        // derselbe Fehler wie in `useEvent` (Befund B, PR #121). Seit ADR-035
-        // deckt das Fenster außerdem das Override-Intervall der angeforderten
-        // Occurrence ab.
+        // Occurrence (>1 Jahr) würde sonst abgeschnitten. Die Zonenbehandlung
+        // muss dabei zonen-genau sein: `eventLookupWindow` bildet Tagesanfang
+        // und -ende des angeforderten Regel-Tags in `row.timezone`, nicht in
+        // der Zone des Lesers — ein lokal gebildetes Fenster kann eine
+        // Occurrence nahe Mitternacht in `row.timezone` verfehlen, `theirs`
+        // würde `null`, obwohl die fremde Fassung bekannt ist (Befund B,
+        // PR #121). Seit ADR-035 deckt das Fenster außerdem das
+        // Override-Intervall der angeforderten Occurrence ab.
         const { start: windowStart, end: windowEnd } = eventLookupWindow(row, vars.occurrenceKey);
         // Match auf `occurrenceKey`: Nur der Schlüssel identifiziert dieselbe
         // Occurrence zuverlässig, wenn eine Verschiebung ihn vom aufgelösten
