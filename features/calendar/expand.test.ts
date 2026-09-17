@@ -477,6 +477,40 @@ describe("Override-Vertrag (ADR-035)", () => {
     expect(affected?.startAt.toISOString()).toBe("2026-06-15T07:00:00.000Z");
     expect(affected?.title).toBe("Trotzdem da");
   });
+
+  test("ein Override nur mit start_at erhält die ursprüngliche Dauer der Occurrence", () => {
+    // ROT VOR DEM FIX: `applyOverride` übernahm `start_at` aus dem Override,
+    // ließ `endAt` aber beim unveränderten Regel-Ende der Occurrence stehen.
+    // Gemessen an genau dieser Fixture (Wochenserie, Exception am 29.06.,
+    // Override nur `start_at: "2026-07-20T07:00:00.000Z"`): das Ergebnis war
+    // `start=2026-07-20T07:00:00.000Z`, `end=2026-06-29T09:00:00.000Z` — das
+    // Ende lag drei Wochen VOR dem Start. Der Fix lässt `endAt` der Dauer der
+    // ursprünglichen Occurrence folgen (hier eine Stunde), statt das
+    // Regel-Ende unverändert stehen zu lassen.
+    const row = weeklySeries();
+    row.event_exceptions = [
+      {
+        id: "ex-start-only",
+        event_id: row.id,
+        occurrence_date: "2026-06-29",
+        action: "modified",
+        override: { start_at: "2026-07-20T07:00:00.000Z" },
+        created_at: "2026-06-01T00:00:00.000Z",
+        updated_at: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+    const out = expandEvents(
+      [row],
+      new Date("2026-07-01T00:00:00.000Z"),
+      new Date("2026-07-31T23:59:59.000Z"),
+      lightTheme,
+    );
+    const moved = out.find((o) => o.occurrenceKey === "2026-06-29");
+    expect(moved?.startAt.toISOString()).toBe("2026-07-20T07:00:00.000Z");
+    // Ursprüngliche Dauer der Occurrence: 07:00–08:00, also eine Stunde.
+    expect(moved?.endAt.toISOString()).toBe("2026-07-20T08:00:00.000Z");
+    expect(moved!.endAt.getTime()).toBeGreaterThan(moved!.startAt.getTime());
+  });
 });
 
 describe("Kandidatenmenge aus event_exceptions (ADR-035)", () => {

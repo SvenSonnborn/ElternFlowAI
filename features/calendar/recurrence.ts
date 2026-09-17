@@ -122,8 +122,9 @@ function dayBefore(occurrenceKey: string): string {
 function endOfDayInstant(isoDate: string, timeZone: string): string {
   const bounds = zonedDayBounds(isoDate, timeZone);
   // Hier wird bewusst geworfen statt zurückgefallen — anders als in
-  // `eventLookupWindow`, das denselben Schlüssel bei formwidriger Eingabe auf
-  // sein Standardfenster abbildet: Ein aus Müll abgeleitetes `until` kürzte
+  // `eventLookupWindow`, das denselben Schlüssel bei ungültiger Eingabe (falsch
+  // geformt oder ein Kalenderüberlauf, PR #122) auf sein Standardfenster
+  // abbildet: Ein aus Müll abgeleitetes `until` kürzte
   // eine Serie still am falschen Datum, und das ist die Schadensklasse, gegen
   // die dieser ganze Block antritt. Vor ADR-035 warf die Rechnung an dieser
   // Stelle ebenfalls, nur mit einer nichtssagenden Meldung aus `Intl`.

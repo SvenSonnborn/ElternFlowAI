@@ -101,11 +101,14 @@ describe("eventLookupWindow", () => {
   // `yyyy-MM-dd` entspricht, darf die Funktion nicht zum Werfen bringen —
   // sonst hielte sie ihr eigenes Docstring-Versprechen (Fallback auf
   // `expanded[0]` bei Nicht-Treffer) nicht ein. Vor dem Guard verhielten sich
-  // die vier Fälle uneinheitlich: "", "2026-6-1" und "2026-13-45" fielen schon
-  // zufällig (falsy bzw. `Date.UTC`-Überlauf) auf das Standardfenster zurück,
-  // "kaputt" allein warf einen `RangeError` aus `floatingToInstant`, weil
-  // `split("-").map(Number)` dafür `NaN`-Komponenten liefert. Der Guard macht
-  // alle vier zum selben Zweig, statt den Wurf isoliert abzufangen.
+  // die vier Fälle uneinheitlich: "" und "2026-6-1" fielen schon zufällig
+  // (falsy bzw. Nicht-Muster) auf das Standardfenster zurück, "kaputt" allein
+  // warf einen `RangeError` aus `floatingToInstant`, weil `split("-").map(Number)`
+  // dafür `NaN`-Komponenten liefert. Der Guard macht alle drei zum selben
+  // Zweig, statt den Wurf isoliert abzufangen. "2026-13-45" fällt seit dem
+  // Rundlauf-Check in `zonedDayBounds` (PR #122) aus einem eigenen Grund auf
+  // dasselbe Fenster zurück — echte Validierung, kein Zufallstreffer mehr,
+  // siehe der eigene Test unten.
   describe("nicht dem Muster yyyy-MM-dd entsprechender occurrenceKey: Standardfenster statt Wurf oder Zufallsergebnis", () => {
     test('leerer String ("")', () => {
       const { start, end } = eventLookupWindow(makeRow(), "");
@@ -119,8 +122,29 @@ describe("eventLookupWindow", () => {
       expect(end.toISOString()).toBe("2027-05-05T16:30:00.000Z");
     });
 
-    test('Date.UTC-Überlauf ("2026-13-45")', () => {
+    test('Date.UTC-Überlauf ("2026-13-45"): echter Fallback, kein Zufallstreffer', () => {
+      // Vor PR #122 bestand dieser Test nur, weil Februar 2027 — das
+      // `Date.UTC`-Überlaufziel von Monat 13 — zufällig innerhalb des
+      // Ein-Jahres-Standardfensters um `MASTER_START` (04.05.2026) liegt.
+      // `zonedDayBounds` liefert für diesen Schlüssel seither `null` statt
+      // eines Ergebnisses in `+010007` oder sonst irgendwo — das Fenster
+      // fällt hier also auf denselben Zweig zurück wie "" oder "2026-6-1",
+      // nicht mehr auf einen Treffer, der nur der Zufall der Fixture-Daten
+      // war.
       const { start, end } = eventLookupWindow(makeRow(), "2026-13-45");
+      expect(start.toISOString()).toBe("2026-05-03T16:30:00.000Z");
+      expect(end.toISOString()).toBe("2027-05-05T16:30:00.000Z");
+    });
+
+    test('Date.UTC-Überlauf, weit außerhalb jedes Zufalls ("9999-99-99")', () => {
+      // Dieser Schlüssel überlebte den `Date.UTC`-Überlauf vor PR #122 NICHT
+      // zufällig im Standardfenster — er landete in `+010007`, weit davor.
+      // Das Suchfenster einer unbegrenzten Tagesserie über diesen Schlüssel
+      // umfasste nachgemessen 2.915.008 Tage; `expandEvents` brauchte darüber
+      // 31,2 Sekunden für 2.912.292 Occurrences. Nach dem Rundlauf-Check in
+      // `zonedDayBounds` ist das Fensterende identisch mit dem
+      // Standardfenster — die Sprengung ist weg.
+      const { start, end } = eventLookupWindow(makeRow(), "9999-99-99");
       expect(start.toISOString()).toBe("2026-05-03T16:30:00.000Z");
       expect(end.toISOString()).toBe("2027-05-05T16:30:00.000Z");
     });

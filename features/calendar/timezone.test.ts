@@ -200,15 +200,22 @@ describe("zonedDayBounds", () => {
     expect(zonedDayBounds("", BERLIN)).toBeNull();
   });
 
-  test("ein Date.UTC-Überlauf wird bewusst nicht abgefangen", () => {
-    // `"2026-13-45"` entspricht dem Muster, rollt aber über: Monat 13 =
-    // Januar 2027, Tag 45 = 14. Februar. Das ist keine Eingabe-Validierung,
-    // sondern nur eine Totalitätsgarantie für die Form — dasselbe Verhalten,
-    // das `eventLookupWindow` seit PR #121 hat und das dessen Test
-    // ausdrücklich festhält. Wer echte Validierung braucht, baut sie an der
-    // Route (siehe docs/TODO.md).
-    expect(zonedDayBounds("2026-13-45", BERLIN)?.start.toISOString()).toBe(
-      "2027-02-13T23:00:00.000Z",
-    );
+  test("ein Kalenderüberlauf wird abgelehnt, nicht normalisiert", () => {
+    // `"2026-13-45"` entspricht `DATE_KEY_PATTERN`, ist aber kein gültiges
+    // Kalenderdatum: `Date.UTC` würde Monat 13 still zu Januar 2027 und Tag 45
+    // zum 14. Februar rollen. Zufällig folgenlos, weil Februar 2027 innerhalb
+    // des Ein-Jahres-Standardfensters von `eventLookupWindow` liegt — dessen
+    // Test bestand deshalb schon vor diesem Fix, ohne dass er Validierung
+    // belegt hätte.
+    expect(zonedDayBounds("2026-13-45", BERLIN)).toBeNull();
+
+    // `"9999-99-99"` ist der wichtigere Fall: Der Überlauf landet weit
+    // außerhalb jedes plausiblen Fensters (Jahr +010007 statt 9999), und genau
+    // das hat vor diesem Fix nachgemessen ein Suchfenster von 2.915.008 Tagen
+    // erzeugt — `expandEvents` brauchte darüber 31,2 Sekunden für 2.912.292
+    // Occurrences. Ohne diesen zweiten Fall hätte der Fix beim ersten allein
+    // bestehen können, obwohl die eigentliche Gefahr (URL-erreichbar über den
+    // `occ`-Routenparameter) unbelegt bliebe.
+    expect(zonedDayBounds("9999-99-99", BERLIN)).toBeNull();
   });
 });

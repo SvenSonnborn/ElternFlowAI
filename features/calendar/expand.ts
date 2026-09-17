@@ -161,10 +161,26 @@ function applyOverride(base: Resolved, override: Json | null): Resolved {
   else if (override.location === null) next.location = null;
   // Unparsbare Datumswerte werden verworfen statt als Invalid Date
   // weitergereicht — siehe `overrideDate`.
+  //
+  // Ein gültiger `start_at` ohne (oder mit unparsbarem) `end_at` erbt die
+  // ursprüngliche DAUER der Occurrence, statt `endAt` beim unveränderten
+  // Regel-Ende stehen zu lassen: Sonst kann `endAt` vor `startAt` liegen —
+  // gemessen an einer Wochenserie mit einer Exception am 29.06., deren
+  // Override nur `start_at: "2026-07-20T07:00:00.000Z"` trägt, ergab das
+  // `start=2026-07-20T07:00:00.000Z`, `end=2026-06-29T09:00:00.000Z`, also
+  // drei Wochen VOR dem Start. Den Override deshalb zu verwerfen wäre falsch
+  // (er ist gültig, nur unvollständig), das Intervall auf einen Punkt zu
+  // kürzen (`end = start`) würde die Occurrence ohne Grund verkürzen. Ein
+  // ausdrücklich gesetztes, gültiges `end_at` bleibt unverändert maßgeblich.
   const start = overrideDate(override.start_at);
-  if (start) next.startAt = start;
   const end = overrideDate(override.end_at);
-  if (end) next.endAt = end;
+  if (start) {
+    const durationMs = base.endAt.getTime() - base.startAt.getTime();
+    next.startAt = start;
+    next.endAt = end ?? new Date(start.getTime() + durationMs);
+  } else if (end) {
+    next.endAt = end;
+  }
   return next;
 }
 
