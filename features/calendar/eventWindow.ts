@@ -74,8 +74,13 @@ export function eventLookupWindow(
   // verschobene Exception das Fenster jedes Detail-Aufrufs derselben Serie mit
   // sich, und `expandEvents` expandierte Jahre statt Tage.
   //
-  // Beide Grenzen bekommen beide Werte, weil ein Override in jede Richtung
-  // verschieben kann — `dateMin`/`dateMax` greifen sich das jeweilige Extrem.
+  // Beide Grenzen bekommen beide Werte, weil `overrideInterval` ein
+  // invertiertes Intervall nicht abfängt (`end_at` vor `start_at`): Ein
+  // fehlendes `end_at` wird per `?? start` aufgefüllt, ein vorhandenes, aber
+  // zu frühes `end_at` nicht geprüft. Bekäme nur `starts` `interval.start`
+  // und nur `ends` `interval.end`, verfehlte ein solches Intervall im
+  // invertierten Fall beide Extreme — `dateMin`/`dateMax` laufen ohnehin über
+  // die ganzen Arrays und decken die Richtung des Overrides damit schon ab.
   const interval = overrideInterval(
     (row.event_exceptions ?? []).find(
       (ex) => ex.occurrence_date === occurrenceKey && ex.action === "modified",

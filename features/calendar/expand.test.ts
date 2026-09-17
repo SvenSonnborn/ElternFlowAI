@@ -558,7 +558,7 @@ describe("Kandidatenmenge aus event_exceptions (ADR-035)", () => {
     expect(out.filter((o) => o.occurrenceKey === "2026-06-29")).toHaveLength(1);
   });
 
-  test("eine verwaiste Exception an einem Nicht-Vorkommen erzeugt keinen Phantom-Termin", () => {
+  test("GRENZWÄCHTER (vor dem Fix bereits grün): eine verwaiste Exception an einem Nicht-Vorkommen erzeugt keinen Phantom-Termin", () => {
     // 30.06.2026 ist ein DIENSTAG — kein Vorkommen der Montagsserie. Solche
     // Zeilen überleben den Löschpfad (`deleteAllExceptions` läuft nur bei
     // `ruleDiffers`, `deleteExceptionsFromDate` nur ab dem Schnitt). Ohne die
@@ -586,12 +586,17 @@ describe("Kandidatenmenge aus event_exceptions (ADR-035)", () => {
     expect(out.map((o) => o.occurrenceKey)).not.toContain("2026-06-30");
   });
 
-  test("eine cancelled-Exception erzeugt keinen Kandidaten", () => {
-    const row = movedSeries();
-    row.event_exceptions = [
+  test("GRENZWÄCHTER (vor dem Fix bereits grün): eine cancelled-Exception erzeugt keinen Kandidaten", () => {
+    // Fall 1 — der reale App-Schreibpfad: `modifyOccurrence` schreibt bei
+    // „Löschen" immer `override: null` (`recurrence.ts`). Hier greift schon
+    // `overrideInterval` (liefert `null` für ein Nicht-Objekt), bevor die
+    // Action-Wache in `movedExceptionOccurrences` (`expand.ts:123`) überhaupt
+    // geprüft wird — dieser Fall belegt die Wache also NICHT.
+    const nullOverrideRow = movedSeries();
+    nullOverrideRow.event_exceptions = [
       {
         id: "ex-cancelled",
-        event_id: row.id,
+        event_id: nullOverrideRow.id,
         occurrence_date: "2026-06-29",
         action: "cancelled",
         override: null,
@@ -599,8 +604,37 @@ describe("Kandidatenmenge aus event_exceptions (ADR-035)", () => {
         updated_at: "2026-06-02T00:00:00.000Z",
       },
     ];
-    const out = expandEvents([row], JULI_START, JULI_END, lightTheme);
-    expect(out.map((o) => o.occurrenceKey)).not.toContain("2026-06-29");
+    expect(
+      expandEvents([nullOverrideRow], JULI_START, JULI_END, lightTheme).map((o) => o.occurrenceKey),
+    ).not.toContain("2026-06-29");
+
+    // Fall 2 — eine cancelled-Exception MIT einem verschiebenden Override, wie
+    // bei der verschobenen Fixture: `overrideInterval` liefert hier ein
+    // echtes Intervall, die Vorprüfung in `movedExceptionOccurrences` käme
+    // also bis zur Action-Wache durch. Über den App-Schreibpfad nicht
+    // erreichbar (siehe Fall 1), aber der einzige Fall, in dem die Wache
+    // überhaupt etwas zu prüfen hätte, statt sich auf `overrideInterval`s
+    // `null`-Rückgabe zu verlassen.
+    const shiftedOverrideRow = movedSeries();
+    shiftedOverrideRow.event_exceptions = [
+      {
+        id: "ex-cancelled-shifted",
+        event_id: shiftedOverrideRow.id,
+        occurrence_date: "2026-06-29",
+        action: "cancelled",
+        override: {
+          start_at: "2026-07-20T07:00:00.000Z",
+          end_at: "2026-07-20T08:00:00.000Z",
+        },
+        created_at: "2026-06-01T00:00:00.000Z",
+        updated_at: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+    expect(
+      expandEvents([shiftedOverrideRow], JULI_START, JULI_END, lightTheme).map(
+        (o) => o.occurrenceKey,
+      ),
+    ).not.toContain("2026-06-29");
   });
 
   test("eine Serie, deren einziges sichtbares Vorkommen ein Kandidat ist, verschwindet nicht", () => {
