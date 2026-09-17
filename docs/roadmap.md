@@ -409,7 +409,7 @@ siehe Block 3).
 
 **Aufwand M · 2–3 PRs · dieselbe Schadensklasse bei Tasks, plus was ADR-031 offen ließ**
 
-### 2.1 `features/tasks/mutations.ts` umbauen — **M, ein PR für drei Einträge**
+### 2.1 `features/tasks/mutations.ts` umbauen — **erledigt**
 
 Drei TODO-Einträge fassen **dieselbe Mutation** an. Sie einzeln zu erledigen hieße, `mutations.ts`
 dreimal umzubauen — `TODO.md` sagt das bei zweien davon selbst („verwandt mit dem Eintrag …, der
@@ -435,6 +435,24 @@ dieselbe Mutation umbaut").
 
 **Reihenfolge im PR: erst der Deps-Schnitt, dann die beiden Fixes.** Andersherum baut man zwei
 Korrekturen ohne Testmöglichkeit ein und zieht den Schnitt hinterher durch fertigen Code.
+
+**Umgesetzt als [ADR-036](./decision-log.md).** `features/tasks/mutations.ts` hat jetzt
+denselben injizierbaren Schnitt wie der Kalender — `TaskOps` mit `fetchRow`/`updateRow`/
+`deleteRow`, darüber die reinen `updateTask`/`deleteTask` —, und das Löschen prüft die
+gesehene Version per Compare-and-Swap statt gar nicht. Der 0-Zeilen-Guard und der
+Konflikt-Detektor sind dabei dieselbe Zeile: Ohne `.select("id")` meldet PostgREST auch
+dann Erfolg, wenn null Zeilen getroffen wurden. Die Reihenfolge des Blocks — erst der
+Schnitt, dann die Fixes — hat sich bestätigt: Die beiden im TODO getrennt geführten Löcher
+(0-Zeilen-Guard, fehlende Versionsprüfung beim Löschen) liefen über genau diese eine
+Korrektur und ließen sich dank des schon bestehenden Schnitts von Anfang an mit einem roten
+Test belegen. Ein Löschkonflikt zeigt seither denselben Fehler-Toast mit „Trotzdem löschen"
+wie der Termin-Pfad — diese Ergänzung an `TaskEditScreen.tsx` bekam keinen eigenen Test (hier
+fehlt derselbe Render-Pfad für React-Komponenten wie beim Rest des Screens); belegt ist sie
+durch Codelektüre und die für Block 2 vorgesehene Sichtprüfung am Simulator. Eine Grenze
+blieb und steht als eigener Eintrag in [TODO.md](./TODO.md): Eine **RLS-Ablehnung ohne
+Abmeldung** liefert dasselbe Bild wie „schon gelöscht" — null Zeilen, leere Nachlese — und
+nimmt denselben stillen Weg. Sie zu trennen bräuchte eine serverseitige Auskunft und damit
+eine Migration; vertagt bis Block 7 (Transaktions-RPC).
 
 ### 2.2 Die zwei Löcher in der Conflict-Detection — **M**
 
