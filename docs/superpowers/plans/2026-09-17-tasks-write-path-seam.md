@@ -51,7 +51,8 @@
 **Interfaces:**
 
 - Consumes: `TaskChanges` aus `./optimistic`, `TaskWithType` aus `./types`, `TaskConflictError` aus `./errors`, `UpdateTaskVars` (unverändert, existiert bereits).
-- Produces: `TaskOps` (`fetchRow` · `updateRow` · `deleteRow`), `createSupabaseTaskOps(client: SupabaseClient<Database>): TaskOps`, `updateTask(vars: UpdateTaskVars, deps: TaskOps): Promise<void>`, `TASK_SELECT: string`. **Task 2 baut `deleteTask` auf genau dieses `TaskOps` und ergänzt dessen `deleteRow` nicht — `deleteRow` entsteht vollständig hier**, damit das Interface nicht in zwei Schritten wächst.
+- Produces: `TaskOps` (**zwei** Member: `fetchRow` · `updateRow`), `createSupabaseTaskOps(client: SupabaseClient<Database>): TaskOps`, `updateTask(vars: UpdateTaskVars, deps: TaskOps): Promise<void>`, `TASK_SELECT: string`.
+- **`deleteRow` gehört ausdrücklich NICHT in diesen Task.** Task 2 fügt es dem Interface, `createSupabaseTaskOps` und dem Test-Helfer `makeOps()` hinzu — zusammen mit seinem Aufrufer `deleteTask`, seinem Ops-Test und der Screen-Verdrahtung. Hier angelegt wäre es eine Methode ohne Aufrufer und ohne Test in einem Commit, dessen erklärter Zweck „verhaltensgleicher Umzug" ist; das Interface wächst lieber einmal in dem Commit, der es benutzt, als einmal auf Vorrat.
 
 - [ ] **Step 1: `SELECT` exportierbar machen**
 
@@ -100,8 +101,6 @@ export interface TaskOps {
   fetchRow: (taskId: string) => Promise<TaskWithType | null>;
   /** `true`, wenn das Compare-and-Swap die Zeile getroffen hat. */
   updateRow: (taskId: string, changes: TaskChanges, seenUpdatedAt: string) => Promise<boolean>;
-  /** `true`, wenn das Compare-and-Swap die Zeile getroffen hat. */
-  deleteRow: (taskId: string, seenUpdatedAt: string) => Promise<boolean>;
 }
 
 /**
@@ -131,18 +130,6 @@ export function createSupabaseTaskOps(client: SupabaseClient<Database>): TaskOps
       const { data, error } = await client
         .from("tasks")
         .update(changes)
-        .eq("id", taskId)
-        .eq("updated_at", seenUpdatedAt)
-        .select("id")
-        .maybeSingle();
-      if (error) throw error;
-      return data !== null;
-    },
-
-    deleteRow: async (taskId, seenUpdatedAt) => {
-      const { data, error } = await client
-        .from("tasks")
-        .delete()
         .eq("id", taskId)
         .eq("updated_at", seenUpdatedAt)
         .select("id")
@@ -254,7 +241,6 @@ function makeOps(overrides: Partial<TaskOps> = {}): TaskOps {
   return {
     fetchRow: mock(() => Promise.resolve(null)),
     updateRow: mock(() => Promise.resolve(true)),
-    deleteRow: mock(() => Promise.resolve(true)),
     ...overrides,
   };
 }
@@ -419,7 +405,13 @@ Nach der dritten Probe `git diff` prüfen: Der Baum muss wieder exakt dem Stand 
 
 Das Ergebnis dieser drei Proben gehört **wörtlich in den Task-Report** (welche Probe, welcher Test fiel). Eine Probe, die grün bleibt, ist ein Befund — dann meldet der Task das, statt weiterzumachen.
 
-- [ ] **Step 10: Gates und Commit**
+- [ ] **Step 10: Den erledigten TODO-Eintrag löschen**
+
+In `docs/TODO.md` den Eintrag **„`useUpdateTask` hat keine eigene Testsuite"** (Sektion Conflict-Detection, eine Zeile) **vollständig entfernen** — nicht abhaken, nicht umformulieren. `docs/TODO.md` ist der aktive Backlog, keine Historie (CLAUDE.md → Out-of-scope TODOs).
+
+Das gehört in **denselben** Commit wie der Code, nicht in einen eigenen: CLAUDE.md verlangt, den Eintrag in dem Commit zu löschen, der ihn auflöst — und das ist der, der die Testsuite mitbringt.
+
+- [ ] **Step 11: Gates und Commit**
 
 ```bash
 bun run typecheck && bun lint && bun format:check
@@ -432,17 +424,8 @@ Alle vier Läufe grün und die drei Zonen identisch. Dann:
 
 ```bash
 git add features/tasks/mutations.ts features/tasks/mutations.test.ts \
-        features/tasks/queries.ts features/tasks/index.ts
+        features/tasks/queries.ts features/tasks/index.ts docs/TODO.md
 git commit -m "refactor(tasks): injizierbarer Deps-Schnitt fuer den Schreibpfad"
-```
-
-- [ ] **Step 11: Den erledigten TODO-Eintrag löschen**
-
-In `docs/TODO.md` den Eintrag **„`useUpdateTask` hat keine eigene Testsuite"** (Sektion Conflict-Detection, eine Zeile) **vollständig entfernen** — nicht abhaken, nicht umformulieren. `docs/TODO.md` ist der aktive Backlog, keine Historie (CLAUDE.md → Out-of-scope TODOs).
-
-```bash
-git add docs/TODO.md
-git commit -m "docs(tasks): TODO-Eintrag zur fehlenden Mutations-Testsuite entfernen"
 ```
 
 ---
@@ -459,8 +442,37 @@ git commit -m "docs(tasks): TODO-Eintrag zur fehlenden Mutations-Testsuite entfe
 
 **Interfaces:**
 
-- Consumes: `TaskOps` und `createSupabaseTaskOps` aus Task 1 — `deleteRow(taskId, seenUpdatedAt) => Promise<boolean>` existiert dort bereits vollständig.
-- Produces: `deleteTask(vars: DeleteTaskVars, deps: TaskOps): Promise<void>`; `DeleteTaskVars` trägt jetzt `{ taskId: string; baseVersion: string }`. **Task 3 hängt sich an genau diese Signatur** und ruft sie mit `baseVersion: err.row.updated_at` erneut.
+- Consumes: `TaskOps` und `createSupabaseTaskOps` aus Task 1 — dort mit **zwei** Membern (`fetchRow`, `updateRow`) und der Testhelfer `makeOps()` entsprechend.
+- Produces: **`deleteRow` als drittes Member** von `TaskOps`, samt Implementierung in `createSupabaseTaskOps` und Eintrag in `makeOps()`; `deleteTask(vars: DeleteTaskVars, deps: TaskOps): Promise<void>`; `DeleteTaskVars` trägt jetzt `{ taskId: string; baseVersion: string }`. **Task 3 hängt sich an genau diese Signatur** und ruft sie mit `baseVersion: err.row.updated_at` erneut.
+
+> **`deleteRow` entsteht hier, nicht in Task 1.** Es kommt zusammen mit seinem Aufrufer, seinem Test und der Screen-Verdrahtung in einen Commit. In Task 1 angelegt wäre es eine Methode ohne Aufrufer und ohne Test gewesen.
+
+- [ ] **Step 0: `deleteRow` an `TaskOps` und `createSupabaseTaskOps` ergänzen**
+
+Interface-Member (hinter `updateRow`):
+
+```ts
+/** `true`, wenn das Compare-and-Swap die Zeile getroffen hat. */
+deleteRow: (taskId: string, seenUpdatedAt: string) => Promise<boolean>;
+```
+
+Implementierung in `createSupabaseTaskOps` (hinter `updateRow`):
+
+```ts
+    deleteRow: async (taskId, seenUpdatedAt) => {
+      const { data, error } = await client
+        .from("tasks")
+        .delete()
+        .eq("id", taskId)
+        .eq("updated_at", seenUpdatedAt)
+        .select("id")
+        .maybeSingle();
+      if (error) throw error;
+      return data !== null;
+    },
+```
+
+Und im Testhelfer `makeOps()` in `features/tasks/mutations.test.ts` die Zeile `deleteRow: mock(() => Promise.resolve(true)),` hinter `updateRow` ergänzen.
 
 > **Warum Feature-Schicht und Screen in einem Commit:** `DeleteTaskVars` bekommt ein Pflichtfeld. `TaskEditScreen` ist der einzige Aufrufer (`rg 'useDeleteTask' --type ts --type tsx`) und bricht ohne die Anpassung im Typecheck. Ein Commit, der nicht typecheckt, ist kein grüner Commit — die beiden gehören zusammen. Der Toast-Teil ist davon unabhängig und steht in Task 3.
 
