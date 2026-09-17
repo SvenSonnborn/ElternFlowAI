@@ -1,4 +1,8 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+
+import type { Database } from "@/features/supabase/database.types";
 
 import { useCurrentParent } from "@/features/auth";
 import { supabase } from "@/features/supabase";
@@ -8,7 +12,7 @@ import type { TaskRow, TaskWithType } from "./types";
 
 import { MissingParentError, TaskConflictError } from "./errors";
 import { applyDelete, applyToggle, applyUpdate } from "./optimistic";
-import { taskKeys } from "./queries";
+import { TASK_SELECT, taskKeys } from "./queries";
 
 export interface CreateTaskVars {
   typeId: string;
@@ -78,6 +82,97 @@ function invalidateTasks(qc: QueryClient): Promise<void> {
 }
 
 /**
+ * Der Schnitt, an dem der Schreibpfad die Datenbank berührt — das Gegenstück
+ * zu `EventOps` in [features/calendar/recurrence.ts](../calendar/recurrence.ts).
+ * Ohne ihn spricht die Mutation direkt mit dem Modul-`supabase`, und ihr
+ * Compare-and-Swap ist allein durch einen beobachteten Zwei-Client-Lauf
+ * belegt statt durch einen Test.
+ *
+ * **Die Ops melden, die reine Funktion urteilt.** `updateRow`/`deleteRow`
+ * geben `true`/`false` zurück, statt bei null Zeilen selbst zu werfen: Das
+ * Klassifizieren („fremde Änderung" gegen „Zeile weg") braucht einen zweiten
+ * Aufruf (`fetchRow`), und eine Op, die eine andere Op ruft, ist keine Op
+ * mehr. Der Kalender hat den Wurf **in** `updateMaster` — genau deshalb muss
+ * ein Fix dort in den Supabase-Adapter hineingreifen statt in die reine
+ * Funktion.
+ *
+ * Nur `useUpdateTask` und `useDeleteTask` laufen hierüber. `useCreateTask`
+ * und `useToggleTaskDone` bleiben bewusst beim direkten Client: Beide haben
+ * kein Compare-and-Swap, das zu prüfen wäre, und sie ohne Anlass umzubauen
+ * hieße, zwei Pfade anzufassen, für die niemand einen Testfall genannt hat.
+ * Die Datei trägt dafür vorerst zwei Idiome.
+ */
+export interface TaskOps {
+  /** Die Zeile samt `task_types`-Join — die Form, die `TaskConflictError` trägt. */
+  fetchRow: (taskId: string) => Promise<TaskWithType | null>;
+  /** `true`, wenn das Compare-and-Swap die Zeile getroffen hat. */
+  updateRow: (taskId: string, changes: TaskChanges, seenUpdatedAt: string) => Promise<boolean>;
+}
+
+/**
+ * Der einzige Ort in diesem Feature, der den Supabase-Client kennt.
+ *
+ * `.eq("updated_at", …)` macht aus Update und Delete je ein Compare-and-Swap:
+ * Sie treffen die Zeile nur, solange niemand anderes sie seit dem Laden des
+ * Formulars angefasst hat. `.select("id").maybeSingle()` ist die andere
+ * Hälfte davon — **ohne sie meldet PostgREST auch dann `error: null`, wenn
+ * null Zeilen getroffen wurden**, und der Aufrufer könnte „gelungen" nicht von
+ * „nichts passiert" unterscheiden. Beides zusammen ist das CAS; einzeln ist
+ * keines davon etwas wert (ADR-031).
+ */
+export function createSupabaseTaskOps(client: SupabaseClient<Database>): TaskOps {
+  return {
+    fetchRow: async (taskId) => {
+      const { data, error } = await client
+        .from("tasks")
+        .select(TASK_SELECT)
+        .eq("id", taskId)
+        .maybeSingle();
+      if (error) throw error;
+      return data ?? null;
+    },
+
+    updateRow: async (taskId, changes, seenUpdatedAt) => {
+      const { data, error } = await client
+        .from("tasks")
+        .update(changes)
+        .eq("id", taskId)
+        .eq("updated_at", seenUpdatedAt)
+        .select("id")
+        .maybeSingle();
+      if (error) throw error;
+      return data !== null;
+    },
+  };
+}
+
+/**
+ * Schreibt die Änderungen, solange niemand anderes die Zeile seit dem Laden
+ * des Formulars angefasst hat.
+ *
+ * Anders als im Kalender ist das Compare-and-Swap hier der *Detektor*, nicht
+ * bloß die Absicherung: Es gibt keinen Fetch, den man mitbenutzen könnte, und
+ * ein Pre-Flight kostete einen Roundtrip pro Speichern. Gelesen wird erst,
+ * **wenn** das CAS verfehlt — im Normalfall kostet der Guard damit keinen
+ * zusätzlichen Roundtrip (ADR-031).
+ */
+export async function updateTask(vars: UpdateTaskVars, deps: TaskOps): Promise<void> {
+  const hit = await deps.updateRow(vars.taskId, vars.changes, vars.baseVersion);
+  if (hit) return;
+
+  // Null Zeilen heißt eines von zwei Dingen. Erst *jetzt* wird gelesen.
+  const current = await deps.fetchRow(vars.taskId);
+  if (!current) {
+    // `hw.error.staleReference` names a stale *child or task type* reference
+    // specifically — using it here (the task row itself is gone) would
+    // misdescribe the failure. A plain Error falls through mapTaskError's
+    // classification to `hw.error.generic`, which is the closer fit.
+    throw new Error("Task no longer exists");
+  }
+  throw new TaskConflictError(current);
+}
+
+/**
  * Not optimistic on purpose: an optimistic row would need an invented id *and*
  * the joined task_types row, and a rollback would make the row the user just
  * created disappear again.
@@ -116,41 +211,7 @@ export function useUpdateTask() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async (vars: UpdateTaskVars): Promise<void> => {
-      // `.eq("updated_at", …)` macht aus dem Update ein Compare-and-Swap: Es
-      // trifft die Zeile nur, solange niemand anderes sie seit dem Laden des
-      // Formulars angefasst hat. Anders als im Kalender ist das hier der
-      // *Detektor*, nicht bloß die Absicherung — es gibt keinen Fetch, den man
-      // mitbenutzen könnte, und ein Pre-Flight kostete einen Roundtrip pro
-      // Speichern (ADR-031).
-      const { data, error } = await supabase
-        .from("tasks")
-        .update(vars.changes)
-        .eq("id", vars.taskId)
-        .eq("updated_at", vars.baseVersion)
-        .select("id")
-        .maybeSingle();
-      if (error) throw error;
-      if (data) return;
-
-      // Null Zeilen heißt eines von zwei Dingen. Erst *jetzt* wird gelesen —
-      // im Normalfall kostet der Guard damit keinen zusätzlichen Roundtrip.
-      const { data: current, error: readError } = await supabase
-        .from("tasks")
-        .select("*, task_types(*)")
-        .eq("id", vars.taskId)
-        .maybeSingle();
-      if (readError) throw readError;
-      if (!current) {
-        // `hw.error.staleReference` names a stale *child or task type*
-        // reference specifically — using it here (the task row itself is
-        // gone) would misdescribe the failure. A plain Error falls through
-        // mapTaskError's classification to `hw.error.generic`, which is the
-        // closer fit.
-        throw new Error("Task no longer exists");
-      }
-      throw new TaskConflictError(current);
-    },
+    mutationFn: (vars: UpdateTaskVars) => updateTask(vars, createSupabaseTaskOps(supabase)),
     onMutate: (vars) =>
       patchTaskCaches(qc, (tasks) => applyUpdate(tasks, vars.taskId, vars.changes)),
     onError: (_err, _vars, snapshot) => restoreTaskCaches(qc, snapshot),

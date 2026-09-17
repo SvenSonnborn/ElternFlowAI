@@ -11,12 +11,15 @@ export {
 } from "./filter";
 export { useTaskFilter, useTaskFilterStore } from "./filterStore";
 export {
+  createSupabaseTaskOps,
+  updateTask,
   useCreateTask,
   useDeleteTask,
   useToggleTaskDone,
   useUpdateTask,
   type CreateTaskVars,
   type DeleteTaskVars,
+  type TaskOps,
   type ToggleTaskDoneVars,
   type UpdateTaskVars,
 } from "./mutations";
