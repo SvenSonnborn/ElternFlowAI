@@ -75,26 +75,35 @@ function formatterFor(timeZone: string): Intl.DateTimeFormat {
  * Der Offset der Zone **zu diesem Zeitpunkt**, in Millisekunden, als
  * `Wandzeit-als-UTC − Instant`. Berlin im Sommer ergibt `+2 h`.
  *
- * Zwei Eigenheiten, die beide einen Test haben:
+ * Drei Eigenheiten, die alle einen Test haben:
  *
  * - `hour12: false` liefert in manchen ICU-Versionen `24` statt `00` für
  *   Mitternacht; `% 24` fängt das ab.
  * - `formatToParts` kennt keine Millisekunden. Der Instant wird deshalb auf
  *   volle Sekunden abgeschnitten, bevor er abgezogen wird — sonst trüge der
  *   Offset die Millisekunden des Eingabewerts.
+ * - **`asUtc` entsteht per `setUTCFullYear`/`setUTCHours`, nicht per `Date.UTC`.**
+ *   `Date.UTC` bildet ein zweistelliges Jahr (0–99) auf 1900+ ab. Für ein
+ *   Jahr-99-Instant lieferte `formatToParts` korrekt `year: "99"`,
+ *   `Date.UTC(99, …)` baute daraus aber 1999 — der berechnete „Offset" war
+ *   dann nicht mehr die paar Minuten Ortszeit-Differenz, sondern rund 1900
+ *   Jahre in Millisekunden (nachgemessen:
+ *   `zoneOffsetMs(new Date("0099-06-15T12:00:00.000Z"), "UTC")` lieferte
+ *   `59958144000000` statt `0`). Dieselbe Bugklasse wie in `zonedDayBounds`
+ *   und `overrideDate` (siehe dort), hier aber seit dem allerersten Commit
+ *   dieser Datei (ADR-033) und mit dem größten Wirkradius der drei: Jede
+ *   Funktion, die über `instantToFloating`/`floatingToInstant` lokalisiert
+ *   (`mergeDateAndTimeOfDay`, `zonedDateKey`, `zonedDayBounds`), war für ein
+ *   Jahr < 100 betroffen — in jeder Zone, auch `UTC`, wo der Offset exakt
+ *   `0` sein müsste.
  */
 export function zoneOffsetMs(instant: Date, timeZone: string): number {
   const parts = formatterFor(timeZone).formatToParts(instant);
   const at = (type: string): number => Number(parts.find((p) => p.type === type)?.value);
-  const asUtc = Date.UTC(
-    at("year"),
-    at("month") - 1,
-    at("day"),
-    at("hour") % 24,
-    at("minute"),
-    at("second"),
-  );
-  return asUtc - Math.floor(instant.getTime() / 1000) * 1000;
+  const asUtcDate = new Date(0);
+  asUtcDate.setUTCFullYear(at("year"), at("month") - 1, at("day"));
+  asUtcDate.setUTCHours(at("hour") % 24, at("minute"), at("second"), 0);
+  return asUtcDate.getTime() - Math.floor(instant.getTime() / 1000) * 1000;
 }
 
 /** Instant → Wandzeit in `timeZone`, als floating `Date`. */
@@ -221,8 +230,23 @@ const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
  * von einer URL, ist also ohne Mitwirkung der App erreichbar. Geprüft wird mit
  * `new Date(0).setUTCFullYear(year, month - 1, day)` statt mit `Date.UTC`:
  * Nur `setUTCFullYear` normalisiert einen Überlauf, ohne zweistellige Jahre
- * (0–99) auf 1900+ abzubilden — mit `Date.UTC` als Prüfinstrument liefe der
- * Rundlauf für solche Jahre falsch-negativ.
+ * (0–99) auf 1900+ abzubilden.
+ *
+ * **Dieselbe validierte Basis baut auch die Grenzen — kein zweiter `Date.UTC`-Aufruf
+ * danach.** Ein erneuter `Date.UTC(year, …)`-Aufruf nach dem Rundlauf-Check
+ * hätte für Jahre unter 100 wieder in dieselbe Falle geführt, die der Check
+ * gerade ausschließen sollte: Für `"0099-06-15"` bestätigt der Rundlauf Jahr
+ * 99, `Date.UTC(99, …)` baute daraus aber `1999-06-…` — zwei Semantiken in
+ * einer Funktion, geprüft mit der einen, gebaut mit der anderen (nachgemessen
+ * beim Review dieses Fixes: `zonedDayBounds("0099-06-15")` lag 1900 Jahre
+ * daneben). Über den App-Schreibpfad nicht erreichbar — `occurrence_date`
+ * kommt nur aus `zonedDateKey`, das reale Kalenderjahre wie 2020–2035 erzeugt
+ * —, aber eine innere Widersprüchlichkeit, die beim nächsten Fix in die Irre
+ * geführt hätte. Der validierte `probe` steht nach `setUTCFullYear` schon auf
+ * `00:00:00.000` des Tages (`new Date(0)` startet an Mitternacht,
+ * `setUTCFullYear` lässt die Uhrzeit unangetastet) und wird direkt als
+ * Tagesanfang verwendet; das Tagesende entsteht per `setUTCHours(23, 59, 59,
+ * 999)` auf einer Kopie derselben Basis.
  *
  * Der Tagesanfang ist nicht durchweg `00:00`: In Zonen, die um Mitternacht
  * umstellen, existiert die Stunde nicht (nachgemessen: `America/Santiago`
@@ -251,8 +275,16 @@ export function zonedDayBounds(
   ) {
     return null;
   }
+  // `probe` ist nach `setUTCFullYear` bereits der Tagesanfang (00:00:00.000):
+  // `new Date(0)` beginnt an Mitternacht, und `setUTCFullYear` ändert nur das
+  // Datum, nicht die Uhrzeit. Er wird deshalb direkt weiterverwendet statt
+  // verworfen und mit `Date.UTC` neu gebaut — ein zweiter `Date.UTC`-Aufruf
+  // hier würde für Jahre unter 100 dieselbe Jahrhundert-Falle wieder öffnen,
+  // die der Rundlauf-Check oben gerade geschlossen hat (siehe Docstring).
+  const dayEnd = new Date(probe);
+  dayEnd.setUTCHours(23, 59, 59, 999);
   return {
-    start: floatingToInstant(new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)), timeZone),
-    end: floatingToInstant(new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)), timeZone),
+    start: floatingToInstant(probe, timeZone),
+    end: floatingToInstant(dayEnd, timeZone),
   };
 }
