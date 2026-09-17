@@ -380,10 +380,12 @@ export function TaskEditScreen() {
         return {
           label: t("conflict.deleteAnyway"),
           onPress: () => {
-            // `useDeleteTask` hat kein `onError` — ohne dieses `.catch()`
-            // verschwände ein zweiter Kollisions- oder Netzwerkfehler
-            // lautlos: Es gibt weder einen `unhandledrejection`-Handler noch
-            // eine ErrorBoundary im Repo. Bewusst ohne eine zweite
+            // `useDeleteTask`s `onError` restauriert nur den optimistischen
+            // Cache-Stand (`restoreTaskCaches`) — die Ablehnung selbst fängt es
+            // nicht ab, das `mutateAsync`-Promise lehnt trotzdem ab. Ohne dieses
+            // `.catch()` verschwände ein zweiter Kollisions- oder Netzwerkfehler
+            // deshalb lautlos: Es gibt weder einen `unhandledrejection`-Handler
+            // noch eine ErrorBoundary im Repo. Bewusst ohne eine zweite
             // „Trotzdem löschen"-Aktion — eine Aktion, die sich selbst
             // nachreicht, baute eine Kette, die nur wächst. Die Aufgabe steht
             // ja noch; der Nutzer kann sie regulär erneut löschen, dann mit
