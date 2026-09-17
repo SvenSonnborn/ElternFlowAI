@@ -26,6 +26,16 @@ export function isJsonObject(j: Json | null | undefined): j is { [k: string]: Js
 }
 
 /**
+ * Das Datumspräfix eines ISO-Strings — nur die drei Kalenderkomponenten, ohne
+ * Uhrzeit oder Offset. `new Date(...)` prüft den Monat (`"2026-13-01"` wird zu
+ * `Invalid Date`), den Tag aber nicht: `"2026-02-30"` normalisiert still zum
+ * 2. März. Dieses Muster zieht die drei Zifferngruppen für den Rundlauf-Check
+ * unten aus dem **String**, nicht aus dem geparsten `Date` — siehe die
+ * Begründung dort.
+ */
+const ISO_DATE_PREFIX = /^(\d{4})-(\d{2})-(\d{2})/;
+
+/**
  * Ein Datumswert aus dem Override-JSON, oder `null`.
  *
  * Ein nicht parsbarer String ergab bis ADR-035 eine `Invalid Date`, die
@@ -34,11 +44,44 @@ export function isJsonObject(j: Json | null | undefined): j is { [k: string]: Js
  * laufen, blieb der **gesamte** Kalenderbereich leer statt nur der eine Termin
  * (nachgemessen, Spec §6.9). Dieselbe Schadensklasse wie eine unbekannte Zone
  * (Befund D, ADR-033) und dieselbe Antwort: verwerfen, damit der Rest steht.
+ *
+ * **Ein Kalenderüberlauf wird seither ebenfalls verworfen.** `event_exceptions.override`
+ * ist freies `jsonb` ohne Inhaltsprüfung; ein direkter DB-Schreibzugriff oder
+ * ein künftiger serverseitiger Writer kann `"2026-02-30T07:00:00.000Z"`
+ * ablegen. `new Date(...)` normalisiert das still auf den 2. März (nachgemessen)
+ * statt zu werfen — die Occurrence wanderte sonst unbemerkt auf einen anderen
+ * Kalendertag. Geprüft wird das Datumspräfix **so, wie es im String steht**
+ * (`ISO_DATE_PREFIX`), nicht gegen die UTC-Komponenten des geparsten `Date`:
+ * Ein Override darf legitim einen Offset tragen (`"2026-06-15T00:30:00+02:00"`
+ * ist UTC bereits der 14.06.) — ein Rundlauf gegen `getUTCDate()` würde einen
+ * solchen, gültigen Wert fälschlich verwerfen. Trägt der String kein
+ * ISO-Datumspräfix, entscheidet weiterhin `new Date` allein.
  */
 export function overrideDate(value: Json | undefined): Date | null {
   if (typeof value !== "string") return null;
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  const match = value.match(ISO_DATE_PREFIX);
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    // Derselbe Rundlauf wie in `zonedDayBounds` (`timezone.ts`): `setUTCFullYear`
+    // normalisiert einen Überlauf ebenso still wie `Date.UTC`, meldet ihn
+    // danach aber über abweichende Getter zurück.
+    const probe = new Date(0);
+    probe.setUTCFullYear(year, month - 1, day);
+    if (
+      probe.getUTCFullYear() !== year ||
+      probe.getUTCMonth() !== month - 1 ||
+      probe.getUTCDate() !== day
+    ) {
+      return null;
+    }
+  }
+
+  return parsed;
 }
 
 /**

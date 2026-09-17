@@ -184,8 +184,10 @@ export function zonedDateKey(instant: Date, timeZone: string): string {
 
 /**
  * Die Form, die `zonedDateKey` erzeugt und die `event_exceptions.occurrence_date`
- * trägt. Bewusst nur ein **Form**-Test: `"2026-13-45"` besteht ihn und rollt in
- * `Date.UTC` über — das ist Totalität, keine Validierung (siehe unten).
+ * trägt. Nur ein **Form**-Test: `"2026-13-45"` besteht ihn ebenso wie
+ * `"2026-06-15"`. Die Kalendergültigkeit der Komponenten prüft `zonedDayBounds`
+ * unten selbst per Rundlauf-Check — dieses Pattern filtert nur offensichtlich
+ * falsch geformte Werte vor, bevor die Zahlen überhaupt geparst werden.
  */
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -202,11 +204,25 @@ const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
  * `eventWindow.ts` auch so begründet; das dritte kippt sie.
  *
  * **`null` statt eines Wurfs**, weil die Aufrufer verschieden auf einen
- * formwidrigen Schlüssel antworten müssen: `eventLookupWindow` fällt auf sein
+ * ungültigen Schlüssel antworten müssen: `eventLookupWindow` fällt auf sein
  * Standardfenster zurück — ein kaputter `occ`-Routenparameter soll irgendeine
  * Occurrence zeigen statt den Screen zu zerlegen —, `endOfDayInstant` wirft,
  * weil ein aus Müll abgeleitetes `until` eine Serie still am falschen Datum
  * kürzte. Diese Entscheidung gehört den Aufrufern, nicht dieser Funktion.
+ *
+ * **Die Kalenderkomponenten werden per Rundlauf geprüft, nicht nur ihre Form.**
+ * `Date.UTC(year, month - 1, day, …)` normalisiert einen Überlauf still statt
+ * ihn abzulehnen — `"9999-99-99"` besteht `DATE_KEY_PATTERN` anstandslos und
+ * `Date.UTC` rollt daraus ein Datum in `+010007`. Nachgemessen an einer
+ * unbegrenzten Tagesserie: Das Suchfenster für `occ="9999-99-99"` umfasste
+ * 2.915.008 Tage, `expandEvents` brauchte darüber 31,2 Sekunden für 2.912.292
+ * Occurrences — auf einem Telefon unter Hermes ein Einfrieren mit
+ * Speicherabbruch. Der Schlüssel kommt über den Routen-Parameter `occ` direkt
+ * von einer URL, ist also ohne Mitwirkung der App erreichbar. Geprüft wird mit
+ * `new Date(0).setUTCFullYear(year, month - 1, day)` statt mit `Date.UTC`:
+ * Nur `setUTCFullYear` normalisiert einen Überlauf, ohne zweistellige Jahre
+ * (0–99) auf 1900+ abzubilden — mit `Date.UTC` als Prüfinstrument liefe der
+ * Rundlauf für solche Jahre falsch-negativ.
  *
  * Der Tagesanfang ist nicht durchweg `00:00`: In Zonen, die um Mitternacht
  * umstellen, existiert die Stunde nicht (nachgemessen: `America/Santiago`
@@ -222,6 +238,19 @@ export function zonedDayBounds(
 ): { start: Date; end: Date } | null {
   if (!DATE_KEY_PATTERN.test(isoDate)) return null;
   const [year, month, day] = isoDate.split("-").map(Number);
+  // Rundlauf-Check: `setUTCFullYear` normalisiert einen Kalenderüberlauf
+  // ebenso still wie `Date.UTC`, meldet ihn danach aber über abweichende
+  // Getter zurück — und bildet, anders als `Date.UTC`, zweistellige Jahre
+  // nicht auf 1900+ ab.
+  const probe = new Date(0);
+  probe.setUTCFullYear(year, month - 1, day);
+  if (
+    probe.getUTCFullYear() !== year ||
+    probe.getUTCMonth() !== month - 1 ||
+    probe.getUTCDate() !== day
+  ) {
+    return null;
+  }
   return {
     start: floatingToInstant(new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)), timeZone),
     end: floatingToInstant(new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)), timeZone),
