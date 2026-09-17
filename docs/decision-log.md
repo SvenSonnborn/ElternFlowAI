@@ -1359,7 +1359,7 @@ Der **Kollisionsfall** fällt damit mit an: Der 20.07. ist ein Montag, an dem di
 
 ### Status
 
-Accepted. Ergänzt [ADR-031](#adr-031--conflict-detection-updated_at-beleben-dreiwertig-vergleichen-ein-dialog-im-root-layout-2026-09-04); löst nichts ab. Setzt [Roadmap 2.1](./roadmap.md#block-2--aufgaben-löschpfad--konfliktlücken) um.
+Accepted. Ergänzt [ADR-031](#adr-031--conflict-detection-updated_at-beleben-dreiwertig-vergleichen-ein-dialog-im-root-layout-2026-09-04); löst nichts ab. Setzt [Roadmap 2.1](./roadmap.md#21-featurestasksmutationsts-umbauen--erledigt) um. Spec: [2026-09-17-tasks-delete-path-conflict-gaps-design.md](./superpowers/specs/2026-09-17-tasks-delete-path-conflict-gaps-design.md) §3 („PR 1 — Der Aufgaben-Schreibpfad").
 
 ### Context
 
