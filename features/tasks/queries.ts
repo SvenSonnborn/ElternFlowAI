@@ -12,7 +12,15 @@ import { useTaskFilter } from "./filterStore";
 import { usePendingTaskIds, withoutPendingTaskDeletes } from "./pendingDeletes";
 import { computeTaskStats, groupTasksByChild, groupTasksByDue } from "./stats";
 
-const SELECT = "*, task_types(*)";
+/**
+ * Die Spaltenliste, mit der eine Aufgabe überall gelesen wird — Listen wie
+ * Einzelzeile. Exportiert, weil `createSupabaseTaskOps.fetchRow`
+ * (`mutations.ts`) dieselbe Form braucht: `TaskConflictError` trägt eine
+ * `TaskWithType`, und der Screen zeigt daraus den Aufgabentyp. Zwei
+ * Spaltenlisten für dieselbe Zeile liefen auseinander, sobald eine Spalte
+ * dazukommt.
+ */
+export const TASK_SELECT = "*, task_types(*)";
 
 /** Referenzstabil, damit `data` nicht bei jedem Render ein neues Array ist. */
 const NO_TASKS: TaskWithType[] = [];
@@ -50,7 +58,7 @@ export const taskKeys = {
 export async function fetchFamilyTasks(doneSince: string): Promise<TaskWithType[]> {
   const { data, error } = await supabase
     .from("tasks")
-    .select(SELECT)
+    .select(TASK_SELECT)
     .or(`is_done.eq.false,completed_at.gte.${doneSince}`)
     .order("due_date", { ascending: true });
   if (error) throw error;
