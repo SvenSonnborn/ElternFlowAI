@@ -140,8 +140,7 @@ features/                Cross-cutting feature logic
 │                        · Kanal (privat, ein Topic pro Familie) · Sammelfenster · Reconnect-Regeln
 │                        · Status-Store · dispatch (kennt die Feature-Mapper) · useFamilyRealtime
 ├─ tasks/                Queries · Mutations · Filter · Stats · Pending-Deletes
-│                        · mutations.ts (TaskOps-Schnitt, reine updateTask/deleteTask, CAS
-│                          auch beim Löschen, ADR-036)
+│                        · mutations.ts (TaskOps-Schnitt, reine updateTask/deleteTask, CAS auch beim Löschen, ADR-036)
 │                        · conflict.ts (Feldvergleich, ADR-031)
 ├─ children/             Kinderprofile
 ├─ meals/                Meal-Planner-Daten-Layer (Queries · JSONB-Normalisierung · Wochenlogik
