@@ -339,7 +339,12 @@ export function TaskEditScreen() {
   }
 
   async function onDelete() {
-    if (!taskId || !task) return;
+    // `baseVersion` statt `task.updated_at`: dieselbe Invariante wie in
+    // `onSave`. Ein Refetch, der Millisekunden nach der Hydration landet,
+    // schiebt `task.updated_at` weiter, ohne dass der Nutzer etwas davon
+    // sieht — das CAS träfe dann anstandslos und prüfte genau die
+    // Fremdänderung nicht, gegen die es gebaut ist.
+    if (!taskId || !task || baseVersion == null) return;
     const confirmed = await confirmDestructive({
       title: t("hw.delete.confirmTitle"),
       body: t("hw.delete.confirmBody"),
@@ -355,7 +360,7 @@ export function TaskEditScreen() {
       target: { taskId },
       title: t("hw.delete.undoTitle"),
       message: task.title,
-      run: () => deleteMutation.mutateAsync({ taskId }),
+      run: () => deleteMutation.mutateAsync({ taskId, baseVersion }),
       errorTitle: t("hw.delete.error"),
       formatError: (err) => t(mapTaskError(err)),
     });

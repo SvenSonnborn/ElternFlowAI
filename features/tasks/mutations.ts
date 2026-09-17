@@ -37,6 +37,13 @@ export interface UpdateTaskVars {
 
 export interface DeleteTaskVars {
   taskId: string;
+  /**
+   * `task.updated_at` beim Laden des Formulars — derselbe eingefrorene Stand
+   * wie bei {@link UpdateTaskVars}, aus demselben Grund: Maßgeblich ist, was
+   * der Nutzer *gesehen* hat, nicht was die lebende Query inzwischen führt
+   * (ADR-031 Decision 6).
+   */
+  baseVersion: string;
 }
 
 export interface ToggleTaskDoneVars {
@@ -107,6 +114,8 @@ export interface TaskOps {
   fetchRow: (taskId: string) => Promise<TaskWithType | null>;
   /** `true`, wenn das Compare-and-Swap die Zeile getroffen hat. */
   updateRow: (taskId: string, changes: TaskChanges, seenUpdatedAt: string) => Promise<boolean>;
+  /** `true`, wenn das Compare-and-Swap die Zeile getroffen hat. */
+  deleteRow: (taskId: string, seenUpdatedAt: string) => Promise<boolean>;
 }
 
 /**
@@ -143,6 +152,18 @@ export function createSupabaseTaskOps(client: SupabaseClient<Database>): TaskOps
       if (error) throw error;
       return data !== null;
     },
+
+    deleteRow: async (taskId, seenUpdatedAt) => {
+      const { data, error } = await client
+        .from("tasks")
+        .delete()
+        .eq("id", taskId)
+        .eq("updated_at", seenUpdatedAt)
+        .select("id")
+        .maybeSingle();
+      if (error) throw error;
+      return data !== null;
+    },
   };
 }
 
@@ -169,6 +190,34 @@ export async function updateTask(vars: UpdateTaskVars, deps: TaskOps): Promise<v
     // classification to `hw.error.generic`, which is the closer fit.
     throw new Error("Task no longer exists");
   }
+  throw new TaskConflictError(current);
+}
+
+/**
+ * Löscht die Aufgabe, solange niemand anderes sie seit dem Laden des
+ * Formulars angefasst hat — dasselbe Compare-and-Swap wie
+ * {@link updateTask}, mit einem Unterschied am Ende.
+ *
+ * **Eine bereits verschwundene Zeile ist hier ein Erfolg, beim Speichern ein
+ * Fehler.** Beim Speichern geht *Inhalt* verloren: Der Nutzer hat etwas
+ * getippt, das nirgendwo mehr ankommt. Beim Löschen ist die *Absicht*
+ * erfüllt — die Aufgabe ist weg, gleich wessen DELETE sie erwischt hat, und
+ * eine Fehlermeldung darüber wäre schlicht falsch.
+ *
+ * Die Grenze davon: Eine RLS-Ablehnung **ohne** Abmeldung (der Elternteil
+ * wurde aus der Familie entfernt, während der Undo-Timer lief) ist vom
+ * Client aus von „schon gelöscht" nicht zu unterscheiden — beide liefern null
+ * Zeilen ohne Fehler und eine leere Nachlese. Sie nimmt hier denselben
+ * stillen Weg; siehe `docs/TODO.md`. Der *Abmelde*-Fall ist davon nicht
+ * betroffen: `useSignOut` ruft `flush()` vor `signOut`, das DELETE läuft also
+ * noch angemeldet.
+ */
+export async function deleteTask(vars: DeleteTaskVars, deps: TaskOps): Promise<void> {
+  const hit = await deps.deleteRow(vars.taskId, vars.baseVersion);
+  if (hit) return;
+
+  const current = await deps.fetchRow(vars.taskId);
+  if (!current) return;
   throw new TaskConflictError(current);
 }
 
@@ -223,10 +272,7 @@ export function useDeleteTask() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async (vars: DeleteTaskVars): Promise<void> => {
-      const { error } = await supabase.from("tasks").delete().eq("id", vars.taskId);
-      if (error) throw error;
-    },
+    mutationFn: (vars: DeleteTaskVars) => deleteTask(vars, createSupabaseTaskOps(supabase)),
     onMutate: (vars) => patchTaskCaches(qc, (tasks) => applyDelete(tasks, vars.taskId)),
     onError: (_err, _vars, snapshot) => restoreTaskCaches(qc, snapshot),
     onSettled: () => invalidateTasks(qc),

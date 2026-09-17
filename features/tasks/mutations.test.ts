@@ -4,7 +4,7 @@ import { describe, expect, mock, test } from "bun:test";
 
 import type { Database } from "@/features/supabase/database.types";
 
-import type { TaskOps, UpdateTaskVars } from "./mutations";
+import type { DeleteTaskVars, TaskOps, UpdateTaskVars } from "./mutations";
 import type { TaskChanges } from "./optimistic";
 import type { TaskWithType } from "./types";
 
@@ -28,7 +28,7 @@ void mock.module("@/features/auth", () => ({ useCurrentParent: () => ({ data: nu
 
 // Imported after the module mock is installed: a static import would be
 // hoisted above it and `mutations.ts` would capture the real barrel.
-const { createSupabaseTaskOps, updateTask } = await import("./mutations");
+const { createSupabaseTaskOps, deleteTask, updateTask } = await import("./mutations");
 
 const BASE_VERSION = "2026-06-01T00:00:00.000Z";
 const THEIR_VERSION = "2026-06-01T09:30:00.000Z";
@@ -59,6 +59,7 @@ function makeOps(overrides: Partial<TaskOps> = {}): TaskOps {
   return {
     fetchRow: mock(() => Promise.resolve(null)),
     updateRow: mock(() => Promise.resolve(true)),
+    deleteRow: mock(() => Promise.resolve(true)),
     ...overrides,
   };
 }
@@ -119,6 +120,60 @@ describe("updateTask", () => {
     // Bewusst nicht `hw.error.staleReference` — der Key benennt ein totes Kind
     // oder einen toten Aufgabentyp, nicht die verschwundene Zeile selbst.
     expect(mapTaskError(error)).toBe("hw.error.generic");
+  });
+});
+
+const DELETE_VARS: DeleteTaskVars = { taskId: "task-1", baseVersion: BASE_VERSION };
+
+describe("deleteTask", () => {
+  test("das CAS trifft: kein Wurf und keine Nachlese", async () => {
+    const ops = makeOps();
+    await deleteTask(DELETE_VARS, ops);
+    expect(ops.deleteRow).toHaveBeenCalledWith("task-1", BASE_VERSION);
+    expect(ops.fetchRow).not.toHaveBeenCalled();
+  });
+
+  test("das CAS verfehlt und die Zeile steht noch: TaskConflictError mit der fremden Fassung", async () => {
+    // Der beobachtete Zwei-Client-Lauf, jetzt automatisiert: A plant eine
+    // Loeschung, B aendert dieselbe Zeile im Undo-Fenster und speichert.
+    // Vorher lief das DELETE durch, ohne dass B ein Wort davon erfuhr.
+    const theirs = makeTask({ title: "Mathe Seite 44", updated_at: THEIR_VERSION });
+    const ops = makeOps({
+      deleteRow: mock(() => Promise.resolve(false)),
+      fetchRow: mock(() => Promise.resolve(theirs)),
+    });
+
+    const error = await deleteTask(DELETE_VARS, ops).catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(TaskConflictError);
+    expect((error as TaskConflictError).row).toBe(theirs);
+  });
+
+  test("GRENZWAECHTER: das CAS verfehlt und die Zeile ist weg: kein Wurf", async () => {
+    // Die Absicht ist erfuellt — die Aufgabe ist weg, gleich wessen DELETE sie
+    // erwischt hat. Ein Toast „Loeschen fehlgeschlagen" ueber einer Aufgabe,
+    // die nicht mehr existiert, waere schlicht falsch (Spec Decision 4).
+    // Beim Speichern ist derselbe Fall ein Fehler, weil dort *Inhalt*
+    // verlorengeht — siehe den Test darueber.
+    const ops = makeOps({
+      deleteRow: mock(() => Promise.resolve(false)),
+      fetchRow: mock(() => Promise.resolve(null)),
+    });
+
+    // Kein `expect(...).resolves` — ein Wurf laesst den Test hier von selbst
+    // fehlschlagen, und das ist die Aussage.
+    await deleteTask(DELETE_VARS, ops);
+    expect(ops.fetchRow).toHaveBeenCalledWith("task-1");
+  });
+
+  test("GRENZWAECHTER: die uebergebene baseVersion geht unveraendert an das CAS", async () => {
+    // Der Waechter gegen ein spaeteres „wir nehmen doch die frische Version":
+    // Mit `task.updated_at` aus der lebenden Query traefe das CAS anstandslos
+    // und pruefte damit genau die Fremdaenderung nicht mehr, gegen die es
+    // gebaut ist (ADR-031 Decision 6).
+    const ops = makeOps();
+    await deleteTask({ taskId: "task-7", baseVersion: "2026-01-02T03:04:05.000Z" }, ops);
+    expect(ops.deleteRow).toHaveBeenCalledWith("task-7", "2026-01-02T03:04:05.000Z");
   });
 });
 
@@ -196,5 +251,52 @@ describe("createSupabaseTaskOps.updateRow", () => {
       .catch((err: unknown) => err);
 
     expect(error).toBe(pgError);
+  });
+});
+
+/** Wie `fakeUpdateClient`, nur fuer die Kette `.from().delete().eq().eq().select().maybeSingle()`. */
+function fakeDeleteClient(result: { data: { id: string } | null; error: unknown }) {
+  const calls = { table: "", eqCalls: [] as [string, unknown][], selectColumns: "" };
+  const builder = {
+    eq(column: string, value: unknown) {
+      calls.eqCalls.push([column, value]);
+      return builder;
+    },
+    select(columns: string) {
+      calls.selectColumns = columns;
+      return builder;
+    },
+    maybeSingle: () => Promise.resolve(result),
+  };
+  const client = {
+    from(table: string) {
+      calls.table = table;
+      return { delete: () => builder };
+    },
+  };
+  return { client: client as unknown as SupabaseClient<Database>, calls };
+}
+
+describe("createSupabaseTaskOps.deleteRow", () => {
+  test("filtert auf id UND den gesehenen Stempel und liest die id zurueck", async () => {
+    const { client, calls } = fakeDeleteClient({ data: { id: "task-1" }, error: null });
+
+    const hit = await createSupabaseTaskOps(client).deleteRow("task-1", BASE_VERSION);
+
+    expect(hit).toBe(true);
+    expect(calls.table).toBe("tasks");
+    expect(calls.eqCalls).toEqual([
+      ["id", "task-1"],
+      ["updated_at", BASE_VERSION],
+    ]);
+    // Der Kern des 0-Zeilen-Guards: Ein DELETE ohne `.select(…)` meldet auch
+    // dann Erfolg, wenn es unter RLS oder nach einer Fremdloeschung keine
+    // einzige Zeile getroffen hat.
+    expect(calls.selectColumns).toBe("id");
+  });
+
+  test("null Zeilen ergeben false, nicht einen Wurf", async () => {
+    const { client } = fakeDeleteClient({ data: null, error: null });
+    expect(await createSupabaseTaskOps(client).deleteRow("task-1", BASE_VERSION)).toBe(false);
   });
 });
