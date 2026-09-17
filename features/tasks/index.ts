@@ -12,6 +12,7 @@ export {
 export { useTaskFilter, useTaskFilterStore } from "./filterStore";
 export {
   createSupabaseTaskOps,
+  deleteTask,
   updateTask,
   useCreateTask,
   useDeleteTask,
