@@ -31,6 +31,22 @@ describe("zoneOffsetMs", () => {
     // käme hier ein um 123 ms verschobener Offset heraus.
     expect(zoneOffsetMs(new Date("2026-07-01T00:00:00.123Z"), BERLIN)).toBe(2 * 3600_000);
   });
+
+  test("ein Jahr unter 100 ergibt keinen ~1900-Jahre-Offset (innere Widerspruchsfreiheit)", () => {
+    // Über `event_exceptions.occurrence_date` oder `events.start_at` nicht
+    // erreichbar — beide entstehen aus realen Kalenderjahren (2020er/2030er).
+    // Dieser Test sichert keinen Nutzerpfad, sondern die innere
+    // Widerspruchsfreiheit von `zoneOffsetMs` selbst: `formatToParts` liefert
+    // für ein Jahr-99-Instant korrekt `year: "99"` (siehe die rohen Parts, die
+    // beim Review dieses Fixes ausgegeben wurden — kein `era`-Part, kein
+    // Sonderfall). Vorher baute `asUtc` das per `Date.UTC(99, …)`, und
+    // `Date.UTC` bildet zweistellige Jahre (0–99) auf 1900+ ab — der
+    // "Offset" war dann keine Handvoll Minuten, sondern rund 1900 Jahre in
+    // Millisekunden, in JEDER Zone, auch `UTC`, wo er exakt `0` sein muss.
+    // Vorbestehend seit dem allerersten Commit dieser Datei (ADR-033), nicht
+    // von dieser PR eingeführt.
+    expect(zoneOffsetMs(new Date("0099-06-15T12:00:00.000Z"), "UTC")).toBe(0);
+  });
 });
 
 describe("instantToFloating", () => {
@@ -217,5 +233,24 @@ describe("zonedDayBounds", () => {
     // bestehen können, obwohl die eigentliche Gefahr (URL-erreichbar über den
     // `occ`-Routenparameter) unbelegt bliebe.
     expect(zonedDayBounds("9999-99-99", BERLIN)).toBeNull();
+  });
+
+  test("ein Jahr unter 100 landet nicht in 1900+ und nicht in einem noch falscheren Jahr (innere Widerspruchsfreiheit)", () => {
+    // Über den App-Schreibpfad nicht erreichbar — `occurrence_date` kommt nur
+    // aus `zonedDateKey`, das reale Kalenderjahre wie 2020–2035 erzeugt. Der
+    // Test sichert keinen Nutzerpfad, sondern die innere
+    // Widerspruchsfreiheit von `zonedDayBounds`: Der Rundlauf-Check oben
+    // bestätigt Jahr 99 als gültig, und das Ergebnis muss dann auch Jahr 99
+    // tragen — alles andere wäre ein Widerspruch zwischen Prüfung und
+    // Konstruktion. Vor diesem Fix lieferte `zonedDayBounds("0099-06-15", …)`
+    // zwei verschiedene falsche Jahre, je nach Zwischenstand des Fixes:
+    // zuerst 1999 (der eigene, inzwischen entfernte zweite `Date.UTC`-Aufruf
+    // dieser Funktion bildete das Jahr auf 1900+ ab), danach -1801 (die
+    // Century-Falle steckte unabhängig davon auch in `zoneOffsetMs`). Beide
+    // Symptome derselben Bugklasse, an zwei verschiedenen Stellen — erst mit
+    // diesem Test sind beide gleichzeitig geschlossen.
+    const bounds = zonedDayBounds("0099-06-15", BERLIN);
+    expect(bounds?.start.getUTCFullYear()).toBe(99);
+    expect(bounds?.end.getUTCFullYear()).toBe(99);
   });
 });
