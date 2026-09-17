@@ -54,6 +54,12 @@ Die beiden Features haben denselben Schreibpfad ungleich weit gebaut, und zwar �
 
 Jede Zeile dieser Tabelle ist ein TODO-Eintrag. Die letzte ist der Grund, warum PR 2 klein ist: Die Aufgaben machen dem Kalender dort seit ADR-031 vor, was ihm fehlt — die Nachlese nach null Zeilen. PR 2 überträgt sie, PR 1 überträgt die andere Richtung.
 
+### 1.4 Nachtrag aus dem Whole-Branch-Review von PR 1
+
+Im Whole-Branch-Review von PR 1 wurde geprüft, ob `createSupabaseEventOps.deleteMaster` denselben 0-Zeilen-Guard trägt, den PR 1 für Aufgaben gerade eingeführt hat. Gemessen an [`features/calendar/recurrence.ts:392-395`](../../../features/calendar/recurrence.ts): nein. Der Aufruf ist unverändert `client.from("events").delete().eq("id", eventId)` — kein `.select()`, kein Versions-Filter. Das ist derselbe Fehler, den PR 1 für Aufgaben gerade geschlossen hat, im Kalender aber weiterhin unangetastet. PR 2 verengt in diesem Block nur `updateMaster`, PR 3 rührt an den Vergleich — keines von beiden schließt diese Lücke. Sie ist bereits durch den stehenden TODO-Eintrag „Fünf Schreib-Ops laufen ohne bedingte Versionsprüfung" (`docs/TODO.md`) erfasst; dies ist ein Verweis darauf, kein neuer Rückstand.
+
+Damit kippt eine weitere Zeile der Tabelle in §1.3 zugunsten der Aufgaben: „CAS beim Löschen" stand dort für den Kalender als „ja", gestützt allein auf den minütlichen Pre-Flight in `deleteEvent` — `deleteMaster` selbst hat, wie eben belegt, gar kein eigenes CAS. Aufgaben haben mit PR 1 ein echtes, atomares CAS auf Op-Ebene bekommen (`.eq("updated_at", …)` plus `.select("id")`, direkt in `deleteRow`). Der Kalender bleibt beim schwächeren, minütlichen Fenster.
+
 ### Zielbild
 
 Nach Block 2 gilt für **beide** Features dasselbe: Ein Schreibvorgang, der eine fremde Änderung überschriebe, meldet sich; ein Löschvorgang, der eine fremde Änderung überschriebe, meldet sich; und beide Pfade sind ohne Netz testbar.

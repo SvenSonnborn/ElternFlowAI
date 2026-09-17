@@ -108,6 +108,13 @@ function invalidateTasks(qc: QueryClient): Promise<void> {
  * kein Compare-and-Swap, das zu prüfen wäre, und sie ohne Anlass umzubauen
  * hieße, zwei Pfade anzufassen, für die niemand einen Testfall genannt hat.
  * Die Datei trägt dafür vorerst zwei Idiome.
+ *
+ * Das ist enger als der tatsächliche Abstand zwischen den beiden Paaren:
+ * „kein CAS" ist eine andere Eigenschaft als „kein 0-Zeilen-Guard", und
+ * `useToggleTaskDone` fehlt **beides** — sein `.update(...).eq("id", …)` läuft
+ * ohne `.select()` und meldet unter RLS oder nach einer Fremdlöschung
+ * `error: null`, obwohl keine Zeile getroffen wurde. Siehe `docs/TODO.md`,
+ * Abschnitt „Aufgaben / Tasks".
  */
 export interface TaskOps {
   /** Die Zeile samt `task_types`-Join — die Form, die `TaskConflictError` trägt. */
@@ -217,7 +224,7 @@ export async function deleteTask(vars: DeleteTaskVars, deps: TaskOps): Promise<v
   if (hit) return;
 
   const current = await deps.fetchRow(vars.taskId);
-  if (!current) return;
+  if (!current) return; // schon weg — das Ziel ist erreicht
   throw new TaskConflictError(current);
 }
 
