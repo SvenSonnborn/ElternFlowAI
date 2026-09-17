@@ -363,6 +363,44 @@ export function TaskEditScreen() {
       run: () => deleteMutation.mutateAsync({ taskId, baseVersion }),
       errorTitle: t("hw.delete.error"),
       formatError: (err) => t(mapTaskError(err)),
+      // „Trotzdem löschen" statt eines Dialogs: Das Löschen läuft seit ADR-026
+      // fünf Sekunden verzögert, der Nutzer ist längst auf einem anderen
+      // Screen und hat die Aufgabe nicht mehr vor sich — ein Feldvergleich
+      // hätte dort nichts zu vergleichen (ADR-031). Wort für Wort dieselbe
+      // Überlegung wie im Termin-Pfad (`EventDetailScreen.tsx`).
+      //
+      // Die frische Basis-Version kommt aus der Fassung, die der Fehler
+      // mitträgt; ein `force`-Flag braucht es dafür nicht. Der Retry läuft
+      // ohne eigenes Undo-Fenster — der Nutzer hat gerade ausdrücklich
+      // entschieden, ein zweites „bist du sicher?" wäre eine Rückfrage auf
+      // eine Antwort, die schon gegeben ist.
+      errorAction: (err) => {
+        if (!(err instanceof TaskConflictError)) return undefined;
+        const fresh = err.row.updated_at;
+        return {
+          label: t("conflict.deleteAnyway"),
+          onPress: () => {
+            // `useDeleteTask` hat kein `onError` — ohne dieses `.catch()`
+            // verschwände ein zweiter Kollisions- oder Netzwerkfehler
+            // lautlos: Es gibt weder einen `unhandledrejection`-Handler noch
+            // eine ErrorBoundary im Repo. Bewusst ohne eine zweite
+            // „Trotzdem löschen"-Aktion — eine Aktion, die sich selbst
+            // nachreicht, baute eine Kette, die nur wächst. Die Aufgabe steht
+            // ja noch; der Nutzer kann sie regulär erneut löschen, dann mit
+            // vollem Undo-Fenster.
+            deleteMutation
+              .mutateAsync({ taskId, baseVersion: fresh })
+              .catch((retryErr: unknown) => {
+                show({
+                  title: t("hw.delete.error"),
+                  message: t(mapTaskError(retryErr)),
+                  variant: "error",
+                  position: "bottom",
+                });
+              });
+          },
+        };
+      },
     });
     goBackOrToTasks();
   }
