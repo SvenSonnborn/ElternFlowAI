@@ -15,10 +15,12 @@ import { computeTaskStats, groupTasksByChild, groupTasksByDue } from "./stats";
 /**
  * Die Spaltenliste, mit der eine Aufgabe überall gelesen wird — Listen wie
  * Einzelzeile. Exportiert, weil `createSupabaseTaskOps.fetchRow`
- * (`mutations.ts`) dieselbe Form braucht: `TaskConflictError` trägt eine
- * `TaskWithType`, und der Screen zeigt daraus den Aufgabentyp. Zwei
- * Spaltenlisten für dieselbe Zeile liefen auseinander, sobald eine Spalte
- * dazukommt.
+ * (`mutations.ts`) dieselbe Form braucht: `TaskConflictError`s Konstruktor
+ * verlangt eine `TaskWithType`, und ohne den `task_types`-Embed erfüllt die
+ * gelesene Zeile diesen Typ gar nicht erst — nicht, weil der Screen den
+ * Aufgabentyp daraus anzeigen würde (der löst ihn aus der ohnehin geladenen
+ * `useTaskTypes`-Liste auf, siehe `conflict.ts`). Zwei Spaltenlisten für
+ * dieselbe Zeile liefen auseinander, sobald eine Spalte dazukommt.
  */
 export const TASK_SELECT = "*, task_types(*)";
 

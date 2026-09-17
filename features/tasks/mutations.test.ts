@@ -23,6 +23,15 @@ import { TaskConflictError, mapTaskError } from "./errors";
  * as `@/features/supabase` in features/meals/queries.test.ts and
  * features/calendar/reminders.test.ts, keeping the fix scoped to this file
  * instead of risking every other suite.
+ *
+ * The mock itself is not file-scoped, though: bun's `mock.module` replaces
+ * the module process-wide for the rest of the test run, and this stub
+ * defines exactly one of the barrel's exports. Today that is harmless — this
+ * is the only suite that reaches `@/features/auth` at all, directly or
+ * transitively — but a later suite that loads after this one and happens to
+ * touch the barrel would get `undefined` for every export but
+ * `useCurrentParent`, i.e. a load-time crash rather than a readable
+ * assertion failure. Whoever hits that should look here first.
  */
 void mock.module("@/features/auth", () => ({ useCurrentParent: () => ({ data: null }) }));
 
@@ -298,5 +307,20 @@ describe("createSupabaseTaskOps.deleteRow", () => {
   test("null Zeilen ergeben false, nicht einen Wurf", async () => {
     const { client } = fakeDeleteClient({ data: null, error: null });
     expect(await createSupabaseTaskOps(client).deleteRow("task-1", BASE_VERSION)).toBe(false);
+  });
+
+  test("ein PostgREST-Fehler wird durchgereicht, nicht als Erfolg maskiert", async () => {
+    // Ohne den Wurf faellt `deleteRow` auf `false` zurueck, `deleteTask` liest
+    // nach, und kommt die Nachlese leer zurueck — RLS oder eine echte
+    // Race — meldet das Loeschen Erfolg ueber einem verschluckten Fehler.
+    // Genau die Fehlerklasse, gegen die dieser Zweig gebaut ist.
+    const pgError = { message: "connection reset", code: "08006" };
+    const { client } = fakeDeleteClient({ data: null, error: pgError });
+
+    const error = await createSupabaseTaskOps(client)
+      .deleteRow("task-1", BASE_VERSION)
+      .catch((err: unknown) => err);
+
+    expect(error).toBe(pgError);
   });
 });
