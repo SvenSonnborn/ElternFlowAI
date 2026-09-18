@@ -547,13 +547,13 @@ In `docs/roadmap.md`, Abschnitt **2.2**, den zweiten Spiegelstrich („Der Compa
 
 Im Tech-Stack-Absatz (Supabase, der lange Absatz um Zeile 71) diese Teilzeichenkette:
 
-```
+```text
 der Kalender prüft die Version im Pre-Flight und sichert `updateMaster` per Compare-and-Swap ab, Aufgaben genau umgekehrt
 ```
 
 ersetzen durch:
 
-```
+```text
 der Kalender prüft die Version im Pre-Flight und sichert `updateMaster` per Compare-and-Swap ab — das seit [ADR-037](docs/decision-log.md) bei null getroffenen Zeilen die fremde Fassung nachliest, weshalb `EventConflictError.row` nicht mehr `null` sein kann —, Aufgaben genau umgekehrt
 ```
 
