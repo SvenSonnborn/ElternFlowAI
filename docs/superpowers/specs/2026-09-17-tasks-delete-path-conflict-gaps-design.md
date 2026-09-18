@@ -78,11 +78,11 @@ Drei PRs, in dieser Reihenfolge:
 
 **Warum PR 1 zuerst:** Größter Nutzerschaden. Eine Aufgabe, die jemand anderes gerade bearbeitet hat, verschwindet heute endgültig, ohne dass dieser Jemand ein Wort davon erfährt — beobachtet im Zwei-Client-Lauf.
 
-**Warum PR 2 vor PR 3:** PR 2 ist der kleinere und verbessert die Diagnostizierbarkeit des größeren. Solange der CAS-Fall den Dialog ohne Vergleichszeilen zeigt, ist bei jedem Dialog ohne Zeilen unklar, ob der Vergleich nichts fand oder die fremde Fassung fehlte. Nach PR 2 heißt „keine Zeilen" nur noch eines — und genau das ist der Zustand, den PR 3 beseitigen will.
+**Warum PR 2 vor PR 3:** PR 2 ist der kleinere und verbessert die Diagnostizierbarkeit des größeren. Solange der CAS-Fall den Dialog ohne Vergleichszeilen zeigt, ist bei jedem Dialog ohne Zeilen unklar, ob der Vergleich nichts fand oder die fremde Fassung fehlte. Nach PR 2 ist die fremde Fassung immer bekannt und die Basis-Version immer frisch; ein Dialog ohne Zeilen hat seither nur noch Ursachen, die sich benennen lassen — Occurrence außerhalb des Suchfensters, Basis nicht hydriert, erschöpftes Auto-Retry-Limit (ADR-037). _(Korrigiert 2026-09-18: Hier stand, „keine Zeilen" heiße nach PR 2 nur noch eines. Das stimmte nicht; dieselbe Behauptung wurde in PR 2 in ADR-037 und §9 berichtigt und an dieser Stelle übersehen.)_
 
-Die drei PRs teilen keine **Produktionsdatei**. PR 1 fasst `features/tasks/` und `TaskEditScreen` an, PR 2 `features/calendar/recurrence.ts` + `errors.ts` + zwei Screens, PR 3 `features/calendar/conflict.ts` + ein neues Modul + `EventEditScreen`. Sie sind in jeder Reihenfolge mergebar; die obige ist die nützlichste.
+Der Schnitt trennt die PRs nach **Verträgen**, nicht nach Dateien. PR 1 fasst `features/tasks/` und `TaskEditScreen` an. PR 2 und PR 3 teilen zwei Produktionsdateien — `features/calendar/recurrence.ts` (PR 2 `updateMaster`, PR 3 `ruleDiffers`) und `EventEditScreen` (PR 2 die Null-Zweige in `showConflict`, PR 3 die Regel-Zeilen) —, PR 3 fasst außerdem `features/calendar/conflict.ts`, das neue `rule.ts` und einen Helfer neben dem Screen an. PR 3 setzt deshalb auf PR 2 auf; die Reihenfolge ist nicht beliebig. _(Korrigiert 2026-09-18: Hier stand, die drei PRs teilten keine Produktionsdatei und seien in jeder Reihenfolge mergebar.)_
 
-An den **Dokumenten** arbeiten sie dagegen sehr wohl gemeinsam: `docs/TODO.md` fassen alle drei an, `docs/roadmap.md` und `docs/decision-log.md` je zwei (§7). Das ist kein Merge-Risiko im Sinne widersprüchlicher Änderungen — jeder PR löscht oder ergänzt seine eigenen Zeilen —, aber es heißt, dass der zweite und dritte PR nach einem Merge des ersten neu gegen `main` gelesen werden müssen, statt blind gerebast zu werden.
+An den **Dokumenten** arbeiten sie dagegen sehr wohl gemeinsam: `docs/TODO.md`, `docs/roadmap.md` und `docs/decision-log.md` fassen alle drei an (je ein ADR, §7). Das ist kein Merge-Risiko im Sinne widersprüchlicher Änderungen — jeder PR löscht oder ergänzt seine eigenen Zeilen —, aber es heißt, dass der zweite und dritte PR nach einem Merge des ersten neu gegen `main` gelesen werden müssen, statt blind gerebast zu werden.
 
 ---
 
@@ -242,6 +242,14 @@ Die Typ-Verengung braucht keinen eigenen Test: Sie ist eine Compiler-Aussage, un
 
 ## 5. PR 3 — Die Regel im Vergleich
 
+### 5.0 Nachtrag vor der Umsetzung (2026-09-18)
+
+Vor dem Plan für PR 3 habe ich die tragenden Behauptungen dieses Abschnitts erneut gegen `main` gemessen. Drei weichen ab; die Unterabschnitte unten sind entsprechend nachgezogen.
+
+1. **Das `until`-Phantom gibt es heute nicht.** §5.1 begründete den Zeitvergleich mit einem beobachtbaren Fehler (Server `…+00:00` gegen Formular `…Z`). Gemessen: Das Formular reicht `until` als Server-String unverändert durch (`rrule_until: parsedCount == null ? (initial?.rruleUntil ?? null) : null` in `EventEditScreen`), das Optimistic-Overlay fasst `rrule_until` nicht an, Realtime invalidiert nur. Kein aktueller Pfad bringt zwei Schreibweisen in denselben Vergleich. Der Zeitvergleich bleibt — als Absicherung, nicht als Bugfix.
+2. **Die Anzeige aus §5.3 ist mit den vorhandenen Keys nicht zu bauen.** `cal.create.fieldRecurrenceCount` ist eine **Beschriftung** („Endet nach … Terminen"), kein Wert mit `{{count}}` und ohne Plural. Und „Option + Anzahl" kann ein Serienende per Datum nicht ausdrücken — das setzen zwei alltägliche Aktionen: „ab hier löschen" auf einer unbegrenzten Serie und Bearbeiten mit „dieser und folgende". Die eine Zeile nach Spec zeigte dann zwei gleiche Werte. **Entschieden (2026-09-18): zwei Zeilen, keine neuen Keys** — §5.3 und Decision 10.
+3. **Die geplante Form existiert schon.** `RuleShape` hätte dieselben fünf Felder wie `OccurrenceRrule` in `features/calendar/types.ts`, die jede Occurrence als `occ.rrule` trägt; und `RecurrenceChanges` hat genau die fünf `rrule_*`-Spalten einer Zeile, `ruleOfRow` und `ruleOfChanges` wären also dieselbe Funktion. `rule.ts` exportiert deshalb nur `ruleOf` und `sameRule` auf `OccurrenceRrule` (§5.1).
+
 ### 5.1 Ein Regel-Vergleich, nicht zwei
 
 Es gibt bereits einen: `ruleDiffers(master, next)` in [recurrence.ts:197-208](../../../features/calendar/recurrence.ts), privat, entscheidet über `deleteAllExceptions`. Ein zweiter, leicht anders gebauter Vergleich für den Dialog wäre genau die Divergenz, vor der CLAUDE.md warnt — und hier besonders folgenreich: Die beiden würden über _dieselbe_ Frage („hat sich die Regel geändert?") verschieden urteilen, einmal beim Löschen der Exceptions und einmal beim Melden des Konflikts.
@@ -249,29 +257,21 @@ Es gibt bereits einen: `ruleDiffers(master, next)` in [recurrence.ts:197-208](..
 Deshalb ein eigenes Modul `features/calendar/rule.ts` mit zwei Lesern — dasselbe Muster und derselbe Anlass wie bei `override.ts` in ADR-035:
 
 ```ts
-/** Die fünf `rrule_*`-Werte, aus welcher Quelle auch immer. */
-export interface RuleShape {
-  freq: string | null;
-  interval: number;
-  byweekday: number[] | null;
-  count: number | null;
-  until: string | null;
-}
-
 type RuleColumns = Pick<
   EventRow,
   "rrule_freq" | "rrule_interval" | "rrule_byweekday" | "rrule_count" | "rrule_until"
 >;
 
-export function ruleOfRow(row: RuleColumns): RuleShape;
-export function ruleOfChanges(changes: RecurrenceChanges): RuleShape;
-export function ruleOfOccurrence(occ: CalendarOccurrence): RuleShape;
-export function sameRule(a: RuleShape, b: RuleShape): boolean;
+/** Die Regel aus den fünf `rrule_*`-Spalten — einer Zeile ebenso wie `RecurrenceChanges`. */
+export function ruleOf(columns: RuleColumns): OccurrenceRrule;
+export function sameRule(a: OccurrenceRrule, b: OccurrenceRrule): boolean;
 ```
 
-`ruleDiffers` wird zu `!sameRule(ruleOfRow(master), ruleOfChanges(next))` und bleibt als benannter Aufrufer stehen.
+Die Form ist `OccurrenceRrule` aus `types.ts`, kein neuer Typ: Jede `CalendarOccurrence` trägt sie bereits als `occ.rrule` (gebaut in `expand.ts`), eine Occurrence braucht also keinen eigenen Umwandler (§5.0, Punkt 3).
 
-**Zwei Feinheiten, die `sameRule` erbt und eine, die es korrigiert.** `byweekday` vergleicht als Menge, nicht als Liste (so wie `ruleDiffers` es schon tut) — die Reihenfolge ist keine Information. `until` vergleicht dagegen künftig als **Zeitpunkt**, nicht als Zeichenkette: Seit ADR-033 schreibt `setRruleUntil` einen Instant, und der Server liefert PostgREST-Format (`…+00:00`), das Formular `toISOString()` (`…Z`). Ein Stringvergleich meldete dieselbe Zeit als Unterschied — im Dialog als Phantom-Konflikt, in `ruleDiffers` als überflüssiges `deleteAllExceptions`. Das ist eine Verhaltensänderung an einer zweiten Stelle und bekommt ihren eigenen Test. `null` wird vor der Umrechnung abgefangen (`new Date(null)` ist die Epoche, nicht `NaN`).
+`ruleDiffers` wird zu `!sameRule(ruleOf(master), ruleOf(next))` und bleibt als benannter Aufrufer stehen.
+
+**Zwei Feinheiten, die `sameRule` erbt und eine, die es korrigiert.** `byweekday` vergleicht als Menge, nicht als Liste (so wie `ruleDiffers` es schon tut) — die Reihenfolge ist keine Information. `until` vergleicht dagegen künftig als **Zeitpunkt**, nicht als Zeichenkette — wie `sameInstant` in `conflict.ts` für Start und Ende. **Das ist eine Absicherung, kein Bugfix** (§5.0, Punkt 1): Heute erreicht kein Pfad den Vergleich mit zwei Schreibweisen, weil das Formular `until` als Server-String durchreicht. Der Stringvergleich beruht aber auf einer Annahme über die Herkunft beider Seiten, die niemand prüft; der Zeitvergleich macht sie überflüssig. Gleiche Zeichenketten gelten als gleich, bevor überhaupt geparst wird — die Änderung macht also nur Paare gleich, die vorher verschieden waren, nie umgekehrt. Sie wirkt auch auf `ruleDiffers` und bekommt dort einen eigenen Test. `null` wird vor der Umrechnung abgefangen (`new Date(null)` ist die Epoche, nicht `NaN`).
 
 ### 5.2 Der Vergleich
 
@@ -291,8 +291,8 @@ Die Regel folgt dem Muster, das `differingTaskFields` für seine optionalen Feld
 ```ts
 if (
   mineRecurrence != null &&
-  !sameRule(ruleOfOccurrence(theirs), ruleOfOccurrence(base)) &&
-  !sameRule(ruleOfOccurrence(theirs), ruleOfChanges(mineRecurrence))
+  !sameRule(theirs.rrule, base.rrule) &&
+  !sameRule(theirs.rrule, ruleOf(mineRecurrence))
 ) {
   out.push("recurrence");
 }
@@ -304,28 +304,39 @@ Damit ist die Feldliste im gemessenen Szenario nicht mehr leer, der Auto-Retry e
 
 ### 5.3 Die Darstellung
 
-Label: `cal.create.fieldRecurrence` („Wiederholung"). Werte: `rruleToRecurrence(…)` → `cal.recur.<option>`, plus die Anzahl, wenn gesetzt (`cal.create.fieldRecurrenceCount`). **Alle vier Keys existieren** — PR 3 ist nicht 🎨-blockiert.
+**Zwei Zeilen, keine neuen Keys** (entschieden 2026-09-18, §5.0 Punkt 2). Je Bedienelement des Formulars eine Zeile — der Nutzer hat einen Radio-Button und ein Anzahl-Feld angefasst:
 
-Ein Sonderfall, der nicht auftreten kann, und einer, der es kann:
+| Zeile      | Label (vorhanden)                                           | Wert                                                                                                                                                   |
+| ---------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Option     | `cal.create.fieldRecurrence` („Wiederholung")               | `cal.recur.<option>` aus `rruleToRecurrence(…)`; „—", wenn die Regel keiner der fünf Optionen entspricht                                               |
+| Serienende | `cal.create.fieldRecurrenceCount` („Endet nach … Terminen") | die Zahl; `cal.create.recurrenceCountUnlimited` („Unbegrenzt"), wenn weder Anzahl noch Enddatum gesetzt sind; „—", wenn die Serie an einem Datum endet |
 
-- **A's Regel ist nicht darstellbar** — unmöglich. Der Editor ist bei einer Regel außerhalb der fünf V1-Optionen gar nicht sichtbar (`recurrenceEditable`), `vars.recurrence` bleibt dann null, und die Zeile entsteht nicht.
-- **B's Regel ist nicht darstellbar** — möglich (ein anderer Client, ein direkter DB-Schreibvorgang). `rruleToRecurrence` liefert `null`; die Zeile zeigt dann „—" für die fremde Fassung. Unschön, aber ehrlicher als eine erfundene Beschriftung, und kein neuer Copy-Key.
+Eine Zeile erscheint nur, wenn sich ihre beiden Werte **sichtbar** unterscheiden — verglichen wird der angezeigte Text, nicht die Regel. Zeigt keine der beiden einen Unterschied, obwohl `differingEventFields` einen gemeldet hat (er liegt dann in einem Teil der Regel, den das Formular nicht darstellt: Intervall, Wochentage, zwei verschiedene Enddaten), erscheint die Options-Zeile trotzdem. Ein erkannter Konflikt ohne Zeile wäre ein Dialog, der etwas meldet und nichts zeigt.
 
-`formatField` in `EventEditScreen` bekommt `"recurrence"` **nicht** in den bestehenden `switch`: Dessen Signatur (`field, source`) passt nicht, weil die Regel nicht in `EventChanges` steckt. Die beiden Strings entstehen an der Stelle, an der die `rows` gebaut werden, aus `theirs.rrule` und `vars.recurrence`.
+„Unbegrenzt" nur, wenn auch kein Enddatum gesetzt ist: Eine Serie, die jemand per „ab hier löschen" an einem Datum beendet hat, hat keine Anzahl — sie als „Unbegrenzt" zu beschriften, wäre falsch. Das „—" ist dort ehrlich, aber karg; ein Wert „endet am …" bräuchte einen neuen Key (§5.4).
+
+Der Wochentag für `rruleToRecurrence` wird geprüft wie bei der Hydration: für die fremde Fassung gegen `theirs.startAt` in `theirs.timezone`, für die eigene gegen den Start, mit dem das Formular die Regel gebaut hat (`vars.changes.start_at`), in `vars.timezone`. So hält die Hin-und-Rück-Abbildung, die `createMutation.test.ts` festhält.
+
+Die Zeilen baut ein reiner Helfer neben dem Screen, `app-sections/event/recurrenceConflictRows.ts` — Vorbild `submitLock.ts` —, weil `EventEditScreen` selbst unter `bun test` nicht ladbar ist und die Zeilenlogik Zweige hat, die einen Test verdienen. `formatField` bekommt `"recurrence"` nicht: Seine Signatur (`field, source`) passt nicht, weil die Regel nicht in `EventChanges` steckt.
+
+Ein Sonderfall kann nicht auftreten: **A's Regel ist nicht darstellbar** — der Editor ist bei einer Regel außerhalb der fünf V1-Optionen gar nicht sichtbar (`recurrenceEditable`), `vars.recurrence` bleibt dann null, und die Zeile entsteht nicht. **B's Regel** kann es sein (ein anderer Client, ein direkter DB-Schreibvorgang); dann zeigt die fremde Seite „—".
 
 ### 5.4 Was der Dialog nicht sagt
 
 Wählt der Nutzer „Deine Fassung speichern", gewinnt A's Regel — und `deleteAllExceptions` löscht die Ausnahmen der Serie (§1.1). Der Dialog benennt diese Folge **nicht**; dafür bräuchte es einen neuen Copy-Key. Die Entscheidung ist damit informiert über _das_, was kollidiert, nicht über alles, was daran hängt. Das ist besser als heute (gar keine Entscheidung) und schlechter als möglich — und geht als 🎨-Eintrag in `docs/TODO.md`.
+
+Dasselbe gilt für eine zweite Folge, die beim Nachmessen vor PR 3 auffiel (§5.0): Hat B die Serie per „ab hier löschen" an einem Datum beendet, trägt A's Schreibvorgang das `until` aus dem Stand, den A's Formular geladen hat — also keins. „Deine Fassung speichern" macht B's Kürzung damit rückgängig, die gelöschten Termine kehren zurück. Die Serienende-Zeile zeigt dann „—" gegen „Unbegrenzt": ein Hinweis, keine Erklärung. Derselbe 🎨-Eintrag nimmt beide Folgen auf.
 
 ### 5.5 Tests
 
 Neu in `features/calendar/rule.test.ts`:
 
 - `sameRule` über alle fünf Felder, je ein Unterschied.
-- `byweekday` in anderer Reihenfolge ist **dieselbe** Regel.
-- `until` in PostgREST-Format und als `toISOString()` ist **derselbe** Zeitpunkt. **Rot vor dem Fix.**
-- `until: null` auf beiden Seiten ist gleich; `null` gegen einen Wert ist verschieden.
-- `ruleDiffers` bleibt an seinen bestehenden Fällen grün (`recurrence.test.ts`).
+- `byweekday` in anderer Reihenfolge ist **dieselbe** Regel; `null` und `[]` sind dasselbe.
+- `until` in PostgREST-Format und als `toISOString()` ist **derselbe** Zeitpunkt; `null` gegen `null` gleich, `null` gegen einen Wert verschieden.
+- `ruleOf` bildet die fünf Spalten ab.
+
+In `recurrence.test.ts`, als Beleg der Verhaltensänderung an `ruleDiffers`: ein `master.rrule_until` in PostgREST-Format gegen dasselbe Instant als `…Z` löst **kein** `deleteAllExceptions` aus. **Rot vor dem Fix** — an einer konstruierten Eingabe, denn kein heutiger Pfad erzeugt sie (§5.0). Die bestehenden `ruleDiffers`-Fälle bleiben grün.
 
 Neu in `conflict.test.ts` — die drei gemessenen Szenarien aus §1.1, jetzt mit dem erwarteten Ergebnis:
 
@@ -334,6 +345,7 @@ Neu in `conflict.test.ts` — die drei gemessenen Szenarien aus §1.1, jetzt mit
 - A ändert die Regel **nicht** (`mineRecurrence` null), B schon → `[]`. **GRENZWÄCHTER**: Dieser Fall darf keinen Dialog erzeugen, sonst meldet jede fremde Regeländerung einen Konflikt bei einem Nutzer, der die Regel gar nicht anfasst.
 - A und B ändern die Regel **identisch** → `[]`. Zweiter Grenzwächter: gleiches Ergebnis ist kein Konflikt.
 
+Neu in `app-sections/event/recurrenceConflictRows.test.ts`: nur die Anzahl weicht ab → nur die Serienende-Zeile; nur die Option → nur die Options-Zeile; fremdes Enddatum gegen eigene unbegrenzte Serie → „—" gegen „Unbegrenzt", **nie** „Unbegrenzt" für eine Serie mit Enddatum; kein sichtbarer Unterschied → die Options-Zeile trotzdem; nicht darstellbare fremde Regel → „—".
 ---
 
 ## 6. Was diese Iteration nicht liefert
@@ -348,7 +360,7 @@ Neu in `conflict.test.ts` — die drei gemessenen Szenarien aus §1.1, jetzt mit
 
 ## 7. Folgen für die Dokumentation
 
-- **`docs/TODO.md`**: fünf Einträge gelöscht (drei in PR 1, je einer in PR 2 und PR 3), drei neue angelegt (§6). Je im selben Commit.
+- **`docs/TODO.md`**: fünf Einträge gelöscht (drei in PR 1, je einer in PR 2 und PR 3), vier neue angelegt — zwei in PR 1 (die RLS-Grenze aus §6 und der fehlende 0-Zeilen-Guard in `useToggleTaskDone`), einer in PR 2 (die fehlende `no-unnecessary-condition`-Regel, beim Verengen gefunden), der 🎨-Eintrag aus §5.4 in PR 3. Je im selben Commit.
 - **`docs/roadmap.md`**: Block 2 abgehakt, 2.1–2.2 mit dem Ergebnis versehen; 2.3 bleibt offen und wandert sichtbar zu Block 3.
 - **`docs/decision-log.md`**: ADR-036, ADR-037 und ADR-038 angehängt.
 - **`CLAUDE.md`**: Der Absatz zu Conflict-Detection nennt heute nur den Kalender („der Kalender prüft die Version im Pre-Flight …, Aufgaben genau umgekehrt"). Nach PR 1 stimmt das nicht mehr — Aufgaben haben dann beim Löschen dasselbe CAS. Der Satz wird nachgezogen. Dazu in der Ordnerübersicht: `features/tasks/` um den `TaskOps`-Schnitt, `features/calendar/` um `rule.ts`.
@@ -374,9 +386,9 @@ Neu in `conflict.test.ts` — die drei gemessenen Szenarien aus §1.1, jetzt mit
 
 8. **Ein Regel-Vergleich für das ganze Feature, in `rule.ts`.** Zwei Leser, dasselbe Muster wie `override.ts` in ADR-035. `ruleDiffers` bleibt als benannter Aufrufer.
 
-9. **`rrule_until` vergleicht als Zeitpunkt, nicht als Zeichenkette.** Seit ADR-033 ist es ein Instant, und Server- und Client-Schreibweise unterscheiden sich. Die Änderung wirkt auch auf `ruleDiffers` und bekommt dort einen eigenen Test.
+9. **`rrule_until` vergleicht als Zeitpunkt, nicht als Zeichenkette.** Seit ADR-033 ist es ein Instant. Als Absicherung, nicht als Bugfix: Heute bringt kein Pfad zwei Schreibweisen in denselben Vergleich (§5.0), aber der Stringvergleich hängt an einer ungeprüften Annahme über die Herkunft beider Seiten. Gleiche Zeichenketten bleiben gleich, bevor geparst wird. Die Änderung wirkt auch auf `ruleDiffers` und bekommt dort einen eigenen Test.
 
-10. **Die Regel wird eine Dialogzeile, nicht fünf.** Der Nutzer hat einen Radio-Button angefasst, keine fünf Spalten — und fünf Zeilen bräuchten fünf neue Copy-Keys und damit den Designer.
+10. **Die Regel wird zwei Dialogzeilen, nicht fünf — und nicht eine.** Geändert am 2026-09-18 (§5.0): Ursprünglich stand hier „eine Zeile", mit der Begründung, der Nutzer habe einen Radio-Button angefasst, keine fünf Spalten. Die Begründung trägt weiter, sie zählt nur richtig: Das Formular hat **zwei** Bedienelemente für die Regel, Option und Anzahl, und beide haben vorhandene Beschriftungen. Eine Zeile konnte Unterschiede allein in Anzahl oder Enddatum nicht zeigen und hätte zwei gleiche Werte nebeneinandergestellt. Fünf Zeilen bräuchten weiterhin fünf neue Copy-Keys und damit den Designer.
 
 11. **`mineRecurrence == null` ist nie ein Konflikt.** Ohne Regel im Schreibvorgang stehen die `rrule_*`-Spalten nicht im UPDATE; es gibt nichts zu überschreiben.
 
