@@ -340,38 +340,32 @@ export function EventEditScreen() {
     autoRetries: number,
   ) {
     try {
-      // Kein `row` heißt: der Compare-and-Swap hat den Konflikt erkannt, ohne
-      // die fremde Fassung zu kennen. Dann steht der Dialog ohne
-      // Vergleichszeilen und ohne frische Version — siehe `docs/TODO.md`.
+      // Fenster wie `useEvent` (`features/calendar/hooks.ts`): an der Zeile
+      // selbst verankert und um das angeforderte Datum geweitet — nicht an
+      // den geänderten Eingabewerten aus `vars.changes`. Sonst fiele jede
+      // Verschiebung des Termins um mehr als seine eigene Dauer (ein
+      // anderer Tag, mehrere Stunden) aus dem Fenster, und `theirs` würde
+      // `null`, obwohl die fremde Fassung bekannt ist — ausgerechnet beim
+      // häufigsten echten Konfliktfall („wir haben beide verschoben").
+      // Dieselbe Begründung wie dort: eine weit in der Zukunft liegende
+      // Occurrence (>1 Jahr) würde sonst abgeschnitten. Die Zonenbehandlung
+      // muss dabei zonen-genau sein: `eventLookupWindow` bildet Tagesanfang
+      // und -ende des angeforderten Regel-Tags in `row.timezone`, nicht in
+      // der Zone des Lesers — ein lokal gebildetes Fenster kann eine
+      // Occurrence nahe Mitternacht in `row.timezone` verfehlen, `theirs`
+      // würde `null`, obwohl die fremde Fassung bekannt ist (Befund B,
+      // PR #121). Seit ADR-035 deckt das Fenster außerdem das
+      // Override-Intervall der angeforderten Occurrence ab.
       const row = err.row;
-      let theirs: CalendarOccurrence | null = null;
-      if (row) {
-        // Fenster wie `useEvent` (`features/calendar/hooks.ts`): an der Zeile
-        // selbst verankert und um das angeforderte Datum geweitet — nicht an
-        // den geänderten Eingabewerten aus `vars.changes`. Sonst fiele jede
-        // Verschiebung des Termins um mehr als seine eigene Dauer (ein
-        // anderer Tag, mehrere Stunden) aus dem Fenster, und `theirs` würde
-        // `null`, obwohl die fremde Fassung bekannt ist — ausgerechnet beim
-        // häufigsten echten Konfliktfall („wir haben beide verschoben").
-        // Dieselbe Begründung wie dort: eine weit in der Zukunft liegende
-        // Occurrence (>1 Jahr) würde sonst abgeschnitten. Die Zonenbehandlung
-        // muss dabei zonen-genau sein: `eventLookupWindow` bildet Tagesanfang
-        // und -ende des angeforderten Regel-Tags in `row.timezone`, nicht in
-        // der Zone des Lesers — ein lokal gebildetes Fenster kann eine
-        // Occurrence nahe Mitternacht in `row.timezone` verfehlen, `theirs`
-        // würde `null`, obwohl die fremde Fassung bekannt ist (Befund B,
-        // PR #121). Seit ADR-035 deckt das Fenster außerdem das
-        // Override-Intervall der angeforderten Occurrence ab.
-        const { start: windowStart, end: windowEnd } = eventLookupWindow(row, vars.occurrenceKey);
-        // Match auf `occurrenceKey`: Nur der Schlüssel identifiziert dieselbe
-        // Occurrence zuverlässig, wenn eine Verschiebung ihn vom aufgelösten
-        // Anzeigedatum hat auseinanderlaufen lassen (ADR-034) — derselbe Grund
-        // wie beim `find` in `useEvent` (`features/calendar/hooks.ts`).
-        theirs =
-          expandEvents([row], windowStart, windowEnd, theme).find(
-            (o) => o.occurrenceKey === vars.occurrenceKey,
-          ) ?? null;
-      }
+      const { start: windowStart, end: windowEnd } = eventLookupWindow(row, vars.occurrenceKey);
+      // Match auf `occurrenceKey`: Nur der Schlüssel identifiziert dieselbe
+      // Occurrence zuverlässig, wenn eine Verschiebung ihn vom aufgelösten
+      // Anzeigedatum hat auseinanderlaufen lassen (ADR-034) — derselbe Grund
+      // wie beim `find` in `useEvent` (`features/calendar/hooks.ts`).
+      const theirs: CalendarOccurrence | null =
+        expandEvents([row], windowStart, windowEnd, theme).find(
+          (o) => o.occurrenceKey === vars.occurrenceKey,
+        ) ?? null;
 
       // Fehlt `baseOccurrence` (theoretisch: der Konflikt trifft vor der
       // Hydration ein), bleibt `fields` leer — aber der Guard darunter prüft
@@ -379,8 +373,8 @@ export function EventEditScreen() {
       // fehlende Basis nicht denselben Weg nimmt wie ein echtes „niemand hat
       // etwas geändert". Ohne Basis lässt sich das gar nicht feststellen, also
       // muss der Dialog erscheinen — ohne Zeilen, aber sichtbar. Genau die
-      // Überlegung, die den `row === null`-Fall (`theirs === null`) schon
-      // heute in den Dialog statt ins Durchspeichern schickt.
+      // Überlegung, die auch `theirs === null` (Occurrence außerhalb
+      // des Suchfensters) in den Dialog statt ins Durchspeichern schickt.
       const fields =
         theirs && baseOccurrence ? differingEventFields(theirs, vars.changes, baseOccurrence) : [];
       // Der Zähler begrenzt **nur** diese stille Wiederholung, nicht den Tap
@@ -421,19 +415,12 @@ export function EventEditScreen() {
         onKeepMine: () => {
           save({
             ...vars,
-            // `theirs` fehlt entweder, weil die fremde Fassung außerhalb des
-            // Fensters lag, oder weil der CAS-Fall (`row === null`) sie gar
-            // nicht kennt. Im ersten Fall ist `row` trotzdem da — die frische
-            // Version lässt sich dann direkt berechnen, ohne erneut zu
-            // expandieren. **Nur** wenn auch `row` fehlt, bleibt die alte
-            // `vars.baseVersion` übrig: Es gibt nichts Frischeres, dieser
-            // Versuch kollidiert dann erneut, bis der nächste Refetch durch
-            // ist (siehe `docs/TODO.md`) — anders als vorher fällt der
-            // Normalfall (Fenster hätte `theirs` sonst gefunden, `row`
-            // bekannt) aber nicht mehr auf denselben toten Wert zurück.
-            baseVersion:
-              theirs?.version ??
-              (row ? occurrenceVersion(row, vars.occurrenceKey) : vars.baseVersion),
+            // `theirs` fehlt nur noch aus einem Grund: die fremde Fassung lag
+            // außerhalb des Suchfensters. `row` ist seit ADR-037 immer da, die
+            // frische Version also immer berechenbar — ohne erneut zu
+            // expandieren. Der tote Rückfall auf `vars.baseVersion`, der diesen
+            // Versuch zwangsläufig erneut kollidieren ließ, ist damit weg.
+            baseVersion: theirs?.version ?? occurrenceVersion(row, vars.occurrenceKey),
           });
         },
       });

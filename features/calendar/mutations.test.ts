@@ -140,7 +140,7 @@ describe("updateEvent", () => {
     );
 
     expect(error).toBeInstanceOf(EventConflictError);
-    expect((error as EventConflictError).row?.title).toBe("Fremd");
+    expect((error as EventConflictError).row.title).toBe("Fremd");
   });
 
   test("eine fremde Exception an DIESEM Datum ist ein Konflikt", async () => {

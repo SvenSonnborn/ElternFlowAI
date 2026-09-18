@@ -37,14 +37,16 @@ export class EventNotFoundError extends Error {
  * mit `expandEvents` auflösen und Feld für Feld gegen die eigene Eingabe
  * stellen kann — genau das, was der Vergleichs-Dialog zeigt (ADR-031).
  *
- * `row` ist `null`, wenn der Konflikt aus dem Compare-and-Swap in
- * `updateMaster` kommt statt aus dem Pre-Flight: Dort ist bekannt, *dass*
- * jemand dazwischengeschrieben hat, aber nicht *was*. Der Dialog erscheint dann
- * ohne Vergleichszeilen — stilles Durchwinken wäre genau der Fehler, gegen den
- * diese Klasse gebaut ist.
+ * `row` ist **nicht** nullable, und das ist eine Zusicherung, kein Zufall:
+ * Beide Wege hierher liefern die Zeile — der Pre-Flight in `mutations.ts` den
+ * gerade geladenen Master, das Compare-and-Swap in `updateMaster` seit
+ * ADR-037 eine Nachlese. Damit beweist der Compiler, was der Dialog braucht:
+ * eine frische Basis-Version für „Deine Fassung speichern". Vorher konnte der
+ * CAS-Fall `null` liefern, und der Wiederholungsversuch lief zwangsläufig
+ * gegen dieselbe veraltete `baseVersion` — bis zum nächsten Refetch.
  */
 export class EventConflictError extends Error {
-  constructor(readonly row: EventWithRelations | null) {
+  constructor(readonly row: EventWithRelations) {
     super("Event was modified by someone else");
     this.name = "EventConflictError";
   }

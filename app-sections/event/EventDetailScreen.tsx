@@ -183,7 +183,7 @@ export function EventDetailScreen() {
               // ausdrücklich entschieden, ein zweites „bist du sicher?" wäre
               // eine Rückfrage auf eine Antwort, die schon gegeben ist.
               errorAction: (err) => {
-                if (!(err instanceof EventConflictError) || !err.row) return undefined;
+                if (!(err instanceof EventConflictError)) return undefined;
                 const fresh = occurrenceVersion(err.row, data.occurrenceKey);
                 return {
                   label: t("conflict.deleteAnyway"),

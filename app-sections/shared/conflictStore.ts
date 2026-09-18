@@ -48,8 +48,10 @@ export interface ShowConflictOptions {
   body: string;
   /**
    * Leer heißt nicht „kein Dialog" — das entscheidet der Aufrufer, bevor er
-   * hierher kommt. Leer heißt: erkannt, aber die fremde Fassung liegt nicht
-   * vor (der Compare-and-Swap-Fall, siehe `EventConflictError.row === null`).
+   * hierher kommt. Leer heißt: die fremde Fassung liegt vor, aber die
+   * betroffene Occurrence lag außerhalb des Suchfensters, es gibt also nichts
+   * zu vergleichen. Bis ADR-037 hieß leer auch noch „der Compare-and-Swap
+   * kennt die fremde Fassung gar nicht" — dieser Fall existiert nicht mehr.
    */
   rows: ConflictRow[];
   keepMineLabel: string;
