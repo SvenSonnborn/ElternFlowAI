@@ -4,7 +4,10 @@ import { describe, expect, mock, test } from "bun:test";
 
 import type { Database } from "@/features/supabase/database.types";
 
-import { EventConflictError } from "./errors";
+import type { EventWithRelations } from "./expand";
+
+import { EventConflictError, EventNotFoundError } from "./errors";
+import { EVENT_SELECT } from "./queries";
 import {
   applyDeleteScope,
   applyEditScope,
@@ -621,29 +624,50 @@ describe("applyEditScope", () => {
 const SEEN_UPDATED_AT = "2026-05-01T00:00:00.000Z";
 
 /**
- * Doppelgänger des Query-Builders, den `updateMaster` durchläuft
- * (`.from().update().eq().eq().select().maybeSingle()`). Kein `mock.module`:
- * `createSupabaseEventOps` nimmt den Client als Parameter, genau damit ein
- * Test ihn ersetzen kann — gleiches Muster wie `fakeClient` in
+ * Doppelgänger des Query-Builders, den `updateMaster` durchläuft — inzwischen
+ * zwei Ketten statt einer: erst `.from().update().eq().eq().select().maybeSingle()`
+ * (das Compare-and-Swap), im Konfliktfall dann `.from().select().eq().maybeSingle()`
+ * (die Nachlese). Beide hängen an demselben `from()`, unterscheiden sich aber
+ * an der ersten Methode — `update()` gegen `select()` —, und genau daran
+ * trennt der Fake sie.
+ *
+ * `calls.rereadColumns === null` heißt: die Nachlese hat nicht stattgefunden.
+ * Das ist die Zusicherung, die den Preis dieser Änderung festhält — ein
+ * zusätzlicher Roundtrip ausschließlich im Fehlerfall.
+ *
+ * Kein `mock.module`: `createSupabaseEventOps` nimmt den Client als Parameter,
+ * genau damit ein Test ihn ersetzen kann — gleiches Muster wie `fakeClient` in
  * `features/realtime/subscribe.test.ts`.
  */
-function fakeUpdateClient(result: { data: { id: string } | null; error: unknown }) {
+function fakeUpdateClient(
+  result: { data: { id: string } | null; error: unknown },
+  reread: { data: EventWithRelations | null; error: unknown } = { data: null, error: null },
+) {
   const calls = {
     table: "",
     updatePayload: undefined as unknown,
     eqCalls: [] as [string, unknown][],
     selectColumns: "",
+    rereadColumns: null as string | null,
+    rereadEqCalls: [] as [string, unknown][],
   };
-  const builder = {
+  const updateBuilder = {
     eq(column: string, value: unknown) {
       calls.eqCalls.push([column, value]);
-      return builder;
+      return updateBuilder;
     },
     select(columns: string) {
       calls.selectColumns = columns;
-      return builder;
+      return updateBuilder;
     },
     maybeSingle: () => Promise.resolve(result),
+  };
+  const rereadBuilder = {
+    eq(column: string, value: unknown) {
+      calls.rereadEqCalls.push([column, value]);
+      return rereadBuilder;
+    },
+    maybeSingle: () => Promise.resolve(reread),
   };
   const client = {
     from(table: string) {
@@ -651,12 +675,29 @@ function fakeUpdateClient(result: { data: { id: string } | null; error: unknown 
       return {
         update(payload: unknown) {
           calls.updatePayload = payload;
-          return builder;
+          return updateBuilder;
+        },
+        select(columns: string) {
+          calls.rereadColumns = columns;
+          return rereadBuilder;
         },
       };
     },
   };
   return { client: client as unknown as SupabaseClient<Database>, calls };
+}
+
+/**
+ * Die fremde Fassung, wie die Nachlese sie liefert — `EventRow` plus Relationen.
+ * `updated_at` weicht bewusst von `MASTER_UPDATED_AT` ab: Genau das ist der
+ * Zustand, den das Compare-and-Swap erkannt hat.
+ */
+function makeForeignRow(): EventWithRelations {
+  return {
+    ...makeMaster({ title: "Fremd geändert", updated_at: "2026-05-02T09:00:00.000Z" }),
+    event_types: null,
+    event_exceptions: null,
+  };
 }
 
 describe("createSupabaseEventOps", () => {
@@ -674,18 +715,69 @@ describe("createSupabaseEventOps", () => {
     ]);
   });
 
-  test("maybeSingle liefert keine Zeile → EventConflictError, nicht die fremde Fassung", async () => {
-    const { client } = fakeUpdateClient({ data: null, error: null });
+  test("null Zeilen → EventConflictError MIT der fremden Fassung", async () => {
+    const foreign = makeForeignRow();
+    const { client, calls } = fakeUpdateClient(
+      { data: null, error: null },
+      { data: foreign, error: null },
+    );
     const ops = createSupabaseEventOps(client);
 
     const error = await ops
       .updateMaster("evt-1", CHANGES, SEEN_UPDATED_AT)
       .catch((err: unknown) => err);
 
-    // `null` statt der fremden Fassung: Hier ist nur bekannt, *dass* jemand
-    // dazwischengeschrieben hat, nicht *was* — siehe Docstring in errors.ts.
+    // Vorher warf diese Stelle `EventConflictError(null)`: bekannt war nur,
+    // *dass* jemand dazwischengeschrieben hat, nicht *was*. Der Dialog stand
+    // dann ohne Vergleichszeilen und ohne frische Basis-Version da.
     expect(error).toBeInstanceOf(EventConflictError);
-    expect((error as EventConflictError).row).toBeNull();
+    expect((error as EventConflictError).row).toEqual(foreign);
+    // Die Nachlese muss dieselben Spalten holen wie die Queries — sonst ist
+    // die Zeile, die `showConflict` an `expandEvents` weitergibt, unvollständig.
+    expect(calls.rereadColumns).toBe(EVENT_SELECT);
+    expect(calls.rereadEqCalls).toEqual([["id", "evt-1"]]);
+  });
+
+  test("null Zeilen und die Zeile ist weg → EventNotFoundError, kein Konflikt", async () => {
+    const { client } = fakeUpdateClient({ data: null, error: null }, { data: null, error: null });
+    const ops = createSupabaseEventOps(client);
+
+    const error = await ops
+      .updateMaster("evt-1", CHANGES, SEEN_UPDATED_AT)
+      .catch((err: unknown) => err);
+
+    // „Weg" und „geändert" sind verschiedene Meldungen — dieselbe Trennung,
+    // die der Pre-Flight in `mutations.ts` macht.
+    expect(error).toBeInstanceOf(EventNotFoundError);
+  });
+
+  test("Treffer → keine Nachlese", async () => {
+    const { client, calls } = fakeUpdateClient({ data: { id: "evt-1" }, error: null });
+    const ops = createSupabaseEventOps(client);
+
+    await ops.updateMaster("evt-1", CHANGES, SEEN_UPDATED_AT);
+
+    // Der Preis dieser Änderung, festgehalten: ein zusätzlicher Roundtrip
+    // ausschließlich im Fehlerfall. Im Normalfall kostet sie nichts.
+    expect(calls.rereadColumns).toBeNull();
+  });
+
+  test("ein Fehler bei der Nachlese wird durchgereicht, nicht als Konflikt maskiert", async () => {
+    const pgError = { message: "connection reset", code: "08006" };
+    const { client } = fakeUpdateClient(
+      { data: null, error: null },
+      { data: null, error: pgError },
+    );
+    const ops = createSupabaseEventOps(client);
+
+    const error = await ops
+      .updateMaster("evt-1", CHANGES, SEEN_UPDATED_AT)
+      .catch((err: unknown) => err);
+
+    // Ein abgerissenes Netz darf nicht als „jemand anderes war schneller"
+    // erscheinen — der Nutzer bekäme einen Vergleichs-Dialog für ein Problem,
+    // das keiner ist.
+    expect(error).toBe(pgError);
   });
 
   test("maybeSingle liefert eine Zeile → kein Wurf", async () => {

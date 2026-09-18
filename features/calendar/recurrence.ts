@@ -4,7 +4,8 @@ import { addDays, format, parseISO } from "date-fns";
 
 import type { Database } from "@/features/supabase/database.types";
 
-import { EventConflictError } from "./errors";
+import { EventConflictError, EventNotFoundError } from "./errors";
+import { EVENT_SELECT } from "./queries";
 import { allOccurrences } from "./rrule";
 import {
   floatingToInstant,
@@ -403,10 +404,24 @@ export function createSupabaseEventOps(client: SupabaseClient<Database>): EventO
         .select("id")
         .maybeSingle();
       if (error) throw error;
+      if (data) return;
+
       // Null Zeilen heißt: zwischen dem Lesen und diesem Schreiben hat jemand
-      // die Zeile angefasst (oder gelöscht). `null` statt der fremden Fassung —
-      // hier ist bekannt, *dass*, nicht *was*.
-      if (!data) throw new EventConflictError(null);
+      // die Zeile angefasst oder gelöscht. Welches von beidem, sagt erst die
+      // Nachlese — und *was* er geändert hat, braucht der Vergleichs-Dialog,
+      // sonst steht er ohne Zeilen und ohne frische Basis-Version da und
+      // „Deine Fassung speichern" schickt zwangsläufig wieder dieselbe
+      // veraltete `baseVersion`. Derselbe Ablauf wie in `updateTask`
+      // (ADR-031) und `deleteTask` (ADR-036); der zusätzliche Roundtrip fällt
+      // ausschließlich hier im Fehlerfall an.
+      const { data: current, error: readError } = await client
+        .from("events")
+        .select(EVENT_SELECT)
+        .eq("id", eventId)
+        .maybeSingle();
+      if (readError) throw readError;
+      if (!current) throw new EventNotFoundError(eventId);
+      throw new EventConflictError(current);
     },
 
     deleteAllExceptions: async (eventId) => {
