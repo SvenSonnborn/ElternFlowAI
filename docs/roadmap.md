@@ -476,6 +476,20 @@ außerhalb von Task 8 gelassen:
 Der zweite Punkt ist erkennbar der kleinere und sollte zuerst kommen — er verbessert die
 Diagnostizierbarkeit des ersten, während man daran arbeitet.
 
+**Umgesetzt als [ADR-037](./decision-log.md).** `updateMaster` liest bei null getroffenen Zeilen
+jetzt dieselbe Zeile nach, die auch die Queries laden (`EVENT_SELECT`, exportiert statt in
+`recurrence.ts` neu geschrieben) — und wirft `EventConflictError(current)` statt
+`EventConflictError(null)`, oder `EventNotFoundError`, wenn auch die Nachlese leer bleibt. Der
+zusätzliche Roundtrip fällt ausschließlich im Fehlerfall an, festgehalten im Test „Treffer → keine
+Nachlese". Mit `row` jetzt garantiert vorhanden ist `EventConflictError.row` nicht mehr nullable;
+zwei defensive Zweige, die kein Test je erreichen konnte, sind ersatzlos entfallen (der
+`if (row)`-Block und der tote `?? vars.baseVersion`-Rückfall in `EventEditScreen`s `showConflict`,
+die zweite Hälfte der Bedingung in `EventDetailScreen`s Lösch-Konflikt). `theirs` bleibt nullable —
+das heißt jetzt nur noch eines: die Occurrence lag außerhalb des Suchfensters. Beim Verengen zeigte
+sich, dass Compiler und Linter tote Prüf-Zweige nicht von selbst finden (`no-unnecessary-condition`
+ist in diesem Repo aus); als eigener Eintrag in [TODO.md](./TODO.md) festgehalten. Der erste
+Spiegelstrich (die Wiederholungsregel im Vergleich) bleibt offen und kommt mit PR 3.
+
 ### 2.3 Toggle-Fehler ist auf Web unsichtbar
 
 🎨 **„Toggle-Fehler ist auf Web unsichtbar"** · [TaskRow.tsx](<../app-sections/(tabs)/aufgaben/TaskRow.tsx>) — `handleToggle`
