@@ -315,7 +315,7 @@ Eine Zeile erscheint nur, wenn sich ihre beiden Werte **sichtbar** unterscheiden
 
 „Unbegrenzt" nur, wenn auch kein Enddatum gesetzt ist: Eine Serie, die jemand per „ab hier löschen" an einem Datum beendet hat, hat keine Anzahl — sie als „Unbegrenzt" zu beschriften, wäre falsch. Das „—" ist dort ehrlich, aber karg; ein Wert „endet am …" bräuchte einen neuen Key (§5.4).
 
-Der Wochentag für `rruleToRecurrence` wird geprüft wie bei der Hydration: für die fremde Fassung gegen `theirs.startAt` in `theirs.timezone`, für die eigene gegen den Start, mit dem das Formular die Regel gebaut hat (`vars.changes.start_at`), in `vars.timezone`. So hält die Hin-und-Rück-Abbildung, die `createMutation.test.ts` festhält.
+Der Wochentag für `rruleToRecurrence` wird geprüft wie bei der Hydration: für die fremde Fassung gegen `theirs.startAt` in `theirs.timezone`, für die eigene gegen `range.startAt` in `vars.timezone` — den Start, mit dem `buildRecurrenceChanges` die Regel tatsächlich gebaut hat, nicht `vars.changes.start_at`. Bei einem ganztägigen Termin ist Letzteres bereits `toAllDayRange(range).startAt`, auf Mitternacht in der **Gerätezone** geschnappt statt in `vars.timezone`, und hätte den Wochentag falsch verankert. So hält die Hin-und-Rück-Abbildung, die `createMutation.test.ts` festhält.
 
 Die Zeilen baut ein reiner Helfer neben dem Screen, `app-sections/event/recurrenceConflictRows.ts` — Vorbild `submitLock.ts` —, weil `EventEditScreen` selbst unter `bun test` nicht ladbar ist und die Zeilenlogik Zweige hat, die einen Test verdienen. `formatField` bekommt `"recurrence"` nicht: Seine Signatur (`field, source`) passt nicht, weil die Regel nicht in `EventChanges` steckt.
 

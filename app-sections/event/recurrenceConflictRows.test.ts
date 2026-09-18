@@ -105,4 +105,58 @@ describe("recurrenceConflictRows", () => {
       mine: "conflict.mine: cal.recur.weekly",
     });
   });
+
+  test("Option und Anzahl weichen beide ab → beide Zeilen, Options-Zeile zuerst", () => {
+    const rows = recurrenceConflictRows(
+      theirs(),
+      mine({ rrule_freq: "daily", rrule_byweekday: null, rrule_count: 6 }),
+      t,
+    );
+    expect(rows).toEqual([
+      {
+        label: "cal.create.fieldRecurrence",
+        theirs: "conflict.theirs: cal.recur.weekly",
+        mine: "conflict.mine: cal.recur.daily",
+      },
+      {
+        label: "cal.create.fieldRecurrenceCount",
+        theirs: "conflict.theirs: cal.create.recurrenceCountUnlimited",
+        mine: "conflict.mine: 6",
+      },
+    ]);
+  });
+
+  test("A hat auf „Keine“ gestellt, B die Serie auf zehn Termine begrenzt → kein „Unbegrenzt“ für einen Einzeltermin", () => {
+    // Regressionstest zu Befund 2 (Review-Runde 1): Ein Einzeltermin ("Keine")
+    // hat kein Serienende, ist aber auch nicht „unbegrenzt" — das Formular
+    // blendet das Anzahl-Feld für „Keine" ohnehin aus.
+    const rows = recurrenceConflictRows(
+      theirs({ count: 10 }),
+      mine({ rrule_freq: null, rrule_byweekday: null }),
+      t,
+    );
+    expect(rows).toEqual([
+      {
+        label: "cal.create.fieldRecurrence",
+        theirs: "conflict.theirs: cal.recur.weekly",
+        mine: "conflict.mine: cal.recur.none",
+      },
+      {
+        label: "cal.create.fieldRecurrenceCount",
+        theirs: "conflict.theirs: 10",
+        mine: "conflict.mine: —",
+      },
+    ]);
+  });
+
+  test("die eigene Seite ist nicht darstellbar → „—“ auf der eigenen Seite", () => {
+    const rows = recurrenceConflictRows(theirs(), mine({ rrule_interval: 2 }), t);
+    expect(rows).toEqual([
+      {
+        label: "cal.create.fieldRecurrence",
+        theirs: "conflict.theirs: cal.recur.weekly",
+        mine: "conflict.mine: —",
+      },
+    ]);
+  });
 });

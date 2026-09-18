@@ -12,7 +12,13 @@ import { ruleOf } from "@/features/calendar/rule";
 /** Die eigene Seite: die Regel, die geschrieben würde, und wo ihr Wochentag gilt. */
 interface MineSide {
   recurrence: RecurrenceChanges;
-  /** Der Start, mit dem das Formular die Regel gebaut hat (`vars.changes.start_at`). */
+  /**
+   * Der Start, mit dem `buildRecurrenceChanges` die Regel gebaut hat — die
+   * Formular-Range (`range.startAt`), **nicht** `vars.changes.start_at`: Bei
+   * einem ganztägigen Termin ist das bereits `toAllDayRange(range).startAt`,
+   * auf Mitternacht in der Gerätezone geschnappt statt in `timezone`, und
+   * hätte den Wochentag hier falsch verankert.
+   */
   startAt: Date;
   /** Die Zone des Termins (`vars.timezone`) — dort prüft `rruleToRecurrence` den Wochentag. */
   timezone: string;
@@ -32,8 +38,15 @@ function optionText(rule: OccurrenceRrule, startAt: Date, timezone: string, t: T
  * löschen" an einem Datum beendete Serie hat keine Anzahl, ist aber nicht
  * unbegrenzt. Für ein Enddatum gibt es keinen Key — „—" ist dort karg, aber
  * nicht falsch (🎨-Eintrag in `docs/TODO.md`).
+ *
+ * Ohne Regel (`freq === null`, „Keine") gibt es gar kein Serienende zu
+ * benennen — die Regel beschreibt dann einen Einzeltermin, für den das
+ * Formular das Anzahl-Feld ohnehin ausblendet. „Unbegrenzt" wäre hier
+ * inhaltlich falsch, nicht nur karg (Befund 2, Review-Runde 1), deshalb
+ * kommt diese Prüfung vor den anderen beiden.
  */
 function endText(rule: OccurrenceRrule, t: Translate): string {
+  if (rule.freq == null) return "—";
   if (rule.count != null) return String(rule.count);
   if (rule.until != null) return "—";
   return t("cal.create.recurrenceCountUnlimited");

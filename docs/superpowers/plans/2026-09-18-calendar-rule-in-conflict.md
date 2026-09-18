@@ -327,7 +327,7 @@ git commit -m "refactor(calendar): ein Regel-Vergleich in rule.ts, Serienende al
 
 - **Die Anzeige ist entschieden (2026-09-18, Spec §5.3):** zwei Zeilen aus vorhandenen Keys, **keine neuen**. Option: Label `cal.create.fieldRecurrence`, Wert `cal.recur.<option>` oder „—". Serienende: Label `cal.create.fieldRecurrenceCount` („Endet nach … Terminen“ — eine Beschriftung, deshalb als **Label** benutzt, nicht als Wert-Vorlage), Wert = die Zahl, `cal.create.recurrenceCountUnlimited` nur ohne Anzahl **und** ohne Enddatum, sonst „—". Eine Zeile nur, wenn ihre beiden **angezeigten** Texte verschieden sind; ist es keine, trotzdem die Options-Zeile.
 - **Das Hinzufügen von `"recurrence"` zum Union bricht zwei Stellen im Screen beim Kompilieren** — `FIELD_LABEL_KEY: Record<EventConflictField, string>` und den erschöpfenden `switch` in `formatField`. Beide bekommen `Exclude<EventConflictField, "recurrence">`; die Regel-Zeilen baut der Helfer mit eigenen Labels. Das ist gewollt: Detektion und Anzeige müssen in einem Commit landen, sonst ist der Baum dazwischen rot.
-- Der Wochentag für `rruleToRecurrence` wird geprüft wie bei der Hydration (`EventEditScreen`, `initial`): die fremde Fassung gegen `theirs.startAt` in `theirs.timezone`, die eigene gegen `vars.changes.start_at` in `vars.timezone` — die Werte, mit denen das Formular die Regel gebaut hat.
+- Der Wochentag für `rruleToRecurrence` wird geprüft wie bei der Hydration (`EventEditScreen`, `initial`): die fremde Fassung gegen `theirs.startAt` in `theirs.timezone`, die eigene gegen `range.startAt` in `vars.timezone` — den Wert, mit dem `buildRecurrenceChanges` die Regel tatsächlich gebaut hat, **nicht** `vars.changes.start_at`: Bei einem ganztägigen Termin ist Letzteres bereits `toAllDayRange(range).startAt`, auf Mitternacht in der Gerätezone geschnappt statt in `vars.timezone`.
 - `rruleToRecurrence` kommt direkt aus `@/features/calendar/createMutation`, **nicht** aus dem Barrel `@/features/calendar` (der zieht Hooks, die unter `bun test` nicht laden). Gemessen: Der direkte Import lädt neben dem Screen sauber.
 - Vorbild für den Helfer samt Test: `app-sections/event/submitLock.ts` / `submitLock.test.ts`; für `t: Translate`: `features/calendar/undoDeleteMessage.ts`.
 
@@ -742,7 +742,7 @@ const fields =
                   theirs,
                   {
                     recurrence: vars.recurrence,
-                    startAt: new Date(vars.changes.start_at),
+                    startAt,
                     timezone: vars.timezone,
                   },
                   t,
