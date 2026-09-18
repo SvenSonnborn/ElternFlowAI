@@ -397,6 +397,6 @@ Für den Block:
 
 - Das Löschen einer Aufgabe, die jemand anderes im Undo-Fenster geändert hat, zeigt denselben Fehler-Toast mit „Trotzdem löschen" wie der Termin-Pfad.
 - Eine reine Rhythmus-Änderung durch zwei Clients erzeugt einen Dialog statt eines stillen Overwrites — und die Exceptions der Serie überleben, solange niemand „Deine Fassung speichern" wählt.
-- Der Konflikt-Dialog zeigt nie mehr Vergleichszeilen-lose Leere, ohne dass die Occurrence außerhalb des Fensters lag.
+- Der zeilenlose Konflikt-Dialog verschwindet nicht (Occurrence außerhalb des Fensters, noch nicht hydrierte Basis, erschöpftes Auto-Retry-Limit bleiben möglich) — aber er hat jetzt in jedem Fall eine frische Basis-Version, weil `row` nicht mehr fehlen kann.
 - `features/tasks/mutations.ts` hat eine Testsuite; der Zwei-Client-Lauf ist nicht mehr der einzige Beleg für das Task-CAS.
 - Eine Sichtprüfung am Simulator über beide Pfade: Aufgabe löschen (Konflikt und Normalfall), Serienrhythmus gleichzeitig ändern. Web reicht für den Aufgaben-Löschpfad, nicht für den Termin-Pfad (Block 3).

@@ -713,6 +713,10 @@ describe("createSupabaseEventOps", () => {
       ["id", "evt-1"],
       ["updated_at", SEEN_UPDATED_AT],
     ]);
+    // Ohne `.select("id")` liefert PostgREST bei jedem Update `data: null`,
+    // egal ob das CAS getroffen hat — jedes Speichern würde dann als Konflikt
+    // zurückkommen, samt Nachlese und vollem Vergleichs-Dialog.
+    expect(calls.selectColumns).toBe("id");
   });
 
   test("null Zeilen → EventConflictError MIT der fremden Fassung", async () => {
