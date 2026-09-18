@@ -7,6 +7,7 @@ import type { Database } from "@/features/supabase/database.types";
 import { EventConflictError, EventNotFoundError } from "./errors";
 import { EVENT_SELECT } from "./queries";
 import { allOccurrences } from "./rrule";
+import { ruleOf, sameRule } from "./rule";
 import {
   floatingToInstant,
   instantToFloating,
@@ -194,18 +195,14 @@ export async function applyDeleteScope(args: ApplyDeleteScopeArgs): Promise<void
   await ops.deleteMaster(eventId);
 }
 
-/** Whether a rule change actually moves any occurrence, ignoring no-op edits. */
+/**
+ * Ob das Speichern die Regel wirklich ändert — ein unverändert zurückgeschickter
+ * Rhythmus soll die Exceptions der Serie nicht löschen. Der Vergleich selbst
+ * liegt in `rule.ts`: derselbe, mit dem der Konflikt-Dialog eine fremde
+ * Regeländerung erkennt (ADR-038).
+ */
 function ruleDiffers(master: EventRow, next: RecurrenceChanges): boolean {
-  const sameDays =
-    (master.rrule_byweekday ?? []).length === (next.rrule_byweekday ?? []).length &&
-    (master.rrule_byweekday ?? []).every((d) => next.rrule_byweekday?.includes(d));
-  return !(
-    master.rrule_freq === next.rrule_freq &&
-    master.rrule_interval === next.rrule_interval &&
-    sameDays &&
-    master.rrule_count === next.rrule_count &&
-    master.rrule_until === next.rrule_until
-  );
+  return !sameRule(ruleOf(master), ruleOf(next));
 }
 
 /**
