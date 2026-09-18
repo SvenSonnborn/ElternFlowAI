@@ -9,7 +9,7 @@
 
 ## 1. Context
 
-Block 2 bündelt fünf Einträge aus `docs/TODO.md`: **dieselbe Schadensklasse wie Block 1, nur bei Aufgaben** — plus die beiden Löcher, die ADR-031 bewusst außerhalb von Task 8 gelassen hat. Vier davon sind unblockiert, einer (2.3) wartet auf einen Copy-Key.
+Block 2 fasst sechs Einträge aus `docs/TODO.md` an: **dieselbe Schadensklasse wie Block 1, nur bei Aufgaben** — plus die beiden Löcher, die ADR-031 bewusst außerhalb von Task 8 gelassen hat. **Fünf davon werden in dieser Iteration erledigt** (drei unter 2.1, je einer unter 2.2a und 2.2b). Der sechste ist 2.3; er wartet auf einen Copy-Key und wird deshalb nicht hier gezählt, sondern wandert sichtbar zu Block 3 — genau so führt ihn auch [roadmap.md](../../roadmap.md), dessen Block-2-Zeile „5" nennt und den Toggle-Eintrag in Block 3 mitzählt.
 
 Vor dem Entwurf habe ich die tragenden Behauptungen nachgestellt. Zwei Ergebnisse weichen von dem ab, was `TODO.md` und `roadmap.md` notieren, und beide ändern die Arbeit.
 
@@ -80,7 +80,9 @@ Drei PRs, in dieser Reihenfolge:
 
 **Warum PR 2 vor PR 3:** PR 2 ist der kleinere und verbessert die Diagnostizierbarkeit des größeren. Solange der CAS-Fall den Dialog ohne Vergleichszeilen zeigt, ist bei jedem Dialog ohne Zeilen unklar, ob der Vergleich nichts fand oder die fremde Fassung fehlte. Nach PR 2 heißt „keine Zeilen" nur noch eines — und genau das ist der Zustand, den PR 3 beseitigen will.
 
-Die drei PRs teilen keine Datei. PR 1 fasst `features/tasks/` und `TaskEditScreen` an, PR 2 `features/calendar/recurrence.ts` + `errors.ts` + zwei Screens, PR 3 `features/calendar/conflict.ts` + ein neues Modul + `EventEditScreen`. Sie sind in jeder Reihenfolge mergebar; die obige ist die nützlichste.
+Die drei PRs teilen keine **Produktionsdatei**. PR 1 fasst `features/tasks/` und `TaskEditScreen` an, PR 2 `features/calendar/recurrence.ts` + `errors.ts` + zwei Screens, PR 3 `features/calendar/conflict.ts` + ein neues Modul + `EventEditScreen`. Sie sind in jeder Reihenfolge mergebar; die obige ist die nützlichste.
+
+An den **Dokumenten** arbeiten sie dagegen sehr wohl gemeinsam: `docs/TODO.md` fassen alle drei an, `docs/roadmap.md` und `docs/decision-log.md` je zwei (§7). Das ist kein Merge-Risiko im Sinne widersprüchlicher Änderungen — jeder PR löscht oder ergänzt seine eigenen Zeilen —, aber es heißt, dass der zweite und dritte PR nach einem Merge des ersten neu gegen `main` gelesen werden müssen, statt blind gerebast zu werden.
 
 ---
 
