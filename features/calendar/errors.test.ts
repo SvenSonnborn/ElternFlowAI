@@ -1,6 +1,38 @@
 import { describe, expect, spyOn, test } from "bun:test";
 
+import type { EventWithRelations } from "./expand";
+
 import { EventConflictError, EventNotFoundError, mapEventError } from "./errors";
+
+/**
+ * Minimal, aber vollständig: `mapEventError` liest aus dem Fehler nur `name`,
+ * die Zeile ist hier reines Typ-Futter. Ein `as` wäre die kürzere Lüge —
+ * dieser Test soll bemerken, wenn `EventWithRelations` wächst.
+ */
+const ROW: EventWithRelations = {
+  id: "evt-1",
+  family_id: "fam-1",
+  type_id: "type-1",
+  child_id: null,
+  parent_id: null,
+  title: "Termin",
+  description: null,
+  location: null,
+  start_at: "2026-05-04T16:30:00.000Z",
+  end_at: "2026-05-04T17:30:00.000Z",
+  all_day: false,
+  timezone: "Europe/Berlin",
+  rrule_freq: null,
+  rrule_interval: 1,
+  rrule_byweekday: null,
+  rrule_until: null,
+  rrule_count: null,
+  created_by: null,
+  created_at: "2026-04-20T00:00:00.000Z",
+  updated_at: "2026-05-01T00:00:00.000Z",
+  event_types: null,
+  event_exceptions: null,
+};
 
 describe("mapEventError", () => {
   test("EventNotFoundError → cal.error.eventGone", () => {
@@ -16,7 +48,7 @@ describe("mapEventError", () => {
   });
 
   test("EventConflictError → cal.error.conflict", () => {
-    expect(mapEventError(new EventConflictError(null))).toBe("cal.error.conflict");
+    expect(mapEventError(new EventConflictError(ROW))).toBe("cal.error.conflict");
   });
 
   test("auch der Konflikt wird an `name` erkannt, nicht an der Meldung", () => {
