@@ -6,7 +6,18 @@ import type { EventWithRelations } from "./expand";
 
 type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
 
-const SELECT = "*, event_types(*), event_exceptions(*)";
+/**
+ * Die Spalten, die `EventWithRelations` verlangt — beide gehören zusammen:
+ * Fehlt hier eine Relation, ist der Typ eine Lüge, und `expandEvents` liest
+ * `event_exceptions` ins Leere.
+ *
+ * Exportiert (und damit umbenannt — `SELECT` sagt außerhalb dieser Datei
+ * nichts), seit `createSupabaseEventOps.updateMaster` im Konfliktfall
+ * dieselbe Zeile nachliest, die auch die Queries laden. Ein zweiter,
+ * handgeführter Spaltenstring dort wäre genau die Divergenz, die
+ * `EventWithRelations` unbemerkt falsch werden ließe.
+ */
+export const EVENT_SELECT = "*, event_types(*), event_exceptions(*)";
 
 export const calendarKeys = {
   all: ["calendar"] as const,
@@ -32,7 +43,7 @@ export async function fetchEventsInRange(
   const endIso = rangeEnd.toISOString();
   const { data, error } = await supabase
     .from("events")
-    .select(SELECT)
+    .select(EVENT_SELECT)
     .lte("start_at", endIso)
     .or(`rrule_until.is.null,rrule_until.gte.${startIso}`);
   if (error) throw error;
@@ -40,7 +51,11 @@ export async function fetchEventsInRange(
 }
 
 export async function fetchEventById(id: string): Promise<EventWithRelations | null> {
-  const { data, error } = await supabase.from("events").select(SELECT).eq("id", id).maybeSingle();
+  const { data, error } = await supabase
+    .from("events")
+    .select(EVENT_SELECT)
+    .eq("id", id)
+    .maybeSingle();
   if (error) throw error;
   return data ?? null;
 }
