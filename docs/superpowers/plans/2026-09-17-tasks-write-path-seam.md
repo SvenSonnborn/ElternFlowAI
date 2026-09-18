@@ -4,7 +4,7 @@
 
 **Goal:** `features/tasks/mutations.ts` bekommt denselben injizierbaren Schnitt wie der Kalender, das Löschen bekommt ein Compare-and-Swap samt 0-Zeilen-Guard, und der Aufgaben-Schreibpfad ist zum ersten Mal ohne Netz testbar.
 
-**Architecture:** Ein `TaskOps`-Interface kapselt die drei PostgREST-Aufrufe (`fetchRow`/`updateRow`/`deleteRow`); `createSupabaseTaskOps(client)` ist der einzige Ort, der `supabase` kennt. Darüber liegen zwei reine Funktionen `updateTask(vars, deps)` und `deleteTask(vars, deps)`, die aus „null Zeilen getroffen" per Nachlese einen `TaskConflictError` oder — beim Löschen — einen stillen Erfolg machen. Die Hooks werden dünne Hüllen; ihre optimistischen `onMutate`/`onError`/`onSettled`-Zweige bleiben unverändert.
+**Architecture:** Ein `TaskOps`-Interface kapselt die drei PostgREST-Aufrufe (`fetchRow`/`updateRow`/`deleteRow`); `createSupabaseTaskOps(client)` ist der einzige Ort, der `supabase` für diese beiden Pfade kennt — `useCreateTask` und `useToggleTaskDone` bleiben bewusst daneben. Darüber liegen zwei reine Funktionen `updateTask(vars, deps)` und `deleteTask(vars, deps)`, die aus „null Zeilen getroffen" per Nachlese einen `TaskConflictError` oder — beim Löschen — einen stillen Erfolg machen. Die Hooks werden dünne Hüllen; ihre optimistischen `onMutate`/`onError`/`onSettled`-Zweige bleiben unverändert.
 
 **Tech Stack:** TypeScript ~6.0 strict · `@supabase/supabase-js` · `@tanstack/react-query` · Bun-Testrunner (`bun:test`, nicht Jest)
 
@@ -104,7 +104,9 @@ export interface TaskOps {
 }
 
 /**
- * Der einzige Ort in diesem Feature, der den Supabase-Client kennt.
+ * Kapselt die PostgREST-Aufrufe von `updateTask` und `deleteTask` — und zwar
+ * nur deren: `useCreateTask` und `useToggleTaskDone` sprechen weiterhin direkt
+ * mit dem Modul-`supabase` (siehe {@link TaskOps}).
  *
  * `.eq("updated_at", …)` macht aus Update und Delete je ein Compare-and-Swap:
  * Sie treffen die Zeile nur, solange niemand anderes sie seit dem Laden des
@@ -837,7 +839,7 @@ ADR-031 hat den Aufgaben-Pfad mit einem Compare-and-Swap versehen, aber ohne Sch
 
 ### Decisions
 
-1. **`TaskOps` kapselt die drei PostgREST-Aufrufe**, `createSupabaseTaskOps(client)` ist der einzige Ort mit Client-Kenntnis. Gegenstück zu `EventOps`.
+1. **`TaskOps` kapselt die drei PostgREST-Aufrufe** von `updateTask` und `deleteTask`; `createSupabaseTaskOps(client)` ist der einzige Ort, der für diese beiden Pfade den Client kennt. Gegenstück zu `EventOps`. Für die anderen beiden Mutationen gilt das ausdrücklich nicht — siehe Decision 3.
 
 2. **Die Ops melden `true`/`false`, die reine Funktion urteilt.** Anders als `updateMaster` im Kalender wirft keine Op selbst: Das Klassifizieren braucht einen zweiten Aufruf (`fetchRow`), und eine Op, die eine andere ruft, ist keine mehr. Genau diese Verschränkung macht denselben Fix im Kalender teurer.
 

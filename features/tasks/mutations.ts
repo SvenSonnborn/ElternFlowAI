@@ -126,7 +126,9 @@ export interface TaskOps {
 }
 
 /**
- * Der einzige Ort in diesem Feature, der den Supabase-Client kennt.
+ * Kapselt die PostgREST-Aufrufe von `updateTask` und `deleteTask` — und zwar
+ * nur deren: `useCreateTask` und `useToggleTaskDone` sprechen weiterhin direkt
+ * mit dem Modul-`supabase` (siehe {@link TaskOps}).
  *
  * `.eq("updated_at", …)` macht aus Update und Delete je ein Compare-and-Swap:
  * Sie treffen die Zeile nur, solange niemand anderes sie seit dem Laden des

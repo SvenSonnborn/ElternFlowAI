@@ -1367,7 +1367,7 @@ ADR-031 hat den Aufgaben-Pfad mit einem Compare-and-Swap versehen, aber ohne Sch
 
 ### Decisions
 
-1. **`TaskOps` kapselt die drei PostgREST-Aufrufe**, `createSupabaseTaskOps(client)` ist der einzige Ort mit Client-Kenntnis. Gegenstück zu `EventOps`.
+1. **`TaskOps` kapselt die drei PostgREST-Aufrufe** von `updateTask` und `deleteTask`; `createSupabaseTaskOps(client)` ist der einzige Ort, der für diese beiden Pfade den Client kennt. Gegenstück zu `EventOps`. Für die anderen beiden Mutationen gilt das ausdrücklich nicht — siehe Decision 3.
 2. **Die Ops melden `true`/`false`, die reine Funktion urteilt.** Anders als `updateMaster` im Kalender wirft keine Op selbst: Das Klassifizieren braucht einen zweiten Aufruf (`fetchRow`), und eine Op, die eine andere ruft, ist keine mehr. Genau diese Verschränkung macht denselben Fix im Kalender teurer.
 3. **Nur `update` und `delete` laufen über den Schnitt.** `useCreateTask` und `useToggleTaskDone` haben kein CAS und werden ohne Anlass nicht umgebaut; die Datei trägt dafür zwei Idiome.
 4. **Das Löschen bekommt `baseVersion` und damit dasselbe CAS wie das Speichern** — plus `.select("id").maybeSingle()`, ohne das PostgREST null getroffene Zeilen als Erfolg meldet. Der 0-Zeilen-Guard und der Konflikt-Detektor sind dieselbe Zeile.
