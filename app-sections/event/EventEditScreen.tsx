@@ -41,13 +41,18 @@ import {
   type RecurrenceOption,
 } from "@/features/calendar";
 
+import { recurrenceConflictRows } from "./recurrenceConflictRows";
 import { RecurrenceCountField } from "./RecurrenceCountField";
 import { RecurrenceRadio } from "./RecurrenceRadio";
 import { pickScope } from "./scopeDialog";
 import { createSubmitLock } from "./submitLock";
 
-/** Welcher Copy-Key welches Feld benennt — die Beschriftungen des Formulars. */
-const FIELD_LABEL_KEY: Record<EventConflictField, string> = {
+/**
+ * Welcher Copy-Key welches Feld benennt — die Beschriftungen des Formulars.
+ * Ohne `recurrence`: Die Regel bekommt bis zu zwei Zeilen mit eigenen
+ * Beschriftungen, die `recurrenceConflictRows` baut (ADR-038).
+ */
+const FIELD_LABEL_KEY: Record<Exclude<EventConflictField, "recurrence">, string> = {
   title: "cal.edit.fieldTitle",
   start_at: "cal.edit.fieldStart",
   end_at: "cal.edit.fieldEnd",
@@ -255,7 +260,7 @@ export function EventEditScreen() {
    * die Zeiten kommt hier schon aufgelöst als `Date` an).
    */
   function formatField(
-    field: EventConflictField,
+    field: Exclude<EventConflictField, "recurrence">,
     source: {
       title: string;
       startAt: Date;
@@ -376,7 +381,9 @@ export function EventEditScreen() {
       // Überlegung, die auch `theirs === null` (Occurrence außerhalb
       // des Suchfensters) in den Dialog statt ins Durchspeichern schickt.
       const fields =
-        theirs && baseOccurrence ? differingEventFields(theirs, vars.changes, baseOccurrence) : [];
+        theirs && baseOccurrence
+          ? differingEventFields(theirs, vars.changes, baseOccurrence, vars.recurrence)
+          : [];
       // Der Zähler begrenzt **nur** diese stille Wiederholung, nicht den Tap
       // auf „Deine Fassung speichern": Ohne ihn liefe `speichern → Konflikt →
       // kein Feld weicht ab → speichern` beliebig oft, solange ein zweiter
@@ -405,11 +412,30 @@ export function EventEditScreen() {
         rows:
           theirs === null
             ? []
-            : fields.map((field) => ({
-                label: t(FIELD_LABEL_KEY[field]),
-                theirs: `${t("conflict.theirs")}: ${formatField(field, theirs)}`,
-                mine: `${t("conflict.mine")}: ${formatField(field, mineSource)}`,
-              })),
+            : fields.flatMap((field) => {
+                if (field !== "recurrence") {
+                  return [
+                    {
+                      label: t(FIELD_LABEL_KEY[field]),
+                      theirs: `${t("conflict.theirs")}: ${formatField(field, theirs)}`,
+                      mine: `${t("conflict.mine")}: ${formatField(field, mineSource)}`,
+                    },
+                  ];
+                }
+                // `differingEventFields` meldet die Regel nur, wenn dieser
+                // Schreibvorgang eine mitführt — der leere Zweig ist für den
+                // Compiler da, nicht für einen Laufzeitfall.
+                if (!vars.recurrence) return [];
+                return recurrenceConflictRows(
+                  theirs,
+                  {
+                    recurrence: vars.recurrence,
+                    startAt: new Date(vars.changes.start_at),
+                    timezone: vars.timezone,
+                  },
+                  t,
+                );
+              }),
         keepMineLabel: t("conflict.keepMine"),
         keepTheirsLabel: t("conflict.keepTheirs"),
         onKeepMine: () => {

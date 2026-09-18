@@ -1,8 +1,15 @@
-import type { EventChanges } from "./recurrence";
+import type { EventChanges, RecurrenceChanges } from "./recurrence";
 import type { CalendarOccurrence } from "./types";
 
-/** Die fünf Felder, die das Bearbeiten-Formular schreibt (`EventChanges`). */
-export type EventConflictField = "title" | "start_at" | "end_at" | "location" | "description";
+import { ruleOf, sameRule } from "./rule";
+
+/**
+ * Was das Bearbeiten-Formular schreibt und ein Konflikt sein kann: die fünf
+ * Felder aus `EventChanges` — und seit ADR-038 die Regel, die nicht in
+ * `EventChanges` steckt, sondern daneben in `RecurrenceChanges`.
+ */
+export type EventConflictField =
+  "title" | "start_at" | "end_at" | "location" | "description" | "recurrence";
 
 /** `""` und `null` heißen beide „nicht gesetzt" — das Formular schickt `trim() || null`. */
 function sameText(a: string | null, b: string | null): boolean {
@@ -47,11 +54,21 @@ function sameInstant(a: Date, b: string): boolean {
  * Eine leere Liste heißt weiterhin: kein Dialog, der Schreibvorgang läuft
  * durch. Sie ist jetzt nur wieder das, was sie sein sollte — der Normalfall,
  * wenn niemand ins Gehege kommt (ADR-031).
+ *
+ * `mineRecurrence` ist die Regel, die dieser Schreibvorgang mitführt
+ * (`vars.recurrence`). Fehlt sie, stehen die `rrule_*`-Spalten gar nicht im
+ * UPDATE (`updateMaster` schreibt sie nur mit, wenn sie da ist) — eine fremde
+ * Regeländerung kann dann nicht überschrieben werden, dieselbe Begründung, mit
+ * der `differingTaskFields` seine `undefined`-Felder überspringt. Bis ADR-038
+ * floss die Regel gar nicht ein: Änderten zwei Eltern denselben Termin nur am
+ * Rhythmus, war die Liste leer, der Screen speicherte still durch, und
+ * `applyEditScope` löschte dabei vorher alle Exceptions der Serie.
  */
 export function differingEventFields(
   theirs: CalendarOccurrence,
   mine: EventChanges,
   base: CalendarOccurrence,
+  mineRecurrence?: RecurrenceChanges | null,
 ): EventConflictField[] {
   const out: EventConflictField[] = [];
   if (!sameText(theirs.title, base.title) && !sameText(theirs.title, mine.title)) {
@@ -74,6 +91,13 @@ export function differingEventFields(
     !sameText(theirs.description, mine.description)
   ) {
     out.push("description");
+  }
+  if (
+    mineRecurrence != null &&
+    !sameRule(theirs.rrule, base.rrule) &&
+    !sameRule(theirs.rrule, ruleOf(mineRecurrence))
+  ) {
+    out.push("recurrence");
   }
   return out;
 }
