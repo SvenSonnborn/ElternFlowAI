@@ -1380,3 +1380,27 @@ ADR-031 hat den Aufgaben-Pfad mit einem Compare-and-Swap versehen, aber ohne Sch
 
 - `features/tasks/mutations.ts` hat eine Testsuite; der Zwei-Client-Lauf ist nicht mehr der einzige Beleg für das Task-CAS. Der Adapter selbst wird mitgeprüft — ohne diese Fälle blieben alle Aufgaben-Tests grün, würde jemand `.eq("updated_at", …)` oder `.select("id")` entfernen.
 - Offen bleibt eine Mehrdeutigkeit: Eine RLS-Ablehnung **ohne** Abmeldung liefert dasselbe Bild wie „schon gelöscht" — null Zeilen, leere Nachlese — und nimmt denselben stillen Weg. Sie zu trennen bräuchte eine serverseitige Auskunft und damit eine Migration; als Eintrag in [docs/TODO.md](./TODO.md) bis Block 7 vertagt.
+
+## ADR-037 — Der Compare-and-Swap-Fall trägt seine Zeile: `updateMaster` liest nach, `EventConflictError.row` wird nicht-nullable (2026-09-18)
+
+### Status
+
+Accepted. Ergänzt [ADR-031](#adr-031--conflict-detection-updated_at-beleben-dreiwertig-vergleichen-ein-dialog-im-root-layout-2026-09-04) und [ADR-036](#adr-036--der-aufgaben-schreibpfad-bekommt-den-schnitt-des-kalenders-2026-09-17). Löst nichts ab. Setzt den zweiten Spiegelstrich von [Roadmap 2.2](./roadmap.md#22-die-zwei-löcher-in-der-conflict-detection--m) um — der erste, die fehlende Wiederholungsregel im Vergleich, bleibt offen und ist für ADR-038 (PR 3) vorgesehen. Zweiter von drei ADRs aus Block 2 der Roadmap (036 Aufgaben-Schreibpfad → 037 dieser → 038 die Regel im Vergleich). Spec: [2026-09-17-tasks-delete-path-conflict-gaps-design.md](./superpowers/specs/2026-09-17-tasks-delete-path-conflict-gaps-design.md) §4 („PR 2 — Der CAS-Fall trägt seine Zeile").
+
+### Context
+
+`updateMaster`s Compare-and-Swap wusste, _dass_ jemand dazwischengeschrieben hatte, nicht _was_: Traf das `UPDATE` null Zeilen, warf es `EventConflictError(null)`. Der Vergleichs-Dialog in `EventEditScreen` stand dann ohne Vergleichszeilen **und** ohne frische Basis-Version da — „Deine Fassung speichern" schickte zwangsläufig dieselbe veraltete `baseVersion` erneut und scheiterte wieder, bis der nächste Refetch durchgelaufen war. Ein seltener Fall (er verlangt einen fremden Schreibvorgang exakt zwischen dem Pre-Flight-Fetch in `updateEvent` und dem CAS in `updateMaster`), aber ein sackgassenartiger: Ohne einen manuellen Neuaufruf des Screens blieb der Nutzer im selben Fehler gefangen.
+
+### Decisions
+
+1. **Nachlese bei null getroffenen Zeilen** — dieselbe, die `updateTask` seit [ADR-031](#adr-031--conflict-detection-updated_at-beleben-dreiwertig-vergleichen-ein-dialog-im-root-layout-2026-09-04) und `deleteTask` seit [ADR-036](#adr-036--der-aufgaben-schreibpfad-bekommt-den-schnitt-des-kalenders-2026-09-17) schon machen. Der Kalender erbt sie von den Aufgaben; die Gegenrichtung — der injizierbare Deps-Schnitt — war PR 1.
+2. **Der zusätzliche Roundtrip fällt ausschließlich im Fehlerfall an**, festgehalten im Test „Treffer → keine Nachlese": Trifft das CAS eine Zeile, liest `updateMaster` nichts nach.
+3. **Eine leere Nachlese heißt `EventNotFoundError`, nicht `EventConflictError`.** „Weg" und „geändert" sind verschiedene Meldungen — dieselbe Trennung, die der Pre-Flight in `mutations.ts` bereits macht.
+4. **`EVENT_SELECT` wird exportiert statt in `recurrence.ts` neu geschrieben.** Ein zweiter, handgeführter Spaltenstring hätte `EventWithRelations` unbemerkt falsch werden lassen können. Vorlage: `TASK_SELECT` aus ADR-036.
+5. **`EventConflictError.row` wird nicht-nullable.** Der Compiler beweist jetzt, was der TODO-Eintrag aus ADR-031 gefordert hatte; zwei defensive Zweige, die kein Test je erreichen konnte, entfallen ersatzlos — der `if (row)`-Block und der tote `?? vars.baseVersion`-Rückfall in `showConflict` (`EventEditScreen`), sowie die `!err.row`-Hälfte von `if (!(err instanceof EventConflictError) || !err.row)` in `EventDetailScreen`.
+6. **`theirs` bleibt nullable.** Occurrence außerhalb des Suchfensters ist ein anderer Zustand als „Fassung unbekannt" — vorher lagen beide unter demselben `null`, jetzt ist nur noch einer davon möglich, und der ist behandelbar: `row` ist da, die frische Version also berechenbar.
+
+### Consequences
+
+- Der Vergleichs-Dialog zeigt nie mehr Vergleichszeilen-lose Leere, ohne dass die Occurrence außerhalb des Suchfensters lag.
+- Zwei Grenzen bleiben benannt: (a) „Fünf Schreib-Ops laufen ohne bedingte Versionsprüfung" ([docs/TODO.md](./TODO.md)) — `deleteMaster`, `modifyOccurrence`, `cancelOccurrence`, `setRruleCount` und `setRruleUntil` schreiben weiterhin unbedingt, das ist Block 7. (b) Die Verengung hat ihre eigenen toten Zweige nicht selbst aufgezeigt — `no-unnecessary-condition` ist im Repo aus (`eslint.config.js` lädt nur `recommendedTypeChecked`, die Regel steckt erst in `strictTypeChecked`), `tsc` meldete nur die Stellen, die `null` übergeben, nicht die, die auf `null` prüfen; die drei betroffenen Stellen mussten von Hand gefunden werden. Als Eintrag in [docs/TODO.md](./TODO.md) festgehalten.
