@@ -27,8 +27,8 @@ import { create } from "zustand";
  * Mal ein voller Roundtrip, ohne dass der Nutzer je etwas sieht.
  *
  * Nach dem Limit erscheint der Dialog — dann zwar ohne Vergleichszeilen, aber
- * sichtbar. Dieselbe Überlegung wie beim Compare-and-Swap ohne fremde Fassung:
- * lieber ein Dialog, der wenig sagt, als stilles Weiterlaufen.
+ * sichtbar. Dieselbe Überlegung wie in jedem anderen zeilenlosen Fall: lieber
+ * ein Dialog, der wenig sagt, als stilles Weiterlaufen.
  *
  * Gilt **nur** für die stille Wiederholung. Ein Tap auf „Deine Fassung
  * speichern" ist eine bewusste Entscheidung und setzt den Zähler zurück.
@@ -48,10 +48,14 @@ export interface ShowConflictOptions {
   body: string;
   /**
    * Leer heißt nicht „kein Dialog" — das entscheidet der Aufrufer, bevor er
-   * hierher kommt. Leer heißt: die fremde Fassung liegt vor, aber die
-   * betroffene Occurrence lag außerhalb des Suchfensters, es gibt also nichts
-   * zu vergleichen. Bis ADR-037 hieß leer auch noch „der Compare-and-Swap
-   * kennt die fremde Fassung gar nicht" — dieser Fall existiert nicht mehr.
+   * hierher kommt. Ein geteilter Typ für zwei Aufrufer (Kalender und
+   * Aufgaben — Letzterer kennt gar kein Suchfenster), darum bleiben mehrere
+   * Gründe offen: die fremde Fassung lag außerhalb des Suchfensters (nur
+   * Kalender, `theirs === null`), die eigene Basis war beim Eintreffen des
+   * Konflikts noch nicht hydriert (`baseOccurrence`/`baseTask === null`),
+   * oder das Auto-Retry-Limit ist erschöpft, ohne dass ein Feld abweicht. Bis
+   * ADR-037 gehörte hierher auch noch „der Compare-and-Swap kennt die fremde
+   * Fassung gar nicht" — dieser Fall existiert nicht mehr.
    */
   rows: ConflictRow[];
   keepMineLabel: string;

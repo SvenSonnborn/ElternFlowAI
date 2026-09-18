@@ -26,9 +26,9 @@ interface ConflictDialogProps {
  * Formular mehr, in das ein Abbruch zurückführen könnte. Der Scrim-Tap wirkt
  * wie „behalten": nichts tun heißt hier, dass die fremde Fassung gilt.
  *
- * `rows` darf leer sein (Compare-and-Swap ohne fremde Fassung). Dann steht der
- * Text allein — stilles Durchwinken wäre der Fehler, gegen den der Dialog
- * gebaut ist.
+ * `rows` darf leer sein (siehe `ShowConflictOptions.rows` in `conflictStore.ts`
+ * für die möglichen Gründe). Dann steht der Text allein — stilles
+ * Durchwinken wäre der Fehler, gegen den der Dialog gebaut ist.
  */
 export function ConflictDialog({ entry, onKeepMine, onKeepTheirs }: ConflictDialogProps) {
   const { theme } = useTheme();
