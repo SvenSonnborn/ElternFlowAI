@@ -528,6 +528,55 @@ describe("applyEditScope", () => {
     expect(ops.deleteAllExceptions).not.toHaveBeenCalled();
   });
 
+  test("dasselbe Serienende in anderer Schreibweise ist keine Regeländerung", async () => {
+    // Konstruiert: Heute bringt kein Pfad beide Schreibweisen hierher — das
+    // Formular reicht `until` als Server-String durch (ADR-038). Der Test hält
+    // fest, dass `ruleDiffers` davon nicht mehr abhängt: PostgREST liefert
+    // `…+00:00`, `toISOString()` schreibt `…Z`, gemeint ist derselbe Zeitpunkt.
+    const ops = makeOps();
+    const sameEnd: RecurrenceChanges = {
+      rrule_freq: "weekly",
+      rrule_interval: 1,
+      rrule_byweekday: [1],
+      rrule_count: null,
+      rrule_until: "2026-09-27T21:59:59.999Z",
+    };
+    await applyEditScope({
+      ops,
+      scope: "all",
+      eventId: "evt-1",
+      occurrenceKey: "2026-06-15",
+      isRecurring: true,
+      master: makeMaster({ rrule_until: "2026-09-27T21:59:59.999+00:00" }),
+      changes: CHANGES,
+      recurrence: sameEnd,
+    });
+    expect(ops.deleteAllExceptions).not.toHaveBeenCalled();
+  });
+
+  test("ein anderes Serienende bleibt eine Regeländerung", async () => {
+    // Gegenprobe: Der Zeitvergleich darf nicht großzügiger werden als nötig.
+    const ops = makeOps();
+    const laterEnd: RecurrenceChanges = {
+      rrule_freq: "weekly",
+      rrule_interval: 1,
+      rrule_byweekday: [1],
+      rrule_count: null,
+      rrule_until: "2026-10-04T21:59:59.999Z",
+    };
+    await applyEditScope({
+      ops,
+      scope: "all",
+      eventId: "evt-1",
+      occurrenceKey: "2026-06-15",
+      isRecurring: true,
+      master: makeMaster({ rrule_until: "2026-09-27T21:59:59.999+00:00" }),
+      changes: CHANGES,
+      recurrence: laterEnd,
+    });
+    expect(ops.deleteAllExceptions).toHaveBeenCalledWith("evt-1");
+  });
+
   test("a changed count alone counts as a rule change", async () => {
     const ops = makeOps();
     const bounded: RecurrenceChanges = {
