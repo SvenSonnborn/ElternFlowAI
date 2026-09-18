@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import type { EventChanges } from "./recurrence";
-import type { CalendarOccurrence } from "./types";
+import type { EventChanges, RecurrenceChanges } from "./recurrence";
+import type { CalendarOccurrence, OccurrenceRrule } from "./types";
 
 import { differingEventFields } from "./conflict";
 
@@ -149,5 +149,72 @@ describe("differingEventFields — Drei-Wege", () => {
     // Dasselbe für end_at.
     const fremd = theirs({ endAt: new Date("2026-06-15T19:00:00.000Z") });
     expect(differingEventFields(fremd, mine(), theirs())).toEqual(["end_at"]);
+  });
+});
+
+describe("differingEventFields — die Regel", () => {
+  const WEEKLY: OccurrenceRrule = {
+    freq: "weekly",
+    interval: 1,
+    byweekday: [1],
+    count: null,
+    until: null,
+  };
+  const base = () => theirs({ isRecurring: true, rrule: WEEKLY });
+  // Die fremde Fassung: B hat die Serie auf zehn Termine begrenzt.
+  const fremd = (overrides: Partial<CalendarOccurrence> = {}) =>
+    theirs({ isRecurring: true, rrule: { ...WEEKLY, count: 10 }, ...overrides });
+  const rule = (overrides: Partial<RecurrenceChanges> = {}): RecurrenceChanges => ({
+    rrule_freq: "weekly",
+    rrule_interval: 1,
+    rrule_byweekday: [1],
+    rrule_count: null,
+    rrule_until: null,
+    ...overrides,
+  });
+
+  test("beide ändern die Regel verschieden → Konflikt", () => {
+    expect(differingEventFields(fremd(), mine(), base(), rule({ rrule_count: 6 }))).toEqual([
+      "recurrence",
+    ]);
+  });
+
+  test("ich ändere Titel und Regel, die andere Seite nur die Regel → nur die Regel", () => {
+    // Das Szenario, in dem der Drei-Wege-Vergleich (ADR-031) die Lücke schärfer
+    // gemacht hatte: Meine Titeländerung ist keine fremde, die Liste war leer.
+    expect(
+      differingEventFields(
+        fremd(),
+        mine({ title: "Kieferorthopäde" }),
+        base(),
+        rule({ rrule_freq: "daily", rrule_byweekday: null }),
+      ),
+    ).toEqual(["recurrence"]);
+  });
+
+  test("GRENZWÄCHTER: ich fasse die Regel nicht an → kein Konflikt, auch wenn sie fremd geändert wurde", () => {
+    // Ohne Regel im Schreibvorgang stehen die `rrule_*`-Spalten nicht im
+    // UPDATE — es gibt nichts zu überschreiben.
+    expect(differingEventFields(fremd(), mine(), base(), null)).toEqual([]);
+    expect(differingEventFields(fremd(), mine(), base())).toEqual([]);
+  });
+
+  test("GRENZWÄCHTER: beide ändern die Regel gleich → kein Konflikt", () => {
+    expect(differingEventFields(fremd(), mine(), base(), rule({ rrule_count: 10 }))).toEqual([]);
+  });
+
+  test("nur ich ändere die Regel → meine eigene Bearbeitung, kein Konflikt", () => {
+    expect(differingEventFields(base(), mine(), base(), rule({ rrule_count: 6 }))).toEqual([]);
+  });
+
+  test("die Regel steht in der Liste hinter den fünf Feldern", () => {
+    expect(
+      differingEventFields(
+        fremd({ title: "Fremd" }),
+        mine({ title: "Meins" }),
+        base(),
+        rule({ rrule_count: 6 }),
+      ),
+    ).toEqual(["title", "recurrence"]);
   });
 });
