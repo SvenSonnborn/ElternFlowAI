@@ -430,7 +430,15 @@ export function EventEditScreen() {
                   theirs,
                   {
                     recurrence: vars.recurrence,
-                    startAt: new Date(vars.changes.start_at),
+                    // `startAt` aus der Formular-Range (Zeile ~112), nicht
+                    // `vars.changes.start_at`: `buildRecurrenceChanges` hat die
+                    // Regel mit genau diesem Wert gebaut. Bei einem ganztägigen
+                    // Termin ist `vars.changes.start_at` bereits
+                    // `toAllDayRange(range).startAt` — auf Mitternacht in der
+                    // **Gerätezone** geschnappt, nicht in `vars.timezone` — und
+                    // hätte den Wochentag hier falsch verankert (Befund 1,
+                    // Review-Runde 1).
+                    startAt,
                     timezone: vars.timezone,
                   },
                   t,
