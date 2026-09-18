@@ -350,7 +350,7 @@ Neu in `conflict.test.ts` — die drei gemessenen Szenarien aus §1.1, jetzt mit
 
 - **`docs/TODO.md`**: fünf Einträge gelöscht (drei in PR 1, je einer in PR 2 und PR 3), drei neue angelegt (§6). Je im selben Commit.
 - **`docs/roadmap.md`**: Block 2 abgehakt, 2.1–2.2 mit dem Ergebnis versehen; 2.3 bleibt offen und wandert sichtbar zu Block 3.
-- **`docs/decision-log.md`**: ADR-036 und ADR-037 angehängt.
+- **`docs/decision-log.md`**: ADR-036, ADR-037 und ADR-038 angehängt.
 - **`CLAUDE.md`**: Der Absatz zu Conflict-Detection nennt heute nur den Kalender („der Kalender prüft die Version im Pre-Flight …, Aufgaben genau umgekehrt"). Nach PR 1 stimmt das nicht mehr — Aufgaben haben dann beim Löschen dasselbe CAS. Der Satz wird nachgezogen. Dazu in der Ordnerübersicht: `features/tasks/` um den `TaskOps`-Schnitt, `features/calendar/` um `rule.ts`.
 - **`docs/architecture.md`**: der Schreibpfad-Abschnitt, falls er den Aufgaben-Pfad beschreibt.
 
