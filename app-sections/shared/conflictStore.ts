@@ -50,10 +50,12 @@ export interface ShowConflictOptions {
    * Leer heißt nicht „kein Dialog" — das entscheidet der Aufrufer, bevor er
    * hierher kommt. Ein geteilter Typ für zwei Aufrufer (Kalender und
    * Aufgaben — Letzterer kennt gar kein Suchfenster), darum bleiben mehrere
-   * Gründe offen: die fremde Fassung lag außerhalb des Suchfensters (nur
-   * Kalender, `theirs === null`), die eigene Basis war beim Eintreffen des
-   * Konflikts noch nicht hydriert (`baseOccurrence`/`baseTask === null`),
-   * oder das Auto-Retry-Limit ist erschöpft, ohne dass ein Feld abweicht. Bis
+   * Gründe offen: die Occurrence fehlt in der fremden Fassung (nur Kalender,
+   * `theirs === null`) — sie lag außerhalb des Suchfensters oder hinter einem
+   * fremden Schnitt, den die gekürzte Regel nicht mehr erzeugt —, die eigene
+   * Basis war beim Eintreffen des Konflikts noch nicht hydriert
+   * (`baseOccurrence`/`baseTask === null`), oder das Auto-Retry-Limit ist
+   * erschöpft, ohne dass ein Feld abweicht. Bis
    * ADR-037 gehörte hierher auch noch „der Compare-and-Swap kennt die fremde
    * Fassung gar nicht" — dieser Fall existiert nicht mehr.
    */

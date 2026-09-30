@@ -378,8 +378,9 @@ export function EventEditScreen() {
       // fehlende Basis nicht denselben Weg nimmt wie ein echtes „niemand hat
       // etwas geändert". Ohne Basis lässt sich das gar nicht feststellen, also
       // muss der Dialog erscheinen — ohne Zeilen, aber sichtbar. Genau die
-      // Überlegung, die auch `theirs === null` (Occurrence außerhalb
-      // des Suchfensters) in den Dialog statt ins Durchspeichern schickt.
+      // Überlegung, die auch `theirs === null` (Occurrence außerhalb des
+      // Suchfensters oder hinter einem fremden Schnitt) in den Dialog statt
+      // ins Durchspeichern schickt.
       const fields =
         theirs && baseOccurrence
           ? differingEventFields(theirs, vars.changes, baseOccurrence, vars.recurrence)
@@ -449,11 +450,13 @@ export function EventEditScreen() {
         onKeepMine: () => {
           save({
             ...vars,
-            // `theirs` fehlt nur noch aus einem Grund: die fremde Fassung lag
-            // außerhalb des Suchfensters. `row` ist seit ADR-037 immer da, die
-            // frische Version also immer berechenbar — ohne erneut zu
-            // expandieren. Der tote Rückfall auf `vars.baseVersion`, der diesen
-            // Versuch zwangsläufig erneut kollidieren ließ, ist damit weg.
+            // `theirs` fehlt, wenn die Occurrence außerhalb des Suchfensters lag
+            // oder hinter einem fremden Schnitt („ab hier löschen"), den die
+            // gekürzte Regel nicht mehr erzeugt. In beiden Fällen ist `row` seit
+            // ADR-037 da, die frische Version also immer berechenbar — ohne
+            // erneut zu expandieren. Der tote Rückfall auf `vars.baseVersion`,
+            // der diesen Versuch zwangsläufig erneut kollidieren ließ, ist damit
+            // weg.
             baseVersion: theirs?.version ?? occurrenceVersion(row, vars.occurrenceKey),
           });
         },

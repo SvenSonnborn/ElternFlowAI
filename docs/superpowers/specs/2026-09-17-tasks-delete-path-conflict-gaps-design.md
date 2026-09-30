@@ -306,14 +306,14 @@ Damit ist die Feldliste im gemessenen Szenario nicht mehr leer, der Auto-Retry e
 
 **Zwei Zeilen, keine neuen Keys** (entschieden 2026-09-18, §5.0 Punkt 2). Je Bedienelement des Formulars eine Zeile — der Nutzer hat einen Radio-Button und ein Anzahl-Feld angefasst:
 
-| Zeile      | Label (vorhanden)                                           | Wert                                                                                                                                                   |
-| ---------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Option     | `cal.create.fieldRecurrence` („Wiederholung")               | `cal.recur.<option>` aus `rruleToRecurrence(…)`; „—", wenn die Regel keiner der fünf Optionen entspricht                                               |
-| Serienende | `cal.create.fieldRecurrenceCount` („Endet nach … Terminen") | die Zahl; `cal.create.recurrenceCountUnlimited` („Unbegrenzt"), wenn weder Anzahl noch Enddatum gesetzt sind; „—", wenn die Serie an einem Datum endet |
+| Zeile      | Label (vorhanden)                                           | Wert                                                                                                                                                                                                                                                                                          |
+| ---------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Option     | `cal.create.fieldRecurrence` („Wiederholung")               | `cal.recur.<option>` aus `rruleToRecurrence(…)`; „—", wenn die Regel keiner der fünf Optionen entspricht                                                                                                                                                                                      |
+| Serienende | `cal.create.fieldRecurrenceCount` („Endet nach … Terminen") | „—", wenn die Regel „Keine" ist (kein `freq` — ein Einzeltermin hat kein Serienende; diese Prüfung kommt **vor** allen anderen); sonst die Zahl; `cal.create.recurrenceCountUnlimited` („Unbegrenzt"), wenn weder Anzahl noch Enddatum gesetzt sind; „—", wenn die Serie an einem Datum endet |
 
-Eine Zeile erscheint nur, wenn sich ihre beiden Werte **sichtbar** unterscheiden — verglichen wird der angezeigte Text, nicht die Regel. Zeigt keine der beiden einen Unterschied, obwohl `differingEventFields` einen gemeldet hat (er liegt dann in einem Teil der Regel, den das Formular nicht darstellt: Intervall, Wochentage, zwei verschiedene Enddaten), erscheint die Options-Zeile trotzdem. Ein erkannter Konflikt ohne Zeile wäre ein Dialog, der etwas meldet und nichts zeigt.
+Eine Zeile erscheint nur, wenn sich ihre beiden Werte **sichtbar** unterscheiden — verglichen wird der angezeigte Text, nicht die Regel. Zeigt keine der beiden einen Unterschied, obwohl `differingEventFields` einen gemeldet hat (er liegt dann in einem Teil der Regel, den das Formular nicht darstellt: Intervall, Wochentage, zwei verschiedene Enddaten), erscheint die Options-Zeile trotzdem. Ein erkannter Konflikt ohne Zeile wäre ein Dialog, der etwas meldet und nichts zeigt. Erscheinen beide Zeilen, steht die Options-Zeile zuerst.
 
-„Unbegrenzt" nur, wenn auch kein Enddatum gesetzt ist: Eine Serie, die jemand per „ab hier löschen" an einem Datum beendet hat, hat keine Anzahl — sie als „Unbegrenzt" zu beschriften, wäre falsch. Das „—" ist dort ehrlich, aber karg; ein Wert „endet am …" bräuchte einen neuen Key (§5.4).
+„Unbegrenzt" nur, wenn auch kein Enddatum gesetzt ist: Eine Serie, die jemand per „ab hier löschen" an einem Datum beendet hat, hat keine Anzahl — sie als „Unbegrenzt" zu beschriften, wäre falsch. Das „—" ist dort ehrlich, aber karg; ein Wert „endet am …" bräuchte einen neuen Key (§5.4). Dasselbe gilt für „Keine": Ohne Regel gibt es kein Serienende, das Formular blendet das Anzahl-Feld dafür ohnehin aus, und „Unbegrenzt" wäre inhaltlich falsch, nicht nur karg. Die Prüfung auf die Regel steht deshalb vor der auf die Anzahl.
 
 Der Wochentag für `rruleToRecurrence` wird geprüft wie bei der Hydration: für die fremde Fassung gegen `theirs.startAt` in `theirs.timezone`, für die eigene gegen `range.startAt` in `vars.timezone` — den Start, mit dem `buildRecurrenceChanges` die Regel tatsächlich gebaut hat, nicht `vars.changes.start_at`. Bei einem ganztägigen Termin ist Letzteres bereits `toAllDayRange(range).startAt`, auf Mitternacht in der **Gerätezone** geschnappt statt in `vars.timezone`, und hätte den Wochentag falsch verankert. So hält die Hin-und-Rück-Abbildung, die `createMutation.test.ts` festhält.
 
@@ -336,16 +336,18 @@ Neu in `features/calendar/rule.test.ts`:
 - `until` in PostgREST-Format und als `toISOString()` ist **derselbe** Zeitpunkt; `null` gegen `null` gleich, `null` gegen einen Wert verschieden.
 - `ruleOf` bildet die fünf Spalten ab.
 
-In `recurrence.test.ts`, als Beleg der Verhaltensänderung an `ruleDiffers`: ein `master.rrule_until` in PostgREST-Format gegen dasselbe Instant als `…Z` löst **kein** `deleteAllExceptions` aus. **Rot vor dem Fix** — an einer konstruierten Eingabe, denn kein heutiger Pfad erzeugt sie (§5.0). Die bestehenden `ruleDiffers`-Fälle bleiben grün.
+In `recurrence.test.ts`, als Beleg der Verhaltensänderung an `ruleDiffers`: ein `master.rrule_until` in PostgREST-Format gegen dasselbe Instant als `…Z` löst **kein** `deleteAllExceptions` aus. **Rot vor dem Fix** — an einer konstruierten Eingabe, denn kein heutiger Pfad erzeugt sie (§5.0). Dazu die Gegenprobe, schon vorher grün: Ein anderes Serienende bleibt eine Regeländerung. Die bestehenden `ruleDiffers`-Fälle bleiben grün.
 
-Neu in `conflict.test.ts` — die drei gemessenen Szenarien aus §1.1, jetzt mit dem erwarteten Ergebnis:
+Neu in `conflict.test.ts` — die gemessenen Szenarien aus §1.1, jetzt mit dem erwarteten Ergebnis, dazu die Grenzwächter:
 
 - A und B ändern beide die Regel → `["recurrence"]`. **Rot vor dem Fix** (heute `[]`).
 - A ändert Titel und Regel, B nur die Regel → `["recurrence"]`. **Rot vor dem Fix.**
 - A ändert die Regel **nicht** (`mineRecurrence` null), B schon → `[]`. **GRENZWÄCHTER**: Dieser Fall darf keinen Dialog erzeugen, sonst meldet jede fremde Regeländerung einen Konflikt bei einem Nutzer, der die Regel gar nicht anfasst.
 - A und B ändern die Regel **identisch** → `[]`. Zweiter Grenzwächter: gleiches Ergebnis ist kein Konflikt.
+- Nur ich ändere die Regel (`theirs` gleich `base`) → `[]`. Dritter Grenzwächter, schon vorher grün: Die eigene Bearbeitung ist kein Konflikt.
+- Ändern beide Titel und Regel → `["title", "recurrence"]`. **Rot vor dem Fix**: Die Regel steht in der Liste hinter den fünf Feldern.
 
-Neu in `app-sections/event/recurrenceConflictRows.test.ts`: nur die Anzahl weicht ab → nur die Serienende-Zeile; nur die Option → nur die Options-Zeile; fremdes Enddatum gegen eigene unbegrenzte Serie → „—" gegen „Unbegrenzt", **nie** „Unbegrenzt" für eine Serie mit Enddatum; kein sichtbarer Unterschied → die Options-Zeile trotzdem; nicht darstellbare fremde Regel → „—".
+Neu in `app-sections/event/recurrenceConflictRows.test.ts`: nur die Anzahl weicht ab → nur die Serienende-Zeile; nur die Option → nur die Options-Zeile; fremdes Enddatum gegen eigene unbegrenzte Serie → „—" gegen „Unbegrenzt", **nie** „Unbegrenzt" für eine Serie mit Enddatum; kein sichtbarer Unterschied → die Options-Zeile trotzdem; nicht darstellbare fremde Regel → „—". Aus der Review-Runde dazu: Option und Anzahl weichen beide ab → beide Zeilen, Options-Zeile zuerst; A hat auf „Keine" gestellt, B die Serie auf zehn Termine begrenzt → Options-Zeile „Wöchentlich" gegen „Keine", Serienende-Zeile „10" gegen „—", **nie** „Unbegrenzt" für einen Einzeltermin; die eigene Seite ist nicht darstellbar → „—" auf der eigenen Seite.
 ---
 
 ## 6. Was diese Iteration nicht liefert
