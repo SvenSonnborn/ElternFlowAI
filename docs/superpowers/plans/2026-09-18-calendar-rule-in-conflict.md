@@ -610,7 +610,13 @@ import { ruleOf } from "@/features/calendar/rule";
 /** Die eigene Seite: die Regel, die geschrieben würde, und wo ihr Wochentag gilt. */
 interface MineSide {
   recurrence: RecurrenceChanges;
-  /** Der Start, mit dem das Formular die Regel gebaut hat (`vars.changes.start_at`). */
+  /**
+   * Der Start, mit dem `buildRecurrenceChanges` die Regel gebaut hat — die
+   * Formular-Range (`range.startAt`), **nicht** `vars.changes.start_at`: Bei
+   * einem ganztägigen Termin ist das bereits `toAllDayRange(range).startAt`,
+   * auf Mitternacht in der Gerätezone geschnappt statt in `timezone`, und
+   * hätte den Wochentag hier falsch verankert.
+   */
   startAt: Date;
   /** Die Zone des Termins (`vars.timezone`) — dort prüft `rruleToRecurrence` den Wochentag. */
   timezone: string;
