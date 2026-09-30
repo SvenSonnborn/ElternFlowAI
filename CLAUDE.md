@@ -220,13 +220,31 @@ Lives in [app-sections/shared/VoiceAssistantFAB.tsx](app-sections/shared/VoiceAs
 
 ## Documentation discipline
 
-When you change code that's documented, update the doc in the same commit:
+When you change code that's documented, update the doc before the PR is opened — docstrings and code comments in the same commit as the code, ADRs, roadmap and `docs/architecture.md` once at the end of the branch (see [Wo was steht](#wo-was-steht--eine-heimat-pro-tatsache) below):
 
 - Architectural changes → [docs/architecture.md](docs/architecture.md)
 - Decisions worth a paper trail → append a new ADR to [docs/decision-log.md](docs/decision-log.md) (never edit older ADRs — supersede them). The rule protects the _content_ of a decision: its rationale and consequences. Purely editorial repairs that leave the statement intact — dead links, wrong file/path references, typos — are fixed in place; a superseding ADR for a filename typo would be noise and would leave the broken reference in the original.
 - Anything visible to engineers (folder moves, new conventions, renamed routes) → this file
 
 When in doubt, the **handoff bundle wins**. CLAUDE.md and decision-log.md adapt around it.
+
+### Wo was steht — eine Heimat pro Tatsache
+
+Jede Tatsache hat genau **einen** Ort; andere Dokumente verlinken dorthin, statt sie zu wiederholen. Wer denselben Satz an mehreren Stellen pflegt, pflegt ihn an allen falsch, sobald sich das Verständnis ändert — in PR #125 stand dieselbe Erklärung in sieben Dateien, und ihr Nachziehen kostete ein Mehrfaches der Laufzeit des Codes.
+
+| Was                                | Wo                                                 | Nicht dort                                             |
+| ---------------------------------- | -------------------------------------------------- | ------------------------------------------------------ |
+| Eine Entscheidung und ihr Warum    | ADR in `docs/decision-log.md`, kurz                | Testzahlen, Zeilennummern, Commit-Hashes, Messtabellen |
+| Eine offene Lücke, vertagte Arbeit | ein Eintrag in `docs/TODO.md`, zwei bis drei Sätze | Herleitungen, Messprotokolle                           |
+| Reihenfolge und Status             | `docs/roadmap.md`                                  | den Text von TODO-Einträgen oder ADRs — verlinken      |
+| Warum eine Stelle so gebaut ist    | Kommentar an dieser Stelle                         | Aufzählungen, die für mehrere Dateien gelten           |
+| Das Design vor der Umsetzung       | Spec unter `docs/superpowers/specs/`               | Nachpflege nach der Umsetzung — dann gilt der ADR      |
+| Der Arbeitsplan eines Branches     | `.superpowers/plans/` (git-ignoriert)              | im Repo                                                |
+
+- **Keine flüchtigen Details in dauerhafter Doku.** Testzahlen, Zeilennummern und Messwerte veralten mit dem nächsten Commit. Commit-Hashes sind nach dem Merge tot, weil GitHub die Commits beim Merge neu schreibt. Auf Code wird über Datei und Funktion verwiesen.
+- **Doku einmal am Ende eines Branches, nicht pro Task.** ADR, Roadmap und `docs/architecture.md` entstehen im letzten Schritt vor dem PR, auf dem Stand, der dann gilt. Docstrings, Code-Kommentare und TODO-Einträge bleiben im Commit des Codes, den sie beschreiben.
+- **Doku-Befunde aus Reviews werden gesammelt** und in einem Durchgang vor dem PR behoben, nicht als eigene Review-Runde. Ausnahme: eine falsche Aussage in einem ADR, denn der friert mit dem Merge ein.
+- **Spec und Plan sind Arbeitsmittel.** Stellt sich eine Spec während der Umsetzung als falsch heraus, wird sie nicht nachgepflegt; der ADR hält fest, was stattdessen gilt. Pläne landen nicht mehr im Repo (die bis 2026-09 committeten unter `docs/superpowers/plans/` bleiben als Bericht stehen).
 
 ### Docstrings
 
@@ -286,6 +304,6 @@ This catches bugs, security issues, and CLAUDE.md/handoff violations **before** 
 
 Living follow-up list lives at [docs/TODO.md](docs/TODO.md). Workflow:
 
-- **When you find something during a task that should be done but is out of scope** (V1 limitation, deferred refactor, follow-up to fix in a later iteration), **append it to `docs/TODO.md`** in the same commit that introduces the limitation. Each entry: one bullet, references the file/area, explains _why_ it's deferred.
+- **When you find something during a task that should be done but is out of scope** (V1 limitation, deferred refactor, follow-up to fix in a later iteration), **append it to `docs/TODO.md`** in the same commit that introduces the limitation. Each entry: one bullet of **two to three sentences** — what is missing, where (file/area), and _why_ it's deferred. No derivations or measurement logs; the reasoning behind a decision belongs in its ADR.
 - **When you finish a TODO**, **delete the entry from `docs/TODO.md`** in the same commit that resolves it. Do not just check it off — remove the line entirely. The file is the active backlog, not a history.
 - Re-read `docs/TODO.md` at the start of every new task so you know what's already on the list before adding duplicates.
