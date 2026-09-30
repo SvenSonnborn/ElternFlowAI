@@ -151,12 +151,20 @@ export function EventEditScreen() {
   const initial = useMemo(() => {
     if (!source) return null;
     // The weekday check in `rruleToRecurrence` runs against this occurrence's
-    // start rather than the master's dtstart — equivalent here, because a
-    // byweekday rule only ever yields occurrences on the days it names. It
-    // also needs this occurrence's zone (`source.timezone`), not the device's
-    // — `recurrenceToRrule` wrote `rrule_byweekday` there, and reading it back
-    // in a different zone can land on the wrong weekday for a start near
-    // midnight (ADR-034 follow-up, Befund 1 of the final review).
+    // start rather than the master's dtstart, which stays put when the rule
+    // changes (ADR-032) and can sit on a different weekday than the rule.
+    // Not a full substitute either: `source.startAt` is the override-resolved
+    // start. An occurrence moved to another weekday via "Nur diesen" no longer
+    // lies on the rule's day, `rruleToRecurrence` returns `null` for a
+    // single-weekday rule, and the editor stays hidden although the rule is
+    // representable — open limitation, see docs/TODO.md; `ruleAnchor`
+    // (`recurrenceConflictRows.ts`) solves the same anchor problem for the
+    // other side of the conflict dialog.
+    //
+    // The check also needs this occurrence's zone (`source.timezone`), not the
+    // device's — `recurrenceToRrule` wrote `rrule_byweekday` there, and reading
+    // it back in a different zone can land on the wrong weekday for a start
+    // near midnight (ADR-034 follow-up, Befund 1 of the final review).
     const rrule = source.rrule;
     return {
       // Mitgeführt, damit die Hydration unten genau die Occurrence einfriert,
@@ -414,7 +422,8 @@ export function EventEditScreen() {
       };
 
       // Die eigene Regel-Seite, gelesen von beiden Zweigen unten. `startAt`
-      // aus der Formular-Range (Zeile ~112), nicht `vars.changes.start_at`:
+      // aus der Formular-Range (`const { startAt, endAt } = range` oben im
+      // Screen), nicht `vars.changes.start_at`:
       // `buildRecurrenceChanges` hat die Regel mit genau diesem Wert gebaut.
       // Bei einem ganztägigen Termin ist `vars.changes.start_at` bereits
       // `toAllDayRange(range).startAt` — auf Mitternacht in der
