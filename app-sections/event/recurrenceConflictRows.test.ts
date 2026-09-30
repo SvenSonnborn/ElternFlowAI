@@ -256,7 +256,8 @@ describe("recurrenceRowsWithoutOccurrence", () => {
   });
 
   test("die andere Seite hat die Regel nicht geändert → keine Zeilen", () => {
-    // `theirs` fehlt dann aus einem anderen Grund, etwa außerhalb des Suchfensters.
+    // `theirs` fehlt dann in der Praxis, weil die andere Seite genau diese
+    // Occurrence abgesagt hat.
     expect(recurrenceRowsWithoutOccurrence(foreignRow(), [MONDAY], WEEKLY, mine(daily), t)).toEqual(
       [],
     );
@@ -288,7 +289,7 @@ describe("recurrenceRowsWithoutOccurrence", () => {
     expect(rows[0]?.theirs).toBe("conflict.theirs: cal.recur.weekly");
   });
 
-  test("verschobene Exceptions zählen nicht als Anker", () => {
+  test("Occurrences mit Exception (`isException`) zählen nicht als Anker", () => {
     const rows = recurrenceRowsWithoutOccurrence(
       foreignRow({ rrule_byweekday: [3] }),
       [moved("2026-05-05T15:00:00.000Z"), regular("2026-05-06T15:00:00.000Z")],

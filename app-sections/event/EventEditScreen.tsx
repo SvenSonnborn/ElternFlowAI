@@ -379,8 +379,9 @@ export function EventEditScreen() {
       // fehlende Basis nicht denselben Weg nimmt wie ein echtes „niemand hat
       // etwas geändert". Ohne Basis lässt sich das gar nicht feststellen, also
       // muss der Dialog erscheinen — ohne Zeilen, aber sichtbar. Genau die
-      // Überlegung, die auch `theirs === null` (die fremde Regel erzeugt die
-      // Occurrence nicht mehr) in den Dialog statt ins Durchspeichern schickt.
+      // Überlegung, die auch `theirs === null` (die andere Seite hat die
+      // Occurrence abgesagt, oder ihre Regel erzeugt sie nicht mehr) in den
+      // Dialog statt ins Durchspeichern schickt.
       const fields =
         theirs && baseOccurrence
           ? differingEventFields(theirs, vars.changes, baseOccurrence, vars.recurrence)
@@ -423,8 +424,10 @@ export function EventEditScreen() {
         body: t("conflict.body.event"),
         rows:
           theirs === null
-            ? // Die Occurrence fehlt in der fremden Fassung. Ist die Regel der
-              // Grund, kennt `err.row` sie trotzdem (ADR-038).
+            ? // Die Occurrence fehlt in der fremden Fassung: abgesagt, oder die
+              // fremde Regel erzeugt sie nicht mehr. `err.row` kennt die fremde
+              // Regel trotzdem; Zeilen entstehen nur bei einer Regel-Kollision
+              // (ADR-038).
               recurrenceRowsWithoutOccurrence(
                 row,
                 expanded,
@@ -454,8 +457,8 @@ export function EventEditScreen() {
           save({
             ...vars,
             // `theirs` fehlt, wenn die fremde Fassung die Occurrence nicht mehr
-            // enthält — etwa weil ihre Regel sie nicht mehr erzeugt oder sie
-            // außerhalb des Suchfensters lag. In jedem Fall ist `row` seit
+            // enthält — in der Praxis, weil die andere Seite sie abgesagt hat
+            // oder ihre Regel sie nicht mehr erzeugt. In jedem Fall ist `row` seit
             // ADR-037 da, die frische Version also immer berechenbar — ohne
             // erneut zu expandieren. Der tote Rückfall auf `vars.baseVersion`,
             // der diesen Versuch zwangsläufig erneut kollidieren ließ, ist damit

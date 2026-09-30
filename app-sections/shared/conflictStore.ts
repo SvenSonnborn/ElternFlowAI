@@ -49,11 +49,13 @@ export interface ShowConflictOptions {
   /**
    * Leer heißt nicht „kein Dialog" — das entscheidet der Aufrufer, bevor er
    * hierher kommt. Ein geteilter Typ für zwei Aufrufer (Kalender und
-   * Aufgaben — Letzterer kennt gar kein Suchfenster), darum bleiben mehrere
+   * Aufgaben — Letzterer kennt keine Occurrences), darum bleiben mehrere
    * Gründe offen: die Occurrence fehlt in der fremden Fassung (nur Kalender,
-   * `theirs === null`) — sie lag etwa außerhalb des Suchfensters; ist die
-   * Regel der Grund, zeigt der Dialog stattdessen die Regel-Zeilen (ADR-038) —,
-   * die eigene Basis war beim Eintreffen des Konflikts noch nicht hydriert
+   * `theirs === null`) — die andere Seite hat sie abgesagt, oder ihre Regel
+   * erzeugt sie nicht mehr; Regel-Zeilen gibt es dann nur, wenn die eigene
+   * Seite die Regel ebenfalls ändert, die Basis hydriert ist und die fremde
+   * Regel von Basis und eigener abweicht (ADR-038) —, die eigene Basis war
+   * beim Eintreffen des Konflikts noch nicht hydriert
    * (`baseOccurrence`/`baseTask === null`), oder das Auto-Retry-Limit ist
    * erschöpft, ohne dass ein Feld abweicht. Bis
    * ADR-037 gehörte hierher auch noch „der Compare-and-Swap kennt die fremde
