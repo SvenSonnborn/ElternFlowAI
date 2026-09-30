@@ -510,7 +510,15 @@ fremde Kürzung rückgängig, per „ab hier löschen" ebenso wie per „dieser 
 Schnitt dann zwei Serien nebeneinander laufen und Termine doppelt stehen —, und ein Enddatum
 erscheint nur als „—". Jede dieser Folgen zu benennen bräuchte einen Copy-Key. Ein zweiter
 🎨-Eintrag, vorbestehend seit ADR-031: Hat die andere Seite genau die bearbeitete Occurrence abgesagt,
-erscheint der Dialog ohne Zeilen, und „Deine Fassung speichern" hebt die Absage auf.
+erscheint der Dialog ohne Zeilen, und „Deine Fassung speichern" hebt die Absage mit „Nur diesen"
+oder „dieser und folgende" auf. Ohne 🎨, als offene Verhaltensfrage, dazu ein dritter Eintrag
+(ebenfalls seit ADR-031): Fehlt die bearbeitete Occurrence in der fremden Fassung und ändert der
+Nutzer die Regel nicht, erscheint der Dialog ohne Zeilen, und „Deine Fassung speichern" tut je nach
+Scope Unerwartetes — mit „dieser und folgende" schiebt es etwa ein fremdes Serienende per Datum nach
+hinten, sodass gelöschte Termine zurückkehren, während die eigene Änderung nirgends erscheint; mit
+„Nur diesen"
+landet die Änderung in einer verwaisten, unsichtbaren Exception. Ein Fix braucht zuerst die
+Entscheidung, was „Deine Fassung speichern" für eine weggefallene Occurrence heißen soll.
 
 ### 2.3 Toggle-Fehler ist auf Web unsichtbar
 

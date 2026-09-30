@@ -69,6 +69,10 @@ function endText(rule: OccurrenceRrule, t: Translate): string {
  * `recurrenceRowsWithoutOccurrence`); ein Dialog, der ihn meldet und nichts
  * zeigt, wäre schlechter als zwei gleiche Werte.
  *
+ * `theirs.startAt` ist der Wochentag-Anker der fremden Regel, den beide
+ * Aufrufer aus `ruleAnchor` nehmen — nicht der per Override aufgelöste Start
+ * der fremden Occurrence.
+ *
  * Ein eigenes Modul statt Code in `showConflict`, weil `EventEditScreen` unter
  * `bun test` nicht ladbar ist und diese Zweige einen Test verdienen.
  */
@@ -115,6 +119,40 @@ type ForeignRow = Pick<
 >;
 
 /**
+ * Der Wochentag-Anker der fremden Regel: die erste Occurrence ohne Exception
+ * in `expanded` — der frisch gelesenen Zeile, expandiert im Suchfenster von
+ * `showConflict` —, sonst der Serienanker `row.start_at`.
+ *
+ * Bei einer wöchentlichen Regel mit einem Wochentag erkennt
+ * `rruleToRecurrence` „Wöchentlich" nur, wenn dieser Tag der Wochentag des
+ * Ankers ist; sonst zeigt die fremde Options-Zeile „—". Eine Occurrence, die
+ * die fremde Regel selbst erzeugt hat, liegt auf dem richtigen Tag. Zwei
+ * naheliegende Anker tun das nicht:
+ *
+ * - `row.start_at` bleibt bei einer Regeländerung stehen (ADR-032):
+ *   „wöchentlich am Mittwoch" kann auf einer Serie liegen, die an einem
+ *   Montag begann.
+ * - `theirs.startAt` ist der per Override aufgelöste Start. Hat die andere
+ *   Seite die bearbeitete Occurrence per „Nur diesen" auf einen anderen
+ *   Wochentag verschoben und die Serie hinter ihr gekürzt, bleibt die
+ *   Exception stehen, und ihr Start liegt neben der Regel.
+ *
+ * Keine Occurrence mit Exception (`isException`) zählt, auch keine, deren
+ * Override nur den Titel ändert: Das Flag sagt nicht, ob der Override den
+ * Start verschoben hat. Nur wenn das Fenster keine reguläre Occurrence
+ * enthält, bleibt `row.start_at`.
+ *
+ * Beide Zweige von `showConflict` verankern hierüber, mit und ohne `theirs` —
+ * dieselbe fremde Regel wird so nicht je nach Zweig verschieden beschriftet.
+ */
+export function ruleAnchor(
+  row: Pick<EventWithRelations, "start_at">,
+  expanded: readonly Pick<CalendarOccurrence, "isException" | "startAt">[],
+): Date {
+  return expanded.find((o) => !o.isException)?.startAt ?? new Date(row.start_at);
+}
+
+/**
  * Die Regel-Zeilen für den Fall, dass die fremde Fassung die bearbeitete
  * Occurrence nicht mehr enthält (`theirs === null`).
  *
@@ -133,26 +171,27 @@ type ForeignRow = Pick<
  * Schlüssels in `row.timezone` immer ab, nur ein kaputter Schlüssel fiele auf
  * das Standardfenster zurück.
  *
- * Der Wochentag der fremden Regel hängt an einer Occurrence, die sie
- * tatsächlich erzeugt — der ersten regulären im Suchfenster —, nicht an
- * `row.start_at`: Der Serienanker bleibt bei einer Regeländerung stehen
- * (ADR-032) und liegt dann nicht zwingend auf dem Wochentag der neuen Regel
- * („wöchentlich am Mittwoch" auf einer Serie, die an einem Montag begann).
- * Keine Occurrence mit Exception (`isException`) zählt, auch keine, deren
- * Override nur den Titel ändert: Das Flag sagt nicht, ob der Override den
- * Start verschoben hat, und ein verschobener Start sagt nichts über die
- * Regel. Nur wenn das Fenster keine reguläre Occurrence enthält, bleibt
- * `row.start_at`.
+ * Der Wochentag der fremden Regel kommt aus `ruleAnchor`, demselben Anker wie
+ * im Zweig mit `theirs`.
  *
  * Zeilen entstehen nur, wenn alle drei Bedingungen gelten: Die eigene Seite
  * ändert die Regel ebenfalls (`mine` gesetzt), die Basis ist hydriert
  * (`baseRule` gesetzt), und die fremde Regel weicht von Basis und eigener ab
  * (`ruleConflicts`). Sonst ist die Liste leer, und der Dialog bleibt ohne
  * Zeilen. Ändert die eigene Seite an einer weggefallenen Occurrence nur den
- * Titel, ist das richtig: Ihr Schreibvorgang fasst die Regel dann nicht an.
- * Hat die andere Seite die Regel nicht geändert, bleibt von den beiden
- * Gründen für das fehlende `theirs` nur der erste: Sie hat genau diese
- * Occurrence abgesagt.
+ * Titel, ist das mit „Nur diesen" und „alle Termine" richtig: Ihr
+ * Schreibvorgang fasst die Regel dann nicht an. Mit „dieser und folgende"
+ * fasst er sie doch an, außer am ersten Termin der Serie: Der Schnitt
+ * schreibt das Serienende der fremden Regel neu (`setRruleUntil` bzw.
+ * `setRruleCount`), ohne dass der Dialog etwas davon zeigt (`docs/TODO.md`).
+ *
+ * Hat die andere Seite die Regel-Spalten nicht geändert, bleibt in der Praxis
+ * nur der erste Grund für das fehlende `theirs`: Sie hat genau diese
+ * Occurrence abgesagt. Ein Randfall bleibt: „dieser und folgende" am ersten
+ * Termin schreibt die Änderungen wörtlich (`updateMaster` ohne
+ * `anchoredChanges`), eine Datumsänderung verschiebt dann den Serienanker
+ * und kann die Schlüssel verschieben, ohne dass sich eine Regel-Spalte
+ * ändert.
  *
  * Entstehen Zeilen, zeigen sie nur die Regel. Hat die andere Seite zugleich
  * ein Feld wie Titel oder Ort geändert (Scope „alle"), fehlt dafür eine Zeile
@@ -170,9 +209,8 @@ export function recurrenceRowsWithoutOccurrence(
   if (baseRule == null || mine == null) return [];
   const theirsRule = ruleOf(row);
   if (!ruleConflicts(theirsRule, baseRule, mine.recurrence)) return [];
-  const anchor = expanded.find((o) => !o.isException)?.startAt ?? new Date(row.start_at);
   return recurrenceConflictRows(
-    { rrule: theirsRule, startAt: anchor, timezone: row.timezone },
+    { rrule: theirsRule, startAt: ruleAnchor(row, expanded), timezone: row.timezone },
     mine,
     t,
   );

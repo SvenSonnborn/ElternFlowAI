@@ -41,7 +41,11 @@ import {
   type RecurrenceOption,
 } from "@/features/calendar";
 
-import { recurrenceConflictRows, recurrenceRowsWithoutOccurrence } from "./recurrenceConflictRows";
+import {
+  recurrenceConflictRows,
+  recurrenceRowsWithoutOccurrence,
+  ruleAnchor,
+} from "./recurrenceConflictRows";
 import { RecurrenceCountField } from "./RecurrenceCountField";
 import { RecurrenceRadio } from "./RecurrenceRadio";
 import { pickScope } from "./scopeDialog";
@@ -363,8 +367,9 @@ export function EventEditScreen() {
       // Override-Intervall der angeforderten Occurrence ab.
       const row = err.row;
       const { start: windowStart, end: windowEnd } = eventLookupWindow(row, vars.occurrenceKey);
-      // Einmal expandiert, zweimal gelesen: für `theirs` und — fehlt es — als
-      // Wochentag-Anker der fremden Regel (`recurrenceRowsWithoutOccurrence`).
+      // Einmal expandiert, zweimal gelesen: für `theirs` und als
+      // Wochentag-Anker der fremden Regel (`ruleAnchor`, in beiden Zweigen
+      // unten).
       const expanded = expandEvents([row], windowStart, windowEnd, theme);
       // Match auf `occurrenceKey`: Nur der Schlüssel identifiziert dieselbe
       // Occurrence zuverlässig, wenn eine Verschiebung ihn vom aufgelösten
@@ -449,7 +454,18 @@ export function EventEditScreen() {
                 // Schreibvorgang eine mitführt — der leere Zweig ist für den
                 // Compiler da, nicht für einen Laufzeitfall.
                 if (!mineRuleSide) return [];
-                return recurrenceConflictRows(theirs, mineRuleSide, t);
+                // Anker wie im Zweig ohne `theirs`, nicht `theirs.startAt`:
+                // Das ist der per Override aufgelöste Start und läge bei einer
+                // verschobenen Occurrence neben dem Wochentag der Regel.
+                return recurrenceConflictRows(
+                  {
+                    rrule: theirs.rrule,
+                    startAt: ruleAnchor(row, expanded),
+                    timezone: theirs.timezone,
+                  },
+                  mineRuleSide,
+                  t,
+                );
               }),
         keepMineLabel: t("conflict.keepMine"),
         keepTheirsLabel: t("conflict.keepTheirs"),
