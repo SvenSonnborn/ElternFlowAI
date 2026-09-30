@@ -144,8 +144,4 @@ Voice/LLM, no Expo Notifications, no Edge Functions.
 
 Supabase, the auth flow, onboarding and the settings screen have all landed
 since this list was written (ADR-003, ADR-005, ADR-008); Realtime is wired as
-far as the section above describes. Conflict-Detection (Issue #52) steht
-seit ADR-031: Ein Schreibvorgang prüft, ob die Zeile noch die Version hat, aus
-der das Formular stammt, und weicht ein fremd geändertes Feld ab, zeigt ein Dialog den Vergleich — bei
-Terminen seit ADR-038 auch für die Wiederholungsregel. Die Einzelheiten stehen
-in den ADRs 031 und 036–038.
+far as the section above describes. Conflict-Detection (Issue #52) steht seit ADR-031: Ein Schreibvorgang prüft, ob die Zeile noch die Version hat, aus der das Formular stammt. Hat jemand anderes inzwischen ein Feld geändert, das der eigene Schreibvorgang anders setzen würde, zeigt ein Dialog beide Fassungen nebeneinander — bei Terminen seit ADR-038 auch die Wiederholungsregel. Die Einzelheiten stehen in den ADRs 031 und 036–038.
