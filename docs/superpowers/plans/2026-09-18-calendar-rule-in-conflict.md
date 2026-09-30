@@ -863,3 +863,522 @@ git commit -m "docs(calendar): ADR-038 zur Regel im Konflikt-Vergleich, Roadmap 
 - [ ] Jede neue exportierte Funktion und jedes neue Modul mit JSDoc.
 - [ ] Lokaler CodeRabbit-Durchlauf vor dem PR.
 - [ ] **Für den Block:** Eine reine Rhythmus-Änderung durch zwei Clients erzeugt einen Dialog statt eines stillen Overwrites — Sichtprüfung am Simulator steht beim Nutzer.
+
+---
+
+## Nachtrag 2026-09-30: Regel-Zeilen auch ohne fremde Occurrence
+
+**Anlass.** In Task 3 wurde gemessen: Ob der Dialog seine Regel-Zeilen zeigt, hängt davon ab, ob die **fremde** Regel die bearbeitete Occurrence noch erzeugt. Eine wöchentliche Montagsserie ab 04.05.2026, bearbeitet wird der 22.06.:
+
+| Die andere Seite stellt auf … | 22.06. in der fremden Fassung | Dialog bisher    |
+| ----------------------------- | ----------------------------- | ---------------- |
+| täglich                       | wird erzeugt                  | mit Regel-Zeilen |
+| monatlich                     | nicht mehr                    | ohne jede Zeile  |
+| „Endet nach 6"                | nicht mehr                    | ohne jede Zeile  |
+| alle zwei Wochen              | nicht mehr                    | ohne jede Zeile  |
+
+Der Dialog **erschien** in allen Fällen, das Ziel des PRs ist also erfüllt. In den häufigsten Rhythmus-Änderungen zeigte er aber nichts, und „Deine Fassung speichern" überschrieb eine Regel, die der Nutzer nie gesehen hatte. Die fremde Regel ist über `err.row` bekannt. **Entschieden (Nutzer, 2026-09-30): Die Regel-Zeilen kommen noch in diesen PR.** Neue Copy-Keys sind dafür nicht nötig.
+
+### Task 4: Regel-Zeilen ohne fremde Occurrence
+
+**Files:**
+
+- Modify: `features/calendar/conflict.ts` (neue Funktion `ruleConflicts`, `differingEventFields` nutzt sie), `features/calendar/conflict.test.ts`
+- Modify: `app-sections/event/recurrenceConflictRows.ts` (neue Funktion `recurrenceRowsWithoutOccurrence`), `app-sections/event/recurrenceConflictRows.test.ts`
+- Modify: `app-sections/event/EventEditScreen.tsx` (`showConflict`)
+- Modify: Kommentare in `app-sections/shared/conflictStore.ts` und `app-sections/task/TaskEditScreen.tsx`
+- Modify: `docs/TODO.md` (der 🎨-Eintrag verliert einen Fall)
+
+**Interfaces:**
+
+- Produces: `ruleConflicts(theirsRule: OccurrenceRrule, baseRule: OccurrenceRrule, mineRecurrence: RecurrenceChanges | null | undefined): boolean` aus `features/calendar/conflict.ts`.
+- Produces: `recurrenceRowsWithoutOccurrence(row, expanded, baseRule, mine, t): ConflictRow[]` aus `app-sections/event/recurrenceConflictRows.ts`.
+
+**Kontext, der nicht im Diff steht:**
+
+- **Der Wochentag-Anker der fremden Regel** ist die erste **reguläre** Occurrence, die die fremde Zeile im Suchfenster erzeugt. `row.start_at` taugt dafür nicht: Der Serienanker bleibt bei einer Regeländerung stehen (ADR-032), eine Regel „wöchentlich am Mittwoch" kann also auf einer Serie liegen, die an einem Montag begann. `rruleToRecurrence` hielte die Regel dann für nicht darstellbar und zeigte „—". Verschobene Exceptions (`isException`) zählen nicht, weil ihr Start nichts über die Regel sagt. Nur wenn das Fenster keine reguläre Occurrence enthält, bleibt `row.start_at`. Das ist dieselbe Logik wie im Fall mit `theirs`: Auch dort liegt der Anker auf einer Occurrence, die die fremde Regel erzeugt hat.
+- **`showConflict` expandiert bereits** (`expandEvents([row], windowStart, windowEnd, theme)`), um `theirs` zu finden. Das Ergebnis wird einmal berechnet und zweimal gelesen.
+- **Die bestehenden sechs Regel-Tests in `conflict.test.ts` sichern die Extraktion von `ruleConflicts`.** Sie müssen unverändert grün bleiben.
+- `recurrenceConflictRows.ts` importiert `ruleConflicts` direkt aus `@/features/calendar/conflict`, nicht aus dem Barrel. `conflict.ts` zieht nur `rule.ts` und Typen und lädt unter `bun test`.
+
+- [ ] **Step 1: `ruleConflicts` extrahieren**
+
+In `features/calendar/conflict.ts` den Typ-Import erweitern:
+
+```ts
+import type { CalendarOccurrence, OccurrenceRrule } from "./types";
+```
+
+Vor `differingEventFields` einfügen:
+
+```ts
+/**
+ * Ob die Regel ein Konflikt ist — dreiwertig wie die fünf Felder: jemand
+ * anderes hat sie geändert (`theirs ≠ base`), und mein Schreibvorgang würde
+ * sie überschreiben (`mine ≠ theirs`). Ohne Regel im Schreibvorgang
+ * (`mineRecurrence == null`) nie: Die `rrule_*`-Spalten stehen dann nicht im
+ * UPDATE (ADR-038 Decision 2).
+ *
+ * Eine eigene Funktion statt eines Zweigs in `differingEventFields`, weil der
+ * Konflikt-Dialog sie auch **ohne** fremde Occurrence braucht: Erzeugt die
+ * fremde Regel die bearbeitete Occurrence nicht mehr (monatlich statt
+ * wöchentlich, eine kleinere Anzahl, ein Schnitt per „ab hier löschen"), gibt
+ * es kein `theirs` — die fremde Regel ist über `err.row` aber bekannt.
+ */
+export function ruleConflicts(
+  theirsRule: OccurrenceRrule,
+  baseRule: OccurrenceRrule,
+  mineRecurrence: RecurrenceChanges | null | undefined,
+): boolean {
+  return (
+    mineRecurrence != null &&
+    !sameRule(theirsRule, baseRule) &&
+    !sameRule(theirsRule, ruleOf(mineRecurrence))
+  );
+}
+```
+
+In `differingEventFields` den Regel-Block ersetzen durch:
+
+```ts
+if (ruleConflicts(theirs.rrule, base.rrule, mineRecurrence)) {
+  out.push("recurrence");
+}
+```
+
+Run: `bun test features/calendar/conflict.test.ts`. Alles bleibt grün.
+
+- [ ] **Step 2: Tests für `ruleConflicts`**
+
+In `features/calendar/conflict.test.ts` den Import um `ruleConflicts` erweitern (`import { differingEventFields, ruleConflicts } from "./conflict";`) und am Dateiende anhängen:
+
+```ts
+describe("ruleConflicts", () => {
+  const WEEKLY: OccurrenceRrule = {
+    freq: "weekly",
+    interval: 1,
+    byweekday: [1],
+    count: null,
+    until: null,
+  };
+  const MONTHLY: OccurrenceRrule = {
+    freq: "monthly",
+    interval: 1,
+    byweekday: null,
+    count: null,
+    until: null,
+  };
+  const daily: RecurrenceChanges = {
+    rrule_freq: "daily",
+    rrule_interval: 1,
+    rrule_byweekday: null,
+    rrule_count: null,
+    rrule_until: null,
+  };
+
+  test("fremd geändert und meine Regel weicht ab → Konflikt", () => {
+    expect(ruleConflicts(MONTHLY, WEEKLY, daily)).toBe(true);
+  });
+
+  test("ohne eigene Regel nie ein Konflikt", () => {
+    expect(ruleConflicts(MONTHLY, WEEKLY, null)).toBe(false);
+    expect(ruleConflicts(MONTHLY, WEEKLY, undefined)).toBe(false);
+  });
+
+  test("fremd unverändert → kein Konflikt, auch wenn meine Regel abweicht", () => {
+    expect(ruleConflicts(WEEKLY, WEEKLY, daily)).toBe(false);
+  });
+
+  test("beide Seiten gleich geändert → kein Konflikt", () => {
+    expect(ruleConflicts(MONTHLY, WEEKLY, { ...daily, rrule_freq: "monthly" })).toBe(false);
+  });
+});
+```
+
+- [ ] **Step 3: Tests für `recurrenceRowsWithoutOccurrence` schreiben**
+
+In `app-sections/event/recurrenceConflictRows.test.ts` den Import erweitern:
+
+```ts
+import { recurrenceConflictRows, recurrenceRowsWithoutOccurrence } from "./recurrenceConflictRows";
+```
+
+und am Dateiende anhängen:
+
+```ts
+describe("recurrenceRowsWithoutOccurrence", () => {
+  type ForeignRow = Parameters<typeof recurrenceRowsWithoutOccurrence>[0];
+
+  // Die fremde Zeile: eine Serie, die an einem Montag begann (04.05.2026,
+  // 17:00 Berlin). Die bearbeitete Occurrence fehlt in ihr — deshalb gibt es
+  // kein `theirs`.
+  function foreignRow(overrides: Partial<ForeignRow> = {}): ForeignRow {
+    return {
+      rrule_freq: "weekly",
+      rrule_interval: 1,
+      rrule_byweekday: [1],
+      rrule_count: null,
+      rrule_until: null,
+      start_at: "2026-05-04T15:00:00.000Z",
+      timezone: ZONE,
+      ...overrides,
+    };
+  }
+  const regular = (iso: string) => ({ isException: false, startAt: new Date(iso) });
+  const moved = (iso: string) => ({ isException: true, startAt: new Date(iso) });
+  const MONDAY = regular("2026-05-04T15:00:00.000Z");
+  const daily = { rrule_freq: "daily" as const, rrule_byweekday: null };
+
+  test("die andere Seite stellt auf monatlich → die Options-Zeile, obwohl die Occurrence fehlt", () => {
+    expect(
+      recurrenceRowsWithoutOccurrence(
+        foreignRow({ rrule_freq: "monthly", rrule_byweekday: null }),
+        [MONDAY],
+        WEEKLY,
+        mine(daily),
+        t,
+      ),
+    ).toEqual([
+      {
+        label: "cal.create.fieldRecurrence",
+        theirs: "conflict.theirs: cal.recur.monthly",
+        mine: "conflict.mine: cal.recur.daily",
+      },
+    ]);
+  });
+
+  test("die andere Seite begrenzt auf 6, ich auf 10 → die Serienende-Zeile", () => {
+    expect(
+      recurrenceRowsWithoutOccurrence(
+        foreignRow({ rrule_count: 6 }),
+        [MONDAY],
+        WEEKLY,
+        mine({ rrule_count: 10 }),
+        t,
+      ),
+    ).toEqual([
+      {
+        label: "cal.create.fieldRecurrenceCount",
+        theirs: "conflict.theirs: 6",
+        mine: "conflict.mine: 10",
+      },
+    ]);
+  });
+
+  test("ein fremder Schnitt gegen meine offene tägliche Serie → beide Zeilen", () => {
+    expect(
+      recurrenceRowsWithoutOccurrence(
+        foreignRow({ rrule_until: "2026-06-14T21:59:59.999+00:00" }),
+        [MONDAY],
+        WEEKLY,
+        mine(daily),
+        t,
+      ),
+    ).toEqual([
+      {
+        label: "cal.create.fieldRecurrence",
+        theirs: "conflict.theirs: cal.recur.weekly",
+        mine: "conflict.mine: cal.recur.daily",
+      },
+      {
+        label: "cal.create.fieldRecurrenceCount",
+        theirs: "conflict.theirs: —",
+        mine: "conflict.mine: cal.create.recurrenceCountUnlimited",
+      },
+    ]);
+  });
+
+  test("ich fasse die Regel nicht an → keine Zeilen", () => {
+    expect(
+      recurrenceRowsWithoutOccurrence(
+        foreignRow({ rrule_freq: "monthly", rrule_byweekday: null }),
+        [MONDAY],
+        WEEKLY,
+        null,
+        t,
+      ),
+    ).toEqual([]);
+  });
+
+  test("die andere Seite hat die Regel nicht geändert → keine Zeilen", () => {
+    // `theirs` fehlt dann aus einem anderen Grund, etwa außerhalb des Suchfensters.
+    expect(recurrenceRowsWithoutOccurrence(foreignRow(), [MONDAY], WEEKLY, mine(daily), t)).toEqual(
+      [],
+    );
+  });
+
+  test("ohne hydrierte Basis → keine Zeilen", () => {
+    expect(
+      recurrenceRowsWithoutOccurrence(
+        foreignRow({ rrule_freq: "monthly", rrule_byweekday: null }),
+        [MONDAY],
+        null,
+        mine(daily),
+        t,
+      ),
+    ).toEqual([]);
+  });
+
+  test("der Wochentag hängt an einer erzeugten Occurrence, nicht am Serienanker", () => {
+    // „Wöchentlich am Mittwoch" auf einer Serie, die an einem Montag begann:
+    // Der Anker bleibt bei einer Regeländerung stehen (ADR-032). Gegen den
+    // Montag gelesen, hielte `rruleToRecurrence` die Regel für nicht darstellbar.
+    const rows = recurrenceRowsWithoutOccurrence(
+      foreignRow({ rrule_byweekday: [3] }),
+      [regular("2026-05-06T15:00:00.000Z")],
+      WEEKLY,
+      mine(daily),
+      t,
+    );
+    expect(rows[0]?.theirs).toBe("conflict.theirs: cal.recur.weekly");
+  });
+
+  test("verschobene Exceptions zählen nicht als Anker", () => {
+    const rows = recurrenceRowsWithoutOccurrence(
+      foreignRow({ rrule_byweekday: [3] }),
+      [moved("2026-05-05T15:00:00.000Z"), regular("2026-05-06T15:00:00.000Z")],
+      WEEKLY,
+      mine(daily),
+      t,
+    );
+    expect(rows[0]?.theirs).toBe("conflict.theirs: cal.recur.weekly");
+  });
+
+  test("ohne reguläre Occurrence im Fenster bleibt der Serienanker", () => {
+    const rows = recurrenceRowsWithoutOccurrence(
+      foreignRow({ rrule_count: 6 }),
+      [],
+      WEEKLY,
+      mine(daily),
+      t,
+    );
+    expect(rows[0]?.theirs).toBe("conflict.theirs: cal.recur.weekly");
+  });
+});
+```
+
+- [ ] **Step 4: Die Funktion mit dem naiven Anker schreiben, rot vorführen, dann richtig verankern**
+
+In `app-sections/event/recurrenceConflictRows.ts` die Importe ergänzen:
+
+```ts
+import type { EventWithRelations } from "@/features/calendar/expand";
+```
+
+```ts
+import { ruleConflicts } from "@/features/calendar/conflict";
+```
+
+Am Dateiende einfügen, **zunächst mit dem naiven Anker** `const anchor = new Date(row.start_at);`:
+
+```ts
+/** Die Spalten der fremden Zeile, die die Regel-Zeilen brauchen. */
+type ForeignRow = Pick<
+  EventWithRelations,
+  | "rrule_freq"
+  | "rrule_interval"
+  | "rrule_byweekday"
+  | "rrule_count"
+  | "rrule_until"
+  | "start_at"
+  | "timezone"
+>;
+
+/**
+ * Die Regel-Zeilen für den Fall, dass die fremde Fassung die bearbeitete
+ * Occurrence nicht mehr enthält (`theirs === null`).
+ *
+ * Häufig, nicht exotisch: Stellt die andere Seite von wöchentlich auf
+ * monatlich, begrenzt sie die Serie auf weniger Termine oder schneidet sie per
+ * „ab hier löschen" ab, erzeugt die neue Regel die Occurrence nicht mehr, an
+ * der dieses Formular hängt. Der Dialog erschien dann schon immer — aber ohne
+ * jede Zeile, und „Deine Fassung speichern" überschrieb eine Regel, die der
+ * Nutzer nie gesehen hatte. Die fremde Regel ist über `err.row` bekannt; nur
+ * die Occurrence fehlt (ADR-038).
+ *
+ * Der Wochentag der fremden Regel hängt an einer Occurrence, die sie
+ * tatsächlich erzeugt — der ersten regulären im Suchfenster —, nicht an
+ * `row.start_at`: Der Serienanker bleibt bei einer Regeländerung stehen
+ * (ADR-032) und liegt dann nicht zwingend auf dem Wochentag der neuen Regel
+ * („wöchentlich am Mittwoch" auf einer Serie, die an einem Montag begann).
+ * Verschobene Exceptions zählen nicht, ihr Start sagt nichts über die Regel.
+ * Nur wenn das Fenster keine reguläre Occurrence enthält, bleibt
+ * `row.start_at`.
+ *
+ * Leer, wenn es keine Regel-Kollision gibt: Die eigene Seite fasst die Regel
+ * nicht an, die andere hat sie nicht geändert, oder die Basis ist noch nicht
+ * hydriert. Dann fehlt `theirs` aus einem anderen Grund, etwa weil die
+ * Occurrence außerhalb des Suchfensters lag, und der Dialog bleibt ohne Zeilen.
+ */
+export function recurrenceRowsWithoutOccurrence(
+  row: ForeignRow,
+  expanded: readonly Pick<CalendarOccurrence, "isException" | "startAt">[],
+  baseRule: OccurrenceRrule | null,
+  mine: MineSide | null,
+  t: Translate,
+): ConflictRow[] {
+  if (baseRule == null || mine == null) return [];
+  const theirsRule = ruleOf(row);
+  if (!ruleConflicts(theirsRule, baseRule, mine.recurrence)) return [];
+  const anchor = new Date(row.start_at); // naiv — Step 4 ersetzt das
+  return recurrenceConflictRows(
+    { rrule: theirsRule, startAt: anchor, timezone: row.timezone },
+    mine,
+    t,
+  );
+}
+```
+
+Run: `bun test app-sections/event/recurrenceConflictRows.test.ts`
+Erwartet: **genau zwei** Fehlschläge, „der Wochentag hängt an einer erzeugten Occurrence …" und „verschobene Exceptions zählen nicht als Anker" (beide erhalten „—" statt „cal.recur.weekly"). Die wörtliche Ausgabe gehört in den Report. Dann den Anker ersetzen:
+
+```ts
+const anchor = expanded.find((o) => !o.isException)?.startAt ?? new Date(row.start_at);
+```
+
+Run erneut → grün.
+
+- [ ] **Step 5: `showConflict` verdrahten**
+
+In `app-sections/event/EventEditScreen.tsx`:
+
+**(a)** Import: `recurrenceRowsWithoutOccurrence` neben `recurrenceConflictRows` aus `./recurrenceConflictRows`.
+
+**(b)** Die Expansion einmal berechnen. Die Zuweisung von `theirs` ersetzen durch:
+
+```ts
+// Einmal expandiert, zweimal gelesen: für `theirs` und — fehlt es — als
+// Wochentag-Anker der fremden Regel (`recurrenceRowsWithoutOccurrence`).
+const expanded = expandEvents([row], windowStart, windowEnd, theme);
+// Match auf `occurrenceKey`: Nur der Schlüssel identifiziert dieselbe
+// Occurrence zuverlässig, wenn eine Verschiebung ihn vom aufgelösten
+// Anzeigedatum hat auseinanderlaufen lassen (ADR-034) — derselbe Grund
+// wie beim `find` in `useEvent` (`features/calendar/hooks.ts`).
+const theirs: CalendarOccurrence | null =
+  expanded.find((o) => o.occurrenceKey === vars.occurrenceKey) ?? null;
+```
+
+**(c)** Direkt vor `conflict.show({` die eigene Regel-Seite **einmal** bauen. Den langen Kommentar zum `startAt`-Anker aus dem bisherigen `recurrenceConflictRows`-Aufruf hierher verschieben:
+
+```ts
+// Die eigene Regel-Seite, gelesen von beiden Zweigen unten. `startAt`
+// aus der Formular-Range (Zeile ~112), nicht `vars.changes.start_at`:
+// `buildRecurrenceChanges` hat die Regel mit genau diesem Wert gebaut.
+// Bei einem ganztägigen Termin ist `vars.changes.start_at` bereits
+// `toAllDayRange(range).startAt` — auf Mitternacht in der
+// **Gerätezone** geschnappt, nicht in `vars.timezone` — und hätte den
+// Wochentag falsch verankert.
+const mineRuleSide = vars.recurrence
+  ? { recurrence: vars.recurrence, startAt, timezone: vars.timezone }
+  : null;
+```
+
+**(d)** Den `rows`-Ausdruck ersetzen:
+
+```ts
+        rows:
+          theirs === null
+            ? // Die Occurrence fehlt in der fremden Fassung. Ist die Regel der
+              // Grund, kennt `err.row` sie trotzdem (ADR-038).
+              recurrenceRowsWithoutOccurrence(
+                row,
+                expanded,
+                baseOccurrence?.rrule ?? null,
+                mineRuleSide,
+                t,
+              )
+            : fields.flatMap((field) => {
+                if (field !== "recurrence") {
+                  return [
+                    {
+                      label: t(FIELD_LABEL_KEY[field]),
+                      theirs: `${t("conflict.theirs")}: ${formatField(field, theirs)}`,
+                      mine: `${t("conflict.mine")}: ${formatField(field, mineSource)}`,
+                    },
+                  ];
+                }
+                // `differingEventFields` meldet die Regel nur, wenn dieser
+                // Schreibvorgang eine mitführt — der leere Zweig ist für den
+                // Compiler da, nicht für einen Laufzeitfall.
+                if (!mineRuleSide) return [];
+                return recurrenceConflictRows(theirs, mineRuleSide, t);
+              }),
+```
+
+**(e)** Zwei Kommentare in `showConflict` erklären `theirs === null` noch mit „außerhalb des Suchfensters oder hinter einem fremden Schnitt". Der Schnitt ist nur ein Beispiel. Die allgemeine Ursache lautet: Die fremde Regel erzeugt die Occurrence nicht mehr. Zieh beide auf diese Ursache nach:
+
+- den Kommentar über `const fields` („Genau die Überlegung, die auch `theirs === null` (…) in den Dialog …"),
+- den Kommentar in `onKeepMine` („`theirs` fehlt, wenn …"). Sein Kern bleibt: `row` ist in jedem Fall da, die frische Version also berechenbar.
+
+- [ ] **Step 6: Die übrigen Kommentare nachziehen**
+
+- `app-sections/shared/conflictStore.ts`, Docstring an `ShowConflictOptions.rows`: Der Grund „die Occurrence fehlt in der fremden Fassung (`theirs === null`)" führt seit diesem Task **nur noch dann** zu leeren Zeilen, wenn die Regel nicht der Grund ist (etwa außerhalb des Suchfensters). Ist die Regel der Grund, zeigt der Dialog die Regel-Zeilen. Formuliere das knapp.
+- `app-sections/task/TaskEditScreen.tsx:236-238`: „(Occurrence außerhalb des Suchfensters oder hinter einem fremden Schnitt)" wird zu „(die Occurrence fehlt in der fremden Fassung)".
+
+Nur Kommentare, kein ausführbarer Code.
+
+- [ ] **Step 7: `docs/TODO.md`, der 🎨-Eintrag „Der Konflikt-Dialog verschweigt, was an einer Regeländerung hängt"**
+
+Der dritte Fall („Liegt die von A bearbeitete Occurrence sogar hinter B's Schnitt … der Dialog erscheint ganz ohne Zeilen; … nur ohne jeden vorherigen Hinweis.") stimmt nach diesem Task nicht mehr. Der Dialog baut die Regel-Zeilen dann aus der fremden Zeile und zeigt „—" gegen „Unbegrenzt" wie im zweiten Fall. Lösche den dritten Fall. Ergänze den zweiten um einen Halbsatz: Das gilt auch dann, wenn die bearbeitete Occurrence hinter dem Schnitt liegt. Aus „Beides zu benennen" wird dabei wieder das Passende. Prüf danach jede Aussage des Eintrags gegen den Code.
+
+- [ ] **Step 8: Gates**
+
+Alle vier Gates. `bun format:check` nach Step 7. Erwartet: **851 pass** (838 + 4 + 9). `features/calendar` unter den drei Zonen, identisch.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add features/calendar/conflict.ts features/calendar/conflict.test.ts \
+  app-sections/event/recurrenceConflictRows.ts app-sections/event/recurrenceConflictRows.test.ts \
+  app-sections/event/EventEditScreen.tsx app-sections/shared/conflictStore.ts \
+  app-sections/task/TaskEditScreen.tsx docs/TODO.md
+git commit -m "fix(calendar): Regel-Zeilen auch, wenn die fremde Regel die Occurrence nicht mehr erzeugt"
+```
+
+---
+
+### Task 5: Dokumentation auf den Stand von Task 4
+
+**Files:**
+
+- Modify: `docs/decision-log.md` (ADR-038, entstanden in diesem PR und daher noch keine Historie)
+- Modify: `docs/roadmap.md` (Abschnitt 2.2, 🎨-Bündel)
+- Modify: `docs/superpowers/specs/2026-09-17-tasks-delete-path-conflict-gaps-design.md`
+
+**Kontext:** Nach Task 4 gilt:
+
+1. Fehlt `theirs`, weil die fremde Regel die Occurrence nicht mehr erzeugt, zeigt der Dialog die Regel-Zeilen, gebaut aus `err.row`.
+2. `theirs === null` hat zwei Ursachen: Die Occurrence liegt außerhalb des Suchfensters, oder die fremde Regel erzeugt sie nicht mehr. Die zweite umfasst einen Schnitt per „ab hier löschen", eine kleinere Anzahl und einen anderen Rhythmus. Sie besteht seit ADR-031 und wurde erst mit ADR-038 erkannt.
+3. Mehrere Texte erklären die zweite Ursache noch als „hinter einem fremden Schnitt". Einige behaupten außerdem, der Dialog erscheine in diesem Fall ohne Zeilen. Beides stimmt nicht mehr.
+
+- [ ] **Step 1: ADR-038**
+
+- Eine **Decision 7** anhängen: Fehlt `theirs`, baut der Dialog die Regel-Zeilen aus der fremden Zeile. Dafür gibt es `ruleConflicts` als eigene Funktion. Der Wochentag hängt an der ersten regulären Occurrence, nicht am Serienanker (ADR-032). Nenn den Anlass mit der Messtabelle aus dem Nachtrag dieses Plans und die Entscheidung des Nutzers vom 2026-09-30.
+- Die Consequences auf den neuen Stand bringen. Der dritte 🎨-Fall („ganz ohne Zeilen") entfällt. Die Erklärung des „zweiten Grundes" wird verallgemeinert: Die fremde Regel erzeugt die Occurrence nicht mehr. Die Testzahl ändert sich von 838 auf **851**, mit `conflict.test.ts` 10 und `recurrenceConflictRows.test.ts` 17. **Zähl selbst nach, statt diese Zahlen zu übernehmen.**
+- ADR-031 und ADR-037 bleiben unangetastet.
+
+- [ ] **Step 2: Roadmap 2.2 und 🎨-Bündel**
+
+- Der ADR-037-Absatz: „hinter einem fremden Schnitt" wird zur allgemeinen Ursache.
+- Der ADR-038-Absatz bekommt einen Satz: Die Regel-Zeilen erscheinen auch, wenn die fremde Regel die bearbeitete Occurrence nicht mehr erzeugt.
+- Der 🎨-Eintrag im Übergabe-Bündel folgt dem TODO-Eintrag aus Task 4 Step 7 und hat nur noch zwei Fälle.
+
+- [ ] **Step 3: Spec**
+
+- §2 (Absatz „Warum PR 2 vor PR 3"), §4.2 (`theirs` kann weiterhin `null` sein) und §9 (zeilenloser Dialog): „hinter einem fremden Schnitt" wird zur allgemeinen Ursache.
+- §5.3: Ein Absatz zum Fall ohne `theirs` kommt dazu, samt Anker-Regel.
+- §5.4: Der dritte Absatz (der Dialog erscheint ganz ohne Zeilen) entfällt oder geht im zweiten auf.
+- §5.5: Die neuen Tests kommen dazu, 4 für `ruleConflicts` und 9 für `recurrenceRowsWithoutOccurrence`.
+- §5.0 bekommt einen Punkt 4 zur Messung vom 2026-09-30 und zur Entscheidung.
+
+- [ ] **Step 4: Gegenlesen, Gates, Commit**
+
+Such danach repo-weit nach „hinter einem fremden Schnitt", „ganz ohne Zeilen" und „außerhalb des Suchfensters". Jeder Treffer außerhalb von ADR-031/ADR-037 und außerhalb der Pläne muss zum Stand nach Task 4 passen. Die Trefferliste gehört in den Report.
+
+`bun format:check`, `bun run typecheck`, `bun lint`, `bun test` (unverändert 851 pass).
+
+```bash
+git add docs/decision-log.md docs/roadmap.md \
+  docs/superpowers/specs/2026-09-17-tasks-delete-path-conflict-gaps-design.md
+git commit -m "docs(calendar): ADR-038 um die Regel-Zeilen ohne Occurrence ergaenzen"
+```
