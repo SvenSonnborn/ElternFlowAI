@@ -244,7 +244,7 @@ Jede Tatsache hat genau **einen** Ort; andere Dokumente verlinken dorthin, statt
 - **Keine flüchtigen Details in dauerhafter Doku.** Testzahlen, Zeilennummern und Messwerte veralten mit dem nächsten Commit. Commit-Hashes sind nach dem Merge tot, weil GitHub die Commits beim Merge neu schreibt. Auf Code wird über Datei und Funktion verwiesen.
 - **Doku einmal am Ende eines Branches, nicht pro Task.** ADR, Roadmap und `docs/architecture.md` entstehen im letzten Schritt vor dem PR, auf dem Stand, der dann gilt. Docstrings, Code-Kommentare und TODO-Einträge bleiben im Commit des Codes, den sie beschreiben.
 - **Doku-Befunde aus Reviews werden gesammelt** und in einem Durchgang vor dem PR behoben, nicht als eigene Review-Runde. Ausnahme: eine falsche Aussage in einem ADR, denn der friert mit dem Merge ein.
-- **Spec und Plan sind Arbeitsmittel.** Stellt sich eine Spec während der Umsetzung als falsch heraus, wird sie nicht nachgepflegt; der ADR hält fest, was stattdessen gilt. Pläne landen nicht mehr im Repo (die bis 2026-09 committeten unter `docs/superpowers/plans/` bleiben als Bericht stehen).
+- **Spec und Plan sind Arbeitsmittel.** Stellt sich eine Spec während der Umsetzung als falsch heraus, wird sie nicht nachgepflegt; der ADR hält fest, was stattdessen gilt. Pläne landen nicht mehr im Repo; die bereits auf `main` liegenden unter `docs/superpowers/plans/` bleiben als Bericht stehen.
 
 ### Docstrings
 
