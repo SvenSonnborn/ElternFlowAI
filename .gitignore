@@ -42,3 +42,6 @@ yarn-error.*
 
 # Claude worktrees (local development state)
 .claude/worktrees/
+
+# Arbeitsplaene und SDD-Workspaces (CLAUDE.md → „Wo was steht")
+.superpowers/

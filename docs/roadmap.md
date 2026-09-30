@@ -1079,8 +1079,10 @@ plausibel als „Abbrechen") · die Radien-Benennung zwischen Design-CSS und Tok
 ## Pflege dieser Datei
 
 - **`TODO.md` bleibt der Backlog.** Erledigtes wird dort **gelöscht** (CLAUDE.md → „Out-of-scope
-  TODOs"), nicht abgehakt. Hier wird der Block als erledigt markiert.
-- **Neue Funde** gehen zuerst nach `TODO.md`, dann in den passenden Block hier.
+  TODOs"), nicht abgehakt. Hier wird der Punkt als erledigt markiert — mit einem Satz und einem Verweis
+  auf den ADR, ohne dessen Inhalt zu wiederholen.
+- **Neue Funde** gehen nach `TODO.md` und stehen hier höchstens als **Verweis** im passenden Block. Der
+  Text eines Eintrags lebt nur an einer Stelle (CLAUDE.md → „Wo was steht").
 - **Verschiebt sich die Reihenfolge**, gehört der Grund dazu — diese Datei ist eine Begründung, keine
   Liste.
 - **Die Blöcke 1–4 sind gegeneinander verschiebbar**, 5–7 nicht: Block 6 sollte nach Block 5 kommen
