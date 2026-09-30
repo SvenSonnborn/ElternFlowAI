@@ -485,7 +485,9 @@ Nachlese". Mit `row` jetzt garantiert vorhanden ist `EventConflictError.row` nic
 zwei defensive Zweige, die kein Test je erreichen konnte, sind ersatzlos entfallen (der
 `if (row)`-Block und der tote `?? vars.baseVersion`-Rückfall in `EventEditScreen`s `showConflict`,
 die zweite Hälfte der Bedingung in `EventDetailScreen`s Lösch-Konflikt). `theirs` bleibt nullable —
-das heißt jetzt nur noch eines: die Occurrence lag außerhalb des Suchfensters. Beim Verengen zeigte
+das heißt jetzt nur noch: Die Occurrence lag außerhalb des Suchfensters oder hinter einem fremden
+Schnitt („ab hier löschen"), den die gekürzte Regel nicht mehr erzeugt. Der zweite Grund besteht
+seit ADR-031 und wurde erst mit [ADR-038](./decision-log.md) erkannt. Beim Verengen zeigte
 sich, dass Compiler und Linter tote Prüf-Zweige nicht von selbst finden (`no-unnecessary-condition`
 ist in diesem Repo aus); als eigener Eintrag in [TODO.md](./TODO.md) festgehalten. Der erste
 Spiegelstrich (die Wiederholungsregel im Vergleich) blieb damals offen und kam mit PR 3.
@@ -496,7 +498,7 @@ anderen und nur, wenn der Schreibvorgang überhaupt eine Regel mitführt. Der Ve
 in [rule.ts](../features/calendar/rule.ts) und ist derselbe, mit dem `applyEditScope` entscheidet,
 ob die Exceptions der Serie gelöscht werden — beide urteilen über dieselbe Frage und können nicht
 mehr auseinanderlaufen. Der Dialog zeigt bis zu **zwei** Zeilen aus vorhandenen Keys („Wiederholung",
-„Endet nach … Terminen") statt der einen Zeile aus der Spec: `cal.create.fieldRecurrenceCount` ist
+„Endet nach … Terminen") statt der einen Zeile aus dem ursprünglichen Spec-Entwurf: `cal.create.fieldRecurrenceCount` ist
 eine Beschriftung, keine Wert-Vorlage, und „Option + Anzahl" kann ein Serienende per Datum nicht
 ausdrücken. Benannte Grenze, als 🎨-Eintrag in [TODO.md](./TODO.md): Der Dialog sagt nicht, was an
 „Deine Fassung speichern" hängt — es löscht alle Exceptions der Serie und macht eine fremde
