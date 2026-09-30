@@ -235,7 +235,8 @@ export function TaskEditScreen() {
       // Basis lässt sich das gar nicht feststellen, also muss der Dialog
       // erscheinen — ohne Zeilen, aber sichtbar. Genau die Überlegung, die im
       // Kalender-Sheet den `theirs === null`-Fall (Occurrence außerhalb des
-      // Suchfensters) weiterhin in den Dialog statt ins Durchspeichern schickt.
+      // Suchfensters oder hinter einem fremden Schnitt) weiterhin in den Dialog
+      // statt ins Durchspeichern schickt.
       fields = baseTask ? differingTaskFields(theirs, vars.changes, baseTask) : [];
       // Der Zähler begrenzt **nur** diese stille Wiederholung, nicht den Tap
       // auf „Deine Fassung speichern": Ohne ihn liefe `speichern → Konflikt →

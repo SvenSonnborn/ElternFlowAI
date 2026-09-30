@@ -78,7 +78,7 @@ Drei PRs, in dieser Reihenfolge:
 
 **Warum PR 1 zuerst:** Größter Nutzerschaden. Eine Aufgabe, die jemand anderes gerade bearbeitet hat, verschwindet heute endgültig, ohne dass dieser Jemand ein Wort davon erfährt — beobachtet im Zwei-Client-Lauf.
 
-**Warum PR 2 vor PR 3:** PR 2 ist der kleinere und verbessert die Diagnostizierbarkeit des größeren. Solange der CAS-Fall den Dialog ohne Vergleichszeilen zeigt, ist bei jedem Dialog ohne Zeilen unklar, ob der Vergleich nichts fand oder die fremde Fassung fehlte. Nach PR 2 ist die fremde Fassung immer bekannt und die Basis-Version immer frisch; ein Dialog ohne Zeilen hat seither nur noch Ursachen, die sich benennen lassen — Occurrence außerhalb des Suchfensters, Basis nicht hydriert, erschöpftes Auto-Retry-Limit (ADR-037). _(Korrigiert 2026-09-18: Hier stand, „keine Zeilen" heiße nach PR 2 nur noch eines. Das stimmte nicht; dieselbe Behauptung wurde in PR 2 in ADR-037 und §9 berichtigt und an dieser Stelle übersehen.)_
+**Warum PR 2 vor PR 3:** PR 2 ist der kleinere und verbessert die Diagnostizierbarkeit des größeren. Solange der CAS-Fall den Dialog ohne Vergleichszeilen zeigt, ist bei jedem Dialog ohne Zeilen unklar, ob der Vergleich nichts fand oder die fremde Fassung fehlte. Nach PR 2 ist die fremde Fassung immer bekannt und die Basis-Version immer frisch; ein Dialog ohne Zeilen hat seither nur noch Ursachen, die sich benennen lassen — Occurrence außerhalb des Suchfensters, Basis nicht hydriert, erschöpftes Auto-Retry-Limit (ADR-037) und eine Occurrence hinter einem fremden Schnitt (ADR-038; dieser Grund besteht seit ADR-031 und ist erst mit PR 3 erkannt). _(Korrigiert 2026-09-18: Hier stand, „keine Zeilen" heiße nach PR 2 nur noch eines. Das stimmte nicht; dieselbe Behauptung wurde in PR 2 in ADR-037 und §9 berichtigt und an dieser Stelle übersehen.)_
 
 Der Schnitt trennt die PRs nach **Verträgen**, nicht nach Dateien. PR 1 fasst `features/tasks/` und `TaskEditScreen` an. PR 2 und PR 3 teilen zwei Produktionsdateien — `features/calendar/recurrence.ts` (PR 2 `updateMaster`, PR 3 `ruleDiffers`) und `EventEditScreen` (PR 2 die Null-Zweige in `showConflict`, PR 3 die Regel-Zeilen) —, PR 3 fasst außerdem `features/calendar/conflict.ts`, das neue `rule.ts` und einen Helfer neben dem Screen an. PR 3 setzt deshalb auf PR 2 auf; die Reihenfolge ist nicht beliebig. _(Korrigiert 2026-09-18: Hier stand, die drei PRs teilten keine Produktionsdatei und seien in jeder Reihenfolge mergebar.)_
 
@@ -222,12 +222,12 @@ Nach 4.1 kann `EventConflictError.row` nicht mehr `null` sein: Die einzige Stell
 
 Damit fallen zwei defensive Zweige ersatzlos weg:
 
-- `showConflict` in `EventEditScreen`: `const row = err.row; let theirs = null; if (row) { … }` wird geradlinig. Der `theirs === null`-Zweig beim Rendern der `rows` und der `?? vars.baseVersion`-Rückfall in `onKeepMine` verschwinden mit.
+- `showConflict` in `EventEditScreen`: `const row = err.row; let theirs = null; if (row) { … }` wird geradlinig. Der `?? vars.baseVersion`-Rückfall in `onKeepMine` verschwindet mit; der `theirs === null`-Zweig beim Rendern der `rows` bleibt (siehe unten).
 - `EventDetailScreen.errorAction`: `if (!(err instanceof EventConflictError) || !err.row)` verliert die zweite Hälfte.
 
 Der Gewinn ist nicht die gesparte Zeile, sondern dass der **Compiler** beweist, was der TODO-Eintrag fordert: Der Dialog hat immer eine frische Basis-Version, „Deine Fassung speichern" kann nicht mehr in eine Endlosschleife gegen dieselbe veraltete `baseVersion` laufen.
 
-`theirs` kann weiterhin `null` sein — dann nämlich, wenn die Occurrence außerhalb des Suchfensters liegt. Dieser Zweig bleibt, und er behält seinen Sinn: `row` ist dann bekannt, die frische Version also berechenbar (`occurrenceVersion(row, key)`), nur die Vergleichszeilen fehlen. Genau diese Unterscheidung war vorher unter dem gemeinsamen `null` begraben.
+`theirs` kann weiterhin `null` sein — dann nämlich, wenn die Occurrence außerhalb des Suchfensters liegt oder hinter einem fremden Schnitt („ab hier löschen"), den die gekürzte Regel nicht mehr erzeugt. Der zweite Grund besteht seit ADR-031 und ist erst mit ADR-038 erkannt. Dieser Zweig bleibt, und er behält seinen Sinn: `row` ist in beiden Fällen bekannt, die frische Version also berechenbar (`occurrenceVersion(row, key)`), nur die Vergleichszeilen fehlen. Genau diese Unterscheidung war vorher unter dem gemeinsamen `null` begraben.
 
 ### 4.3 Tests
 
@@ -325,7 +325,9 @@ Ein Sonderfall kann nicht auftreten: **A's Regel ist nicht darstellbar** — der
 
 Wählt der Nutzer „Deine Fassung speichern", gewinnt A's Regel — und `deleteAllExceptions` löscht die Ausnahmen der Serie (§1.1). Der Dialog benennt diese Folge **nicht**; dafür bräuchte es einen neuen Copy-Key. Die Entscheidung ist damit informiert über _das_, was kollidiert, nicht über alles, was daran hängt. Das ist besser als heute (gar keine Entscheidung) und schlechter als möglich — und geht als 🎨-Eintrag in `docs/TODO.md`.
 
-Dasselbe gilt für eine zweite Folge, die beim Nachmessen vor PR 3 auffiel (§5.0): Hat B die Serie per „ab hier löschen" an einem Datum beendet, trägt A's Schreibvorgang das `until` aus dem Stand, den A's Formular geladen hat — also keins. „Deine Fassung speichern" macht B's Kürzung damit rückgängig, die gelöschten Termine kehren zurück. Die Serienende-Zeile zeigt dann „—" gegen „Unbegrenzt": ein Hinweis, keine Erklärung. Derselbe 🎨-Eintrag nimmt beide Folgen auf.
+Dasselbe gilt für eine zweite Folge, die beim Nachmessen vor PR 3 auffiel (§5.0): Hat B die Serie per „ab hier löschen" an einem Datum beendet, trägt A's Schreibvorgang das `until` aus dem Stand, den A's Formular geladen hat — also keins. „Deine Fassung speichern" macht B's Kürzung damit rückgängig, die gelöschten Termine kehren zurück. Die Serienende-Zeile zeigt dann „—" gegen „Unbegrenzt": ein Hinweis, keine Erklärung.
+
+Eine dritte Folge hängt an derselben Kürzung: Liegt A's bearbeitete Occurrence **hinter** B's Schnitt, erzeugt die gekürzte Regel ihren Schlüssel nicht mehr. `expandEvents` findet sie in der frisch gelesenen Zeile nicht, `theirs` ist `null`, und der Dialog erscheint ganz ohne Zeilen — auch die „—"-Zeile der zweiten Folge fehlt dann, und der stille Auto-Retry entfällt, weil er ein `theirs` voraussetzt. „Deine Fassung speichern" macht die Kürzung trotzdem rückgängig, nur ohne jeden Hinweis vorher; die frische Basis-Version liefert `occurrenceVersion(row, key)`, weil `row` bekannt ist. Der Fall besteht seit ADR-031 (jeder Schnitt ändert den Master, der Pre-Flight schlägt an) und ist erst mit ADR-038 erkannt; ADR-037 nennt für `theirs === null` nur das Suchfenster. Derselbe 🎨-Eintrag nimmt alle drei Folgen auf.
 
 ### 5.5 Tests
 
@@ -411,6 +413,6 @@ Für den Block:
 
 - Das Löschen einer Aufgabe, die jemand anderes im Undo-Fenster geändert hat, zeigt denselben Fehler-Toast mit „Trotzdem löschen" wie der Termin-Pfad.
 - Eine reine Rhythmus-Änderung durch zwei Clients erzeugt einen Dialog statt eines stillen Overwrites — und die Exceptions der Serie überleben, solange niemand „Deine Fassung speichern" wählt.
-- Der zeilenlose Konflikt-Dialog verschwindet nicht (Occurrence außerhalb des Fensters, noch nicht hydrierte Basis, erschöpftes Auto-Retry-Limit bleiben möglich) — aber er hat jetzt in jedem Fall eine frische Basis-Version, weil `row` nicht mehr fehlen kann.
+- Der zeilenlose Konflikt-Dialog verschwindet nicht (Occurrence außerhalb des Fensters oder hinter einem fremden Schnitt, noch nicht hydrierte Basis, erschöpftes Auto-Retry-Limit bleiben möglich; der Schnitt-Fall besteht seit ADR-031 und ist erst mit ADR-038 erkannt) — aber er hat jetzt in jedem Fall eine frische Basis-Version, weil `row` nicht mehr fehlen kann.
 - `features/tasks/mutations.ts` hat eine Testsuite; der Zwei-Client-Lauf ist nicht mehr der einzige Beleg für das Task-CAS.
 - Eine Sichtprüfung am Simulator über beide Pfade: Aufgabe löschen (Konflikt und Normalfall), Serienrhythmus gleichzeitig ändern. Web reicht für den Aufgaben-Löschpfad, nicht für den Termin-Pfad (Block 3).
