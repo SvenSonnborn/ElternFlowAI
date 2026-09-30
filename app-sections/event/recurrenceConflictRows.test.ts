@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { RecurrenceChanges } from "@/features/calendar/recurrence";
 import type { OccurrenceRrule } from "@/features/calendar/types";
 
-import { recurrenceConflictRows } from "./recurrenceConflictRows";
+import { recurrenceConflictRows, recurrenceRowsWithoutOccurrence } from "./recurrenceConflictRows";
 
 // Gibt den Key zurück — so prüft der Test, WELCHER Text gewählt wurde, ohne
 // von der Übersetzung abzuhängen.
@@ -158,5 +158,155 @@ describe("recurrenceConflictRows", () => {
         mine: "conflict.mine: —",
       },
     ]);
+  });
+});
+
+describe("recurrenceRowsWithoutOccurrence", () => {
+  type ForeignRow = Parameters<typeof recurrenceRowsWithoutOccurrence>[0];
+
+  // Die fremde Zeile: eine Serie, die an einem Montag begann (04.05.2026,
+  // 17:00 Berlin). Die bearbeitete Occurrence fehlt in ihr — deshalb gibt es
+  // kein `theirs`.
+  function foreignRow(overrides: Partial<ForeignRow> = {}): ForeignRow {
+    return {
+      rrule_freq: "weekly",
+      rrule_interval: 1,
+      rrule_byweekday: [1],
+      rrule_count: null,
+      rrule_until: null,
+      start_at: "2026-05-04T15:00:00.000Z",
+      timezone: ZONE,
+      ...overrides,
+    };
+  }
+  const regular = (iso: string) => ({ isException: false, startAt: new Date(iso) });
+  const moved = (iso: string) => ({ isException: true, startAt: new Date(iso) });
+  const MONDAY = regular("2026-05-04T15:00:00.000Z");
+  const daily = { rrule_freq: "daily" as const, rrule_byweekday: null };
+
+  test("die andere Seite stellt auf monatlich → die Options-Zeile, obwohl die Occurrence fehlt", () => {
+    expect(
+      recurrenceRowsWithoutOccurrence(
+        foreignRow({ rrule_freq: "monthly", rrule_byweekday: null }),
+        [MONDAY],
+        WEEKLY,
+        mine(daily),
+        t,
+      ),
+    ).toEqual([
+      {
+        label: "cal.create.fieldRecurrence",
+        theirs: "conflict.theirs: cal.recur.monthly",
+        mine: "conflict.mine: cal.recur.daily",
+      },
+    ]);
+  });
+
+  test("die andere Seite begrenzt auf 6, ich auf 10 → die Serienende-Zeile", () => {
+    expect(
+      recurrenceRowsWithoutOccurrence(
+        foreignRow({ rrule_count: 6 }),
+        [MONDAY],
+        WEEKLY,
+        mine({ rrule_count: 10 }),
+        t,
+      ),
+    ).toEqual([
+      {
+        label: "cal.create.fieldRecurrenceCount",
+        theirs: "conflict.theirs: 6",
+        mine: "conflict.mine: 10",
+      },
+    ]);
+  });
+
+  test("ein fremder Schnitt gegen meine offene tägliche Serie → beide Zeilen", () => {
+    expect(
+      recurrenceRowsWithoutOccurrence(
+        foreignRow({ rrule_until: "2026-06-14T21:59:59.999+00:00" }),
+        [MONDAY],
+        WEEKLY,
+        mine(daily),
+        t,
+      ),
+    ).toEqual([
+      {
+        label: "cal.create.fieldRecurrence",
+        theirs: "conflict.theirs: cal.recur.weekly",
+        mine: "conflict.mine: cal.recur.daily",
+      },
+      {
+        label: "cal.create.fieldRecurrenceCount",
+        theirs: "conflict.theirs: —",
+        mine: "conflict.mine: cal.create.recurrenceCountUnlimited",
+      },
+    ]);
+  });
+
+  test("ich fasse die Regel nicht an → keine Zeilen", () => {
+    expect(
+      recurrenceRowsWithoutOccurrence(
+        foreignRow({ rrule_freq: "monthly", rrule_byweekday: null }),
+        [MONDAY],
+        WEEKLY,
+        null,
+        t,
+      ),
+    ).toEqual([]);
+  });
+
+  test("die andere Seite hat die Regel nicht geändert → keine Zeilen", () => {
+    // `theirs` fehlt dann aus einem anderen Grund, etwa außerhalb des Suchfensters.
+    expect(recurrenceRowsWithoutOccurrence(foreignRow(), [MONDAY], WEEKLY, mine(daily), t)).toEqual(
+      [],
+    );
+  });
+
+  test("ohne hydrierte Basis → keine Zeilen", () => {
+    expect(
+      recurrenceRowsWithoutOccurrence(
+        foreignRow({ rrule_freq: "monthly", rrule_byweekday: null }),
+        [MONDAY],
+        null,
+        mine(daily),
+        t,
+      ),
+    ).toEqual([]);
+  });
+
+  test("der Wochentag hängt an einer erzeugten Occurrence, nicht am Serienanker", () => {
+    // „Wöchentlich am Mittwoch" auf einer Serie, die an einem Montag begann:
+    // Der Anker bleibt bei einer Regeländerung stehen (ADR-032). Gegen den
+    // Montag gelesen, hielte `rruleToRecurrence` die Regel für nicht darstellbar.
+    const rows = recurrenceRowsWithoutOccurrence(
+      foreignRow({ rrule_byweekday: [3] }),
+      [regular("2026-05-06T15:00:00.000Z")],
+      WEEKLY,
+      mine(daily),
+      t,
+    );
+    expect(rows[0]?.theirs).toBe("conflict.theirs: cal.recur.weekly");
+  });
+
+  test("verschobene Exceptions zählen nicht als Anker", () => {
+    const rows = recurrenceRowsWithoutOccurrence(
+      foreignRow({ rrule_byweekday: [3] }),
+      [moved("2026-05-05T15:00:00.000Z"), regular("2026-05-06T15:00:00.000Z")],
+      WEEKLY,
+      mine(daily),
+      t,
+    );
+    expect(rows[0]?.theirs).toBe("conflict.theirs: cal.recur.weekly");
+  });
+
+  test("ohne reguläre Occurrence im Fenster bleibt der Serienanker", () => {
+    const rows = recurrenceRowsWithoutOccurrence(
+      foreignRow({ rrule_count: 6 }),
+      [],
+      WEEKLY,
+      mine(daily),
+      t,
+    );
+    expect(rows[0]?.theirs).toBe("conflict.theirs: cal.recur.weekly");
   });
 });

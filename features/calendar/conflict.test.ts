@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { EventChanges, RecurrenceChanges } from "./recurrence";
 import type { CalendarOccurrence, OccurrenceRrule } from "./types";
 
-import { differingEventFields } from "./conflict";
+import { differingEventFields, ruleConflicts } from "./conflict";
 
 const START = new Date("2026-06-15T15:00:00.000Z");
 const END = new Date("2026-06-15T16:00:00.000Z");
@@ -216,5 +216,46 @@ describe("differingEventFields — die Regel", () => {
         rule({ rrule_count: 6 }),
       ),
     ).toEqual(["title", "recurrence"]);
+  });
+});
+
+describe("ruleConflicts", () => {
+  const WEEKLY: OccurrenceRrule = {
+    freq: "weekly",
+    interval: 1,
+    byweekday: [1],
+    count: null,
+    until: null,
+  };
+  const MONTHLY: OccurrenceRrule = {
+    freq: "monthly",
+    interval: 1,
+    byweekday: null,
+    count: null,
+    until: null,
+  };
+  const daily: RecurrenceChanges = {
+    rrule_freq: "daily",
+    rrule_interval: 1,
+    rrule_byweekday: null,
+    rrule_count: null,
+    rrule_until: null,
+  };
+
+  test("fremd geändert und meine Regel weicht ab → Konflikt", () => {
+    expect(ruleConflicts(MONTHLY, WEEKLY, daily)).toBe(true);
+  });
+
+  test("ohne eigene Regel nie ein Konflikt", () => {
+    expect(ruleConflicts(MONTHLY, WEEKLY, null)).toBe(false);
+    expect(ruleConflicts(MONTHLY, WEEKLY, undefined)).toBe(false);
+  });
+
+  test("fremd unverändert → kein Konflikt, auch wenn meine Regel abweicht", () => {
+    expect(ruleConflicts(WEEKLY, WEEKLY, daily)).toBe(false);
+  });
+
+  test("beide Seiten gleich geändert → kein Konflikt", () => {
+    expect(ruleConflicts(MONTHLY, WEEKLY, { ...daily, rrule_freq: "monthly" })).toBe(false);
   });
 });

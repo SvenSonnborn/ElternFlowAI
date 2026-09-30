@@ -1,5 +1,5 @@
 import type { EventChanges, RecurrenceChanges } from "./recurrence";
-import type { CalendarOccurrence } from "./types";
+import type { CalendarOccurrence, OccurrenceRrule } from "./types";
 
 import { ruleOf, sameRule } from "./rule";
 
@@ -31,6 +31,31 @@ function sameText(a: string | null, b: string | null): boolean {
  */
 function sameInstant(a: Date, b: string): boolean {
   return a.getTime() === new Date(b).getTime();
+}
+
+/**
+ * Ob die Regel ein Konflikt ist — dreiwertig wie die fünf Felder: jemand
+ * anderes hat sie geändert (`theirs ≠ base`), und mein Schreibvorgang würde
+ * sie überschreiben (`mine ≠ theirs`). Ohne Regel im Schreibvorgang
+ * (`mineRecurrence == null`) nie: Die `rrule_*`-Spalten stehen dann nicht im
+ * UPDATE (ADR-038 Decision 2).
+ *
+ * Eine eigene Funktion statt eines Zweigs in `differingEventFields`, weil der
+ * Konflikt-Dialog sie auch **ohne** fremde Occurrence braucht: Erzeugt die
+ * fremde Regel die bearbeitete Occurrence nicht mehr (monatlich statt
+ * wöchentlich, eine kleinere Anzahl, ein Schnitt per „ab hier löschen"), gibt
+ * es kein `theirs` — die fremde Regel ist über `err.row` aber bekannt.
+ */
+export function ruleConflicts(
+  theirsRule: OccurrenceRrule,
+  baseRule: OccurrenceRrule,
+  mineRecurrence: RecurrenceChanges | null | undefined,
+): boolean {
+  return (
+    mineRecurrence != null &&
+    !sameRule(theirsRule, baseRule) &&
+    !sameRule(theirsRule, ruleOf(mineRecurrence))
+  );
 }
 
 /**
@@ -92,11 +117,7 @@ export function differingEventFields(
   ) {
     out.push("description");
   }
-  if (
-    mineRecurrence != null &&
-    !sameRule(theirs.rrule, base.rrule) &&
-    !sameRule(theirs.rrule, ruleOf(mineRecurrence))
-  ) {
+  if (ruleConflicts(theirs.rrule, base.rrule, mineRecurrence)) {
     out.push("recurrence");
   }
   return out;

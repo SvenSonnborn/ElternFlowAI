@@ -1,4 +1,5 @@
 import type { ConflictRow } from "@/app-sections/shared/conflictStore";
+import type { EventWithRelations } from "@/features/calendar/expand";
 import type { RecurrenceChanges } from "@/features/calendar/recurrence";
 import type { CalendarOccurrence, OccurrenceRrule } from "@/features/calendar/types";
 import type { Translate } from "@/features/shared";
@@ -6,6 +7,7 @@ import type { Translate } from "@/features/shared";
 // Direkt aus dem Modul, nicht aus dem Barrel `@/features/calendar`: Der zieht
 // Hooks, die unter `bun test` nicht laden, und dieser Helfer existiert gerade,
 // damit seine Zweige testbar sind.
+import { ruleConflicts } from "@/features/calendar/conflict";
 import { rruleToRecurrence } from "@/features/calendar/createMutation";
 import { ruleOf } from "@/features/calendar/rule";
 
@@ -96,4 +98,60 @@ export function recurrenceConflictRows(
   }
   if (rows.length === 0) rows.push(optionRow);
   return rows;
+}
+
+/** Die Spalten der fremden Zeile, die die Regel-Zeilen brauchen. */
+type ForeignRow = Pick<
+  EventWithRelations,
+  | "rrule_freq"
+  | "rrule_interval"
+  | "rrule_byweekday"
+  | "rrule_count"
+  | "rrule_until"
+  | "start_at"
+  | "timezone"
+>;
+
+/**
+ * Die Regel-Zeilen für den Fall, dass die fremde Fassung die bearbeitete
+ * Occurrence nicht mehr enthält (`theirs === null`).
+ *
+ * Häufig, nicht exotisch: Stellt die andere Seite von wöchentlich auf
+ * monatlich, begrenzt sie die Serie auf weniger Termine oder schneidet sie per
+ * „ab hier löschen" ab, erzeugt die neue Regel die Occurrence nicht mehr, an
+ * der dieses Formular hängt. Der Dialog erschien dann schon immer — aber ohne
+ * jede Zeile, und „Deine Fassung speichern" überschrieb eine Regel, die der
+ * Nutzer nie gesehen hatte. Die fremde Regel ist über `err.row` bekannt; nur
+ * die Occurrence fehlt (ADR-038).
+ *
+ * Der Wochentag der fremden Regel hängt an einer Occurrence, die sie
+ * tatsächlich erzeugt — der ersten regulären im Suchfenster —, nicht an
+ * `row.start_at`: Der Serienanker bleibt bei einer Regeländerung stehen
+ * (ADR-032) und liegt dann nicht zwingend auf dem Wochentag der neuen Regel
+ * („wöchentlich am Mittwoch" auf einer Serie, die an einem Montag begann).
+ * Verschobene Exceptions zählen nicht, ihr Start sagt nichts über die Regel.
+ * Nur wenn das Fenster keine reguläre Occurrence enthält, bleibt
+ * `row.start_at`.
+ *
+ * Leer, wenn es keine Regel-Kollision gibt: Die eigene Seite fasst die Regel
+ * nicht an, die andere hat sie nicht geändert, oder die Basis ist noch nicht
+ * hydriert. Dann fehlt `theirs` aus einem anderen Grund, etwa weil die
+ * Occurrence außerhalb des Suchfensters lag, und der Dialog bleibt ohne Zeilen.
+ */
+export function recurrenceRowsWithoutOccurrence(
+  row: ForeignRow,
+  expanded: readonly Pick<CalendarOccurrence, "isException" | "startAt">[],
+  baseRule: OccurrenceRrule | null,
+  mine: MineSide | null,
+  t: Translate,
+): ConflictRow[] {
+  if (baseRule == null || mine == null) return [];
+  const theirsRule = ruleOf(row);
+  if (!ruleConflicts(theirsRule, baseRule, mine.recurrence)) return [];
+  const anchor = expanded.find((o) => !o.isException)?.startAt ?? new Date(row.start_at);
+  return recurrenceConflictRows(
+    { rrule: theirsRule, startAt: anchor, timezone: row.timezone },
+    mine,
+    t,
+  );
 }
