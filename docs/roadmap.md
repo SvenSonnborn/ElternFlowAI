@@ -511,7 +511,9 @@ Schnitt dann zwei Serien nebeneinander laufen und Termine doppelt stehen —, un
 erscheint nur als „—". Jede dieser Folgen zu benennen bräuchte einen Copy-Key. Ein zweiter
 🎨-Eintrag, vorbestehend seit ADR-031: Hat die andere Seite genau die bearbeitete Occurrence abgesagt,
 erscheint der Dialog ohne Zeilen, und „Deine Fassung speichern" hebt die Absage mit „Nur diesen"
-oder „dieser und folgende" auf. Ohne 🎨, als offene Verhaltensfrage, dazu ein dritter Eintrag
+oder „dieser und folgende" auf — mit Letzterem außer am Serienanfang, wo der Zweig nicht teilt,
+sondern den Master schreibt (`updateMaster`), und die Absage bleibt. Ohne 🎨, als offene
+Verhaltensfrage, dazu ein dritter Eintrag
 (ebenfalls seit ADR-031): Fehlt die bearbeitete Occurrence in der fremden Fassung und ändert der
 Nutzer die Regel nicht, erscheint der Dialog ohne Zeilen, und „Deine Fassung speichern" tut je nach
 Scope Unerwartetes — mit „dieser und folgende" schiebt es etwa ein fremdes Serienende per Datum nach
@@ -519,6 +521,16 @@ hinten, sodass gelöschte Termine zurückkehren, während die eigene Änderung n
 „Nur diesen"
 landet die Änderung in einer verwaisten, unsichtbaren Exception. Ein Fix braucht zuerst die
 Entscheidung, was „Deine Fassung speichern" für eine weggefallene Occurrence heißen soll.
+
+Ein vierter Eintrag, ohne 🎨, fiel beim Gesamt-Review von ADR-038 auf und besteht schon länger:
+**„Auf einer per ‚Nur diesen' verschobenen Occurrence bleibt der Recurrence-Editor verborgen, obwohl
+die Regel darstellbar ist"** · [EventEditScreen.tsx](../app-sections/event/EventEditScreen.tsx) —
+`initial`. Die Hydration verankert `rruleToRecurrence` auf dem per Override aufgelösten Start; liegt
+der bei einer Regel „wöchentlich an einem Tag" auf einem anderen Wochentag, liefert es `null`, und
+Wiederholung wie Serienende sind auf dieser Occurrence ausgeblendet. Kein Datenverlust: Ohne Editor
+führt der Schreibvorgang keine neue Regel mit. Dieselbe Anker-Klasse löst `ruleAnchor` auf der
+fremden Seite des Dialogs schon; ein Fix muss den eigenen Anker in `buildRecurrenceChanges`
+(`range.startAt`) mitziehen, sonst schriebe er die Regel auf den verschobenen Wochentag um.
 
 ### 2.3 Toggle-Fehler ist auf Web unsichtbar
 

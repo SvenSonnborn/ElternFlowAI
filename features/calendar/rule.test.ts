@@ -53,6 +53,20 @@ describe("sameRule", () => {
     );
     expect(sameRule(rule({ until: null }), rule({ until: null }))).toBe(true);
   });
+
+  test("ein unparsbares Serienende gegen ein gültiges ist ein Unterschied", () => {
+    // `new Date("kaputt")` ist `NaN`, und `NaN` ist keinem Zeitpunkt gleich —
+    // bei einem kaputten Datum ist „verschieden" die sichere Richtung.
+    expect(sameRule(rule({ until: "kaputt" }), rule({ until: "2026-09-27T21:59:59.999Z" }))).toBe(
+      false,
+    );
+  });
+
+  test("zwei gleiche unparsbare Serienenden sind gleich", () => {
+    // Der Kurzschluss über die Zeichenkette greift vor dem Parsen: Geparst wären
+    // beide `NaN`, und `NaN === NaN` ist falsch.
+    expect(sameRule(rule({ until: "kaputt" }), rule({ until: "kaputt" }))).toBe(true);
+  });
 });
 
 describe("ruleOf", () => {
