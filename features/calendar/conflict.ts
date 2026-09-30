@@ -38,7 +38,11 @@ function sameInstant(a: Date, b: string): boolean {
  * anderes hat sie geändert (`theirs ≠ base`), und mein Schreibvorgang würde
  * sie überschreiben (`mine ≠ theirs`). Ohne Regel im Schreibvorgang
  * (`mineRecurrence == null`) nie: Die `rrule_*`-Spalten stehen dann nicht im
- * UPDATE (ADR-038 Decision 2).
+ * UPDATE (ADR-038 Decision 2). Im Fall ohne `theirs` berührt ein Schnitt mit
+ * „dieser und folgende" die fremde Regel allerdings doch (`setRruleUntil`
+ * bzw. `setRruleCount`); die Entscheidung „kein Konflikt" bleibt trotzdem —
+ * was „Deine Fassung speichern" für eine weggefallene Occurrence heißen soll,
+ * ist offen (`docs/TODO.md`).
  *
  * Eine eigene Funktion statt eines Zweigs in `differingEventFields`, weil der
  * Konflikt-Dialog sie auch **ohne** fremde Occurrence braucht: Erzeugt die

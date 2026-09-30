@@ -3,7 +3,11 @@ import { describe, expect, test } from "bun:test";
 import type { RecurrenceChanges } from "@/features/calendar/recurrence";
 import type { OccurrenceRrule } from "@/features/calendar/types";
 
-import { recurrenceConflictRows, recurrenceRowsWithoutOccurrence } from "./recurrenceConflictRows";
+import {
+  recurrenceConflictRows,
+  recurrenceRowsWithoutOccurrence,
+  ruleAnchor,
+} from "./recurrenceConflictRows";
 
 // Gibt den Key zurück — so prüft der Test, WELCHER Text gewählt wurde, ohne
 // von der Übersetzung abzuhängen.
@@ -309,5 +313,33 @@ describe("recurrenceRowsWithoutOccurrence", () => {
       t,
     );
     expect(rows[0]?.theirs).toBe("conflict.theirs: cal.recur.weekly");
+  });
+});
+
+describe("ruleAnchor", () => {
+  // Serienanker Montag, 04.05.2026; die Regel liegt inzwischen auf Mittwoch.
+  const ROW = { start_at: "2026-05-04T15:00:00.000Z" };
+  const regular = (iso: string) => ({ isException: false, startAt: new Date(iso) });
+  const withException = (iso: string) => ({ isException: true, startAt: new Date(iso) });
+
+  test("die erste reguläre Occurrence", () => {
+    expect(
+      ruleAnchor(ROW, [regular("2026-05-06T15:00:00.000Z"), regular("2026-05-13T15:00:00.000Z")]),
+    ).toEqual(new Date("2026-05-06T15:00:00.000Z"));
+  });
+
+  test("Occurrences mit Exception werden übersprungen", () => {
+    expect(
+      ruleAnchor(ROW, [
+        withException("2026-05-05T15:00:00.000Z"),
+        regular("2026-05-13T15:00:00.000Z"),
+      ]),
+    ).toEqual(new Date("2026-05-13T15:00:00.000Z"));
+  });
+
+  test("ohne reguläre Occurrence gilt der Serienanker", () => {
+    expect(ruleAnchor(ROW, [withException("2026-05-05T15:00:00.000Z")])).toEqual(
+      new Date("2026-05-04T15:00:00.000Z"),
+    );
   });
 });
