@@ -454,7 +454,7 @@ Abmeldung** liefert dasselbe Bild wie „schon gelöscht" — null Zeilen, leere
 nimmt denselben stillen Weg. Sie zu trennen bräuchte eine serverseitige Auskunft und damit
 eine Migration; vertagt bis Block 7 (Transaktions-RPC).
 
-### 2.2 Die zwei Löcher in der Conflict-Detection — **M**
+### 2.2 Die zwei Löcher in der Conflict-Detection — **erledigt**
 
 Beide in `TODO.md` → [Calendar](./TODO.md#calendar-v1--siehe-adr-008), beide von ADR-031 bewusst
 außerhalb von Task 8 gelassen:
@@ -488,7 +488,21 @@ die zweite Hälfte der Bedingung in `EventDetailScreen`s Lösch-Konflikt). `thei
 das heißt jetzt nur noch eines: die Occurrence lag außerhalb des Suchfensters. Beim Verengen zeigte
 sich, dass Compiler und Linter tote Prüf-Zweige nicht von selbst finden (`no-unnecessary-condition`
 ist in diesem Repo aus); als eigener Eintrag in [TODO.md](./TODO.md) festgehalten. Der erste
-Spiegelstrich (die Wiederholungsregel im Vergleich) bleibt offen und kommt mit PR 3.
+Spiegelstrich (die Wiederholungsregel im Vergleich) blieb damals offen und kam mit PR 3.
+
+**Umgesetzt als [ADR-038](./decision-log.md)** — der erste Spiegelstrich. `differingEventFields`
+kennt die Wiederholungsregel jetzt als eigenes Konfliktfeld (`"recurrence"`), dreiwertig wie die
+anderen und nur, wenn der Schreibvorgang überhaupt eine Regel mitführt. Der Vergleich selbst liegt
+in [rule.ts](../features/calendar/rule.ts) und ist derselbe, mit dem `applyEditScope` entscheidet,
+ob die Exceptions der Serie gelöscht werden — beide urteilen über dieselbe Frage und können nicht
+mehr auseinanderlaufen. Der Dialog zeigt bis zu **zwei** Zeilen aus vorhandenen Keys („Wiederholung",
+„Endet nach … Terminen") statt der einen Zeile aus der Spec: `cal.create.fieldRecurrenceCount` ist
+eine Beschriftung, keine Wert-Vorlage, und „Option + Anzahl" kann ein Serienende per Datum nicht
+ausdrücken. Benannte Grenze, als 🎨-Eintrag in [TODO.md](./TODO.md): Der Dialog sagt nicht, was an
+„Deine Fassung speichern" hängt — es löscht alle Exceptions der Serie und macht eine fremde
+Kürzung per „ab hier löschen" rückgängig —, und ein Enddatum erscheint nur als „—". Liegt die
+bearbeitete Occurrence hinter dem fremden Schnitt, erscheint der Dialog ganz ohne Zeilen. Jede
+dieser Folgen zu benennen bräuchte einen Copy-Key.
 
 ### 2.3 Toggle-Fehler ist auf Web unsichtbar
 
@@ -1010,7 +1024,8 @@ Dazu die EN-Gegenlese von `sample.*` ([ADR-020](./decision-log.md)) und `dash.to
 · „Stattdessen kochen"? für den Meal-Hero-Tausch (→ [Block 6](#block-6--meal-plan-mutationen-der-größte-feature-unlock))
 · `set.logoutConfirm` (Body-Text, auf Android heute sichtbar leer) · „Rezept nicht verfügbar" ·
 `hw.dueRelative.today`/`tomorrow` (relative Wörter statt nacktem Datum — der gelöschte Mock konnte
-das besser) · Hinweistext für die bei Scope „alle Termine" verworfene Datumsänderung (→ [Block 1](#block-1--stiller-datenverlust-im-kalender), Vorbild `cal.edit.recurrenceAppliesToAll`, [ADR-032](./decision-log.md)).
+das besser) · Hinweistext für die bei Scope „alle Termine" verworfene Datumsänderung (→ [Block 1](#block-1--stiller-datenverlust-im-kalender), Vorbild `cal.edit.recurrenceAppliesToAll`, [ADR-032](./decision-log.md)) ·
+Warnsatz im Konflikt-Dialog einer Regeländerung („Deine Fassung speichern" löscht alle Ausnahmen der Serie und macht eine fremde Kürzung rückgängig) und ein Wert „endet am …" für das Serienende (→ [2.2](#22-die-zwei-löcher-in-der-conflict-detection--erledigt), [ADR-038](./decision-log.md)).
 
 **Pattern-Docs, die vom Code abweichen** (`patterns/` ist off-limits, Abweichung ist freigegeben,
 der Doc muss nachziehen): `homework.md` (kennt weder Filterleiste noch fünf Sektionen noch die
