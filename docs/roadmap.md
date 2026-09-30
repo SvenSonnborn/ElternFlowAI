@@ -485,9 +485,11 @@ Nachlese". Mit `row` jetzt garantiert vorhanden ist `EventConflictError.row` nic
 zwei defensive Zweige, die kein Test je erreichen konnte, sind ersatzlos entfallen (der
 `if (row)`-Block und der tote `?? vars.baseVersion`-Rückfall in `EventEditScreen`s `showConflict`,
 die zweite Hälfte der Bedingung in `EventDetailScreen`s Lösch-Konflikt). `theirs` bleibt nullable —
-das heißt jetzt nur noch: Die Occurrence lag außerhalb des Suchfensters oder hinter einem fremden
-Schnitt („ab hier löschen"), den die gekürzte Regel nicht mehr erzeugt. Der zweite Grund besteht
-seit ADR-031 und wurde erst mit [ADR-038](./decision-log.md) erkannt. Beim Verengen zeigte
+das heißt jetzt in der Praxis nur noch: Die andere Seite hat genau diese Occurrence abgesagt, oder ihre Regel
+erzeugt sie nicht mehr (ein Schnitt per „ab hier löschen", eine kleinere Anzahl, ein anderer
+Rhythmus). ADR-037 selbst nennt stattdessen eine Occurrence außerhalb des Suchfensters — praktisch
+unerreichbar, weil `eventLookupWindow` den Tag des Schlüssels immer abdeckt. Beide wirklichen
+Gründe bestehen seit ADR-031 und wurden erst mit [ADR-038](./decision-log.md) erkannt. Beim Verengen zeigte
 sich, dass Compiler und Linter tote Prüf-Zweige nicht von selbst finden (`no-unnecessary-condition`
 ist in diesem Repo aus); als eigener Eintrag in [TODO.md](./TODO.md) festgehalten. Der erste
 Spiegelstrich (die Wiederholungsregel im Vergleich) blieb damals offen und kam mit PR 3.
@@ -500,11 +502,15 @@ ob die Exceptions der Serie gelöscht werden — beide urteilen über dieselbe F
 mehr auseinanderlaufen. Der Dialog zeigt bis zu **zwei** Zeilen aus vorhandenen Keys („Wiederholung",
 „Endet nach … Terminen") statt der einen Zeile aus dem ursprünglichen Spec-Entwurf: `cal.create.fieldRecurrenceCount` ist
 eine Beschriftung, keine Wert-Vorlage, und „Option + Anzahl" kann ein Serienende per Datum nicht
-ausdrücken. Benannte Grenze, als 🎨-Eintrag in [TODO.md](./TODO.md): Der Dialog sagt nicht, was an
-„Deine Fassung speichern" hängt — es löscht alle Exceptions der Serie und macht eine fremde
-Kürzung per „ab hier löschen" rückgängig —, und ein Enddatum erscheint nur als „—". Liegt die
-bearbeitete Occurrence hinter dem fremden Schnitt, erscheint der Dialog ganz ohne Zeilen. Jede
-dieser Folgen zu benennen bräuchte einen Copy-Key.
+ausdrücken. Die Regel-Zeilen erscheinen auch, wenn die fremde Regel die bearbeitete Occurrence nicht
+mehr erzeugt: Der Dialog baut sie dann aus der fremden Zeile (`err.row`) — nur bei einer
+Regel-Kollision, die eigene Seite muss die Regel also ebenfalls ändern. Benannte Grenze, als 🎨-Eintrag in [TODO.md](./TODO.md): Der Dialog sagt
+nicht, was an „Deine Fassung speichern" hängt — es löscht alle Exceptions der Serie und macht eine
+fremde Kürzung rückgängig, per „ab hier löschen" ebenso wie per „dieser und folgende", wo ab dem
+Schnitt dann zwei Serien nebeneinander laufen und Termine doppelt stehen —, und ein Enddatum
+erscheint nur als „—". Jede dieser Folgen zu benennen bräuchte einen Copy-Key. Ein zweiter
+🎨-Eintrag, vorbestehend seit ADR-031: Hat die andere Seite genau die bearbeitete Occurrence abgesagt,
+erscheint der Dialog ohne Zeilen, und „Deine Fassung speichern" hebt die Absage auf.
 
 ### 2.3 Toggle-Fehler ist auf Web unsichtbar
 
@@ -1027,7 +1033,8 @@ Dazu die EN-Gegenlese von `sample.*` ([ADR-020](./decision-log.md)) und `dash.to
 · `set.logoutConfirm` (Body-Text, auf Android heute sichtbar leer) · „Rezept nicht verfügbar" ·
 `hw.dueRelative.today`/`tomorrow` (relative Wörter statt nacktem Datum — der gelöschte Mock konnte
 das besser) · Hinweistext für die bei Scope „alle Termine" verworfene Datumsänderung (→ [Block 1](#block-1--stiller-datenverlust-im-kalender), Vorbild `cal.edit.recurrenceAppliesToAll`, [ADR-032](./decision-log.md)) ·
-Warnsatz im Konflikt-Dialog einer Regeländerung („Deine Fassung speichern" löscht alle Ausnahmen der Serie und macht eine fremde Kürzung rückgängig) und ein Wert „endet am …" für das Serienende (→ [2.2](#22-die-zwei-löcher-in-der-conflict-detection--erledigt), [ADR-038](./decision-log.md)).
+Warnsatz im Konflikt-Dialog einer Regeländerung („Deine Fassung speichern" löscht alle Ausnahmen der Serie und macht eine fremde Kürzung rückgängig — nach „dieser und folgende" mit doppelten Terminen ab dem Schnitt) und ein Wert „endet am …" für das Serienende (→ [2.2](#22-die-zwei-löcher-in-der-conflict-detection--erledigt), [ADR-038](./decision-log.md)) ·
+eine Zeile „abgesagt" im Konflikt-Dialog, wenn die andere Seite genau die bearbeitete Occurrence abgesagt hat (→ [2.2](#22-die-zwei-löcher-in-der-conflict-detection--erledigt), vorbestehend seit [ADR-031](./decision-log.md)).
 
 **Pattern-Docs, die vom Code abweichen** (`patterns/` ist off-limits, Abweichung ist freigegeben,
 der Doc muss nachziehen): `homework.md` (kennt weder Filterleiste noch fünf Sektionen noch die

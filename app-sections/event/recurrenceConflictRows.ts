@@ -64,8 +64,10 @@ function endText(rule: OccurrenceRrule, t: Translate): string {
  * unterscheiden. Zeigt keine einen Unterschied — er liegt dann in einem Teil
  * der Regel, den das Formular nicht darstellt: Intervall, Wochentage, zwei
  * verschiedene Enddaten —, erscheint die Options-Zeile trotzdem.
- * `differingEventFields` hat einen echten Konflikt gemeldet; ein Dialog, der
- * ihn meldet und nichts zeigt, wäre schlechter als zwei gleiche Werte.
+ * `ruleConflicts` hat einen echten Konflikt gemeldet (über
+ * `differingEventFields` oder, ohne `theirs`, über
+ * `recurrenceRowsWithoutOccurrence`); ein Dialog, der ihn meldet und nichts
+ * zeigt, wäre schlechter als zwei gleiche Werte.
  *
  * Ein eigenes Modul statt Code in `showConflict`, weil `EventEditScreen` unter
  * `bun test` nicht ladbar ist und diese Zweige einen Test verdienen.
@@ -116,27 +118,47 @@ type ForeignRow = Pick<
  * Die Regel-Zeilen für den Fall, dass die fremde Fassung die bearbeitete
  * Occurrence nicht mehr enthält (`theirs === null`).
  *
- * Häufig, nicht exotisch: Stellt die andere Seite von wöchentlich auf
- * monatlich, begrenzt sie die Serie auf weniger Termine oder schneidet sie per
- * „ab hier löschen" ab, erzeugt die neue Regel die Occurrence nicht mehr, an
- * der dieses Formular hängt. Der Dialog erschien dann schon immer — aber ohne
- * jede Zeile, und „Deine Fassung speichern" überschrieb eine Regel, die der
- * Nutzer nie gesehen hatte. Die fremde Regel ist über `err.row` bekannt; nur
- * die Occurrence fehlt (ADR-038).
+ * `theirs` fehlt in der Praxis aus zwei Gründen: Die andere Seite hat genau
+ * diese Occurrence abgesagt („Nur diesen" löschen — `expandEvents`
+ * überspringt `cancelled`), oder ihre Regel erzeugt sie nicht mehr. Der
+ * zweite ist häufig, nicht exotisch: Stellt die andere Seite von wöchentlich
+ * auf monatlich oder auf alle zwei Wochen, begrenzt sie die Serie auf weniger
+ * Termine oder schneidet sie per „ab hier löschen" ab, fällt die Occurrence,
+ * an der dieses Formular hängt, oft heraus. Der Dialog erschien dann seit
+ * ADR-031 — aber ohne jede Zeile, und änderte die eigene Seite die Regel mit,
+ * überschrieb „Deine Fassung speichern" eine Regel, die der Nutzer nie
+ * gesehen hatte. Die fremde Regel ist über `err.row` bekannt; nur die
+ * Occurrence fehlt (ADR-038). Ein Suchfenster, das die Occurrence verfehlt,
+ * ist dagegen praktisch kein Grund: `eventLookupWindow` deckt den Tag des
+ * Schlüssels in `row.timezone` immer ab, nur ein kaputter Schlüssel fiele auf
+ * das Standardfenster zurück.
  *
  * Der Wochentag der fremden Regel hängt an einer Occurrence, die sie
  * tatsächlich erzeugt — der ersten regulären im Suchfenster —, nicht an
  * `row.start_at`: Der Serienanker bleibt bei einer Regeländerung stehen
  * (ADR-032) und liegt dann nicht zwingend auf dem Wochentag der neuen Regel
  * („wöchentlich am Mittwoch" auf einer Serie, die an einem Montag begann).
- * Verschobene Exceptions zählen nicht, ihr Start sagt nichts über die Regel.
- * Nur wenn das Fenster keine reguläre Occurrence enthält, bleibt
+ * Keine Occurrence mit Exception (`isException`) zählt, auch keine, deren
+ * Override nur den Titel ändert: Das Flag sagt nicht, ob der Override den
+ * Start verschoben hat, und ein verschobener Start sagt nichts über die
+ * Regel. Nur wenn das Fenster keine reguläre Occurrence enthält, bleibt
  * `row.start_at`.
  *
- * Leer, wenn es keine Regel-Kollision gibt: Die eigene Seite fasst die Regel
- * nicht an, die andere hat sie nicht geändert, oder die Basis ist noch nicht
- * hydriert. Dann fehlt `theirs` aus einem anderen Grund, etwa weil die
- * Occurrence außerhalb des Suchfensters lag, und der Dialog bleibt ohne Zeilen.
+ * Zeilen entstehen nur, wenn alle drei Bedingungen gelten: Die eigene Seite
+ * ändert die Regel ebenfalls (`mine` gesetzt), die Basis ist hydriert
+ * (`baseRule` gesetzt), und die fremde Regel weicht von Basis und eigener ab
+ * (`ruleConflicts`). Sonst ist die Liste leer, und der Dialog bleibt ohne
+ * Zeilen. Ändert die eigene Seite an einer weggefallenen Occurrence nur den
+ * Titel, ist das richtig: Ihr Schreibvorgang fasst die Regel dann nicht an.
+ * Hat die andere Seite die Regel nicht geändert, bleibt von den beiden
+ * Gründen für das fehlende `theirs` nur der erste: Sie hat genau diese
+ * Occurrence abgesagt.
+ *
+ * Entstehen Zeilen, zeigen sie nur die Regel. Hat die andere Seite zugleich
+ * ein Feld wie Titel oder Ort geändert (Scope „alle"), fehlt dafür eine Zeile
+ * — `differingEventFields` braucht eine fremde Occurrence, und die gibt es
+ * hier nicht —, und „Deine Fassung speichern" überschreibt es still. Nicht
+ * schlechter als vorher, da gab es gar keine Zeile.
  */
 export function recurrenceRowsWithoutOccurrence(
   row: ForeignRow,
