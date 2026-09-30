@@ -41,7 +41,7 @@ import {
   type RecurrenceOption,
 } from "@/features/calendar";
 
-import { recurrenceConflictRows } from "./recurrenceConflictRows";
+import { recurrenceConflictRows, recurrenceRowsWithoutOccurrence } from "./recurrenceConflictRows";
 import { RecurrenceCountField } from "./RecurrenceCountField";
 import { RecurrenceRadio } from "./RecurrenceRadio";
 import { pickScope } from "./scopeDialog";
@@ -363,14 +363,15 @@ export function EventEditScreen() {
       // Override-Intervall der angeforderten Occurrence ab.
       const row = err.row;
       const { start: windowStart, end: windowEnd } = eventLookupWindow(row, vars.occurrenceKey);
+      // Einmal expandiert, zweimal gelesen: für `theirs` und — fehlt es — als
+      // Wochentag-Anker der fremden Regel (`recurrenceRowsWithoutOccurrence`).
+      const expanded = expandEvents([row], windowStart, windowEnd, theme);
       // Match auf `occurrenceKey`: Nur der Schlüssel identifiziert dieselbe
       // Occurrence zuverlässig, wenn eine Verschiebung ihn vom aufgelösten
       // Anzeigedatum hat auseinanderlaufen lassen (ADR-034) — derselbe Grund
       // wie beim `find` in `useEvent` (`features/calendar/hooks.ts`).
       const theirs: CalendarOccurrence | null =
-        expandEvents([row], windowStart, windowEnd, theme).find(
-          (o) => o.occurrenceKey === vars.occurrenceKey,
-        ) ?? null;
+        expanded.find((o) => o.occurrenceKey === vars.occurrenceKey) ?? null;
 
       // Fehlt `baseOccurrence` (theoretisch: der Konflikt trifft vor der
       // Hydration ein), bleibt `fields` leer — aber der Guard darunter prüft
@@ -378,9 +379,8 @@ export function EventEditScreen() {
       // fehlende Basis nicht denselben Weg nimmt wie ein echtes „niemand hat
       // etwas geändert". Ohne Basis lässt sich das gar nicht feststellen, also
       // muss der Dialog erscheinen — ohne Zeilen, aber sichtbar. Genau die
-      // Überlegung, die auch `theirs === null` (Occurrence außerhalb des
-      // Suchfensters oder hinter einem fremden Schnitt) in den Dialog statt
-      // ins Durchspeichern schickt.
+      // Überlegung, die auch `theirs === null` (die fremde Regel erzeugt die
+      // Occurrence nicht mehr) in den Dialog statt ins Durchspeichern schickt.
       const fields =
         theirs && baseOccurrence
           ? differingEventFields(theirs, vars.changes, baseOccurrence, vars.recurrence)
@@ -407,12 +407,31 @@ export function EventEditScreen() {
         description: vars.changes.description,
       };
 
+      // Die eigene Regel-Seite, gelesen von beiden Zweigen unten. `startAt`
+      // aus der Formular-Range (Zeile ~112), nicht `vars.changes.start_at`:
+      // `buildRecurrenceChanges` hat die Regel mit genau diesem Wert gebaut.
+      // Bei einem ganztägigen Termin ist `vars.changes.start_at` bereits
+      // `toAllDayRange(range).startAt` — auf Mitternacht in der
+      // **Gerätezone** geschnappt, nicht in `vars.timezone` — und hätte den
+      // Wochentag falsch verankert.
+      const mineRuleSide = vars.recurrence
+        ? { recurrence: vars.recurrence, startAt, timezone: vars.timezone }
+        : null;
+
       conflict.show({
         title: t("conflict.title"),
         body: t("conflict.body.event"),
         rows:
           theirs === null
-            ? []
+            ? // Die Occurrence fehlt in der fremden Fassung. Ist die Regel der
+              // Grund, kennt `err.row` sie trotzdem (ADR-038).
+              recurrenceRowsWithoutOccurrence(
+                row,
+                expanded,
+                baseOccurrence?.rrule ?? null,
+                mineRuleSide,
+                t,
+              )
             : fields.flatMap((field) => {
                 if (field !== "recurrence") {
                   return [
@@ -426,33 +445,17 @@ export function EventEditScreen() {
                 // `differingEventFields` meldet die Regel nur, wenn dieser
                 // Schreibvorgang eine mitführt — der leere Zweig ist für den
                 // Compiler da, nicht für einen Laufzeitfall.
-                if (!vars.recurrence) return [];
-                return recurrenceConflictRows(
-                  theirs,
-                  {
-                    recurrence: vars.recurrence,
-                    // `startAt` aus der Formular-Range (Zeile ~112), nicht
-                    // `vars.changes.start_at`: `buildRecurrenceChanges` hat die
-                    // Regel mit genau diesem Wert gebaut. Bei einem ganztägigen
-                    // Termin ist `vars.changes.start_at` bereits
-                    // `toAllDayRange(range).startAt` — auf Mitternacht in der
-                    // **Gerätezone** geschnappt, nicht in `vars.timezone` — und
-                    // hätte den Wochentag hier falsch verankert (Befund 1,
-                    // Review-Runde 1).
-                    startAt,
-                    timezone: vars.timezone,
-                  },
-                  t,
-                );
+                if (!mineRuleSide) return [];
+                return recurrenceConflictRows(theirs, mineRuleSide, t);
               }),
         keepMineLabel: t("conflict.keepMine"),
         keepTheirsLabel: t("conflict.keepTheirs"),
         onKeepMine: () => {
           save({
             ...vars,
-            // `theirs` fehlt, wenn die Occurrence außerhalb des Suchfensters lag
-            // oder hinter einem fremden Schnitt („ab hier löschen"), den die
-            // gekürzte Regel nicht mehr erzeugt. In beiden Fällen ist `row` seit
+            // `theirs` fehlt, wenn die fremde Fassung die Occurrence nicht mehr
+            // enthält — etwa weil ihre Regel sie nicht mehr erzeugt oder sie
+            // außerhalb des Suchfensters lag. In jedem Fall ist `row` seit
             // ADR-037 da, die frische Version also immer berechenbar — ohne
             // erneut zu expandieren. Der tote Rückfall auf `vars.baseVersion`,
             // der diesen Versuch zwangsläufig erneut kollidieren ließ, ist damit
