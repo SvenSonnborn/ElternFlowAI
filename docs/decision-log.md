@@ -1497,3 +1497,29 @@ react-native-web implementiert `Alert` als No-op (`static alert() {}`). Jeder Ab
 - Auf Android sind Abmelden, Termin- und Kind-Löschen jetzt `cancelable` (Tipp neben den Dialog bricht ab) — die Vorgabe von `confirmDestructive`, wie schon in `TaskEditScreen`.
 - Die Geburtstagsfelder sind auf iOS dasselbe Bottom-Sheet wie im Termin-Formular statt des kompakten Inline-Pickers.
 - Die Regel erkennt `Alert.alert` am Namen; `import { Alert as X }` umgeht sie. Sie ist eine Leitplanke gegen Versehen, keine Durchsetzung.
+
+## ADR-040 — Web-Eigenheiten: `AuthGate` behält den Root-Navigator mit Sitzung, das Web-Datumsfeld hält den Zwischenstand (2026-10-01)
+
+### Status
+
+Accepted. Löst nichts ab; präzisiert die Begründung in [ADR-030](#adr-030--live-sync-für-den-kalender-broadcast-from-database-ein-familien-topic-ein-mountpunkt-2026-09-02) Decision 5 (siehe Consequences). Setzt den zweiten PR aus [Roadmap Block 3](./roadmap.md#block-3--web-parität) um. Spec: [2026-10-01-web-parity-quirks-design.md](./superpowers/specs/2026-10-01-web-parity-quirks-design.md) — mit einer Abweichung, Decision 2.
+
+### Context
+
+Die Roadmap verlangte für drei Web-Eigenheiten zuerst eine Diagnose. Gemessen im Web-Build mit Playwright: (1) Der „Agenda-Klick auf eine unsichtbare Kalendertag-Fläche" war ein Testartefakt — inaktive Tabs bleiben verdeckt und `aria-hidden` im DOM, Dashboard und Agenda vergeben dasselbe `aria-label`, und der Testlauf griff die verdeckte Zeile; ein echter Klick auf die Agenda navigiert. (2) Die Render-Schleife beim Login-Übergang entsteht, weil `AuthGate` im Root-Layout bei Splash und Redirect **statt** des `<Stack>` rendert: Ein `<Redirect>`, der einen schon gemounteten Root-Navigator ersetzt, lässt expo-routers `useSyncState.flushUpdates` in „Maximum update depth exceeded" laufen. Expo-Router verlangt einen gemounteten Root-Navigator; nur verschachtelte Layouts dürfen ihn aufschieben. (3) Das kontrollierte Web-Datumsfeld springt zurück, sobald der Browser einen leeren Wert meldet — bei einem gelöschten Segment und bei ungültigen Kombinationen wie 29.02. im Nicht-Schaltjahr, was das Datum in Feldreihenfolge unerreichbar machte.
+
+### Decisions
+
+1. **Agenda: keine Code-Änderung.** Dass verdeckte Tabs auf Web den Tastaturfokus annehmen (`aria-hidden`, aber nicht `inert`), ist ein eigener Befund und steht in [Roadmap Block 4](./roadmap.md#block-4--touch-targets--a11y).
+2. **`AuthGate` hängt den Root-Navigator nicht mehr aus, solange eine Sitzung besteht.** Ist er einmal gemountet, steht ein anstehender Redirect neben ihm, und Warten zeigt den Splash als Deckfläche darüber. Beim Kaltstart und immer, wenn keine Sitzung besteht, ersetzt der Gate seine Kinder wie bisher. **Abweichung von der Spec**, die den Navigator nach dem ersten Mount ausnahmslos stehen ließ: Die Schluss-Review fand, dass beim Abmelden dann `(tabs)` unter `/login` gemountet blieb (`router.replace` tauscht nur die fokussierte Route), nach `qc.clear()` ohne Sitzung nachlud und leere Ergebnisse cachte — nach einem schnellen Wieder-Login zeigte die Familie keine Aufgaben, und der Stack wuchs mit jedem Zyklus. Das Ersetzen beim Abmelden setzt den Stack zurück; die Schleife trat nur beim Umleiten _in_ die App auf.
+3. **Die Regel ist eine reine Funktion**, `gateLayout` in `features/auth/gateLayout.ts` neben `decideRoute`, damit sie unter `bun test` steht; `AuthGate` rendert nur noch ihr Ergebnis. Den Merker „schon gemountet" setzt der Gate beim Rendern, nicht im Effekt — die Lint-Regel `react-hooks/set-state-in-effect` lehnt den Effekt ab, und React verwirft Render-Updates eines abgebrochenen Renders.
+4. **Das Web-Datumsfeld zeigt einen unparsbaren Rohwert als lokalen Entwurf**, statt auf den letzten gültigen Wert zurückzuspringen. Gültige Werte gehen weiter sofort über `onPick` hinaus, der Vertrag aus [ADR-039](#adr-039--web-parität-der-dialoge-alertalert-nur-über-die-helfer-scope-auswahl-als-sheet-auf-web-und-android-2026-10-01) bleibt auf allen Plattformen gleich; „Fertig" bei unvollständigem Entwurf übernimmt den letzten gültigen Wert. Der Entwurf lebt nur, solange das Sheet offen ist. Verworfen: das Feld unkontrolliert führen und erst bei „Fertig" übernehmen — dann verwürfe der Scrim auf Web die Eingabe, auf iOS nicht.
+
+Verworfen für Decision 2: `Stack.Protected` (die Regel, dass der Onboarding-Flow nicht verlassen wird, wenn mitten darin der Parent entsteht — [ADR-005](#adr-005--supabase-auth--onboarding-approach-c-2026-06-01) Decision 5 —, und das Warten auf den Parent ließen sich nicht ohne zusätzlichen Zustand als Guards ausdrücken) und Redirects in den Gruppen-Layouts nach Expo-Doku (die geschützten Root-Routen wie `event/*`, `task/*`, `settings` hätten dann keinen Gate oder müssten in eine neue Gruppe umziehen).
+
+### Consequences
+
+- Die Konsole ist beim Login-Übergang auf Web sauber. Geprüft per Playwright: Login, Kaltstart mit und ohne Sitzung, echtes Abmelden aus dem Settings-Sheet mit schnellem Wieder-Login, das Datumsfeld in deutscher Segmentreihenfolge. **Nicht geprüft: iOS und Android** — `AuthGate` gilt dort genauso.
+- Beim Login-Übergang bleibt der Login-Screen unter der Deckfläche gemountet. Sie fängt Taps ab, nicht Tastatur und Screenreader — vermerkt beim Fokus-Befund in Block 4.
+- ADR-030 Decision 5 begründet den Platz von `useFamilyRealtime()` vor dem Gate damit, dass dieser bei Redirects `<Redirect>` statt seiner Kinder rendere. Das gilt jetzt nur noch beim Kaltstart und ohne Sitzung; der Platz bleibt richtig.
+- Die Familien-Queries (`useFamilyEvents`, `useFamilyTasks`, `useMealPlans`) haben weiter keinen Sitzungs-Guard. Harmlos, solange der Gate die geschützten Screens ohne Sitzung abhängt — als Lücke in [TODO.md](./TODO.md) vermerkt.
