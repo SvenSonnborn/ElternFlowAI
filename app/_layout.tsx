@@ -22,9 +22,10 @@ function ThemedStack() {
   // Offene Undo-Fenster schließen, wenn die App in den Hintergrund geht.
   useFlushPendingDeletes();
   // Der eine Familien-Kanal. Steht bewusst hier und nicht in `useFamilyEvents`
-  // (drei Aufrufer, zwei dauerhaft gemountet) und nicht unter `<AuthGate>`
-  // (beim Kaltstart rendert der Gate Splash/Redirect statt seiner Kinder — ein
-  // Abo darunter stünde dann noch nicht) — siehe ADR-030.
+  // (drei Aufrufer, zwei dauerhaft gemountet) und nicht unter `<AuthGate>`:
+  // Der Gate rendert beim Kaltstart und überall ohne Sitzung Splash bzw.
+  // `<Redirect>` statt seiner Kinder — ein Abo darunter stünde dann noch nicht
+  // oder wäre mit den Kindern wieder abgebaut — siehe ADR-030.
   useFamilyRealtime();
   return (
     <AuthGate>

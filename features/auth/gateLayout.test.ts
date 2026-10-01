@@ -5,6 +5,8 @@ import type { SessionStatus } from "./session";
 
 import { gateLayout, type GateLayoutInput } from "./gateLayout";
 
+const TARGETS: (RoutePath | null)[] = [null, "/(auth)/login", "/(onboarding)/2", "/(tabs)"];
+
 function input(partial: Partial<GateLayoutInput>): GateLayoutInput {
   return {
     sessionStatus: "unauthenticated",
@@ -30,6 +32,13 @@ describe("gateLayout — Kaltstart (Navigator noch nicht gemountet)", () => {
     expect(
       gateLayout(input({ sessionStatus: "unauthenticated", target: "/(auth)/login" })),
     ).toEqual({ kind: "redirect", href: "/(auth)/login" });
+  });
+
+  test("angemeldet + Ziel Tabs (Kaltstart mit Sitzung auf /login) → Redirect ersetzt die Kinder", () => {
+    expect(gateLayout(input({ sessionStatus: "authenticated", target: "/(tabs)" }))).toEqual({
+      kind: "redirect",
+      href: "/(tabs)",
+    });
   });
 
   test("angemeldet, kein Ziel → Kinder ohne Redirect und ohne Deckfläche", () => {
@@ -58,7 +67,7 @@ describe("gateLayout — Navigator gemountet", () => {
     ).toEqual({ kind: "app", redirect: "/(tabs)", cover: true });
   });
 
-  test("abgemeldet + Ziel Login (Abmelden) → Kinder bleiben, Redirect daneben, Deckfläche", () => {
+  test("abgemeldet + Ziel Login (Abmelden) → Redirect ersetzt die Kinder trotz Mount", () => {
     expect(
       gateLayout(
         input({
@@ -67,7 +76,13 @@ describe("gateLayout — Navigator gemountet", () => {
           navigatorMounted: true,
         }),
       ),
-    ).toEqual({ kind: "app", redirect: "/(auth)/login", cover: true });
+    ).toEqual({ kind: "redirect", href: "/(auth)/login" });
+  });
+
+  test("abgemeldet, schon in der Auth-Gruppe (kein Ziel) → Kinder ohne Redirect und ohne Deckfläche", () => {
+    expect(
+      gateLayout(input({ sessionStatus: "unauthenticated", target: null, navigatorMounted: true })),
+    ).toEqual({ kind: "app", redirect: null, cover: false });
   });
 
   test("Sitzung lädt erneut → Kinder bleiben, Deckfläche", () => {
@@ -84,13 +99,12 @@ describe("gateLayout — Navigator gemountet", () => {
     ).toEqual({ kind: "app", redirect: null, cover: false });
   });
 
-  test("Invariante: einmal gemountet, hängt keine Kombination die Kinder wieder aus", () => {
-    const statuses: SessionStatus[] = ["loading", "authenticated", "unauthenticated"];
-    const targets: (RoutePath | null)[] = [null, "/(auth)/login", "/(onboarding)/2", "/(tabs)"];
+  test("Invariante: mit Sitzung (oder ladend) hängt keine Kombination die Kinder wieder aus", () => {
+    const statuses: SessionStatus[] = ["loading", "authenticated"];
 
     for (const sessionStatus of statuses) {
       for (const parentIsLoading of [false, true]) {
-        for (const target of targets) {
+        for (const target of TARGETS) {
           const layout = gateLayout({
             sessionStatus,
             parentIsLoading,
@@ -99,6 +113,24 @@ describe("gateLayout — Navigator gemountet", () => {
           });
           expect(layout.kind).toBe("app");
           if (layout.kind === "app") expect(layout.redirect).toBe(target);
+        }
+      }
+    }
+  });
+
+  test("Invariante: ohne Sitzung ersetzt jedes Ziel die Kinder — gemountet oder nicht", () => {
+    for (const navigatorMounted of [false, true]) {
+      for (const parentIsLoading of [false, true]) {
+        for (const target of TARGETS) {
+          if (target === null) continue;
+          expect(
+            gateLayout({
+              sessionStatus: "unauthenticated",
+              parentIsLoading,
+              target,
+              navigatorMounted,
+            }),
+          ).toEqual({ kind: "redirect", href: target });
         }
       }
     }
