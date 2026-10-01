@@ -2,10 +2,17 @@ import { format, parseISO } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Alert, Pressable, ScrollView, Switch, View } from "react-native";
+import { Pressable, ScrollView, Switch, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ChildAvatar, Icon, useToast, useUndoableDelete } from "@/app-sections/shared";
+import {
+  ChildAvatar,
+  confirmDestructive,
+  Icon,
+  showAlert,
+  useToast,
+  useUndoableDelete,
+} from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
@@ -93,10 +100,10 @@ export function EventDetailScreen() {
       { eventId: id, familyId, offsetMinutes, enabled },
       {
         onError: (err) => {
-          Alert.alert(
-            t("cal.detail.reminderError"),
-            err instanceof Error ? err.message : undefined,
-          );
+          showAlert({
+            title: t("cal.detail.reminderError"),
+            body: err instanceof Error ? err.message : undefined,
+          });
         },
       },
     );
@@ -110,120 +117,116 @@ export function EventDetailScreen() {
     });
   };
 
-  const onDeletePress = () => {
+  const onDeletePress = async () => {
     if (!data) return;
-    Alert.alert(t("cal.delete.confirmTitle"), t("cal.delete.confirmBody"), [
-      { text: t("action.cancel"), style: "cancel" },
-      {
-        text: t("cal.delete.confirmOk"),
-        style: "destructive",
-        onPress: () => {
-          void (async () => {
-            const isRecurring = data.isRecurring;
-            let scope: EditScope = "all";
-            if (isRecurring) {
-              const labels = {
-                title: t("cal.scope.title"),
-                this: t("cal.scope.this"),
-                forward: t("cal.scope.forward"),
-                all: t("cal.scope.all"),
-                cancel: t("action.cancel"),
-              };
-              const chosen = await pickScope(labels);
-              if (!chosen) return;
-              scope = chosen;
-            }
-            const message = undoDeleteMessage({
-              title: data.title,
-              scope,
-              occurrenceDate: data.occurrenceDate,
-              isRecurring,
-              t,
-              // Das Muster hängt an der Sprache, nicht nur am Monatsnamen: der
-              // Punkt nach dem Tag ist deutsche Konvention, Englisch will den
-              // Monat davor. `docs/COPY.md` schreibt beide Formen fest
-              // (DE „Mi, 14. Mai", EN „Wed, May 14"); dieselbe Verzweigung wie
-              // in `TaskForm`s `dueDatePattern`.
-              formatDate: (occurrenceDate) =>
-                format(parseISO(occurrenceDate), lang === "de" ? "E, d. MMM" : "E, MMM d", {
-                  locale: dateLocale,
-                }),
-            });
+    const ok = await confirmDestructive({
+      title: t("cal.delete.confirmTitle"),
+      body: t("cal.delete.confirmBody"),
+      confirm: t("cal.delete.confirmOk"),
+      cancel: t("action.cancel"),
+    });
+    if (!ok) return;
+    const isRecurring = data.isRecurring;
+    let scope: EditScope = "all";
+    if (isRecurring) {
+      const labels = {
+        title: t("cal.scope.title"),
+        this: t("cal.scope.this"),
+        forward: t("cal.scope.forward"),
+        all: t("cal.scope.all"),
+        cancel: t("action.cancel"),
+      };
+      const chosen = await pickScope(labels);
+      if (!chosen) return;
+      scope = chosen;
+    }
+    const message = undoDeleteMessage({
+      title: data.title,
+      scope,
+      occurrenceDate: data.occurrenceDate,
+      isRecurring,
+      t,
+      // Das Muster hängt an der Sprache, nicht nur am Monatsnamen: der
+      // Punkt nach dem Tag ist deutsche Konvention, Englisch will den
+      // Monat davor. `docs/COPY.md` schreibt beide Formen fest
+      // (DE „Mi, 14. Mai", EN „Wed, May 14"); dieselbe Verzweigung wie
+      // in `TaskForm`s `dueDatePattern`.
+      formatDate: (occurrenceDate) =>
+        format(parseISO(occurrenceDate), lang === "de" ? "E, d. MMM" : "E, MMM d", {
+          locale: dateLocale,
+        }),
+    });
 
-            undoableDelete({
-              kind: "event",
-              target: {
+    undoableDelete({
+      kind: "event",
+      target: {
+        eventId: data.eventId,
+        occurrenceKey: data.occurrenceKey,
+        scope,
+      },
+      title: t("cal.delete.undoTitle"),
+      message,
+      run: () =>
+        deleteMutation.mutateAsync({
+          scope,
+          eventId: data.eventId,
+          occurrenceKey: data.occurrenceKey,
+          isRecurring,
+          baseVersion: data.version,
+        }),
+      errorTitle: t("cal.delete.error"),
+      // Nicht `err.message`: der Fehler-Toast läuft nie ab, eine rohe
+      // PostgREST-Meldung stünde also unbegrenzt englisch in einer
+      // deutschen Oberfläche. `mapEventError` klassifiziert wie
+      // `mapTaskError` bei den Aufgaben.
+      formatError: (err) => t(mapEventError(err)),
+      // „Trotzdem löschen" statt eines Dialogs: Seit ADR-026 läuft das
+      // Löschen fünf Sekunden verzögert, der Nutzer ist längst auf
+      // einem anderen Screen und hat den Termin nicht mehr vor sich —
+      // ein Feldvergleich hätte dort nichts zu vergleichen (ADR-031).
+      // Die frische Basis-Version kommt aus der Fassung, die der
+      // Fehler mitträgt; ein Bypass ist damit nicht nötig. Der Retry
+      // läuft ohne eigenes Undo-Fenster: Der Nutzer hat gerade
+      // ausdrücklich entschieden, ein zweites „bist du sicher?" wäre
+      // eine Rückfrage auf eine Antwort, die schon gegeben ist.
+      errorAction: (err) => {
+        if (!(err instanceof EventConflictError)) return undefined;
+        const fresh = occurrenceVersion(err.row, data.occurrenceKey);
+        return {
+          label: t("conflict.deleteAnyway"),
+          onPress: () => {
+            // `useDeleteEvent` kennt nur `onSuccess`, kein `onError` —
+            // ohne dieses `.catch()` verschwindet ein zweiter
+            // Kollisions- oder Netzwerkfehler lautlos: kein
+            // `unhandledrejection`-Handler und keine ErrorBoundary im
+            // Repo fangen ihn auf, siehe `showConflict` in
+            // `EventEditScreen.tsx`. Bewusst ohne eine zweite
+            // „Trotzdem löschen"-Aktion: Eine Aktion, die sich selbst
+            // nachreicht, baute eine Kette, die nur wächst. Der Termin
+            // steht ja noch — der Nutzer kann ihn regulär erneut
+            // löschen, dann mit vollem Undo-Fenster. Ein Toast, der
+            // den Fehlschlag benennt, ist hier die ehrliche Auskunft.
+            deleteMutation
+              .mutateAsync({
+                scope,
                 eventId: data.eventId,
                 occurrenceKey: data.occurrenceKey,
-                scope,
-              },
-              title: t("cal.delete.undoTitle"),
-              message,
-              run: () =>
-                deleteMutation.mutateAsync({
-                  scope,
-                  eventId: data.eventId,
-                  occurrenceKey: data.occurrenceKey,
-                  isRecurring,
-                  baseVersion: data.version,
-                }),
-              errorTitle: t("cal.delete.error"),
-              // Nicht `err.message`: der Fehler-Toast läuft nie ab, eine rohe
-              // PostgREST-Meldung stünde also unbegrenzt englisch in einer
-              // deutschen Oberfläche. `mapEventError` klassifiziert wie
-              // `mapTaskError` bei den Aufgaben.
-              formatError: (err) => t(mapEventError(err)),
-              // „Trotzdem löschen" statt eines Dialogs: Seit ADR-026 läuft das
-              // Löschen fünf Sekunden verzögert, der Nutzer ist längst auf
-              // einem anderen Screen und hat den Termin nicht mehr vor sich —
-              // ein Feldvergleich hätte dort nichts zu vergleichen (ADR-031).
-              // Die frische Basis-Version kommt aus der Fassung, die der
-              // Fehler mitträgt; ein Bypass ist damit nicht nötig. Der Retry
-              // läuft ohne eigenes Undo-Fenster: Der Nutzer hat gerade
-              // ausdrücklich entschieden, ein zweites „bist du sicher?" wäre
-              // eine Rückfrage auf eine Antwort, die schon gegeben ist.
-              errorAction: (err) => {
-                if (!(err instanceof EventConflictError)) return undefined;
-                const fresh = occurrenceVersion(err.row, data.occurrenceKey);
-                return {
-                  label: t("conflict.deleteAnyway"),
-                  onPress: () => {
-                    // `useDeleteEvent` kennt nur `onSuccess`, kein `onError` —
-                    // ohne dieses `.catch()` verschwindet ein zweiter
-                    // Kollisions- oder Netzwerkfehler lautlos: kein
-                    // `unhandledrejection`-Handler und keine ErrorBoundary im
-                    // Repo fangen ihn auf, siehe `showConflict` in
-                    // `EventEditScreen.tsx`. Bewusst ohne eine zweite
-                    // „Trotzdem löschen"-Aktion: Eine Aktion, die sich selbst
-                    // nachreicht, baute eine Kette, die nur wächst. Der Termin
-                    // steht ja noch — der Nutzer kann ihn regulär erneut
-                    // löschen, dann mit vollem Undo-Fenster. Ein Toast, der
-                    // den Fehlschlag benennt, ist hier die ehrliche Auskunft.
-                    deleteMutation
-                      .mutateAsync({
-                        scope,
-                        eventId: data.eventId,
-                        occurrenceKey: data.occurrenceKey,
-                        isRecurring,
-                        baseVersion: fresh,
-                      })
-                      .catch((retryErr: unknown) => {
-                        show({
-                          title: t("cal.delete.error"),
-                          message: t(mapEventError(retryErr)),
-                          variant: "error",
-                          position: "bottom",
-                        });
-                      });
-                  },
-                };
-              },
-            });
-            router.back();
-          })();
-        },
+                isRecurring,
+                baseVersion: fresh,
+              })
+              .catch((retryErr: unknown) => {
+                show({
+                  title: t("cal.delete.error"),
+                  message: t(mapEventError(retryErr)),
+                  variant: "error",
+                  position: "bottom",
+                });
+              });
+          },
+        };
       },
-    ]);
+    });
+    router.back();
   };
 
   return (
@@ -396,7 +399,7 @@ export function EventDetailScreen() {
               variant="soft"
               tone="danger"
               block
-              onPress={onDeletePress}
+              onPress={() => void onDeletePress()}
             />
           </View>
         </ScrollView>

@@ -33,6 +33,7 @@ export function pickScope(labels: ScopeDialogLabels): Promise<EditScope | null> 
     });
   }
   return new Promise((resolve) => {
+    // eslint-disable-next-line no-restricted-properties -- entfällt mit dem Scope-Sheet
     Alert.alert(
       labels.title,
       undefined,
