@@ -106,7 +106,7 @@ der Renovate-Sektion sind aktuell.
 | 1   | [Stiller Datenverlust im Kalender](#block-1--stiller-datenverlust-im-kalender)          | M–L     | 5               | Fünf Wege, auf denen Termine ohne Fehlermeldung verschwinden. Höchster Nutzerschaden.         |
 | 2   | [Aufgaben-Löschpfad & Konfliktlücken](#block-2--aufgaben-löschpfad--konfliktlücken)     | M       | 5               | Dieselbe Schadensklasse bei Tasks + die von ADR-031 offen gelassenen Löcher.                  |
 | 3   | [Web-Parität](#block-3--web-parität)                                                    | M       | 6               | Web ist der schnellste Smoke-Test-Loop — heute überspringt er stumm halbe Features.           |
-| 4   | [Touch-Targets & a11y](#block-4--touch-targets--a11y)                                   | S       | 4               | CLAUDE.md Non-negotiable 4 wird in ausgeliefertem Code verletzt. Eine Sichtprüfung für alles. |
+| 4   | [Touch-Targets & a11y](#block-4--touch-targets--a11y)                                   | S       | 5               | CLAUDE.md Non-negotiable 4 wird in ausgeliefertem Code verletzt. Eine Sichtprüfung für alles. |
 | 5   | [RN-Component-Test-Pfad](#block-5--der-rn-component-test-pfad-schlussstein)             | L       | 4               | Schlussstein: entsperrt drei geparkte Einträge und sichert alles danach ab.                   |
 | 6   | [Meal-Plan-Mutationen](#block-6--meal-plan-mutationen-der-größte-feature-unlock)        | L       | 6               | Größter Einzel-Unlock — eine Mutation löst sechs Einträge über drei Screens.                  |
 | 7   | [Transaktions-RPC für den Kalender](#block-7--transaktions-rpc-für-den-kalender)        | L       | 3               | Teuerste Korrektheitsbaustelle; Pre-Flight + CAS decken den Normalfall bereits ab.            |
@@ -564,11 +564,12 @@ Löschen, beide Geburtstags-Picker und jeder Toggle-Fehler sind dort **tot**, oh
 hinweist. Jede Iteration ab hier zahlt für diese Lücke — deshalb kommt der Block früh, direkt nach
 den Datenverlust-Fixes, deren Sichtprüfung er selbst erleichtert.
 
-> **Stand 2026-10-01:** Die drei Zeilen der Tabelle sind mit dem ersten PR erledigt
+> **Stand 2026-10-01: erledigt.** Die drei Zeilen der Tabelle hat der erste PR gelöst
 > ([ADR-039](./decision-log.md)). Er hat dabei mehr gefunden als hier stand — Serie speichern,
 > Abmelden und Kind löschen waren auf Web ebenso tot, auf Android fehlte im Scope-Dialog
-> „Abbrechen" — und alles über dieselben Helfer gelöst. Offen sind die drei Web-Eigenheiten
-> darunter; sie bilden den zweiten PR.
+> „Abbrechen" — und alles über dieselben Helfer gelöst. Die drei Web-Eigenheiten darunter hat der
+> zweite PR nach einer Diagnose gelöst ([ADR-040](./decision-log.md)); eine davon war gar kein
+> App-Fehler. Der Nebenbefund zur Tastatur steht in Block 4.
 
 Gemeinsame Ursache bei den ersten dreien: `Alert` ist auf react-native-web ein No-op
 (`static alert() {}`).
@@ -581,7 +582,9 @@ Gemeinsame Ursache bei den ersten dreien: `Alert` ist auf react-native-web ein N
 
 Dazu drei Web-Eigenheiten, die keinen Designer brauchen:
 
-- **„Klicks auf die Tagesagenda treffen auf Web eine unsichtbare Kalendertag-Fläche"**
+- **„Klicks auf die Tagesagenda treffen auf Web eine unsichtbare Kalendertag-Fläche"** — erledigt,
+  kein App-Fehler: Der Testlauf griff die gleichnamige Zeile des verdeckten Dashboard-Tabs
+  ([ADR-040](./decision-log.md) Decision 1). Stand vor der Diagnose:
   ([Conflict-Detection](./TODO.md#conflict-detection-siehe-adr-031)) ·
   [KalenderScreen](<../app-sections/(tabs)/kalender/KalenderScreen.tsx>)
   Im Zwei-Client-Lauf zuverlässig reproduziert: ein Klick auf die Tagesliste landet auf einer
@@ -591,12 +594,15 @@ Dazu drei Web-Eigenheiten, die keinen Designer brauchen:
   Usability-Problem**, nicht nur ein Testartefakt — bislang nur festgehalten, nie untersucht. Erster
   Schritt ist eine Diagnose, keine Korrektur: erst klären, ob der Layer abschaltbar ist oder ob die
   Agenda aus dem Kalender-Container heraus muss.
-- **„Web-Datums-/Zeit-Input springt beim Tippen zurück"** ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)) ·
+- **„Web-Datums-/Zeit-Input springt beim Tippen zurück"** — erledigt, das Feld hält den getippten
+  Zwischenstand ([ADR-040](./decision-log.md) Decision 4). Stand vor der Diagnose:
+  ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)) ·
   [DateTimePickerSheet.web.tsx](../app-sections/shared/DateTimePickerSheet.web.tsx)
   Bekannter Quirk kontrollierter Date-Inputs, seit der `Field`-Pressable-Korrektur überhaupt erst
   erreichbar. **Erst prüfen, ob es UX-relevant ist** — der TODO-Eintrag verlangt ausdrücklich diese
   Beobachtung, nicht direkt einen Fix.
-- **„Render-Schleife beim Login-Übergang"** ([Dashboard](./TODO.md#dashboard)) ·
+- **„Render-Schleife beim Login-Übergang"** — erledigt, `AuthGate` ersetzte den Root-Navigator
+  ([ADR-040](./decision-log.md) Decision 2). Stand vor der Diagnose: ([Dashboard](./TODO.md#dashboard)) ·
   [DashboardScreen](<../app-sections/(tabs)/dashboard/DashboardScreen.tsx>)
   `Maximum update depth exceeded` auf Web, einmalig, nur im Übergang von `/login`. Stack führt über
   `forceStoreRerender` → `commitHookLayoutEffects`, also ein `useSyncExternalStore`-Abo, das in
@@ -614,8 +620,8 @@ Geburtstagsfelder öffnen im Web einen Picker · die Konsole ist beim Login-Übe
 **Aufwand S · ein PR · eine gemeinsame Sichtprüfung**
 
 `CLAUDE.md` Non-negotiable 4 lautet „Touch targets ≥ 44×44". Zwei ausgelieferte Screens verletzen
-das, ein dritter Punkt macht einen Filter unsichtbar. Alle vier zusammen kosten eine
-Sichtprüfungsrunde statt vier — genau der Grund, aus dem sie einzeln vertagt wurden.
+das, ein dritter Punkt macht einen Filter unsichtbar. Alle zusammen kosten eine
+Sichtprüfungsrunde statt einer je Punkt — genau der Grund, aus dem sie einzeln vertagt wurden.
 
 - **„`hitSlop` in `TypePicker` und `MemberPicker` vergrößert das Touch-Target nicht"**
   ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)) ✅ verifiziert an
@@ -641,8 +647,13 @@ Sichtprüfungsrunde statt vier — genau der Grund, aus dem sie einzeln vertagt 
   Dashboard-Avatarreihe und Settings-Profilkarte leiten die Initialen weiter selbst ab; ein
   geändertes Kürzel wirkt dort nicht. Je eine Zeile — vertagt worden, weil beide Screens eine
   Sichtprüfung wollten. Die gibt es in diesem Block ohnehin.
+- **„Verdeckte Tabs nehmen auf Web den Tastaturfokus an"** ([Weitere](./TODO.md#weitere-out-of-scope-items)) ·
+  [app/(tabs)/_layout.tsx](<../app/(tabs)/_layout.tsx>)
+  Nebenbefund aus Block 3: Inaktive Tab-Szenen sind `aria-hidden`, aber nicht `inert` — die Tab-Taste
+  landet in der unsichtbaren Dashboard-Szene. Erster Schritt: prüfen, ob React Navigation dafür eine
+  Option hat, bevor `inert` von Hand gesetzt wird.
 
-**Definition of done Block 4:** Alle vier Änderungen in **einem** PR, danach eine Sichtprüfung über
+**Definition of done Block 4:** Alle fünf Änderungen in **einem** PR, danach eine Sichtprüfung über
 Termin-Formular, Aufgaben-Formular, Kinderprofil, Dashboard und Einstellungen — light und dark.
 
 ---
