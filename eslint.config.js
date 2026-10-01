@@ -83,6 +83,22 @@ module.exports = [
   },
 
   {
+    files: ["**/*.{ts,tsx}"],
+    ignores: ["app-sections/shared/confirmDialog.ts"],
+    rules: {
+      "no-restricted-properties": [
+        "error",
+        {
+          object: "Alert",
+          property: "alert",
+          message:
+            "Alert.alert ist auf react-native-web ein No-op. confirmDestructive / showAlert aus @/app-sections/shared benutzen.",
+        },
+      ],
+    },
+  },
+
+  {
     files: ["__tests__/**", "**/*.{test,spec}.{ts,tsx,js,jsx}"],
     rules: {
       "i18next/no-literal-string": "off",

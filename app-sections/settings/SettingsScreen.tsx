@@ -1,12 +1,12 @@
 import Constants from "expo-constants";
 import { router, Stack } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Alert, Linking, Platform, Pressable, ScrollView, Switch, View } from "react-native";
+import { Linking, Platform, Pressable, ScrollView, Switch, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { IconName } from "@/app-sections/shared/Icon";
 
-import { ChildAvatar, Icon } from "@/app-sections/shared";
+import { ChildAvatar, confirmDestructive, Icon, showAlert } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { useThemeStore } from "@/design-system/themeStore";
 import { Card, Text } from "@/design-system/ui";
@@ -124,21 +124,18 @@ export function SettingsScreen() {
     parentsQ.data && childrenQ.data ? String(parentsQ.data.length + childrenQ.data.length) : "—";
   const email = session?.user.email ?? "—";
 
-  const confirmSignOut = () => {
-    Alert.alert(t("set.logout"), undefined, [
-      { text: t("action.cancel"), style: "cancel" },
-      {
-        text: t("set.logout"),
-        style: "destructive",
-        onPress: () => {
-          // No manual navigation: clearing the session lets AuthGate/decideRoute
-          // redirect this route (group "other") to /(auth)/login.
-          signOut.mutate(undefined, {
-            onError: (err) => Alert.alert(t(mapAuthError(err))),
-          });
-        },
-      },
-    ]);
+  const confirmSignOut = async () => {
+    const ok = await confirmDestructive({
+      title: t("set.logout"),
+      confirm: t("set.logout"),
+      cancel: t("action.cancel"),
+    });
+    if (!ok) return;
+    // No manual navigation: clearing the session lets AuthGate/decideRoute
+    // redirect this route (group "other") to /(auth)/login.
+    signOut.mutate(undefined, {
+      onError: (err) => showAlert({ title: t(mapAuthError(err)) }),
+    });
   };
 
   return (
@@ -277,7 +274,7 @@ export function SettingsScreen() {
             isDanger
             isLast
             disabled={signOut.isPending}
-            onPress={confirmSignOut}
+            onPress={() => void confirmSignOut()}
           />
         </Card>
 

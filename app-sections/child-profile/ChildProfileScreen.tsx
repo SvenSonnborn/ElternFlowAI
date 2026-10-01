@@ -3,9 +3,17 @@ import { format, parseISO } from "date-fns";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Alert, Platform, Pressable, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, TextInput, View } from "react-native";
 
-import { ChildAvatar, Field, Icon, Pill, TopBar } from "@/app-sections/shared";
+import {
+  ChildAvatar,
+  confirmDestructive,
+  Field,
+  Icon,
+  Pill,
+  showAlert,
+  TopBar,
+} from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
 import {
@@ -186,32 +194,28 @@ export function ChildProfileScreen() {
       } else {
         await createChild.mutateAsync({ familyId, ...payload });
       }
-      Alert.alert(t("child.saved"));
+      showAlert({ title: t("child.saved") });
       router.back();
     } catch {
       /* error rendered below */
     }
   }
 
-  function onDelete() {
+  async function onDelete() {
     if (!params.id || !familyId) return;
-    Alert.alert(t("child.deleteConfirmTitle"), t("child.deleteConfirmMsg"), [
-      { text: t("action.cancel"), style: "cancel" },
-      {
-        text: t("child.delete"),
-        style: "destructive",
-        onPress: () => {
-          void (async () => {
-            try {
-              await deleteChild.mutateAsync({ id: params.id as string, familyId });
-              router.back();
-            } catch {
-              /* error rendered on next render */
-            }
-          })();
-        },
-      },
-    ]);
+    const ok = await confirmDestructive({
+      title: t("child.deleteConfirmTitle"),
+      body: t("child.deleteConfirmMsg"),
+      confirm: t("child.delete"),
+      cancel: t("action.cancel"),
+    });
+    if (!ok) return;
+    try {
+      await deleteChild.mutateAsync({ id: params.id, familyId });
+      router.back();
+    } catch {
+      /* error rendered on next render */
+    }
   }
 
   const allergySuggestions = ALLERGY_KEYS.filter((key) => !allergies.has(key));
@@ -415,7 +419,7 @@ export function ChildProfileScreen() {
                 variant="soft"
                 block
                 loading={deleteChild.isPending}
-                onPress={onDelete}
+                onPress={() => void onDelete()}
               />
             ) : null}
           </View>

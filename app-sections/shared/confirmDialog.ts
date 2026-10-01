@@ -2,7 +2,7 @@ import { Alert, Platform } from "react-native";
 
 export interface ConfirmLabels {
   title: string;
-  body: string;
+  body?: string;
   confirm: string;
   cancel: string;
 }
@@ -14,10 +14,13 @@ export interface ConfirmLabels {
  * The web branch exists because react-native-web has no `Alert`
  * implementation: on web the call is a no-op, so a delete guarded by Alert
  * would silently never happen.
+ *
+ * Without a `body` only the title is shown — which is what a native
+ * `Alert.alert(message)` already does.
  */
 export function confirmDestructive(labels: ConfirmLabels): Promise<boolean> {
   if (Platform.OS === "web") {
-    return Promise.resolve(window.confirm(`${labels.title}\n\n${labels.body}`));
+    return Promise.resolve(window.confirm(webText(labels)));
   }
   return new Promise((resolve) => {
     Alert.alert(
@@ -34,7 +37,16 @@ export function confirmDestructive(labels: ConfirmLabels): Promise<boolean> {
 
 export interface AlertLabels {
   title: string;
-  body: string;
+  body?: string;
+}
+
+/**
+ * Text for `window.confirm` / `window.alert`, which take a single string: title
+ * and body separated by a blank line. Without a body it stays the bare title —
+ * otherwise the dialog would end in "\n\nundefined" or a dangling blank line.
+ */
+function webText(labels: { title: string; body?: string }): string {
+  return labels.body ? `${labels.title}\n\n${labels.body}` : labels.title;
 }
 
 /**
@@ -45,10 +57,13 @@ export interface AlertLabels {
  * react-native-web's `Alert.alert` is a no-op (`static alert() {}` in
  * react-native-web/src/exports/Alert/index.js), so a message shown only via
  * `Alert.alert` never reaches a web user — it just silently never happens.
+ *
+ * Without a `body` only the title is shown, as a native `Alert.alert(message)`
+ * does.
  */
 export function showAlert(labels: AlertLabels): void {
   if (Platform.OS === "web") {
-    window.alert(`${labels.title}\n\n${labels.body}`);
+    window.alert(webText(labels));
     return;
   }
   Alert.alert(labels.title, labels.body);

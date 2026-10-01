@@ -2,12 +2,12 @@ import { format, parseISO } from "date-fns";
 import { de, enUS } from "date-fns/locale";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Alert, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import type { ChildRow } from "@/features/auth";
 import type { TaskWithType } from "@/features/tasks";
 
-import { ChildAvatar, Icon, Pill } from "@/app-sections/shared";
+import { ChildAvatar, Icon, Pill, showAlert } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Card, Text } from "@/design-system/ui";
 import { mapTaskError, taskTypeColorFor, useToggleTaskDone } from "@/features/tasks";
@@ -37,7 +37,7 @@ export function TaskRow({ task, child, urgency }: TaskRowProps) {
       { taskId: task.id, done: !task.is_done },
       // The layer classifies, the screen presents — that is what mapTaskError
       // is for.
-      { onError: (err) => Alert.alert(t(mapTaskError(err))) },
+      { onError: (err) => showAlert({ title: t(mapTaskError(err)) }) },
     );
   }
 

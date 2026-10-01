@@ -1,10 +1,10 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Field } from "@/app-sections/shared";
+import { Field, showAlert } from "@/app-sections/shared";
 import { Button, Text } from "@/design-system/ui";
 import { mapAuthError, passwordStrength, useSignOut, useUpdatePassword } from "@/features/auth";
 
@@ -41,7 +41,7 @@ export function NewPasswordScreen() {
     } catch {
       /* signOut error surfaced via errorKey; still proceed to login */
     }
-    Alert.alert(t("auth.newPassword.saved"));
+    showAlert({ title: t("auth.newPassword.saved") });
     router.replace("/(auth)/login");
   }
 

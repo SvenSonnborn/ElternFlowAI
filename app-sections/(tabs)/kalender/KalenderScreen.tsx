@@ -4,10 +4,17 @@ import { useRouter } from "expo-router";
 import { type TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { Calendar } from "react-native-calendars";
 
-import { ChildAvatar, Icon, SectionHeader, SyncNotice, TopBar } from "@/app-sections/shared";
+import {
+  ChildAvatar,
+  Icon,
+  SectionHeader,
+  showAlert,
+  SyncNotice,
+  TopBar,
+} from "@/app-sections/shared";
 import { palette } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
@@ -69,7 +76,7 @@ export function KalenderScreen() {
 
   const openAdd = (date?: string) => {
     if (!session) {
-      Alert.alert(t("cal.add.requiresAuth"));
+      showAlert({ title: t("cal.add.requiresAuth") });
       return;
     }
     router.push({ pathname: "/event/new", params: date ? { date } : {} });
