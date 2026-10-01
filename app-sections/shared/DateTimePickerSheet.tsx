@@ -15,7 +15,13 @@ import type { DateTimePickerSheetProps } from "./DateTimePickerSheet.types";
  * It knows nothing about what the value means — a range's start, a task's due
  * date. The caller maps its own state onto `mode` + `value`.
  */
-export function DateTimePickerSheet({ mode, value, onPick, onClose }: DateTimePickerSheetProps) {
+export function DateTimePickerSheet({
+  mode,
+  value,
+  maximumDate,
+  onPick,
+  onClose,
+}: DateTimePickerSheetProps) {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -42,6 +48,7 @@ export function DateTimePickerSheet({ mode, value, onPick, onClose }: DateTimePi
         value={value}
         mode={isDateMode ? "date" : "time"}
         display="default"
+        maximumDate={maximumDate}
         onChange={onChange}
       />
     );
@@ -74,6 +81,7 @@ export function DateTimePickerSheet({ mode, value, onPick, onClose }: DateTimePi
               value={value}
               mode={mode}
               display={isDateMode ? "inline" : "spinner"}
+              maximumDate={maximumDate}
               onChange={onChange}
               themeVariant={theme.card === "#FFFFFF" ? "light" : "dark"}
             />

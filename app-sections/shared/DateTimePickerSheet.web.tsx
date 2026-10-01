@@ -1,4 +1,4 @@
-import { format, isValid, parse } from "date-fns";
+import { format, isValid } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { Modal, Pressable, View } from "react-native";
 
@@ -6,6 +6,8 @@ import { useTheme } from "@/design-system/ThemeProvider";
 import { Button } from "@/design-system/ui";
 
 import type { DateTimePickerSheetProps } from "./DateTimePickerSheet.types";
+
+import { parseWebPickerValue } from "./webPickerValue";
 
 /**
  * Web counterpart of DateTimePickerSheet. `@react-native-community/datetimepicker`
@@ -19,6 +21,7 @@ export function DateTimePickerSheet({
   mode,
   value,
   accessibilityLabel,
+  maximumDate,
   onPick,
   onClose,
 }: DateTimePickerSheetProps) {
@@ -58,32 +61,12 @@ export function DateTimePickerSheet({
               // label, and the field that opened it is behind the modal.
               aria-label={accessibilityLabel}
               value={isValid(value) ? format(value, pattern) : ""}
+              // `max` begrenzt nur die Auswahl im Browser-Picker, nicht das Tippen —
+              // ein Wert hinter dem Maximum verwirft `parseWebPickerValue` im onChange.
+              max={isDateMode && maximumDate ? format(maximumDate, "yyyy-MM-dd") : undefined}
               onChange={(event) => {
-                // date-fns parse() only back-fills unspecified units from the
-                // reference date if the pattern omits those units. In date mode
-                // (pattern "yyyy-MM-dd"), the clock is missing—parse always resets
-                // it to 00:00:00, losing the original time. We must carry it over
-                // explicitly. In time mode (pattern "HH:mm"), the date is missing—
-                // parse correctly back-fills it from the reference, so no carry
-                // needed. Guard: if value is invalid, use epoch as the fallback.
-                const baseValue = isValid(value) ? value : new Date(0);
-                const parsed = parse(event.target.value, pattern, baseValue);
-                if (!isValid(parsed)) return;
-
-                if (isDateMode) {
-                  // Explicitly carry over the clock from the reference date
-                  const next = new Date(parsed);
-                  next.setHours(
-                    baseValue.getHours(),
-                    baseValue.getMinutes(),
-                    baseValue.getSeconds(),
-                    baseValue.getMilliseconds(),
-                  );
-                  onPick(next);
-                } else {
-                  // Time mode: date is already preserved from baseValue
-                  onPick(parsed);
-                }
+                const next = parseWebPickerValue(event.target.value, mode, value, maximumDate);
+                if (next) onPick(next);
               }}
               style={{
                 fontFamily: "Inter",

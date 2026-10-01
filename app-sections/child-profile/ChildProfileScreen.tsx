@@ -1,13 +1,13 @@
-import DateTimePicker from "@react-native-community/datetimepicker";
 import { format, parseISO } from "date-fns";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Platform, Pressable, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, TextInput, View } from "react-native";
 
 import {
   ChildAvatar,
   confirmDestructive,
+  DateTimePickerSheet,
   Field,
   Icon,
   Pill,
@@ -312,19 +312,14 @@ export function ChildProfileScreen() {
               placeholder={t("child.birthdayPlaceholder")}
             />
 
-            {pickerOpen ? (
-              <DateTimePicker
-                value={birthday ?? new Date(2018, 0, 1)}
-                mode="date"
-                maximumDate={new Date()}
-                onChange={(event, d) => {
-                  if (Platform.OS !== "ios") setPickerOpen(false);
-                  if (event.type === "dismissed" || !d) return;
-                  setBirthday(d);
-                  if (Platform.OS === "ios") setPickerOpen(false);
-                }}
-              />
-            ) : null}
+            <DateTimePickerSheet
+              mode={pickerOpen ? "date" : null}
+              value={birthday ?? new Date(2018, 0, 1)}
+              maximumDate={new Date()}
+              accessibilityLabel={t("child.birthday")}
+              onPick={setBirthday}
+              onClose={() => setPickerOpen(false)}
+            />
 
             <Field
               label={t("child.school")}
