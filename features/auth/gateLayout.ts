@@ -27,11 +27,10 @@ export type GateLayout =
  * Warum: Expo-Router verlangt einen gemounteten Root-Navigator; nur
  * verschachtelte Layouts dürfen ihn aufschieben. Ein `<Redirect>`, der einen
  * schon gemounteten Root-Navigator ersetzt, lässt `useSyncState.flushUpdates`
- * beim Login-Übergang in „Maximum update depth exceeded" laufen (Spec
- * `2026-10-01-web-parity-quirks-design.md` §1.3). Deshalb steht nach dem ersten
- * Mount der Redirect *neben* den Kindern, und Warten sowie ein anstehender
- * Redirect zeigen den Splash als Deckfläche *über* ihnen (`cover`) statt an
- * ihrer Stelle.
+ * beim Login-Übergang in „Maximum update depth exceeded" laufen (ADR-040).
+ * Deshalb steht mit Sitzung nach dem ersten Mount der Redirect *neben* den
+ * Kindern, und Warten sowie ein anstehender Redirect zeigen den Splash als
+ * Deckfläche *über* ihnen (`cover`) statt an ihrer Stelle.
  *
  * Vor dem ersten Mount bleibt das Ersetzen bewusst: Stünde der Stack von Anfang
  * an, mounteten ohne Sitzung die geschützten Screens und fragten anonym `events`,

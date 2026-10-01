@@ -83,7 +83,7 @@ export interface WebPickerChange {
  * Nicht-Schaltjahr. Letzteres ist eine Sackgasse: Von 15.10.2026 aus ist
  * 29.02.2028 in Feldreihenfolge unerreichbar, beim Monat sprang das Feld auf
  * 29.10.2026 zurück. Mit Entwurf bleibt der Zwischenstand sichtbar, bis das nächste
- * Segment ihn zu einem gültigen Wert vervollständigt (Spec Web-Parität PR B, §1.2).
+ * Segment ihn zu einem gültigen Wert vervollständigt (ADR-040).
  *
  * Reine Funktion neben `parseWebPickerValue`, weil die Web-Komponente nativewind
  * lädt und unter `bun test` nicht importierbar ist.
