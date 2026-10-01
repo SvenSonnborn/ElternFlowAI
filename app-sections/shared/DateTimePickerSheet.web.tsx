@@ -16,6 +16,12 @@ import { parseWebPickerValue } from "./webPickerValue";
  * and the native module never enters the web bundle at all.
  *
  * Raw `<input>` is legitimate here: on web the renderer is react-dom.
+ *
+ * "Fertig" accepts what the input shows (`onPick(value)`, then `onClose()`);
+ * scrim tap and Escape (`onRequestClose`) are a pure cancel. Same contract as
+ * the native sheet: the sheet opens on `value` as if selected — for an empty
+ * birthday a 2018-01-01 placeholder — and an untouched "Fertig" must not leave
+ * the caller's state empty, which is also what Android's OK does.
  */
 export function DateTimePickerSheet({
   mode,
@@ -82,7 +88,15 @@ export function DateTimePickerSheet({
               }}
             />
           </View>
-          <Button block label={t("action.done")} tone="primary" onPress={onClose} />
+          <Button
+            block
+            label={t("action.done")}
+            tone="primary"
+            onPress={() => {
+              if (isValid(value)) onPick(value);
+              onClose();
+            }}
+          />
         </Pressable>
       </Pressable>
     </Modal>
