@@ -23,6 +23,12 @@ void mock.module("react-native", () => ({
     currentState: "active",
     addEventListener: () => ({ remove() {} }),
   },
+  // Same reason as `AppState`: `confirmDialog.ts` and `scopeDialog.ts` import
+  // these names, and a named export missing from the mock is a load-time error,
+  // so neither module could be imported in any suite without the stubs. Tests
+  // that care about a call spy on it (`spyOn(Alert, "alert")`).
+  Alert: { alert() {} },
+  ActionSheetIOS: { showActionSheetWithOptions() {} },
   NativeModules: {},
   TurboModuleRegistry: { get: () => null, getEnforcing: () => ({}) },
   NativeEventEmitter: class {
