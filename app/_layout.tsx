@@ -8,6 +8,7 @@ import { useEffect, useMemo } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { ScopeSheetHost } from "@/app-sections/event/ScopeSheetHost";
 import { ConflictDialogHost, ToastProvider } from "@/app-sections/shared";
 import { ThemeProvider, useTheme } from "@/design-system/ThemeProvider";
 import { AuthGate, initDeepLinkHandler, useInitSession } from "@/features/auth";
@@ -126,6 +127,8 @@ function ThemedStack() {
         {/* Neben den Toasts und aus demselben Grund: Der Dialog überlebt den
             Screenwechsel, der ihn ausgelöst hat. */}
         <ConflictDialogHost />
+        {/* Ohne ihn löst `pickScope` auf Web und Android nie auf. */}
+        <ScopeSheetHost />
       </ToastProvider>
     </AuthGate>
   );
