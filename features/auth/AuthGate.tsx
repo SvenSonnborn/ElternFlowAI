@@ -36,11 +36,13 @@ function GateCover() {
  * Was gerendert wird, entscheidet `gateLayout` — hier steht nur der Renderer
  * dazu und die Merkhilfe `navigatorMounted`.
  *
- * Der Gate hängt seine Kinder (den Root-Navigator) nach dem ersten Mount nie
- * wieder aus: `navigatorMounted` springt einmal auf `true` und nie zurück, und
- * zwar erst, wenn `gateLayout` die Kinder tatsächlich verlangt — ein Kaltstart,
- * der noch Splash oder Redirect zeigt, zählt nicht. Das Warum und die Regeln
- * stehen an `gateLayout`.
+ * Der Gate hängt seine Kinder (den Root-Navigator) nach dem ersten Mount nur
+ * noch aus, wenn die Sitzung fehlt: `navigatorMounted` springt einmal auf
+ * `true` und nie zurück, und zwar erst, wenn `gateLayout` die Kinder
+ * tatsächlich verlangt — ein Kaltstart, der noch Splash oder Redirect zeigt,
+ * zählt nicht. Mit Sitzung überlebt der Navigator jeden Redirect; beim
+ * Abmelden ersetzt der Redirect ihn wieder, damit kein geschützter Screen unter
+ * `/login` stehen bleibt. Das Warum und die Regeln stehen an `gateLayout`.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const { status } = useSession();
@@ -66,7 +68,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
   // Im Render gesetzt statt per Effekt nachgezogen (die Lint-Regel
   // `set-state-in-effect` verbietet Letzteres): React verwirft diesen Durchlauf
   // und rendert sofort erneut, mit demselben `app`-Layout — die Kinder mounten
-  // dabei nur einmal.
+  // dabei nur einmal. Ein abgebrochener Render verwirft auch sein Update, das
+  // Merkmal springt also nie früher, als die Kinder wirklich gerendert wurden.
   if (layout.kind === "app" && !navigatorMounted) setNavigatorMounted(true);
 
   if (layout.kind === "splash") return <SplashFallback />;
