@@ -75,6 +75,16 @@ describe("webPickerChange", () => {
     });
   });
 
+  test("gültiger Schalttag wird übernommen, ohne Entwurf", () => {
+    // Die Sackgasse von 15.10.2026 aus: Beim Wechsel auf Februar meldet Chrome `""` (29.02.2026 gibt
+    // es nicht). Der Entwurf hält den Zwischenstand, und erst mit dem Jahr 2028 geht der Wert durch.
+    const base = new Date(2026, 9, 15, 14, 30, 12, 345);
+    expect(webPickerChange("2028-02-29", "date", base)).toEqual({
+      pick: new Date(2028, 1, 29, 14, 30, 12, 345),
+      draft: null,
+    });
+  });
+
   test("Wert hinter maximumDate wird geklemmt übernommen, ohne Entwurf", () => {
     // Das Input zeigt dann den geklemmten Wert des Aufrufers, nicht den Rohwert.
     const max = new Date(2026, 9, 1, 10, 0);
