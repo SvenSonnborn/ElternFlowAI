@@ -1,13 +1,14 @@
 import { format, isValid } from "date-fns";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal, Pressable, View } from "react-native";
 
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button } from "@/design-system/ui";
 
-import type { DateTimePickerSheetProps } from "./DateTimePickerSheet.types";
+import type { DateTimePickerMode, DateTimePickerSheetProps } from "./DateTimePickerSheet.types";
 
-import { parseWebPickerValue } from "./webPickerValue";
+import { webPickerChange } from "./webPickerValue";
 
 /**
  * Web counterpart of DateTimePickerSheet. `@react-native-community/datetimepicker`
@@ -24,19 +25,34 @@ import { parseWebPickerValue } from "./webPickerValue";
  * selected — for an empty birthday a 2018-01-01 placeholder — and an untouched
  * "Fertig" must not leave the caller's state empty, which is also what
  * Android's OK does.
+ *
+ * Meldet der Browser einen unparsbaren Rohwert (ein gelöschtes Segment, 29.02.
+ * im Nicht-Schaltjahr), zeigt das Input ihn als lokalen Entwurf, statt auf den
+ * Wert des Aufrufers zurückzuspringen; "Fertig" übernimmt dann den letzten
+ * gültigen Wert. Der Entwurf lebt nur, solange das Sheet offen ist, und ein
+ * anderes Feld beginnt nie mit dem des vorigen (`key` am inneren Teil).
  */
-export function DateTimePickerSheet({
+export function DateTimePickerSheet({ mode, ...props }: DateTimePickerSheetProps) {
+  if (!mode) return null;
+  // Eigener innerer Teil statt Hooks im äußeren: die dürfen nicht hinter dem
+  // frühen `return null` stehen. Der `key` setzt den Entwurf beim Wechsel von
+  // Feld oder Modus zurück.
+  return <PickerSheetBody key={`${mode}:${props.accessibilityLabel}`} mode={mode} {...props} />;
+}
+
+type PickerSheetBodyProps = Omit<DateTimePickerSheetProps, "mode"> & { mode: DateTimePickerMode };
+
+function PickerSheetBody({
   mode,
   value,
   accessibilityLabel,
   maximumDate,
   onPick,
   onClose,
-}: DateTimePickerSheetProps) {
+}: PickerSheetBodyProps) {
   const { t } = useTranslation();
   const { theme } = useTheme();
-
-  if (!mode) return null;
+  const [draft, setDraft] = useState<string | null>(null);
 
   const isDateMode = mode === "date";
   const pattern = isDateMode ? "yyyy-MM-dd" : "HH:mm";
@@ -68,13 +84,14 @@ export function DateTimePickerSheet({
               // The only naming this control gets: the sheet has no visible
               // label, and the field that opened it is behind the modal.
               aria-label={accessibilityLabel}
-              value={isValid(value) ? format(value, pattern) : ""}
+              value={draft ?? (isValid(value) ? format(value, pattern) : "")}
               // `max` begrenzt nur die Auswahl im Browser-Picker, nicht das Tippen —
               // einen Wert hinter dem Maximum klemmt `parseWebPickerValue` im onChange.
               max={isDateMode && maximumDate ? format(maximumDate, "yyyy-MM-dd") : undefined}
               onChange={(event) => {
-                const next = parseWebPickerValue(event.target.value, mode, value, maximumDate);
-                if (next) onPick(next);
+                const result = webPickerChange(event.target.value, mode, value, maximumDate);
+                setDraft(result.draft);
+                if (result.pick) onPick(result.pick);
               }}
               style={{
                 fontFamily: "Inter",
