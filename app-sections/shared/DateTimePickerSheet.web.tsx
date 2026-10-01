@@ -62,7 +62,7 @@ export function DateTimePickerSheet({
               aria-label={accessibilityLabel}
               value={isValid(value) ? format(value, pattern) : ""}
               // `max` begrenzt nur die Auswahl im Browser-Picker, nicht das Tippen —
-              // ein Wert hinter dem Maximum verwirft `parseWebPickerValue` im onChange.
+              // einen Wert hinter dem Maximum klemmt `parseWebPickerValue` im onChange.
               max={isDateMode && maximumDate ? format(maximumDate, "yyyy-MM-dd") : undefined}
               onChange={(event) => {
                 const next = parseWebPickerValue(event.target.value, mode, value, maximumDate);

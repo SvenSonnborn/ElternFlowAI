@@ -4,7 +4,7 @@ import type { DateTimePickerMode } from "./DateTimePickerSheet.types";
 
 /**
  * Wertet den Roh-String eines `<input type="date|time">` zu einem `Date` aus —
- * oder `null`, wenn der Wert nicht übernommen werden soll.
+ * oder `null`, wenn er leer, unvollständig oder kein gültiges Datum ist.
  *
  * Eigene Datei, weil `DateTimePickerSheet.web.tsx` über `useTheme` nativewind
  * lädt und unter `bun test` nicht importierbar ist; die Logik, die dort
@@ -18,13 +18,20 @@ import type { DateTimePickerMode } from "./DateTimePickerSheet.types";
  * Millisekunden setzt es dabei auf 0). Ist `base` ungültig, dient die Epoche als
  * Referenz.
  *
- * `maximumDate` wird **pro Kalendertag** verglichen, nicht als Zeitpunkt:
- * `new Date()` trägt die aktuelle Uhrzeit, und die übernommene Uhrzeit von
- * `base` kann später liegen — ein Instant-Vergleich würde den heutigen Tag dann
- * fälschlich ablehnen. Ein Wert hinter dem Maximum wird verworfen statt auf das
- * Maximum geklemmt: das `max`-Attribut begrenzt nur die Auswahl im Picker des
- * Browsers, nicht das Tippen, und ein stilles Umbiegen auf einen anderen Tag
- * wäre eine Eingabe, die niemand gemacht hat.
+ * `maximumDate` gilt nur im **Datums-Modus** — wie das `max`-Attribut am Input,
+ * das es dort nur gibt — und wird **pro Kalendertag** verglichen, nicht als
+ * Zeitpunkt: `new Date()` trägt die aktuelle Uhrzeit, und die übernommene
+ * Uhrzeit von `base` kann später liegen — ein Instant-Vergleich würde den
+ * heutigen Tag dann fälschlich ablehnen. Im Zeit-Modus wird es ignoriert.
+ *
+ * Ein Tag hinter dem Maximum wird auf den Tag des Maximums **geklemmt** (Jahr,
+ * Monat, Tag vom Maximum, die übernommene Uhrzeit bleibt) statt verworfen: Das
+ * `max`-Attribut begrenzt nur die Auswahl im Picker des Browsers, nicht das
+ * Tippen, und Chrome meldet bei einem kontrollierten Datumsfeld `change` pro
+ * Ziffer des Jahressegments. Wer `2031` tippt, durchläuft `0002` → `0020` →
+ * `0203` (alles gültige Vergangenheit, wird übernommen) → `2031`. Würde der
+ * letzte Schritt verworfen, bliebe das Feld auf `0203` stehen und das würde
+ * gespeichert; geklemmt landet es sichtbar auf dem Maximum.
  */
 export function parseWebPickerValue(
   raw: string,
@@ -45,6 +52,8 @@ export function parseWebPickerValue(
     result.setHours(ref.getHours(), ref.getMinutes(), ref.getSeconds(), ref.getMilliseconds());
   }
 
-  if (maximumDate && isAfter(startOfDay(result), startOfDay(maximumDate))) return null;
+  if (isDateMode && maximumDate && isAfter(startOfDay(result), startOfDay(maximumDate))) {
+    result.setFullYear(maximumDate.getFullYear(), maximumDate.getMonth(), maximumDate.getDate());
+  }
   return result;
 }
