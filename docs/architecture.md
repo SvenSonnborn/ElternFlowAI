@@ -35,6 +35,11 @@ dabei bewusst **vor** `<AuthGate>`: Der Gate rendert bei einem Redirect
 `<Redirect>` statt seiner Kinder, ein Abo darunter würde bei jedem
 Routenwechsel ab- und wieder aufgebaut (ADR-030).
 
+Neben dem `Stack`, innerhalb von `ToastProvider`, hängen zwei Wirte für Dialoge, die nicht
+im Screen leben können: `<ConflictDialogHost />` (der Konflikt kommt erst an, wenn das
+Bearbeiten-Sheet schon zu ist, ADR-031) und `<ScopeSheetHost />` (die Scope-Auswahl auf Web und
+Android, ADR-039). Beide lesen einen Store, den die Screens befüllen.
+
 `features/i18n` is initialized as a side effect on module import.
 
 ## Theme system
