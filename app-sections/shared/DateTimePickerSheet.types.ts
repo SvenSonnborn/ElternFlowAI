@@ -13,7 +13,10 @@ export interface DateTimePickerSheetProps {
    * so only the web implementation reads it.
    */
   accessibilityLabel: string;
-  /** Latest selectable day. Compared per calendar day on web (see parseWebPickerValue). */
+  /**
+   * Latest selectable day. On web a later typed day is clamped to this one,
+   * date mode only, compared per calendar day (see parseWebPickerValue).
+   */
   maximumDate?: Date;
   onPick: (selected: Date) => void;
   onClose: () => void;
