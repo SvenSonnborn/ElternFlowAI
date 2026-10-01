@@ -27,9 +27,11 @@ export interface DateTimePickerSheetProps {
    */
   onPick: (selected: Date) => void;
   /**
-   * Closes the sheet. Pure cancel when reached through the scrim, Escape (web)
-   * or back (Android) — those never call `onPick`. "Fertig" calls `onPick`
-   * first, then this.
+   * Closes the sheet. Reached through the scrim, Escape (web) or back (Android)
+   * it closes without accepting the shown value — it calls no `onPick` of its
+   * own, but it does not revert either: web input and iOS calendar/spinner
+   * already reported every change through `onPick` as it happened. "Fertig"
+   * calls `onPick` first, then this.
    */
   onClose: () => void;
 }

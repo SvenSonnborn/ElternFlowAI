@@ -20,7 +20,9 @@ import type { DateTimePickerSheetProps } from "./DateTimePickerSheet.types";
  * birthday: a 2018-01-01 placeholder), and Android's system dialog already
  * commits the shown value on OK — without this an untouched "Fertig" on iOS
  * left the caller's state empty and its save button silently disabled. Scrim
- * tap and `onRequestClose` stay a pure cancel.
+ * tap and `onRequestClose` close without accepting the shown value; changes
+ * already made in the picker were reported through `onPick` as they happened
+ * and stay.
  */
 export function DateTimePickerSheet({
   mode,
