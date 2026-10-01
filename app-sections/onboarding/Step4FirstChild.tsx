@@ -1,11 +1,10 @@
-import DateTimePicker from "@react-native-community/datetimepicker";
 import { format } from "date-fns";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Platform, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 
-import { Field, Icon } from "@/app-sections/shared";
+import { DateTimePickerSheet, Field, Icon } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { AVATAR_COLORS, mapAuthError, useCreateChild, useCurrentParent } from "@/features/auth";
@@ -165,19 +164,14 @@ export function Step4FirstChild() {
           placeholder={t("onb.s4.birthdayPlaceholder")}
         />
 
-        {pickerOpen ? (
-          <DateTimePicker
-            value={birthday ?? new Date(2018, 0, 1)}
-            mode="date"
-            maximumDate={new Date()}
-            onChange={(event, d) => {
-              if (Platform.OS !== "ios") setPickerOpen(false);
-              if (event.type === "dismissed" || !d) return;
-              setBirthday(d);
-              if (Platform.OS === "ios") setPickerOpen(false);
-            }}
-          />
-        ) : null}
+        <DateTimePickerSheet
+          mode={pickerOpen ? "date" : null}
+          value={birthday ?? new Date(2018, 0, 1)}
+          maximumDate={new Date()}
+          accessibilityLabel={t("onb.s4.birthdayField")}
+          onPick={setBirthday}
+          onClose={() => setPickerOpen(false)}
+        />
 
         <Field
           label={t("onb.s4.schoolField")}
