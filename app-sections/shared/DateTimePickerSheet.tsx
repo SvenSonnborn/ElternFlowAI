@@ -14,6 +14,13 @@ import type { DateTimePickerSheetProps } from "./DateTimePickerSheet.types";
  *
  * It knows nothing about what the value means — a range's start, a task's due
  * date. The caller maps its own state onto `mode` + `value`.
+ *
+ * "Fertig" accepts what the sheet shows: it calls `onPick(value)` before
+ * `onClose()`. The sheet opens on `value` as if it were selected (for an empty
+ * birthday: a 2018-01-01 placeholder), and Android's system dialog already
+ * commits the shown value on OK — without this an untouched "Fertig" on iOS
+ * left the caller's state empty and its save button silently disabled. Scrim
+ * tap and `onRequestClose` stay a pure cancel.
  */
 export function DateTimePickerSheet({
   mode,
@@ -87,7 +94,15 @@ export function DateTimePickerSheet({
             />
           ) : null}
           <View style={{ marginTop: 8 }}>
-            <Button block label={t("action.done")} tone="primary" onPress={onClose} />
+            <Button
+              block
+              label={t("action.done")}
+              tone="primary"
+              onPress={() => {
+                onPick(value);
+                onClose();
+              }}
+            />
           </View>
         </Pressable>
       </Pressable>
