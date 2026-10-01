@@ -31,9 +31,25 @@ describe("parseWebPickerValue", () => {
     expect(next?.getDate()).toBe(15);
   });
 
-  test("ein Tag nach maximumDate wird verworfen", () => {
+  test("ein Tag nach maximumDate wird auf den Tag des Maximums geklemmt", () => {
+    // Die Uhrzeit bleibt die des Basiswerts, nur Jahr/Monat/Tag kommen vom Maximum.
     const max = new Date(2026, 9, 1, 10, 0);
-    expect(parseWebPickerValue("2026-10-02", "date", new Date(2018, 0, 1), max)).toBeNull();
+    const next = parseWebPickerValue("2026-10-02", "date", new Date(2018, 0, 1), max);
+    expect(next).toEqual(new Date(2026, 9, 1, 0, 0));
+  });
+
+  test("ein Jahr weit hinter maximumDate (Tippen im Jahressegment) landet ebenfalls auf dem Maximum", () => {
+    // Chrome meldet `change` pro Ziffer: 0002 → 0020 → 0203 → 2031. Verworfen bliebe das Feld auf 0203.
+    const max = new Date(2026, 9, 1, 10, 0);
+    const next = parseWebPickerValue("2031-04-17", "date", new Date(2018, 0, 1, 8, 15), max);
+    expect(next).toEqual(new Date(2026, 9, 1, 8, 15));
+  });
+
+  test("Zeit-Modus ignoriert maximumDate", () => {
+    // `max` am Input gilt nur im Datums-Modus; der Basiswert liegt hier hinter dem Maximum.
+    const base = new Date(2027, 0, 1, 14, 30);
+    const next = parseWebPickerValue("09:05", "time", base, new Date(2026, 9, 1));
+    expect(next).toEqual(new Date(2027, 0, 1, 9, 5, 0, 0));
   });
 
   test("derselbe Tag wie maximumDate gilt auch mit späterer Uhrzeit im Basiswert", () => {
