@@ -23,7 +23,8 @@ function ThemedStack() {
   useFlushPendingDeletes();
   // Der eine Familien-Kanal. Steht bewusst hier und nicht in `useFamilyEvents`
   // (drei Aufrufer, zwei dauerhaft gemountet) und nicht unter `<AuthGate>`
-  // (rendert bei Redirects seine Kinder nicht) — siehe ADR-030.
+  // (beim Kaltstart rendert der Gate Splash/Redirect statt seiner Kinder — ein
+  // Abo darunter stünde dann noch nicht) — siehe ADR-030.
   useFamilyRealtime();
   return (
     <AuthGate>
