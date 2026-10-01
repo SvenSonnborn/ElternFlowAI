@@ -14,8 +14,8 @@ import type { EditScope } from "@/features/calendar";
  *
  * Bewusst **ohne** `react-native`-Import und ohne Laufzeit-Import aus
  * `@/features/calendar` (nur der Typ `EditScope`): der Barrel ist unter Bun
- * zur Laufzeit nicht ladbar, die Suite läuft so ohne die Mocks aus
- * `bun.test.preload.ts`.
+ * zur Laufzeit nicht ladbar, der Store hängt also nicht von den Mocks aus
+ * `bun.test.preload.ts` ab.
  */
 
 /** Die Texte des Sheets. Der Aufrufer übersetzt, der Store kennt kein i18n. */
@@ -78,8 +78,12 @@ export function requestScope(labels: ScopeDialogLabels): Promise<EditScope | nul
  *
  * Nur wenn `id` die **aktuelle** Anfrage ist: Ein später Tap auf ein bereits
  * ersetztes Sheet darf weder die neue Frage beantworten noch abräumen.
- * Erst abräumen, dann auflösen — der Aufrufer läuft sofort weiter und kann
- * selbst gleich die nächste Frage stellen, die ein spätes `clear` wegnähme.
+ *
+ * Die Reihenfolge „erst leeren, dann auflösen" ändert für Promise-Aufrufer
+ * nichts — deren Fortsetzung läuft ohnehin erst als Microtask nach der
+ * Rückkehr von `settleScope`. Sie bleibt, damit `current` für jeden
+ * synchronen Beobachter schon leer ist, und spiegelt `ConflictDialogHost`
+ * (erst schließen, dann der Callback).
  */
 export function settleScope(id: string, scope: EditScope | null): void {
   const { current } = useScopeSheetStore.getState();

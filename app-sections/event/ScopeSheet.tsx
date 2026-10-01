@@ -25,7 +25,8 @@ interface ScopeSheetProps {
  * gilt hier unverändert (sonst verschmilzt die Karte mit allen vier Knöpfen zu
  * einem A11y-Element).
  *
- * Anders als dort gibt es einen eigenen „Abbrechen"-Knopf: Das Formular lebt
+ * Anders als dort gibt es einen eigenen „Abbrechen"-Knopf: Der Screen, der
+ * gefragt hat (das Bearbeiten-Formular oder die Termin-Detailansicht), lebt
  * hinter dem Sheet weiter, ein Abbruch führt also zu etwas zurück. Scrim-Tap
  * und `onRequestClose` (Android-Zurück) wirken wie dieser Knopf.
  */
