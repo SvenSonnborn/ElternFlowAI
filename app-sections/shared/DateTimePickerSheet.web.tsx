@@ -18,10 +18,12 @@ import { parseWebPickerValue } from "./webPickerValue";
  * Raw `<input>` is legitimate here: on web the renderer is react-dom.
  *
  * "Fertig" accepts what the input shows (`onPick(value)`, then `onClose()`);
- * scrim tap and Escape (`onRequestClose`) are a pure cancel. Same contract as
- * the native sheet: the sheet opens on `value` as if selected — for an empty
- * birthday a 2018-01-01 placeholder — and an untouched "Fertig" must not leave
- * the caller's state empty, which is also what Android's OK does.
+ * scrim tap and Escape (`onRequestClose`) close without accepting the shown
+ * value — edits already typed were committed by the input's `onChange` and
+ * stay. Same contract as the native sheet: the sheet opens on `value` as if
+ * selected — for an empty birthday a 2018-01-01 placeholder — and an untouched
+ * "Fertig" must not leave the caller's state empty, which is also what
+ * Android's OK does.
  */
 export function DateTimePickerSheet({
   mode,
