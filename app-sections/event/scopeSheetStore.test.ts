@@ -65,6 +65,15 @@ describe("scopeSheetStore", () => {
     expect(openRequest().id).not.toBe(firstId);
     expect(openRequest().labels.title).toBe("Zweite");
     expect(secondSettled).toBe(false);
+
+    // Später Tap auf das verdrängte Sheet: darf die zweite Frage weder
+    // beantworten noch abräumen.
+    const second = openRequest();
+    settleScope(firstId, "all");
+    await Promise.resolve();
+
+    expect(useScopeSheetStore.getState().current).toBe(second);
+    expect(secondSettled).toBe(false);
   });
 
   test("settleScope mit veralteter id ist folgenlos", async () => {
