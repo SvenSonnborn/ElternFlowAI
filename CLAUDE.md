@@ -89,7 +89,7 @@ Deferred to later iterations (not yet wired): Edge Functions, gustar.io Worker, 
 
 ```
 app/                     Expo Router routes — THIN re-export files only
-├─ _layout.tsx           Root stack + providers (QueryClient · i18n · ThemeProvider · SafeArea · GestureHandler · ToastProvider) + <ConflictDialogHost /> + useFlushPendingDeletes() + useFamilyRealtime()
+├─ _layout.tsx           Root stack + providers (QueryClient · i18n · ThemeProvider · SafeArea · GestureHandler · ToastProvider) + <ConflictDialogHost /> + <ScopeSheetHost /> + useFlushPendingDeletes() + useFamilyRealtime()
 ├─ (tabs)/_layout.tsx    Bottom tab navigator (5 tabs) + Voice FAB overlay
 ├─ (tabs)/index.tsx      → Dashboard
 ├─ (tabs)/kalender.tsx
@@ -105,6 +105,8 @@ app-sections/            Real screen implementations
 ├─ (tabs)/<name>/<Name>Screen.tsx
 ├─ auth/                 (login & friends — to come)
 ├─ debug/                Dev-Werkzeuge (Realtime-Debug) — Einstieg nur unter `__DEV__`
+├─ event/                Termin anlegen/ansehen/bearbeiten · Scope-Auswahl (`pickScope` →
+│                        ActionSheetIOS auf iOS, sonst scopeSheetStore · ScopeSheet · ScopeSheetHost, ADR-039)
 ├─ onboarding/           (5-step flow — to come)
 ├─ modals/
 ├─ task/                 Anlegen/Bearbeiten von Aufgaben (Create · Edit · TaskForm)
@@ -187,6 +189,8 @@ import { supabase } from "@/features/supabase";
 ```
 
 Path alias `@/*` → repo root (see [tsconfig.json](tsconfig.json)).
+
+**Kein `Alert.alert` außerhalb von [confirmDialog.ts](app-sections/shared/confirmDialog.ts).** react-native-web implementiert `Alert` als No-op — jeder Ablauf, der auf eine Antwort wartet, endet dort stumm. Bestätigen über `confirmDestructive`, Hinweise über `showAlert` (beide aus `@/app-sections/shared`, `body` optional); eine ESLint-Regel hält das ([ADR-039](docs/decision-log.md)).
 
 **Important name collision:** `design-system/components.ts` (SPEC file with lowercase `button`/`card`/`pill` exports) shadows the React components folder if anyone reintroduces `design-system/components/`. That's why the React components live in `design-system/ui/`. Don't rename it back.
 
