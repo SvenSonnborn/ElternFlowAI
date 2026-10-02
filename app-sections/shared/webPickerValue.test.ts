@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { parseWebPickerValue } from "./webPickerValue";
+import { parseWebPickerValue, webPickerChange } from "./webPickerValue";
 
 // Lokale Konstruktoren statt ISO-Strings: der Test soll in jeder Prozess-Zeitzone
 // dasselbe sagen.
@@ -63,5 +63,62 @@ describe("parseWebPickerValue", () => {
     const max = new Date(2026, 9, 1, 10, 0);
     const next = parseWebPickerValue("2026-09-30", "date", new Date(2018, 0, 1), max);
     expect(next).toEqual(new Date(2026, 8, 30, 0, 0));
+  });
+});
+
+describe("webPickerChange", () => {
+  test("gültiger Datumswert wird übernommen, ohne Entwurf", () => {
+    const base = new Date(2026, 0, 1, 14, 30, 12, 345);
+    expect(webPickerChange("2026-03-15", "date", base)).toEqual({
+      pick: new Date(2026, 2, 15, 14, 30, 12, 345),
+      draft: null,
+    });
+  });
+
+  test("gültiger Schalttag wird übernommen, ohne Entwurf", () => {
+    // Die Sackgasse von 15.10.2026 aus: Beim Wechsel auf Februar meldet Chrome `""` (29.02.2026 gibt
+    // es nicht). Der Entwurf hält den Zwischenstand, und erst mit dem Jahr 2028 geht der Wert durch.
+    const base = new Date(2026, 9, 15, 14, 30, 12, 345);
+    expect(webPickerChange("2028-02-29", "date", base)).toEqual({
+      pick: new Date(2028, 1, 29, 14, 30, 12, 345),
+      draft: null,
+    });
+  });
+
+  test("Wert hinter maximumDate wird geklemmt übernommen, ohne Entwurf", () => {
+    // Das Input zeigt dann den geklemmten Wert des Aufrufers, nicht den Rohwert.
+    const max = new Date(2026, 9, 1, 10, 0);
+    expect(webPickerChange("2031-04-17", "date", new Date(2018, 0, 1, 8, 15), max)).toEqual({
+      pick: new Date(2026, 9, 1, 8, 15),
+      draft: null,
+    });
+  });
+
+  test("leerer Rohwert bleibt als Entwurf stehen, ohne Übernahme", () => {
+    // Backspace auf einem Segment — oder 29.02. im Nicht-Schaltjahr: Chrome meldet dann `""`.
+    // Ohne Entwurf stellte React den alten Wert wieder her und das Segment spränge zurück.
+    expect(webPickerChange("", "date", new Date(2026, 9, 15))).toEqual({ pick: null, draft: "" });
+  });
+
+  test("unparsbarer, nicht leerer Rohwert bleibt als Entwurf stehen", () => {
+    expect(webPickerChange("2026-02-30", "date", new Date(2026, 9, 15))).toEqual({
+      pick: null,
+      draft: "2026-02-30",
+    });
+  });
+
+  test("Zeit-Modus übernimmt einen gültigen Wert mit dem Datum des Basiswerts", () => {
+    const base = new Date(2026, 0, 1, 14, 30, 12, 345);
+    expect(webPickerChange("14:30", "time", base)).toEqual({
+      pick: new Date(2026, 0, 1, 14, 30, 0, 0),
+      draft: null,
+    });
+  });
+
+  test("Zeit-Modus hält einen leeren Rohwert als Entwurf", () => {
+    expect(webPickerChange("", "time", new Date(2026, 0, 1, 14, 30))).toEqual({
+      pick: null,
+      draft: "",
+    });
   });
 });

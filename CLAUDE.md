@@ -205,6 +205,8 @@ export { KalenderScreen as default } from "@/app-sections/(tabs)/kalender/Kalend
 
 Keeps `app/` as the URL surface and `app-sections/` as the implementation surface. New routes must follow this split.
 
+**Den Root-`<Stack>` nie bedingt ersetzen.** Ein `<Redirect>` oder Splash an seiner Stelle, nachdem er gemountet war, löst beim Login-Übergang eine Render-Schleife aus; wann `AuthGate` ihn trotzdem ersetzt (Kaltstart, keine Sitzung), entscheidet [gateLayout.ts](features/auth/gateLayout.ts) ([ADR-040](docs/decision-log.md)).
+
 ## Theming
 
 Two themes — `light` (default) and `dark`. Every theme defines the full semantic role set: `bg`, `bgRaised`, `card`, `cardSubtle`, `overlay`, `ink`, `inkSecondary`, `inkTertiary`, `onMint`, `onOrange`, `primary`, `primarySoft`, `primaryStrong`, `accent`, `accentSoft`, `accentStrong`, `success*`, `warning*`, `danger*`, `line`, `lineStrong`, `fabFrom`, `fabTo`.

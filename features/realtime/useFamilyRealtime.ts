@@ -20,9 +20,8 @@ import { subscribeToFamilyChanges } from "./subscribe";
  * naheliegende Stelle wäre `useFamilyEvents` gewesen — so steht es im Issue —,
  * aber der Hook hat drei Aufrufer, zwei davon dauerhaft gemountet (Kalender und
  * Dashboard). Das wären drei Kanäle auf einem Topic für eine Wirkung, die
- * global ist (ADR-030 Decision 4). Der Aufruf steht **vor** `<AuthGate>`: Der
- * Gate rendert bei Redirects `<Redirect>` statt seiner Kinder, ein Abo darunter
- * würde bei jedem Routenwechsel ab- und wieder aufgebaut.
+ * global ist (ADR-030 Decision 4). Der Aufruf steht **vor** `<AuthGate>` — warum,
+ * steht am Aufruf in `ThemedStack`.
  *
  * Vier Aufgaben, die zusammengehören, weil sie alle am selben Lebenszyklus
  * hängen: abonnieren, eingehende Änderungen 300 ms sammeln und einmal

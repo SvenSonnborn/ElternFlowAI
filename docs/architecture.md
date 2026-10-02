@@ -31,9 +31,11 @@ In order, outermost to innermost:
 Innerhalb von `ThemedStack` — also zwischen `Stack` und den Providern darüber —
 laufen zusätzlich drei Hooks ohne eigenes Provider-Element: `useInitSession()`,
 `useFlushPendingDeletes()` und `useFamilyRealtime()`. Der Realtime-Hook steht
-dabei bewusst **vor** `<AuthGate>`: Der Gate rendert bei einem Redirect
-`<Redirect>` statt seiner Kinder, ein Abo darunter würde bei jedem
-Routenwechsel ab- und wieder aufgebaut (ADR-030).
+dabei bewusst **vor** `<AuthGate>` (ADR-030): Der Gate rendert beim Kaltstart und
+ohne Sitzung Splash bzw. `<Redirect>` statt seiner Kinder. Mit Sitzung hängt er den
+Root-Navigator nicht mehr aus — ein anstehender Redirect steht neben dem `Stack`,
+Warten liegt als Deckfläche darüber; ein ersetzter Root-Navigator löste beim
+Login-Übergang eine Render-Schleife aus (ADR-040, Regel in `features/auth/gateLayout.ts`).
 
 Neben dem `Stack`, innerhalb von `ToastProvider`, hängen zwei Wirte für Dialoge, die nicht
 im Screen leben können: `<ConflictDialogHost />` (der Konflikt kommt erst an, wenn das

@@ -57,3 +57,43 @@ export function parseWebPickerValue(
   }
   return result;
 }
+
+/**
+ * Was eine `change`-Meldung des Inputs bewirkt: `pick` geht an `onPick`, `draft`
+ * ist der Text, den das Input anzeigen soll, solange kein gültiger Wert vorliegt.
+ */
+export interface WebPickerChange {
+  /** An `onPick` weiterreichen, wenn gesetzt. */
+  pick: Date | null;
+  /** Anzuzeigender Rohwert; `null` heißt: den Wert des Aufrufers zeigen. */
+  draft: string | null;
+}
+
+/**
+ * Übersetzt den Roh-String einer `change`-Meldung in Übernahme und Entwurf.
+ * Ein gültiger Wert wird über `parseWebPickerValue` übernommen (samt Klemmen auf
+ * `maximumDate`) und braucht keinen Entwurf — das Input zeigt dann den Wert des
+ * Aufrufers, bei einem geklemmten Tag also den geklemmten, nicht den Rohwert.
+ * Alles andere bleibt als `draft` stehen.
+ *
+ * Der Entwurf ist nötig, weil das Input kontrolliert läuft: Meldet es einen
+ * unparsbaren Rohwert und die Komponente tut nichts, stellt React den alten Wert
+ * wieder her. Chrome meldet `""` bei Backspace auf einem Segment — das Segment
+ * sprang sofort zurück — und bei einer ungültigen Kombination wie 29.02. in einem
+ * Nicht-Schaltjahr. Letzteres ist eine Sackgasse: Von 15.10.2026 aus ist
+ * 29.02.2028 in Feldreihenfolge unerreichbar, beim Monat sprang das Feld auf
+ * 29.10.2026 zurück. Mit Entwurf bleibt der Zwischenstand sichtbar, bis das nächste
+ * Segment ihn zu einem gültigen Wert vervollständigt (ADR-040).
+ *
+ * Reine Funktion neben `parseWebPickerValue`, weil die Web-Komponente nativewind
+ * lädt und unter `bun test` nicht importierbar ist.
+ */
+export function webPickerChange(
+  raw: string,
+  mode: DateTimePickerMode,
+  base: Date,
+  maximumDate?: Date,
+): WebPickerChange {
+  const pick = parseWebPickerValue(raw, mode, base, maximumDate);
+  return pick ? { pick, draft: null } : { pick: null, draft: raw };
+}
