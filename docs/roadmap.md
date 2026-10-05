@@ -851,7 +851,7 @@ wiederholt und um die fünf Ops erweitert · ADR-031 wird **superseded**, nicht 
 
 ## Block 8 — Docs-Resync & Refactors
 
-**Aufwand S–M · blockiert nichts · acht Einträge**
+**Aufwand S–M · blockiert nichts · zehn Einträge**
 
 ### 8.1 Der Docs-Pass — **S, ein Commit**
 
