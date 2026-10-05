@@ -26,14 +26,19 @@ import { TaskConflictError, mapTaskError } from "./errors";
  *
  * The mock itself is not file-scoped, though: bun's `mock.module` replaces
  * the module process-wide for the rest of the test run, and this stub
- * defines exactly one of the barrel's exports. Today that is harmless — this
+ * defines only the barrel exports this suite's import graph needs. Today that is harmless — this
  * is the only suite that reaches `@/features/auth` at all, directly or
  * transitively — but a later suite that loads after this one and happens to
  * touch the barrel would get `undefined` for every export but
  * `useCurrentParent`, i.e. a load-time crash rather than a readable
  * assertion failure. Whoever hits that should look here first.
  */
-void mock.module("@/features/auth", () => ({ useCurrentParent: () => ({ data: null }) }));
+void mock.module("@/features/auth", () => ({
+  useCurrentParent: () => ({ data: null }),
+  // `queries.ts` (von `mutations.ts` geladen) importiert `useTaskFilter` →
+  // `useFamilyChildren`; ein fehlender Export scheitert schon beim Linken.
+  useFamilyChildren: () => ({ data: undefined }),
+}));
 
 // Imported after the module mock is installed: a static import would be
 // hoisted above it and `mutations.ts` would capture the real barrel.

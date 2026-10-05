@@ -1,6 +1,6 @@
 import { Redirect, useSegments } from "expo-router";
 import { type ReactNode, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View, type ViewProps } from "react-native";
 
 import { useTheme } from "@/design-system/ThemeProvider";
 
@@ -24,11 +24,31 @@ function SplashFallback() {
 /**
  * Dieselbe Fläche wie `SplashFallback`, aber als Deckschicht über den Kindern
  * statt an ihrer Stelle. Eine `View` fängt Taps ab — niemand tippt während des
- * Übergangs auf den alten Screen dahinter.
+ * Übergangs auf den alten Screen dahinter. Auf Web kommt die Sperre für
+ * Tastatur und Screenreader von `GateFrame`.
  */
 function GateCover() {
   const { theme } = useTheme();
   return <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.bg }]} />;
+}
+
+/**
+ * Auf Web macht `inert` den Screen unter der Deckfläche für Tastatur und
+ * Screenreader unerreichbar — die `View` in `GateCover` fängt nur Taps ab.
+ * Nur Web: nativ bräuchte derselbe Container eine eigene Sichtprüfung (siehe
+ * TODO). Der Container steht dauerhaft da und schaltet nur `inert`: ein erst
+ * während der Deckfläche eingefügter Container würde den Navigator neu mounten
+ * (ADR-040). React Natives `ViewProps` kennt `inert` nicht, react-native-web
+ * reicht das Attribut aber durch — daher die Assertion.
+ */
+function GateFrame({ covered, children }: { covered: boolean; children: ReactNode }) {
+  if (Platform.OS !== "web") return <>{children}</>;
+  const inert = { inert: covered } as unknown as ViewProps;
+  return (
+    <View style={{ flex: 1 }} {...inert}>
+      {children}
+    </View>
+  );
 }
 
 /**
@@ -76,7 +96,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (layout.kind === "redirect") return <Redirect href={layout.href} />;
   return (
     <>
-      {children}
+      <GateFrame covered={layout.cover}>{children}</GateFrame>
       {layout.redirect ? <Redirect href={layout.redirect} /> : null}
       {layout.cover ? <GateCover /> : null}
     </>

@@ -5,11 +5,12 @@ export {
   DEFAULT_TASK_FILTER,
   filterTasks,
   isFiltered,
+  resolveChildFilter,
   type DueFilter,
   type StatusFilter,
   type TaskFilter,
 } from "./filter";
-export { useTaskFilter, useTaskFilterStore } from "./filterStore";
+export { useTaskFilterStore } from "./filterStore";
 export {
   createSupabaseTaskOps,
   deleteTask,
@@ -49,6 +50,7 @@ export {
   useFamilyTasks,
   useFilteredTaskSections,
   useTask,
+  useTaskFilter,
   useTaskTypes,
   useTasksByChild,
   useTasksSections,

@@ -3,7 +3,14 @@ import { describe, expect, test } from "bun:test";
 import type { DueFilter, TaskFilter } from "./filter";
 import type { TaskWithType } from "./types";
 
-import { CHILD_ALL, CHILD_NONE, DEFAULT_TASK_FILTER, filterTasks, isFiltered } from "./filter";
+import {
+  CHILD_ALL,
+  CHILD_NONE,
+  DEFAULT_TASK_FILTER,
+  filterTasks,
+  isFiltered,
+  resolveChildFilter,
+} from "./filter";
 import { computeTaskStats } from "./stats";
 
 /**
@@ -231,5 +238,30 @@ describe("isFiltered", () => {
     expect(isFiltered({ ...DEFAULT_TASK_FILTER, due: "overdue" })).toBe(true);
     expect(isFiltered({ ...DEFAULT_TASK_FILTER, childId: CHILD_NONE })).toBe(true);
     expect(isFiltered({ ...DEFAULT_TASK_FILTER, childId: "child-1" })).toBe(true);
+  });
+});
+
+describe("resolveChildFilter", () => {
+  const known = new Set(["child-1", "child-2"]);
+
+  test("eine bekannte child_id bleibt", () => {
+    expect(resolveChildFilter("child-2", known)).toBe("child-2");
+  });
+
+  test("eine unbekannte child_id wird zu CHILD_ALL", () => {
+    expect(resolveChildFilter("child-gone", known)).toBe(CHILD_ALL);
+  });
+
+  test("die Sentinels bleiben, auch ohne ein einziges Kind", () => {
+    expect(resolveChildFilter(CHILD_ALL, new Set())).toBe(CHILD_ALL);
+    expect(resolveChildFilter(CHILD_NONE, new Set())).toBe(CHILD_NONE);
+  });
+
+  test("solange die Kinderliste lädt, bleibt die Auswahl unangetastet", () => {
+    expect(resolveChildFilter("child-gone", undefined)).toBe("child-gone");
+  });
+
+  test("nach dem Löschen des letzten Kindes liest der Filter CHILD_ALL", () => {
+    expect(resolveChildFilter("child-1", new Set())).toBe(CHILD_ALL);
   });
 });

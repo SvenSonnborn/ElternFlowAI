@@ -2,13 +2,14 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { subDays } from "date-fns";
 import { useMemo } from "react";
 
+import { useCurrentParent, useFamilyChildren } from "@/features/auth";
 import { useToday } from "@/features/shared";
 import { supabase } from "@/features/supabase";
 
 import type { TaskGroup, TaskSections, TaskStats, TaskTypeRow, TaskWithType } from "./types";
 
-import { filterTasks } from "./filter";
-import { useTaskFilter } from "./filterStore";
+import { filterTasks, resolveChildFilter, type TaskFilter } from "./filter";
+import { useTaskFilterStore } from "./filterStore";
 import { usePendingTaskIds, withoutPendingTaskDeletes } from "./pendingDeletes";
 import { computeTaskStats, groupTasksByChild, groupTasksByDue } from "./stats";
 
@@ -148,6 +149,36 @@ export function useTasksSections(): TaskSections {
   // groupTasksByDue only reads the calendar day off `now`, so local midnight is
   // as good as the wall clock — and it keeps the memo from re-running.
   return useMemo(() => groupTasksByDue(data, today), [data, today]);
+}
+
+/**
+ * Die drei Dimensionen als ein Objekt, die Kind-Auswahl gegen die aktuelle
+ * Kinderliste abgeglichen (`resolveChildFilter`); die rohe Auswahl steht nur im
+ * Store. `useFamilyChildren` teilt sich den Query-Key mit `AufgabenScreen`,
+ * kostet also keinen zweiten Roundtrip.
+ *
+ * Drei Einzel-Selektoren statt eines Objekt-Selektors: `useSyncExternalStore`
+ * verlangt einen referenzstabilen Snapshot, und `(s) => ({ status, due, childId })`
+ * gäbe bei jedem Render ein neues Objekt zurück — das endet in einer
+ * Render-Schleife statt in einem Filter.
+ */
+export function useTaskFilter(): TaskFilter {
+  const status = useTaskFilterStore((s) => s.status);
+  const due = useTaskFilterStore((s) => s.due);
+  const storedChildId = useTaskFilterStore((s) => s.childId);
+
+  const { data: parent } = useCurrentParent();
+  const { data: children } = useFamilyChildren(parent?.family_id);
+  const childId = useMemo(
+    () =>
+      resolveChildFilter(
+        storedChildId,
+        children ? new Set(children.map((child) => child.id)) : undefined,
+      ),
+    [storedChildId, children],
+  );
+
+  return useMemo(() => ({ status, due, childId }), [status, due, childId]);
 }
 
 /**

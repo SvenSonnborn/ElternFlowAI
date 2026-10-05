@@ -34,6 +34,24 @@ export const DEFAULT_TASK_FILTER: TaskFilter = {
   childId: CHILD_ALL,
 };
 
+/**
+ * Liest die gespeicherte Kind-Auswahl gegen die aktuelle Kinderliste.
+ *
+ * `knownChildIds === undefined` heißt „Liste noch nicht geladen", nicht „es
+ * gibt keine Kinder" — dann darf nichts zurückgesetzt werden, sonst verlöre
+ * jeder Kaltstart und jeder Refetch die Auswahl. Der Abgleich geschieht beim
+ * Lesen statt per Effekt, damit der Store frei von Server-Daten bleibt und
+ * eine gelöschte `child_id` nie als stiller Leerfilter überlebt.
+ */
+export function resolveChildFilter(
+  childId: string,
+  knownChildIds: ReadonlySet<string> | undefined,
+): string {
+  if (childId === CHILD_ALL || childId === CHILD_NONE) return childId;
+  if (knownChildIds === undefined) return childId;
+  return knownChildIds.has(childId) ? childId : CHILD_ALL;
+}
+
 function matchesStatus(task: TaskWithType, status: StatusFilter): boolean {
   if (status === "all") return true;
   return status === "done" ? task.is_done : !task.is_done;
