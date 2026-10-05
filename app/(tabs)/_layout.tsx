@@ -1,8 +1,8 @@
 import { Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 
-import { Icon, type IconName, VoiceAssistantFAB } from "@/app-sections/shared";
+import { Icon, type IconName, tabSceneStyle, VoiceAssistantFAB } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 
 function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
@@ -17,17 +17,25 @@ export default function TabsLayout() {
   return (
     <View style={{ flex: 1 }}>
       <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: theme.primaryStrong,
-          tabBarInactiveTintColor: theme.inkTertiary,
-          tabBarStyle: {
-            backgroundColor: theme.card,
-            borderTopColor: theme.line,
-            paddingTop: 8,
-            height: 72,
-          },
-          tabBarLabelStyle: { fontSize: 11, fontWeight: "500" },
+        screenOptions={({ route, navigation }) => {
+          const state = navigation.getState();
+          return {
+            headerShown: false,
+            tabBarActiveTintColor: theme.primaryStrong,
+            tabBarInactiveTintColor: theme.inkTertiary,
+            tabBarStyle: {
+              backgroundColor: theme.card,
+              borderTopColor: theme.line,
+              paddingTop: 8,
+              height: 72,
+            },
+            tabBarLabelStyle: { fontSize: 11, fontWeight: "500" },
+            sceneStyle: tabSceneStyle({
+              os: Platform.OS,
+              routeKey: route.key,
+              focusedRouteKey: state.routes[state.index]?.key,
+            }),
+          };
         }}
       >
         <Tabs.Screen

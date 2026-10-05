@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { create } from "zustand";
 
 import type { DueFilter, StatusFilter, TaskFilter } from "./filter";
@@ -26,19 +25,3 @@ export const useTaskFilterStore = create<TaskFilterState>((set) => ({
   setChild: (childId) => set({ childId }),
   reset: () => set({ ...DEFAULT_TASK_FILTER }),
 }));
-
-/**
- * Die drei Dimensionen als ein Objekt.
- *
- * Drei Einzel-Selektoren statt eines Objekt-Selektors: `useSyncExternalStore`
- * verlangt einen referenzstabilen Snapshot, und `(s) => ({ status, due, childId })`
- * gäbe bei jedem Render ein neues Objekt zurück — das endet in einer
- * Render-Schleife statt in einem Filter.
- */
-export function useTaskFilter(): TaskFilter {
-  const status = useTaskFilterStore((s) => s.status);
-  const due = useTaskFilterStore((s) => s.due);
-  const childId = useTaskFilterStore((s) => s.childId);
-
-  return useMemo(() => ({ status, due, childId }), [status, due, childId]);
-}

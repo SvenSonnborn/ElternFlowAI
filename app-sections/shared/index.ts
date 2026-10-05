@@ -47,6 +47,7 @@ export {
   type ToastPosition,
   type ToastVariant,
 } from "./toastStore";
+export { tabSceneStyle } from "./tabSceneStyle";
 export { TypePicker, type TypePickerItem } from "./TypePicker";
 export { useUndoableDelete, type UndoableDeleteArgs } from "./useUndoableDelete";
 export { VoiceAssistantFAB } from "./VoiceAssistantFAB";
