@@ -110,7 +110,7 @@ der Renovate-Sektion sind aktuell.
 | 5   | [RN-Component-Test-Pfad](#block-5--der-rn-component-test-pfad-schlussstein)             | L       | 4               | Schlussstein: entsperrt drei geparkte Einträge und sichert alles danach ab.                   |
 | 6   | [Meal-Plan-Mutationen](#block-6--meal-plan-mutationen-der-größte-feature-unlock)        | L       | 6               | Größter Einzel-Unlock — eine Mutation löst sechs Einträge über drei Screens.                  |
 | 7   | [Transaktions-RPC für den Kalender](#block-7--transaktions-rpc-für-den-kalender)        | L       | 3               | Teuerste Korrektheitsbaustelle; Pre-Flight + CAS decken den Normalfall bereits ab.            |
-| 8   | [Docs-Resync & Refactors](#block-8--docs-resync--refactors)                             | S–M     | 8               | Blockiert nichts. Aufräumen, wenn die Substanz steht.                                         |
+| 8   | [Docs-Resync & Refactors](#block-8--docs-resync--refactors)                             | S–M     | 10              | Blockiert nichts. Aufräumen, wenn die Substanz steht.                                         |
 | 9   | [CI- & Toolchain-Härtung](#block-9--ci-und-toolchain-härten)                            | S–M     | 6               | Verbessert die Gates, die Block 0 überhaupt erst scharf gemacht hat.                          |
 | 10  | [Große Migrationen](#block-10--große-migrationen)                                       | L       | 5               | Kein Zeitdruck, je eine eigene Iteration.                                                     |
 | —   | [Geparkt: extern blockiert](#geparkt--extern-blockiert)                                 | —       | ~28             | Anbieter, Domain oder Konto fehlen.                                                           |
@@ -622,11 +622,18 @@ Geburtstagsfelder öffnen im Web einen Picker · die Konsole ist beim Login-Übe
 
 **Aufwand S · ein PR · eine gemeinsame Sichtprüfung**
 
+> **Stand 2026-10-05: erledigt** ([ADR-041](./decision-log.md)). Abweichend vom Vorschlag unten sind
+> die Tippflächen als 44-px-Box gebaut statt über `py-1` — `hitSlop` wirkt auf Web gar nicht —,
+> und `FilterChipRow` zog mit. Der Fokus-Punkt kam samt der Deckfläche von `AuthGate`, beides nur
+> auf Web. **Nicht geprüft: iOS und Android.** Vier Reste stehen in [TODO.md](./TODO.md): native
+> Screenreader unter der Deckfläche, das Kürzel an den 24-px-Avataren und die zwei Verweise in
+> [8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm).
+
 `CLAUDE.md` Non-negotiable 4 lautet „Touch targets ≥ 44×44". Zwei ausgelieferte Screens verletzen
 das, ein dritter Punkt macht einen Filter unsichtbar. Alle zusammen kosten eine
 Sichtprüfungsrunde statt einer je Punkt — genau der Grund, aus dem sie einzeln vertagt wurden.
 
-- **„`hitSlop` in `TypePicker` und `MemberPicker` vergrößert das Touch-Target nicht"**
+- **„`hitSlop` in `TypePicker` und `MemberPicker` vergrößert das Touch-Target nicht"** — erledigt
   ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)) ✅ verifiziert an
   [TypePicker.tsx:46-47](../app-sections/shared/TypePicker.tsx) (`h-9` + `hitSlop={{top:4,bottom:4}}`,
   Eltern-`View` exakt so hoch wie die Pille).
@@ -634,23 +641,23 @@ Sichtprüfungsrunde statt einer je Punkt — genau der Grund, aus dem sie einzel
   fallen **ersatzlos** weg, die Pillen bleiben bei 36 px. [FilterChipRow](../app-sections/shared/FilterChipRow.tsx)
   hat dasselbe Muster geerbt und mit einem `py-1` am Container behoben; dieselbe Zeile löst es hier.
   Betrifft die ausgelieferten Termin- **und** Aufgaben-Formulare.
-- **„Farbfelder im Kinderprofil überlappen sich"** ([Familie](./TODO.md#familie--child-profile-live-daten-v1)) ·
+- **„Farbfelder im Kinderprofil überlappen sich"** — erledigt ([Familie](./TODO.md#familie--child-profile-live-daten-v1)) ·
   [ChildProfileScreen.tsx](../app-sections/child-profile/ChildProfileScreen.tsx) — `AVATAR_COLORS`
   28 px mit `hitSlop={8}` und `gap-2`: die Touch-Rechtecke treffen sich mitten in der 8-px-Lücke, ein
   Tipp knapp neben einem Feld landet auf dem nächsten. [ParentProfileScreen](../app-sections/parent-profile/ParentProfileScreen.tsx)
   setzt seit dem CodeRabbit-Review 44×44-Boxen, die kantenbündig kacheln — dieselben zehn Zeilen.
-- **„Ein gelöschtes Kind lässt den Kind-Filter ins Leere zeigen"** ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)) ·
+- **„Ein gelöschtes Kind lässt den Kind-Filter ins Leere zeigen"** — erledigt ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)) ·
   [filterStore.ts](../features/tasks/filterStore.ts)
   Der Store hält die `child_id` als freien String und gleicht sie nie gegen die Kinderliste ab. Wird
   ein Profil gelöscht, während sein Chip aktiv ist, bleibt die Liste leer und **kein** Chip ist
   hervorgehoben — der Filter ist aktiv, aber unsichtbar. Abgleich gegen `useFamilyChildren` mit
   Rückfall auf `CHILD_ALL`.
-- **„`short` erscheint nur im Familie-Tab und im Parent-Profil"** ([Familie](./TODO.md#familie--child-profile-live-daten-v1)) ·
+- **„`short` erscheint nur im Familie-Tab und im Parent-Profil"** — erledigt ([Familie](./TODO.md#familie--child-profile-live-daten-v1)) ·
   [ChildAvatar.tsx](../app-sections/shared/ChildAvatar.tsx)
   Dashboard-Avatarreihe und Settings-Profilkarte leiten die Initialen weiter selbst ab; ein
   geändertes Kürzel wirkt dort nicht. Je eine Zeile — vertagt worden, weil beide Screens eine
   Sichtprüfung wollten. Die gibt es in diesem Block ohnehin.
-- **„Verdeckte Tabs nehmen auf Web den Tastaturfokus an"** ([Weitere](./TODO.md#weitere-out-of-scope-items)) ·
+- **„Verdeckte Tabs nehmen auf Web den Tastaturfokus an"** — erledigt ([Weitere](./TODO.md#weitere-out-of-scope-items)) ·
   [app/(tabs)/_layout.tsx](<../app/(tabs)/_layout.tsx>)
   Nebenbefund aus Block 3: Inaktive Tab-Szenen sind `aria-hidden`, aber nicht `inert` — die Tab-Taste
   landet in der unsichtbaren Dashboard-Szene. Erster Schritt: prüfen, ob React Navigation dafür eine
@@ -892,6 +899,10 @@ Importpfad und den Barrel — deshalb eine eigene, sonst leere Änderung, damit 
   — pg_cron-Job auf `family_invitations` mit `used_at is null and expires_at < now()`. `TODO.md`
   schlägt vor, ihn „sinnvollerweise zusammen mit dem Reminder-Worker" zu bauen — der ist 🔒
   notifications-blockiert, dieser Job aber **nicht**. Er steht für sich und kostet eine Migration.
+
+- **„Weitere Tippflächen hängen an `hitSlop`"** und **„`accessibilityState` kommt auf Web nicht im
+  DOM an"** ([Weitere](./TODO.md#weitere-out-of-scope-items)) — Reste aus Block 4. Beide sind ein
+  Durchgang über viele Stellen und brauchen eine Sichtprüfung, sinnvollerweise mit nativem Lauf.
 
 **Definition of done Block 8:** `architecture.md` und die Struktur-Datei beschreiben das Repo von
 heute · `familyMutations.ts` heißt so · der Kompositions-Test läuft.

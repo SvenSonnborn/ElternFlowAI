@@ -192,6 +192,8 @@ Path alias `@/*` → repo root (see [tsconfig.json](tsconfig.json)).
 
 **Kein `Alert.alert` außerhalb von [confirmDialog.ts](app-sections/shared/confirmDialog.ts).** react-native-web implementiert `Alert` als No-op — jeder Ablauf, der auf eine Antwort wartet, endet dort stumm. Bestätigen über `confirmDestructive`, Hinweise über `showAlert` (beide aus `@/app-sections/shared`, `body` optional); eine ESLint-Regel hält das ([ADR-039](docs/decision-log.md)).
 
+**Tippflächen über die Box, nicht über `hitSlop`.** Ein Bedienelement, das kleiner als 44×44 aussehen soll, bekommt ein 44 px großes `Pressable` und trägt seine Optik in einer inneren `View` — Vorbild: [FilterChipRow.tsx](app-sections/shared/FilterChipRow.tsx). `hitSlop` wirkt auf Web gar nicht, und React Native beschneidet es an den Grenzen des Elternteils ([ADR-041](docs/decision-log.md)).
+
 **Important name collision:** `design-system/components.ts` (SPEC file with lowercase `button`/`card`/`pill` exports) shadows the React components folder if anyone reintroduces `design-system/components/`. That's why the React components live in `design-system/ui/`. Don't rename it back.
 
 ## Routing convention
