@@ -47,12 +47,13 @@ export function TypePicker({ label, items, selectedId, onSelect, error }: TypePi
               // bounds and react-native-web ignores it. Wrapped rows sit on the
               // 44 px grid, hence no vertical gap. The height is a number, not
               // `h-11`: NativeWind resolves rem to 14 on native, so `h-11`
-              // would be 38.5 pt there.
+              // would be 38.5 pt there. `minWidth` keeps a one-letter label at
+              // 44 wide as well.
               className="justify-center active:opacity-70"
-              style={{ height: touchTarget.min }}
+              style={{ height: touchTarget.min, minWidth: touchTarget.min }}
             >
               <View
-                className="h-9 flex-row items-center gap-1.5 rounded-pill border px-3"
+                className="h-9 flex-row items-center justify-center gap-1.5 rounded-pill border px-3"
                 style={{
                   backgroundColor: isSelected ? `${item.color}26` : theme.cardSubtle,
                   borderColor: isSelected ? item.color : theme.line,

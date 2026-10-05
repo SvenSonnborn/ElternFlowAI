@@ -98,10 +98,10 @@ export function MemberPicker({
           // Das Maß ist eine Zahl statt `h-11`: NativeWind rechnet rem nativ mit
           // 14, `h-11` wären dort 38,5 pt.
           className="justify-center active:opacity-70"
-          style={{ height: touchTarget.min }}
+          style={{ height: touchTarget.min, minWidth: touchTarget.min }}
         >
           <View
-            className="h-9 flex-row items-center rounded-pill border px-3"
+            className="h-9 flex-row items-center justify-center rounded-pill border px-3"
             style={{
               backgroundColor: selected === null ? theme.primarySoft : theme.cardSubtle,
               borderColor: selected === null ? theme.primary : theme.line,
