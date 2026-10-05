@@ -14,12 +14,18 @@ const HIDDEN_SCENE = { visibility: "hidden" } as unknown as ViewStyle;
  * Auf Web bleiben inaktive Tab-Szenen im DOM (und sind `aria-hidden`), die
  * Tab-Taste erreicht sie trotzdem. `visibility: hidden` nimmt die Szene aus
  * Tab-Reihenfolge und Screenreader-Baum, behält aber Layout und Scrollposition
- * — React Navigations Stack macht dasselbe für verdeckte Karten. Nativ bleibt
+ * — React Navigations JS-Stack versteckt verdeckte Karten auf Web ebenfalls per
+ * `visibility` (`CardA11yWrapper`); der Native-Stack, den diese App als Root
+ * benutzt, nimmt dafür `display: none`. Nativ bleibt
  * alles beim Alten, dort gibt es keinen Tastaturfokus auf verdeckte Szenen.
  *
  * Der Aufrufer liest die fokussierte Route aus dem Zustand des Tab-Navigators
- * statt über `navigation.isFocused()`: Letzteres ist auch dann falsch, wenn ein
- * Sheet über den Tabs liegt, und die Tabs dahinter müssen sichtbar bleiben.
+ * statt über `navigation.isFocused()`: Letzteres meldet auch dann `false`, wenn
+ * ein Root-Screen über den Tabs liegt, und die Optionen werden nur neu
+ * berechnet, wenn der Tab-Navigator selbst rendert. Rendert er, während der
+ * Root-Screen offen ist, wären alle fünf Szenen versteckt und blieben es nach
+ * dem Schließen, bis er zufällig wieder rendert. Der eigene Zustand des
+ * Tab-Navigators hängt nicht am Elternteil.
  * Ohne bekannte fokussierte Route bleibt jede Szene sichtbar. Siehe ADR-041.
  */
 export function tabSceneStyle(input: {

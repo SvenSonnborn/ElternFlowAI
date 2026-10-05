@@ -29,14 +29,14 @@ import { TaskConflictError, mapTaskError } from "./errors";
  * defines only the barrel exports this suite's import graph needs. Today that is harmless — this
  * is the only suite that reaches `@/features/auth` at all, directly or
  * transitively — but a later suite that loads after this one and happens to
- * touch the barrel would get `undefined` for every export but
- * `useCurrentParent`, i.e. a load-time crash rather than a readable
+ * touch the barrel would get `undefined` for every export but the
+ * two stubbed here, i.e. a load-time crash rather than a readable
  * assertion failure. Whoever hits that should look here first.
  */
 void mock.module("@/features/auth", () => ({
   useCurrentParent: () => ({ data: null }),
-  // `queries.ts` (von `mutations.ts` geladen) importiert `useTaskFilter` →
-  // `useFamilyChildren`; ein fehlender Export scheitert schon beim Linken.
+  // `queries.ts` (loaded by `mutations.ts`) imports `useTaskFilter` →
+  // `useFamilyChildren`; a missing export already fails at link time.
   useFamilyChildren: () => ({ data: undefined }),
 }));
 

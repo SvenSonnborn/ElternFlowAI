@@ -1,5 +1,6 @@
 import { Pressable, View } from "react-native";
 
+import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Text } from "@/design-system/ui";
 
@@ -44,8 +45,11 @@ export function TypePicker({ label, items, selectedId, onSelect, error }: TypePi
               // The pill is 36 px tall by design, so the tap area is 44 around
               // it. hitSlop can't do that: React Native clips it at the parent's
               // bounds and react-native-web ignores it. Wrapped rows sit on the
-              // 44 px grid, hence no vertical gap.
-              className="h-11 justify-center active:opacity-70"
+              // 44 px grid, hence no vertical gap. The height is a number, not
+              // `h-11`: NativeWind resolves rem to 14 on native, so `h-11`
+              // would be 38.5 pt there.
+              className="justify-center active:opacity-70"
+              style={{ height: touchTarget.min }}
             >
               <View
                 className="h-9 flex-row items-center gap-1.5 rounded-pill border px-3"
