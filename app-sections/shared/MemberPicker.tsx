@@ -1,5 +1,6 @@
 import { Pressable, View } from "react-native";
 
+import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Text } from "@/design-system/ui";
 
@@ -62,7 +63,8 @@ export function MemberPicker({
               accessibilityLabel={member.name}
               accessibilityState={{ selected: active }}
               onPress={() => onSelect({ kind: member.kind, id: member.id })}
-              className="min-w-11 items-center active:opacity-70"
+              className="items-center active:opacity-70"
+              style={{ minWidth: touchTarget.min }}
             >
               <View
                 className="items-center justify-center rounded-pill"
@@ -93,7 +95,10 @@ export function MemberPicker({
           // Die Pille ist per Design 36 px hoch, die Tippfläche darum 44;
           // `hitSlop` leistet das nicht, weil React Native es an den Grenzen
           // des Elternteils beschneidet und react-native-web es gar nicht kennt.
-          className="h-11 justify-center active:opacity-70"
+          // Das Maß ist eine Zahl statt `h-11`: NativeWind rechnet rem nativ mit
+          // 14, `h-11` wären dort 38,5 pt.
+          className="justify-center active:opacity-70"
+          style={{ height: touchTarget.min }}
         >
           <View
             className="h-9 flex-row items-center rounded-pill border px-3"

@@ -1,5 +1,6 @@
 import { Pressable, View } from "react-native";
 
+import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Text } from "@/design-system/ui";
 
@@ -57,9 +58,10 @@ export function FilterChipRow<T extends string>({
             // `hitSlop` leistet das nicht, weil React Native es an den Grenzen
             // des Elternteils beschneidet und react-native-web es gar nicht
             // kennt. Umbrochene Zeilen liegen im 44-px-Raster, deshalb kein
-            // senkrechter `gap`.
-            className="h-11 justify-center active:opacity-70"
-            style={{ minWidth: 44 }}
+            // senkrechter `gap`. Das Maß ist eine Zahl statt `h-11`: NativeWind
+            // rechnet rem nativ mit 14, `h-11` wären dort 38,5 pt.
+            className="justify-center active:opacity-70"
+            style={{ minWidth: touchTarget.min, height: touchTarget.min }}
           >
             <View
               className="h-9 flex-row items-center justify-center gap-1.5 rounded-pill border px-3"

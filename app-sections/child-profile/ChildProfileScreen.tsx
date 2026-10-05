@@ -14,6 +14,7 @@ import {
   showAlert,
   TopBar,
 } from "@/app-sections/shared";
+import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
 import {
@@ -259,10 +260,11 @@ export function ChildProfileScreen() {
         <>
           <View className="mb-5 items-center">
             <ChildAvatar name={name || "+"} color={color} size="xl" />
-            {/* Jedes Farbfeld sitzt mittig in einer eigenen 44x44-Tippfläche, die
-                Flächen reihen sich lückenlos. `hitSlop` auf dem 28-px-Feld käme
-                zwar auch auf 44, aber der Überstand benachbarter Felder träfe
-                sich im Zwischenraum, und web ignoriert ihn ganz. */}
+            {/* Each swatch sits centred in its own 44x44 tap area, the areas
+                abut without gaps. `hitSlop` on the 28 px swatch would reach 44
+                too, but the overhang of neighbouring swatches would meet in the
+                gap, and web ignores it entirely. The size is a number, not
+                `h-11 w-11`: NativeWind resolves rem to 14 on native. */}
             <View className="mt-3 flex-row">
               {AVATAR_COLORS.map((c) => (
                 <Pressable
@@ -275,7 +277,8 @@ export function ChildProfileScreen() {
                   accessibilityLabel={t(AVATAR_COLOR_NAMES[c])}
                   accessibilityHint={t("child.colorOption")}
                   accessibilityState={{ selected: color === c }}
-                  className="h-11 w-11 items-center justify-center"
+                  className="items-center justify-center"
+                  style={{ width: touchTarget.min, height: touchTarget.min }}
                 >
                   <View
                     style={{

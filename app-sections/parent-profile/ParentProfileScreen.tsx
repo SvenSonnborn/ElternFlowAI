@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, View } from "react-native";
 
 import { ChildAvatar, Field, Icon, TopBar } from "@/app-sections/shared";
+import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
 import {
@@ -145,7 +146,8 @@ export function ParentProfileScreen() {
                     accessibilityLabel={t(AVATAR_COLOR_NAMES[c])}
                     accessibilityHint={t("parent.colorOption")}
                     accessibilityState={{ selected: color === c }}
-                    className="h-11 w-11 items-center justify-center"
+                    className="items-center justify-center"
+                    style={{ width: touchTarget.min, height: touchTarget.min }}
                   >
                     <View
                       style={{

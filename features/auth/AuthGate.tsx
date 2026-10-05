@@ -39,7 +39,10 @@ function GateCover() {
  * TODO). Der Container steht dauerhaft da und schaltet nur `inert`: ein erst
  * während der Deckfläche eingefügter Container würde den Navigator neu mounten
  * (ADR-040). React Natives `ViewProps` kennt `inert` nicht, react-native-web
- * reicht das Attribut aber durch — daher die Assertion.
+ * reicht das Attribut aber durch — daher die Assertion. Nebenwirkung: Auf Web
+ * bildet der Container einen eigenen Stapelkontext, die Toasts aus
+ * `ToastProvider` liegen dadurch während der Deckfläche unter ihr statt darüber;
+ * heute löst während des Login-Übergangs kein Ablauf einen Toast aus.
  */
 function GateFrame({ covered, children }: { covered: boolean; children: ReactNode }) {
   if (Platform.OS !== "web") return <>{children}</>;
