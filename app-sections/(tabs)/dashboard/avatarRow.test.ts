@@ -3,7 +3,14 @@ import { describe, expect, it } from "bun:test";
 import { buildAvatarRow, type AvatarChild, type AvatarParent } from "./avatarRow";
 
 function parent(p: Partial<AvatarParent>): AvatarParent {
-  return { id: "p", name: "Anna Becker", color: "#7DB6A8", created_at: "2026-01-01", ...p };
+  return {
+    id: "p",
+    name: "Anna Becker",
+    color: "#7DB6A8",
+    short: "AB",
+    created_at: "2026-01-01",
+    ...p,
+  };
 }
 
 function child(c: Partial<AvatarChild>): AvatarChild {
@@ -48,6 +55,12 @@ describe("buildAvatarRow", () => {
   it("carries name and color through unchanged", () => {
     const row = buildAvatarRow([], [child({ name: "Mia", color: "#F47AA8" })]);
     expect(row.visible[0]).toMatchObject({ name: "Mia", color: "#F47AA8" });
+  });
+
+  it("carries a parent's short, children have none", () => {
+    const row = buildAvatarRow([parent({ id: "p1", short: "MAM" })], [child({ id: "c1" })]);
+    expect(row.visible[0]).toMatchObject({ kind: "parent", short: "MAM" });
+    expect(row.visible[1]).not.toHaveProperty("short");
   });
 
   it("shows every member while the family fits the limit", () => {

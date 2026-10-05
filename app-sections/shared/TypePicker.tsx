@@ -31,7 +31,7 @@ export function TypePicker({ label, items, selectedId, onSelect, error }: TypePi
       >
         {label}
       </Text>
-      <View className="mt-1.5 flex-row flex-wrap gap-2">
+      <View className="mt-0.5 flex-row flex-wrap gap-x-2">
         {items.map((item) => {
           const isSelected = item.id === selectedId;
           return (
@@ -41,25 +41,35 @@ export function TypePicker({ label, items, selectedId, onSelect, error }: TypePi
               accessibilityLabel={item.label}
               accessibilityState={{ selected: isSelected }}
               onPress={() => onSelect(item.id)}
-              // The pill is 36 px tall by design; hitSlop takes the touch
-              // target to 44 without touching the visual spec.
-              hitSlop={{ top: 4, bottom: 4 }}
-              className="h-9 flex-row items-center gap-1.5 rounded-pill border px-3 active:opacity-70"
-              style={{
-                backgroundColor: isSelected ? `${item.color}26` : theme.cardSubtle,
-                borderColor: isSelected ? item.color : theme.line,
-              }}
+              // The pill is 36 px tall by design, so the tap area is 44 around
+              // it. hitSlop can't do that: React Native clips it at the parent's
+              // bounds and react-native-web ignores it. Wrapped rows sit on the
+              // 44 px grid, hence no vertical gap.
+              className="h-11 justify-center active:opacity-70"
             >
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.color }} />
-              <Text variant="pill" style={{ color: isSelected ? item.color : theme.inkSecondary }}>
-                {item.label}
-              </Text>
+              <View
+                className="h-9 flex-row items-center gap-1.5 rounded-pill border px-3"
+                style={{
+                  backgroundColor: isSelected ? `${item.color}26` : theme.cardSubtle,
+                  borderColor: isSelected ? item.color : theme.line,
+                }}
+              >
+                <View
+                  style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.color }}
+                />
+                <Text
+                  variant="pill"
+                  style={{ color: isSelected ? item.color : theme.inkSecondary }}
+                >
+                  {item.label}
+                </Text>
+              </View>
             </Pressable>
           );
         })}
       </View>
       {error ? (
-        <Text variant="caption" tone="danger" className="mt-1">
+        <Text variant="caption" tone="danger">
           {error}
         </Text>
       ) : null}

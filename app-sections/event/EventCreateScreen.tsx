@@ -197,6 +197,7 @@ export function EventCreateScreen() {
       id: p.id,
       name: p.name,
       color: p.color,
+      short: p.short,
       kind: "parent" as const,
     })),
     ...(familyChildren.data ?? []).map((c) => ({

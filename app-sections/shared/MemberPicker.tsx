@@ -11,6 +11,8 @@ export interface MemberOption {
   id: string;
   name: string;
   color: string;
+  /** Nur Eltern setzen es; Kinder haben kein Kürzel. */
+  short?: string;
   kind: MemberKind;
 }
 
@@ -60,7 +62,7 @@ export function MemberPicker({
               accessibilityLabel={member.name}
               accessibilityState={{ selected: active }}
               onPress={() => onSelect({ kind: member.kind, id: member.id })}
-              className="items-center active:opacity-70"
+              className="min-w-11 items-center active:opacity-70"
             >
               <View
                 className="items-center justify-center rounded-pill"
@@ -70,7 +72,12 @@ export function MemberPicker({
                   borderColor: active ? theme.primaryStrong : "transparent",
                 }}
               >
-                <ChildAvatar name={member.name} color={member.color} size="md" />
+                <ChildAvatar
+                  name={member.name}
+                  short={member.short}
+                  color={member.color}
+                  size="md"
+                />
               </View>
               <Text variant="caption" tone="inkSecondary" className="mt-1">
                 {member.name}
@@ -83,21 +90,27 @@ export function MemberPicker({
           accessibilityLabel={noMemberLabel}
           accessibilityState={{ selected: selected === null }}
           onPress={() => onSelect(null)}
-          hitSlop={{ top: 4, bottom: 4 }}
-          className="h-9 flex-row items-center rounded-pill border px-3 active:opacity-70"
-          style={{
-            backgroundColor: selected === null ? theme.primarySoft : theme.cardSubtle,
-            borderColor: selected === null ? theme.primary : theme.line,
-          }}
+          // Die Pille ist per Design 36 px hoch, die Tippfläche darum 44;
+          // `hitSlop` leistet das nicht, weil React Native es an den Grenzen
+          // des Elternteils beschneidet und react-native-web es gar nicht kennt.
+          className="h-11 justify-center active:opacity-70"
         >
-          <Text
-            variant="pill"
+          <View
+            className="h-9 flex-row items-center rounded-pill border px-3"
             style={{
-              color: selected === null ? theme.primaryStrong : theme.inkSecondary,
+              backgroundColor: selected === null ? theme.primarySoft : theme.cardSubtle,
+              borderColor: selected === null ? theme.primary : theme.line,
             }}
           >
-            {noMemberLabel}
-          </Text>
+            <Text
+              variant="pill"
+              style={{
+                color: selected === null ? theme.primaryStrong : theme.inkSecondary,
+              }}
+            >
+              {noMemberLabel}
+            </Text>
+          </View>
         </Pressable>
       </View>
     </View>

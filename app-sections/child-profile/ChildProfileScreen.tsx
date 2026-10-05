@@ -259,12 +259,15 @@ export function ChildProfileScreen() {
         <>
           <View className="mb-5 items-center">
             <ChildAvatar name={name || "+"} color={color} size="xl" />
-            <View className="mt-3 flex-row gap-2">
+            {/* Jedes Farbfeld sitzt mittig in einer eigenen 44x44-Tippfläche, die
+                Flächen reihen sich lückenlos. `hitSlop` auf dem 28-px-Feld käme
+                zwar auch auf 44, aber der Überstand benachbarter Felder träfe
+                sich im Zwischenraum, und web ignoriert ihn ganz. */}
+            <View className="mt-3 flex-row">
               {AVATAR_COLORS.map((c) => (
                 <Pressable
                   key={c}
                   onPress={() => setColor(c)}
-                  hitSlop={8}
                   accessibilityRole="button"
                   // Label says which control this is, hint says what tapping
                   // does. All six sharing "Farbe wählen" as the label left a
@@ -272,15 +275,19 @@ export function ChildProfileScreen() {
                   accessibilityLabel={t(AVATAR_COLOR_NAMES[c])}
                   accessibilityHint={t("child.colorOption")}
                   accessibilityState={{ selected: color === c }}
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 14,
-                    backgroundColor: c,
-                    borderWidth: 2,
-                    borderColor: color === c ? theme.ink : "transparent",
-                  }}
-                />
+                  className="h-11 w-11 items-center justify-center"
+                >
+                  <View
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      backgroundColor: c,
+                      borderWidth: 2,
+                      borderColor: color === c ? theme.ink : "transparent",
+                    }}
+                  />
+                </Pressable>
               ))}
             </View>
           </View>
