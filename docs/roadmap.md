@@ -112,7 +112,7 @@ der Renovate-Sektion sind aktuell.
 | 7   | [Transaktions-RPC für den Kalender](#block-7--transaktions-rpc-für-den-kalender)        | L       | 3               | Teuerste Korrektheitsbaustelle; Pre-Flight + CAS decken den Normalfall bereits ab.            |
 | 8   | [Docs-Resync & Refactors](#block-8--docs-resync--refactors)                             | S–M     | 8               | Blockiert nichts. Aufräumen, wenn die Substanz steht.                                         |
 | 9   | [CI- & Toolchain-Härtung](#block-9--ci-und-toolchain-härten)                            | S–M     | 6               | Verbessert die Gates, die Block 0 überhaupt erst scharf gemacht hat.                          |
-| 10  | [Große Migrationen](#block-10--große-migrationen)                                       | L       | 4               | Kein Zeitdruck, je eine eigene Iteration.                                                     |
+| 10  | [Große Migrationen](#block-10--große-migrationen)                                       | L       | 5               | Kein Zeitdruck, je eine eigene Iteration.                                                     |
 | —   | [Geparkt: extern blockiert](#geparkt--extern-blockiert)                                 | —       | ~28             | Anbieter, Domain oder Konto fehlen.                                                           |
 | —   | [Geparkt: wartet auf ein drittes Vorkommen](#geparkt--wartet-auf-ein-drittes-vorkommen) | —       | ~10             | Bewusst vertagt, bis der zweite Aufrufer die richtige Form zeigt.                             |
 
@@ -954,6 +954,11 @@ Alle aus `TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-sco
 - **`eas build --local` als gemeinsame Build-Definition** — erst sinnvoll, wenn `eas.json` für die
   🔒 Release-Iteration existiert; sonst gibt es nichts zusammenzuführen. Zu prüfen ist vorher, ob
   sich Caching in den lokalen EAS-Build durchreichen lässt.
+- **„`AuthGate` folgt nicht Expos Auth-Muster"** ([Auth](./TODO.md#auth--onboarding)) ·
+  [gateLayout.ts](../features/auth/gateLayout.ts) — Umbau auf `Stack.Protected` bzw. Guards in
+  verschachtelten Layouts. Kein Fehler heute ([ADR-040](./decision-log.md)), aber eine Abhängigkeit
+  von einem expo-router-Detail. Erst klären, wie Onboarding-Regel und Parent-Warten als Guards
+  aussehen; Sichtprüfung auf iOS und Android Pflicht, weil jeder Login- und Abmelde-Pfad betroffen ist.
 
 ---
 
