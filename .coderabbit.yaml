@@ -91,9 +91,11 @@ reviews:
         Keys aus docs/COPY.md (nav.*, dash.*, voice.*, auth.*, onb.*, cal.*,
         meals.*, hw.*, child.*, set.*). Flagge hartcodierte deutsche/englische
         UI-Strings in JSX. (2) Touch-Targets ≥ 44×44 (Mic-FAB 60, Voice-Overlay-
-        Mic 84) — zu kleine interaktive Flächen melden. Die 44 px müssen aus der
-        Box des Pressable kommen, nicht aus hitSlop: das wirkt auf Web nicht und
-        wird nativ am Elternteil beschnitten (ADR-041). (3) Anrede immer Du, nie
+        Mic 84) — zu kleine interaktive Flächen melden. Die 44 müssen als Zahl
+        (Token touchTarget.min) aus der Box des Pressable kommen. Nicht aus
+        hitSlop: das wirkt auf Web nicht und wird nativ am Elternteil
+        beschnitten. Nicht aus rem-Klassen wie h-11: NativeWind rechnet rem
+        nativ mit 14, das ergibt 38,5 pt (ADR-041). (3) Anrede immer Du, nie
         Sie. (4) Voice-FAB muss auf Dashboard/Kalender/Essen/Aufgaben/Familie
         erreichbar bleiben; nur in Settings-Sheet und Onboarding versteckt.
 

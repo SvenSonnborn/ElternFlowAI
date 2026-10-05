@@ -622,11 +622,14 @@ Geburtstagsfelder öffnen im Web einen Picker · die Konsole ist beim Login-Übe
 
 **Aufwand S · ein PR · eine gemeinsame Sichtprüfung**
 
-> **Stand 2026-10-05: erledigt** ([ADR-041](./decision-log.md)). Abweichend vom Vorschlag unten sind
-> die Tippflächen als 44-px-Box gebaut statt über `py-1` — `hitSlop` wirkt auf Web gar nicht —,
-> und `FilterChipRow` zog mit. Der Fokus-Punkt kam samt der Deckfläche von `AuthGate`, beides nur
-> auf Web. **Nicht geprüft: iOS und Android.** Vier Reste stehen in [TODO.md](./TODO.md): native
-> Screenreader unter der Deckfläche, das Kürzel an den 24-px-Avataren und die zwei Verweise in
+> **Stand 2026-10-05: die fünf Punkte sind erledigt** ([ADR-041](./decision-log.md)). Abweichend
+> vom Vorschlag unten sind die Tippflächen als 44er-Box gebaut statt über `py-1` — `hitSlop` wirkt
+> auf Web gar nicht —, und `FilterChipRow` zog mit. Der Fokus-Punkt kam samt der Deckfläche von
+> `AuthGate`, beides nur auf Web. **Nicht geprüft: iOS und Android.**
+>
+> **Offen geblieben ist die Wurzel, [4.1](#41-inlinerem-entscheiden--offen-entscheidung-bei-dir).**
+> Vier kleinere Reste stehen in [TODO.md](./TODO.md): native Screenreader unter der Deckfläche,
+> das Kürzel in den Avataren und die zwei Verweise in
 > [8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm).
 
 `CLAUDE.md` Non-negotiable 4 lautet „Touch targets ≥ 44×44". Zwei ausgelieferte Screens verletzen
@@ -665,6 +668,17 @@ Sichtprüfungsrunde statt einer je Punkt — genau der Grund, aus dem sie einzel
 
 **Definition of done Block 4:** Alle fünf Änderungen in **einem** PR, danach eine Sichtprüfung über
 Termin-Formular, Aufgaben-Formular, Kinderprofil, Dashboard und Einstellungen — light und dark.
+
+### 4.1 `inlineRem` entscheiden — **offen, Entscheidung bei dir**
+
+`TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-scope-items) → **„NativeWind rechnet
+`rem` nativ mit 14"**
+
+Gefunden in der Schluss-Review von Block 4: `h-11` sind auf iOS und Android 38,5 pt. Die in diesem
+Block angefassten Tippflächen tragen ihr Maß deshalb als Zahl; `Button` und die übrigen
+`*-11`-Flächen der App liegen nativ weiter unter 44. `inlineRem: 16` in
+[metro.config.js](../metro.config.js) ist eine Zeile, skaliert aber jedes rem-Maß der App um ein
+Siebtel und braucht einen nativen Sichtlauf über alle Screens — eigener PR.
 
 ---
 
