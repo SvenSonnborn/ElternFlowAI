@@ -175,7 +175,7 @@ export function SettingsScreen() {
 
         <Card className="flex-row items-center gap-3">
           {parent ? (
-            <ChildAvatar name={parent.name} color={parent.color} />
+            <ChildAvatar name={parent.name} short={parent.short} color={parent.color} />
           ) : (
             <View className="h-8 w-8 rounded-pill bg-bg-raised" />
           )}

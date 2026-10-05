@@ -173,7 +173,7 @@ export function DashboardScreen() {
             }
             className="h-11 w-11 items-center justify-center active:opacity-80"
           >
-            <ChildAvatar name={entry.name} color={entry.color} />
+            <ChildAvatar name={entry.name} short={entry.short} color={entry.color} />
           </Pressable>
         ))}
         {overflow > 0 ? (

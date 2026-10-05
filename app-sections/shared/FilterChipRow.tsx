@@ -39,15 +39,10 @@ export function FilterChipRow<T extends string>({
     // ohne sie unerreichbar zu machen. Die Chips selbst sind `radio`, nicht
     // `button` — die Reihe ist Einfachauswahl mit einem verpflichtenden
     // Default, genau das, was eine Radiogroup semantisch beschreibt.
-    // `py-1` ist kein Abstand, sondern Voraussetzung für das Touch-Target der
-    // Chips: React Native beschneidet `hitSlop` an den Grenzen des Elternteils,
-    // und ohne Polsterung ist dieser Container bei einer einzeiligen Reihe
-    // exakt so hoch wie ein Chip (36px) — die 4px oben und unten fielen dann
-    // ersatzlos weg. Zwischen umbrochenen Reihen liefert `gap-2` dieselben 4px.
     <View
       accessibilityRole="radiogroup"
       accessibilityLabel={accessibilityLabel}
-      className="flex-row flex-wrap gap-2 py-1"
+      className="flex-row flex-wrap gap-x-2"
     >
       {options.map((option) => {
         const active = option.id === selectedId;
@@ -58,35 +53,38 @@ export function FilterChipRow<T extends string>({
             accessibilityLabel={option.label}
             accessibilityState={{ checked: active }}
             onPress={() => onSelect(option.id)}
-            // Der Chip ist per Design 36px hoch; hitSlop bringt das
-            // Touch-Target auf 44, ohne die Optik anzufassen. Wirksam wird das
-            // erst durch das `py-1` des Containers — siehe dort. (TypePicker
-            // und MemberPicker benutzen denselben hitSlop ohne diese
-            // Polsterung; dort greift er deshalb nicht, siehe docs/TODO.md.)
-            hitSlop={{ top: 4, bottom: 4 }}
-            className="h-9 flex-row items-center justify-center gap-1.5 rounded-pill border px-3 active:opacity-70"
-            style={{
-              minWidth: 44,
-              backgroundColor: active ? theme.primarySoft : theme.cardSubtle,
-              borderColor: active ? theme.primary : theme.line,
-            }}
+            // Die Pille ist per Design 36 px hoch, die Tippfläche darum 44;
+            // `hitSlop` leistet das nicht, weil React Native es an den Grenzen
+            // des Elternteils beschneidet und react-native-web es gar nicht
+            // kennt. Umbrochene Zeilen liegen im 44-px-Raster, deshalb kein
+            // senkrechter `gap`.
+            className="h-11 justify-center active:opacity-70"
+            style={{ minWidth: 44 }}
           >
-            {option.dotColor ? (
-              <View
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: option.dotColor,
-                }}
-              />
-            ) : null}
-            <Text
-              variant="pill"
-              style={{ color: active ? theme.primaryStrong : theme.inkSecondary }}
+            <View
+              className="h-9 flex-row items-center justify-center gap-1.5 rounded-pill border px-3"
+              style={{
+                backgroundColor: active ? theme.primarySoft : theme.cardSubtle,
+                borderColor: active ? theme.primary : theme.line,
+              }}
             >
-              {option.label}
-            </Text>
+              {option.dotColor ? (
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: option.dotColor,
+                  }}
+                />
+              ) : null}
+              <Text
+                variant="pill"
+                style={{ color: active ? theme.primaryStrong : theme.inkSecondary }}
+              >
+                {option.label}
+              </Text>
+            </View>
           </Pressable>
         );
       })}

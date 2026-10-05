@@ -6,22 +6,28 @@
  * darf die Zeilen also zwischen zwei Fetches umsortieren — beim Schnitt auf
  * `limit` entscheidet die Reihenfolge aber, wer aus der Reihe fällt. Sortiert
  * wird deshalb hier statt in der Query, die an fünf weiteren Screens hängt.
+ *
+ * Nur Eltern tragen ein Kürzel: `parents.short` ist eine editierbare Spalte,
+ * Kinder haben keine — ihr Eintrag setzt den Schlüssel gar nicht erst.
  */
 
-export interface AvatarParent {
+export interface AvatarChild {
   id: string;
   name: string;
   color: string;
   created_at: string;
 }
 
-export type AvatarChild = AvatarParent;
+export interface AvatarParent extends AvatarChild {
+  short: string;
+}
 
 export interface AvatarEntry {
   kind: "parent" | "child";
   id: string;
   name: string;
   color: string;
+  short?: string;
 }
 
 export interface AvatarRow {
@@ -53,6 +59,7 @@ export function buildAvatarRow(
       id: p.id,
       name: p.name,
       color: p.color,
+      short: p.short,
     })),
     ...byCreatedAt(children).map((c) => ({
       kind: "child" as const,
