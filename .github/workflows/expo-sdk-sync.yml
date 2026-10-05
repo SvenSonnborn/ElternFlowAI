@@ -25,8 +25,9 @@ permissions:
 # bis zu vier Runs in derselben Concurrency-Gruppe. `cancel-in-progress: false`,
 # weil ein abgebrochener Run, der schon gepusht, aber den Schritt "PR
 # kommentieren" noch nicht erreicht hat, diesen Hinweis auf Schließen/
-# Wiederöffnen sonst verschluckt — und `main` hat aktuell keine Required Status
-# Checks, der Kommentar ist also die gesamte Absicherung. Serialisierung kostet
+# Wiederöffnen sonst verschluckt — und die Required Status Checks auf `main`
+# binden den Repo-Admin nicht, für ihn ist der Kommentar also die gesamte
+# Absicherung. Serialisierung kostet
 # dafür nur ein paar Runner-Minuten: die Runs sind idempotent, ein zweiter
 # findet keinen Diff mehr und ist ein No-op.
 concurrency:

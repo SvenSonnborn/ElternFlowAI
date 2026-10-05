@@ -29,8 +29,8 @@ Vier Annahmen aus `TODO.md` habe ich vor dem Ordnen nachgemessen, weil sie die R
 Zwei davon sind schlimmer als dort notiert.
 
 > **Dies ist die Messung _vor_ Block 0.** Befund 1 (SDK-Drift) ist mit 0.2 behoben —
-> `expo install --check` meldet seither „Dependencies are up to date". Befund 5 (Test-Deps) ist
-> mit 0.3 behoben. Die Zahlen bleiben hier als Beleg stehen, warum die Blöcke so sortiert sind;
+> `expo install --check` meldet seither „Dependencies are up to date". Befund 2 (Required Checks)
+> ist mit 0.1 behoben, Befund 5 (Test-Deps) mit 0.3. Die Zahlen bleiben hier als Beleg stehen, warum die Blöcke so sortiert sind;
 > den aktuellen Stand führt jeweils der Block selbst.
 
 **1. Der SDK-Drift ist gewachsen — 13 Pakete statt der zwei notierten.** ✅
@@ -144,11 +144,14 @@ Drei Einzelposten tragen überproportional:
 Zuerst, weil Punkt 1 die Voraussetzung dafür ist, dass jeder PR ab Block 1 überhaupt geprüft wird,
 und Punkt 2 ein Problem ist, das mit jedem Tag teurer wird.
 
-> **Stand 2026-09-08:** 0.2 · 0.3 · 0.4 sind umgesetzt (Branch `chore/block-0-hygiene`), 0.5 ist
-> erledigt. **0.1 ist offen und liegt bei dir** — der Token darf keine Rulesets schreiben, Klickweg
-> siehe unten.
+> **Stand 2026-10-05:** Alle fünf Punkte sind erledigt. 0.2 · 0.3 · 0.4 kamen mit dem Branch
+> `chore/block-0-hygiene`, 0.1 steht im Ruleset.
 
-### 0.1 ⚙️ Required Status Checks eintragen — **offen, Handgriff bei dir**
+### 0.1 ⚙️ Required Status Checks eintragen — **erledigt**
+
+> **Stand 2026-10-05:** Das Ruleset „main protection" trägt die sechs Checks unten, „up to date vor
+> Merge" ist aus. Der Rest dieses Abschnitts beschreibt den Stand davor und bleibt als Begründung
+> stehen.
 
 `TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-scope-items) → **„Branch-Protection-Rule
 ‚Status-Checks required' auf `main`"**
