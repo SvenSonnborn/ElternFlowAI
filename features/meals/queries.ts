@@ -16,6 +16,7 @@ import type {
 } from "./types";
 
 import { escapeLike, normalizeRecipe } from "./normalize";
+import { usePendingMealIds, withoutPendingMealDeletes } from "./pendingDeletes";
 import { groupByDay, nextSlotBoundary, slotForTime, toDateKey, weekStartFor } from "./week";
 
 const ENTRY_SELECT = "*, recipes(*)";
@@ -176,6 +177,10 @@ interface UseMealPlansResult {
  * `weekStart` wird selbst auf den Montag gezogen — ein Aufrufer, der irgendein
  * Datum aus der Woche übergibt, landet damit auf demselben Cache-Eintrag statt
  * einen siebten anzulegen.
+ *
+ * Einträge, deren Löschung noch im Undo-Fenster steht, sind ausgeblendet
+ * (`usePendingMealIds`): Die Löschung wird verzögert statt zurückgerollt, das
+ * Item ist bis dahin nur versteckt. `useTodaysMeal` erbt das.
  */
 export function useMealPlans(weekStart: Date): UseMealPlansResult {
   const today = useToday();
@@ -186,9 +191,10 @@ export function useMealPlans(weekStart: Date): UseMealPlansResult {
     queryFn: () => fetchMealPlanWeek(start),
   });
 
+  const pendingIds = usePendingMealIds();
   const data = useMemo(
-    () => groupByDay(query.data ?? [], start, today),
-    [query.data, start, today],
+    () => groupByDay(withoutPendingMealDeletes(query.data ?? [], pendingIds), start, today),
+    [query.data, pendingIds, start, today],
   );
 
   return {

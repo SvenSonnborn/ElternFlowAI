@@ -16,7 +16,7 @@ import { create } from "zustand";
  * verlassen. Der `AppState`-Teil lebt in `useFlushPendingDeletes.ts`.
  */
 
-export type PendingDeleteKind = "task" | "event";
+export type PendingDeleteKind = "task" | "event" | "meal";
 
 /** Wie lange „Rückgängig" erreichbar bleibt. Siehe Decision 10 der Spec. */
 export const UNDO_WINDOW_MS = 5000;
@@ -79,6 +79,13 @@ interface PendingDeleteState {
    * begrenzt: jeder Commit hat seinen eigenen Watchdog.
    */
   flush: () => Promise<void>;
+  /**
+   * Führt **einen** vorgemerkten Eintrag sofort aus — derselbe Pfad wie bei
+   * `flush` und beim Timer (Timer abgeräumt, Watchdog, Freigabe auch bei
+   * Fehler). Wer auf einen Platz plant, dessen Löschung noch im Undo-Fenster
+   * steht, schließt sie damit zuerst ab. Das Promise lehnt nie ab.
+   */
+  commit: (id: string) => Promise<void>;
 }
 
 // Timer und Laufmarker gehören nicht in den Store: sie lösen kein Rendern aus,
@@ -216,6 +223,8 @@ export const usePendingDeleteStore = create<PendingDeleteState>((set, get) => ({
     remove(id);
     return true;
   },
+
+  commit: (id) => commit(id),
 
   flush: async () => {
     await Promise.all(

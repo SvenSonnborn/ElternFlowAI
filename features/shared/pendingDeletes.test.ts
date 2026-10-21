@@ -314,3 +314,39 @@ describe("shouldFlushOnStateChange", () => {
     expect(shouldFlushOnStateChange("active")).toBe(false);
   });
 });
+
+describe("commit", () => {
+  test("führt nur diesen Eintrag aus, entfernt ihn und sein Timer feuert nicht erneut", async () => {
+    let first = 0;
+    let second = 0;
+    const a = store().schedule(
+      "meal",
+      { entryId: "a" },
+      // eslint-disable-next-line @typescript-eslint/require-await -- `run` muss Promise<void> liefern, das Stub braucht kein await
+      async () => {
+        first += 1;
+      },
+      30,
+    );
+    const b = store().schedule(
+      "meal",
+      { entryId: "b" },
+      // eslint-disable-next-line @typescript-eslint/require-await -- `run` muss Promise<void> liefern, das Stub braucht kein await
+      async () => {
+        second += 1;
+      },
+      10_000,
+    );
+
+    await store().commit(a);
+
+    expect(first).toBe(1);
+    expect(second).toBe(0);
+    expect(store().entries.map((e) => e.id)).toEqual([b]);
+
+    await settle(); // länger als der 30-ms-Timer von `a`
+    expect(first).toBe(1);
+
+    store().undo(b);
+  });
+});

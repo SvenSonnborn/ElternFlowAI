@@ -18,6 +18,40 @@ export {
 } from "./allergens";
 export { pickAlternative } from "./alternative";
 export {
+  mapMealError,
+  MealSlotOccupiedError,
+  MissingParentError,
+  type MealErrorKey,
+} from "./errors";
+export {
+  createSupabaseMealOps,
+  planMeal,
+  removeMeal,
+  replaceMeal,
+  type MealOps,
+  type MealParent,
+  type PlanMealVars,
+  type RemoveMealVars,
+  type ReplaceMealVars,
+} from "./mutations";
+export {
+  applyPlan,
+  applyRemove,
+  applyReplace,
+  isOptimisticEntry,
+  OPTIMISTIC_ID_PREFIX,
+  optimisticEntry,
+  patchMealWeek,
+  restoreMealWeek,
+  type MealWeekSnapshot,
+} from "./optimistic";
+export {
+  findPendingMealDelete,
+  usePendingMealIds,
+  withoutPendingMealDeletes,
+  type PendingMealDelete,
+} from "./pendingDeletes";
+export {
   escapeLike,
   formatAmount,
   localize,
@@ -51,6 +85,7 @@ export type {
 } from "./types";
 export { useFamilyAllergies } from "./useFamilyAllergies";
 export { useMealAlternative } from "./useMealAlternative";
+export { usePlanMeal, useRemoveMeal, useReplaceMeal } from "./useMealMutations";
 export { useRecipeJudge } from "./useRecipeJudge";
 export {
   formatWeekRange,

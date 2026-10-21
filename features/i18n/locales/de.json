@@ -385,6 +385,12 @@
   "meals": {
     "title": "Essensplanung",
     "weekLabel": "Woche {{week}} · {{range}}",
+    "error": {
+      "generic": "Das hat leider nicht geklappt. Versuch es bitte noch einmal.",
+      "notAuthenticated": "Du bist nicht angemeldet oder darfst das nicht ändern.",
+      "recipeGone": "Dieses Rezept gibt es nicht mehr.",
+      "changed": "Der Eintrag wurde inzwischen geändert."
+    },
     "plan": {
       "empty": "Für diese Woche ist noch nichts geplant.",
       "emptyDay": "Noch nichts geplant",
