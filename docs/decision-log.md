@@ -1574,3 +1574,40 @@ Im Repo ließ sich keine React-Native-Komponente im Test rendern. `bun test` lie
 - `features/calendar/hooks.ts` ist unter `jest` ladbar, unter `bun test` weiterhin nicht. Tests für `useFamilyRealtime`, `useEvent` und weitere Screens sind damit möglich. Sie fehlen noch und stehen in [TODO.md](./TODO.md).
 - Zwei Runner heißen zwei Befehle und zwei CI-Schritte. `jest-expo` hängt am SDK und folgt `expo install --check`. Die Bun-Suiten bleiben von dessen Versionsdrift unberührt.
 - `ci.yml` installiert nur Bun. `jest` läuft dort deshalb mit der Node-Version des Runners, und `@testing-library/react-native` 14 verlangt mindestens Node 22.13.
+
+## ADR-043 — Essen einplanen: Schutz über die gesehene `recipe_id`, Cache-Patch statt Overlay, ein gemeinsamer Einplan-Ablauf (2026-10-21)
+
+### Status
+
+Accepted. Setzt [Roadmap Block 6](./roadmap.md#block-6--meal-plan-mutationen-der-größte-feature-unlock) um. Spec: [2026-10-21-meal-plan-mutations-design.md](./superpowers/specs/2026-10-21-meal-plan-mutations-design.md), mit zwei Abweichungen (Decision 5 und 6).
+
+### Context
+
+Der Essensplan war rein lesend. Gebraucht werden zwei Wege: die Wochenplanung (freitags für die kommende Woche) und das spontane Eintragen vom Rezept aus. `meal_plan_entries` hat Policies für alle Schreibbefehle und `unique (family_id, date, meal_slot)`, aber kein `updated_at`. Zwei Eltern können denselben Platz gleichzeitig planen. Ein Rezept mit einem Familien-Allergen darf nie ohne Hinweis im Plan landen.
+
+### Decisions
+
+1. **Schreibpfad nach dem Muster der Aufgaben** ([ADR-036](#adr-036--der-aufgaben-schreibpfad-bekommt-den-schnitt-des-kalenders-2026-09-17)): ein injizierbarer `MealOps`-Schnitt, reine Funktionen `planMeal`/`replaceMeal`/`removeMeal`, darüber Hooks. Die reinen Funktionen (`features/meals/mutations.ts`) importieren weder React noch `@/features/auth`, die Hooks liegen in `useMealMutations.ts`. So laufen die bun-Tests ohne einen zweiten prozessweiten Auth-Mock.
+2. **Schutz vor fremden Änderungen über die gesehene `recipe_id`, keine Migration.**
+   - Ersetzen und Löschen schreiben nur, solange die Zeile noch das Rezept trägt, das der Nutzer gesehen hat. Es ist das einzige Feld, das sich ändert, und vertritt hier `updated_at` aus [ADR-031](#adr-031--conflict-detection-updated_at-beleben-dreiwertig-vergleichen-ein-dialog-im-root-layout-2026-09-04).
+   - Den Wettlauf erkennt das INSERT selbst. `23505` führt zum frischen Stand und von dort zum Ersetzen-Dialog.
+   - Ist die gesehene Zeile ganz verschwunden, plant Ersetzen neu, denn es wird nichts Fremdes überschrieben. Ausgenommen ist das Rückgängig nach dem Hero-Tausch (`planIfGone: false`), das dann nichts schreibt.
+3. **Optimistik als Cache-Patch auf der einen Wochen-Query, nicht als Overlay** wie im Kalender ([ADR-027](#adr-027--optimistische-kalender-updates-ein-occurrence-overlay-auf-der-anzeige-keine-cache-patches-2026-08-31)).
+   - Ein Essens-Eintrag ist eine Zeile ohne Regel-Expansion. Damit bleibt der Eintrag zur Vereinigung der Overlays geparkt.
+   - Eine optimistische Zeile (vorläufige ID) zählt nicht als Belegung und hat kein Menü. Nach dem Erfolg ersetzt die echte Zeile sie.
+4. **Ein Einplan-Ablauf für alle Einstiege.**
+   - `planningSteps` legt rein die Reihenfolge fest: erst der Allergie-Hinweis, dann der Ersetzen-Dialog. Bewusstes Ersetzen fragt nicht nach dem Ersetzen.
+   - `runPlanning` führt den Ablauf mit injizierten Abhängigkeiten aus, `useMealPlanning` bindet ihn.
+   - Der Allergie-Hinweis kommt nur bei `unsafe`/`caution`, nicht bei `unverified`, sonst stünde er vor fast jedem importierten Rezept. Während die Familien-Allergien laden, ist Einplanen gesperrt. Ist ihr Laden gescheitert, kommt ein eigener Hinweis.
+   - Ein vorgemerktes Löschen auf demselben Platz wird über `commit(id)` am Pending-Delete-Store abgeschlossen, bevor die Belegung gelesen wird.
+5. **Fehler in den Essens-Sheets stehen im Sheet, nicht im Toast.** Auf iOS liegt ein Toast, den ein formSheet auslöst, unter dem Sheet. **Abweichung von der Spec**, die einen Fehler-Toast vorsah.
+6. **Allergie-Texte enden mit „Trotzdem einplanen?".** `window.confirm` zeigt auf Web nur OK/Abbrechen, ein Aussagesatz läse sich dort wie „verstanden". **Abweichung vom Plan-Wortlaut.**
+7. **Das `⋯`-Menü einer Zeile ist eine ausklappende Leiste, kein ActionSheet.** Sie verhält sich auf iOS, Android und Web gleich und braucht keinen Host im Root-Layout. Kosten: ein kurzer Layout-Sprung, kein Schließen per Tipp daneben.
+8. **Wochen blättern ohne Grenze.** Der gewählte Slot und das offene Menü liegen im `EssenScreen`, damit das Laden einer neuen Woche den Slot nicht zurücksetzt.
+
+### Consequences
+
+- Zwei neue Root-Routen als formSheet: `meal/pick` (Rezept für einen festen Platz) und `meal/schedule` (Platz für ein festes Rezept).
+- Änderungen eines anderen Geräts erscheinen erst beim nächsten Laden, ein Live-Sync des Essensplans fehlt. Ebenso fehlen Portionen und Notizen pro Eintrag. Beides steht in [TODO.md](./TODO.md).
+- Eine pausierte oder deaktivierte Allergie-Query zählt im Urteil weiterhin als „keine Allergien". Das betrifft alle Urteile und steht als eigener Punkt in [TODO.md](./TODO.md).
+- Die Fragen an den Designer (Aktionen des Menüs, Wochen blättern in V1, Platz des Einplanen-Knopfs, Text des Tausch-Knopfs, neue Copy-Keys) stehen gesammelt in [TODO.md](./TODO.md).

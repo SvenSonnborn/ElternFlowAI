@@ -754,6 +754,14 @@ der Weg (bun vs. jest) ist als ADR festgehalten.
 
 **Aufwand L · eigene Iteration · löst sechs Einträge über drei Screens**
 
+> **Stand 2026-10-21: erledigt** ([ADR-043](./decision-log.md)). Leere Tage im Essen-Tab sind
+> planbar, die Woche lässt sich ohne Grenze blättern, und geplante Einträge lassen sich über ihr
+> `⋯` ersetzen oder löschen (mit Rückgängig). Rezepte lassen sich direkt auf einen Tag legen. Der
+> Hero plant und tauscht ein Allergen-Gericht. Optimistik als Cache-Patch, nicht als drittes
+> Overlay; der geparkte Eintrag zur Vereinigung der Overlays bleibt geparkt. Die drei 🎨-Punkte
+> und zwei neue (Wochen blättern in V1, Platz des Einplanen-Knopfs) stehen als Designer-Eintrag
+> in [TODO.md](./TODO.md), ebenso Portionen und Notizen sowie der fehlende Live-Sync.
+
 Technisch unblockiert ✅ — die RLS-Policies für INSERT/UPDATE/DELETE auf `meal_plan_entries` liegen
 seit [20260529093329_recipes_and_meal_plan.sql](../supabase/migrations/20260529093329_recipes_and_meal_plan.sql)
 bereit, `features/meals/` ist rein lesend. Es fehlt genau eine Mutationsschicht — und mit ihr fallen
