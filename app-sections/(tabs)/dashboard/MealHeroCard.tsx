@@ -11,7 +11,7 @@ import {
   MEAL_PLACEHOLDER_EMOJI,
   recipeA11yLabel,
 } from "@/app-sections/shared";
-import { palette } from "@/design-system";
+import { palette, touchTarget } from "@/design-system";
 import { Text } from "@/design-system/ui";
 import { localize } from "@/features/meals";
 
@@ -26,7 +26,8 @@ interface MealHeroCardProps {
    */
   alternative?: RecipeRow | null;
   onOpenRecipe: () => void;
-  onOpenAlternative?: () => void;
+  /** Tauscht die geplante Mahlzeit gegen `alternative` — nicht: öffnet dessen Rezept. */
+  onSwapAlternative?: () => void;
 }
 
 /**
@@ -43,7 +44,7 @@ export function MealHeroCard({
   verdict,
   alternative,
   onOpenRecipe,
-  onOpenAlternative,
+  onSwapAlternative,
 }: MealHeroCardProps) {
   const { t, i18n } = useTranslation();
 
@@ -56,7 +57,7 @@ export function MealHeroCard({
   const showAlternative =
     (verdict.status === "unsafe" || verdict.status === "caution") &&
     Boolean(alternative) &&
-    Boolean(onOpenAlternative);
+    Boolean(onSwapAlternative);
 
   return (
     <LinearGradient
@@ -114,7 +115,8 @@ export function MealHeroCard({
         <Pressable
           onPress={onOpenRecipe}
           accessibilityRole="button"
-          className="h-11 flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-white active:opacity-85"
+          style={{ minHeight: touchTarget.min }}
+          className="flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-white active:opacity-85"
         >
           <Icon name="book-open" size={15} color={palette.slate[700]} />
           <Text variant="button" tone="ink">
@@ -123,13 +125,17 @@ export function MealHeroCard({
         </Pressable>
         {showAlternative ? (
           <Pressable
-            onPress={onOpenAlternative}
+            onPress={onSwapAlternative}
             accessibilityRole="button"
-            className="h-11 flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-black/20 active:opacity-85"
+            accessibilityLabel={t("dash.a11y.swapMeal", {
+              recipe: localize(alternative?.title, i18n.language),
+            })}
+            style={{ minHeight: touchTarget.min }}
+            className="flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-black/20 active:opacity-85"
           >
             <Icon name="sparkles" size={15} color="#FFFFFF" />
             <Text variant="button" tone="white" numberOfLines={1}>
-              {t("meals.suggest.other")}
+              {t("dash.meal.swap")}
             </Text>
           </Pressable>
         ) : null}

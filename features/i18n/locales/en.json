@@ -212,7 +212,8 @@
       "moreMembers": "Show {{count}} more family members",
       "prepTask": "Open task: {{title}}",
       "prepEvent": "Open event: {{title}}",
-      "prepMore": "Show {{count}} more items to prepare"
+      "prepMore": "Show {{count}} more items to prepare",
+      "swapMeal": "Cook {{recipe}} instead"
     },
     "section": {
       "today": "Today",
@@ -221,6 +222,8 @@
     "meal": {
       "question": "What are we eating today?",
       "openRecipe": "Open recipe",
+      "swap": "Cook this instead",
+      "swapped": "Swapped: {{recipe}}",
       "toShopping": "Add to shopping list",
       "empty": {
         "title": "Nothing planned yet",
