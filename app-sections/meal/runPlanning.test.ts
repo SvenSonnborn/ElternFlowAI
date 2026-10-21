@@ -156,6 +156,38 @@ describe("runPlanning", () => {
     ]);
   });
 
+  test("replaceTarget mit Allergie-Treffer: Nein schreibt nichts", async () => {
+    const h = harness({ occupant: entry("e-1", "r-old"), answers: [false] });
+    const result = await runPlanning(
+      request({
+        allergy: { kind: "hits", status: "unsafe", keys: ["milk"] },
+        replaceTarget: { entryId: "e-1", seenRecipeId: "r-old" },
+      }),
+      h.deps,
+    );
+    expect(result).toBe("cancelled");
+    expect(h.asked).toEqual([{ kind: "confirmAllergy", status: "unsafe", keys: ["milk"] }]);
+    expect(h.planCalls).toHaveLength(0);
+    expect(h.replaceCalls).toHaveLength(0);
+  });
+
+  test("replaceTarget mit Allergie-Treffer: Ja ersetzt ohne Ersetzen-Frage", async () => {
+    const h = harness({ occupant: entry("e-1", "r-old"), answers: [true] });
+    const result = await runPlanning(
+      request({
+        allergy: { kind: "hits", status: "caution", keys: ["milk"] },
+        replaceTarget: { entryId: "e-1", seenRecipeId: "r-old" },
+      }),
+      h.deps,
+    );
+    expect(result).toBe("planned");
+    expect(h.asked).toEqual([{ kind: "confirmAllergy", status: "caution", keys: ["milk"] }]);
+    expect(h.replaceCalls).toEqual([
+      { entryId: "e-1", seenRecipeId: "r-old", date: "2026-10-28", slot: "dinner", recipe },
+    ]);
+    expect(h.planCalls).toHaveLength(0);
+  });
+
   test("andere Fehler werden weitergeworfen", async () => {
     const h = harness({ planErrors: [new Error("netz")] });
     const thrown = await runPlanning(request(), h.deps).catch((err: unknown) => err);

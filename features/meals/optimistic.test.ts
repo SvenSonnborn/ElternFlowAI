@@ -11,6 +11,7 @@ import {
   optimisticEntry,
   patchMealWeek,
   restoreMealWeek,
+  slotOccupant,
 } from "./optimistic";
 import { mealKeys } from "./queries";
 
@@ -118,5 +119,31 @@ describe("patchMealWeek / restoreMealWeek", () => {
     expect(getWeek(qc, weekA)).toBeUndefined();
     restoreMealWeek(qc, snapshot);
     expect(getWeek(qc, weekA)).toBeUndefined();
+  });
+});
+
+describe("slotOccupant", () => {
+  const none: ReadonlySet<string> = new Set();
+
+  test("echte Zeile auf dem Platz: die Zeile", () => {
+    const real = entry("e-1", "2026-10-22", "dinner");
+    const other = entry("e-2", "2026-10-22", "lunch");
+    expect(slotOccupant([other, real], none, "2026-10-22", "dinner")).toBe(real);
+  });
+
+  test("optimistische Zeile: null — ihre Id darf nie an den Server", () => {
+    const pending = entry("optimistic:2026-10-22:dinner", "2026-10-22", "dinner");
+    expect(slotOccupant([pending], none, "2026-10-22", "dinner")).toBeNull();
+  });
+
+  test("Zeile im Undo-Fenster: null", () => {
+    const deleted = entry("e-1", "2026-10-22", "dinner");
+    expect(slotOccupant([deleted], new Set(["e-1"]), "2026-10-22", "dinner")).toBeNull();
+  });
+
+  test("leerer Platz oder nicht geladene Woche: null", () => {
+    const other = entry("e-1", "2026-10-23", "dinner");
+    expect(slotOccupant([other], none, "2026-10-22", "dinner")).toBeNull();
+    expect(slotOccupant(undefined, none, "2026-10-22", "dinner")).toBeNull();
   });
 });

@@ -14,6 +14,7 @@ import { MealScheduleScreen } from "./MealScheduleScreen";
 const mockPlan = jest.fn();
 const mockReplace = jest.fn();
 const mockAllergies = { keys: [] as string[], isLoading: false, error: null };
+let mockParams: Record<string, string> = {};
 
 // Nur die Schreib-Hooks und die Allergien werden ersetzt: `useMealPlanning`
 // samt Dialogen und `runPlanning` laufen echt — das ist der Zweck dieses Tests.
@@ -25,7 +26,7 @@ jest.mock("@/features/meals", () => ({
 }));
 
 jest.mock("expo-router", () => ({
-  useLocalSearchParams: () => ({ recipeId: "r-new" }),
+  useLocalSearchParams: () => mockParams,
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
   Stack: { Screen: () => null },
 }));
@@ -85,6 +86,7 @@ function lastDialog() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockParams = { recipeId: "r-new" };
   mockPlan.mockResolvedValue(undefined);
   mockReplace.mockResolvedValue(undefined);
   mockAllergies.isLoading = false;
@@ -118,6 +120,42 @@ describe("MealScheduleScreen", () => {
       recipe: R,
     });
     expect(mockPlan).not.toHaveBeenCalled();
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it("zeigt ein gescheitertes Ersetzen als Zeile im Sheet und bleibt offen", async () => {
+    // Ein Toast läge auf iOS unter dem Sheet; die Zeile muss im Sheet stehen.
+    mockReplace.mockRejectedValue(new Error("netz"));
+    const alertSpy = lastDialog();
+    await renderScreen(<MealScheduleScreen />, { queryClient: client(true) });
+    expect(screen.queryByText(i18n.t("meals.error.generic"))).toBeNull();
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("meals.schedule.submit") }));
+
+    const buttons = alertSpy.mock.calls[0][2] as AlertButton[];
+    const confirm = buttons.find((b) => b.text === i18n.t("meals.planning.replaceConfirm"));
+    await act(() => {
+      confirm?.onPress?.();
+    });
+
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(i18n.t("meals.error.generic"))).toBeTruthy();
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it("schließt, wenn es das Rezept nicht gibt", async () => {
+    mockParams = { recipeId: "r-unknown" };
+    const queryClient = createTestQueryClient();
+    // Die Query ist fertig und hat nichts gefunden (`fetchRecipeById` → `null`).
+    queryClient.setQueryData(mealKeys.recipe("r-unknown"), null);
+    await renderScreen(<MealScheduleScreen />, { queryClient });
+    expect(router.back).toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: i18n.t("meals.schedule.submit") })).toBeNull();
+  });
+
+  it("schließt ohne recipeId", async () => {
+    mockParams = {};
+    await renderScreen(<MealScheduleScreen />, { queryClient: client(false) });
     expect(router.back).toHaveBeenCalled();
   });
 

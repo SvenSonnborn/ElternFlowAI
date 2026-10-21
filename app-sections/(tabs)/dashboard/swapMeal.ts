@@ -31,7 +31,11 @@ export interface SwapMealDeps {
  * meldet das gesehene Rezept des Eintrags, das Zurücktauschen das
  * Ausweichgericht. Hat jemand den Platz zwischenzeitlich anders belegt,
  * trifft das Zurücktauschen null Zeilen (`MealSlotOccupiedError`) und meldet
- * sich als Toast — es überschreibt nie still eine fremde Änderung.
+ * sich als Toast — es überschreibt nie still eine fremde Änderung. Hat jemand
+ * ihn geleert, plant es auch nicht neu ein (`planIfGone: false`, Spec 4.6):
+ * Rückgängig stellt den gesehenen Stand wieder her, es füllt keinen Platz,
+ * den ein anderer Elternteil bewusst freigemacht hat (`MealEntryGoneError`,
+ * derselbe „geändert"-Toast).
  *
  * Fehler werden hier zu Toasts und nicht weitergeworfen: der Aufrufer ist ein
  * Tap-Handler ohne Fehlerpfad. Ohne vorheriges Rezept (`entry.recipe` ist
@@ -66,7 +70,12 @@ export async function swapMeal(
       ? {
           label: t("action.undo"),
           onPress: () => {
-            replace({ ...place, seenRecipeId: alternative.id, recipe: previous }).catch(fail);
+            replace({
+              ...place,
+              seenRecipeId: alternative.id,
+              recipe: previous,
+              planIfGone: false,
+            }).catch(fail);
           },
         }
       : undefined,

@@ -73,4 +73,10 @@ describe("planningSteps", () => {
   test("bewusstes Ersetzen fragt nicht nach dem Ersetzen", () => {
     expect(planningSteps({ allergy: { kind: "ok" }, occupant, intent: "replace" })).toEqual([]);
   });
+
+  test("bewusstes Ersetzen mit Treffer: nur der Allergie-Hinweis", () => {
+    expect(planningSteps({ allergy: hits, occupant, intent: "replace" })).toEqual([
+      { kind: "confirmAllergy", status: "unsafe", keys: ["milk"] },
+    ]);
+  });
 });

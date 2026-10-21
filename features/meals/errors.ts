@@ -28,6 +28,22 @@ export class MealSlotOccupiedError extends Error {
   }
 }
 
+/**
+ * Die gesehene Zeile ist weg, und der Aufrufer wollte in diesem Fall nicht
+ * einplanen (`ReplaceMealVars.planIfGone: false`).
+ *
+ * Eigene Klasse statt `MealSlotOccupiedError`: Ein leerer Platz ist nicht
+ * „belegt", und es gibt keinen frischen Eintrag, mit dem sich neu fragen
+ * ließe. Für den Nutzer heißt es trotzdem dasselbe — der Eintrag hat sich
+ * inzwischen geändert —, deshalb teilen sich beide den Key.
+ */
+export class MealEntryGoneError extends Error {
+  constructor() {
+    super("Meal plan entry is gone");
+    this.name = "MealEntryGoneError";
+  }
+}
+
 export type MealErrorKey =
   | "meals.error.generic"
   | "meals.error.notAuthenticated"
@@ -36,10 +52,11 @@ export type MealErrorKey =
 
 /**
  * Ordnet die *Ursache* einem i18n-Key zu. Über `instanceof`, nicht über
- * `name`: beide Klassen leben in diesem Feature.
+ * `name`: alle drei Klassen leben in diesem Feature.
  */
 export function mapMealError(err: unknown): MealErrorKey {
   if (err instanceof MealSlotOccupiedError) return "meals.error.changed";
+  if (err instanceof MealEntryGoneError) return "meals.error.changed";
   if (err instanceof MissingParentError) return "meals.error.notAuthenticated";
 
   const code =

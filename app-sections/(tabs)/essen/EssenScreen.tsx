@@ -8,7 +8,14 @@ import { Icon, TopBar } from "@/app-sections/shared";
 import { palette } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
-import { formatWeekRange, toDateKey, useMealPlans, weekStartFor } from "@/features/meals";
+import {
+  formatWeekRange,
+  slotForTime,
+  toDateKey,
+  useMealPlans,
+  weekStartFor,
+  type MealSlot,
+} from "@/features/meals";
 import { useToday } from "@/features/shared";
 
 import { RecipeBrowser } from "./RecipeBrowser";
@@ -26,6 +33,20 @@ export function EssenScreen() {
   // Umspringen unter der Hand risse ihn aus der Woche, die er gerade plant.
   const [weekStart, setWeekStart] = useState(() => weekStartFor(today));
   const isCurrentWeek = toDateKey(weekStart) === toDateKey(weekStartFor(today));
+  // Slot-Tab und offenes Zeilen-Menü leben hier und nicht im Raster: Während
+  // eine neue Woche lädt, steht statt `WeekPlanGrid` ein Spinner, und State im
+  // Raster fiele beim Wiedereinhängen auf seinen Startwert zurück.
+  // Behaviour-Rule aus `patterns/meals.md`: vor 11 Frühstück, 11–15 Mittag,
+  // sonst Abendessen. Nur als *Startwert* — danach gehört der Tab dem Nutzer,
+  // ein Umspringen um 15:00 Uhr unter der Hand wäre übergriffig.
+  const [slot, setSlot] = useState<MealSlot>(() => slotForTime(new Date()));
+  const [openMenuDate, setOpenMenuDate] = useState<string | null>(null);
+  // Ein Wochenwechsel schließt das Menü: Seine Zeile ist nicht mehr zu sehen,
+  // und beim Zurückblättern soll es nicht wieder aufspringen.
+  const changeWeek = (next: Date) => {
+    setWeekStart(next);
+    setOpenMenuDate(null);
+  };
   // Der Screen besitzt die Query, obwohl das Raster sie rendert: Wochenlabel
   // und Pull-to-Refresh hängen an derselben Antwort, und `Screen` trägt den
   // `RefreshControl`. Ein Callback nach oben wäre der Umweg.
@@ -49,7 +70,7 @@ export function EssenScreen() {
           range: formatWeekRange(weekStart, lang),
         })}
       />
-      <WeekNav weekStart={weekStart} isCurrentWeek={isCurrentWeek} onChange={setWeekStart} />
+      <WeekNav weekStart={weekStart} isCurrentWeek={isCurrentWeek} onChange={changeWeek} />
 
       <Pressable className="mt-3 overflow-hidden rounded-2xl active:opacity-90">
         <LinearGradient
@@ -89,7 +110,13 @@ export function EssenScreen() {
           <Button label={t("action.retry")} variant="soft" onPress={refetch} />
         </Card>
       ) : (
-        <WeekPlanGrid days={days} />
+        <WeekPlanGrid
+          days={days}
+          slot={slot}
+          onSlotChange={setSlot}
+          openMenuDate={openMenuDate}
+          onOpenMenuChange={setOpenMenuDate}
+        />
       )}
 
       <Pressable className="mt-4 active:opacity-90">

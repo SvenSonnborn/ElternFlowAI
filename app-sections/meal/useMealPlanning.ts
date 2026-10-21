@@ -4,19 +4,20 @@ import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { confirmDestructive, useToast } from "@/app-sections/shared";
+import { confirmDestructive } from "@/app-sections/shared";
 import {
   allergyCheck,
   findPendingMealDelete,
   localize,
   mapMealError,
   mealKeys,
+  slotOccupant,
   toDateKey,
   usePlanMeal,
   useFamilyAllergies,
   useReplaceMeal,
   weekStartFor,
-  withoutPendingMealDeletes,
+  type MealErrorKey,
   type MealPlanEntryWithRecipe,
   type MealSlot,
   type PlanningStep,
@@ -41,19 +42,27 @@ interface PlanRecipeInput {
  * Solange die Familien-Allergien laden, gibt `planRecipe` `"cancelled"` zurück,
  * ohne zu fragen — still ohne Hinweis zu planen wäre die falsche Richtung.
  * Aufrufer sperren ihre Aktion über `allergiesLoading`. `planRecipe` wirft nie.
+ *
+ * **Fehler kommen als `error` zurück, nicht als Toast.** Beide Aufrufer sind
+ * `formSheet`s, und ein Toast aus einem Sheet liegt auf iOS *unter* ihm
+ * (docs/TODO.md, „Toasts liegen hinter nativen Modal-Screens"); bei
+ * `"failed"` bleibt das Sheet offen, der Nutzer sähe also nichts. `error`
+ * ist der i18n-Key aus `mapMealError` und wird beim nächsten `planRecipe`
+ * geleert — die Sheets zeigen ihn als Zeile (`PlanningErrorLine`).
  */
 export function useMealPlanning(): {
   planRecipe: (input: PlanRecipeInput) => Promise<"planned" | "cancelled" | "failed">;
   allergiesLoading: boolean;
   busy: boolean;
+  error: MealErrorKey | null;
 } {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
-  const toast = useToast();
   const allergies = useFamilyAllergies();
   const plan = usePlanMeal();
   const replace = useReplaceMeal();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<MealErrorKey | null>(null);
   const inFlight = useRef(0);
 
   const confirm = useCallback(
@@ -100,6 +109,7 @@ export function useMealPlanning(): {
 
   const planRecipe = useCallback(
     async (input: PlanRecipeInput): Promise<"planned" | "cancelled" | "failed"> => {
+      setError(null);
       const check = allergyCheck(input.recipe, allergies);
       if (check.kind === "loading") return "cancelled";
 
@@ -119,20 +129,19 @@ export function useMealPlanning(): {
               if (pending) await usePendingDeleteStore.getState().commit(pending.id);
             },
             getOccupant: (date, slot) => {
-              const week = queryClient.getQueryData<MealPlanEntryWithRecipe[]>(
-                mealKeys.plan(toDateKey(weekStartFor(parseISO(date)))),
-              );
-              if (!week) return null;
               const pendingIds = new Set(
                 usePendingDeleteStore
                   .getState()
                   .entries.filter((e) => e.kind === "meal")
                   .map((e) => (e.target as { entryId: string }).entryId),
               );
-              return (
-                withoutPendingMealDeletes(week, pendingIds).find(
-                  (entry) => entry.date === date && entry.meal_slot === slot,
-                ) ?? null
+              return slotOccupant(
+                queryClient.getQueryData<MealPlanEntryWithRecipe[]>(
+                  mealKeys.plan(toDateKey(weekStartFor(parseISO(date)))),
+                ),
+                pendingIds,
+                date,
+                slot,
               );
             },
             plan: (vars) => plan.mutateAsync(vars),
@@ -140,15 +149,15 @@ export function useMealPlanning(): {
           },
         );
       } catch (err) {
-        toast.show({ title: t(mapMealError(err)), variant: "error" });
+        setError(mapMealError(err));
         return "failed";
       } finally {
         inFlight.current -= 1;
         if (inFlight.current === 0) setBusy(false);
       }
     },
-    [allergies, confirm, plan, replace, queryClient, t, toast],
+    [allergies, confirm, plan, replace, queryClient],
   );
 
-  return { planRecipe, allergiesLoading: allergies.isLoading, busy };
+  return { planRecipe, allergiesLoading: allergies.isLoading, busy, error };
 }
