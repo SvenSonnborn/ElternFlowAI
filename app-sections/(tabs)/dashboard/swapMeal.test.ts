@@ -40,6 +40,27 @@ function harness(replaceImpl: (vars: unknown) => Promise<unknown> = () => Promis
 }
 
 describe("swapMeal", () => {
+  test("startet bei einem Doppeltipp nur einen Tausch", async () => {
+    // Beide Taps landen im selben Frame, bevor `isPending` im nächsten Render
+    // greift: Der zweite darf weder schreiben noch einen „geändert"-Toast zeigen.
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const { deps, replaceCalls, toasts } = harness(() => gate);
+
+    const first = swapMeal({ entry, alternative }, deps);
+    const second = swapMeal({ entry, alternative }, deps);
+    release();
+    await Promise.all([first, second]);
+
+    expect(replaceCalls).toHaveLength(1);
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]?.variant).toBe("success");
+
+    // Nach dem Abschluss ist der Eintrag wieder frei.
+    await swapMeal({ entry, alternative }, deps);
+    expect(replaceCalls).toHaveLength(2);
+  });
+
   test("ersetzt den Eintrag gegen das gesehene Rezept und bietet Rückgängig an", async () => {
     const { deps, replaceCalls, toasts } = harness();
     await swapMeal({ entry, alternative }, deps);
