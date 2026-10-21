@@ -92,6 +92,7 @@ export {
   formatWeekRange,
   groupByDay,
   nextSlotBoundary,
+  shiftWeek,
   slotForTime,
   toDateKey,
   weekDayKeys,

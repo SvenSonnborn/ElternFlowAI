@@ -389,7 +389,18 @@
       "generic": "That didn't work. Please try again.",
       "notAuthenticated": "You're signed out or not allowed to change this.",
       "recipeGone": "This recipe no longer exists.",
-      "changed": "The entry has been changed in the meantime."
+      "changed": "The entry has been changed in the meantime.",
+      "deleteFailed": "Entry could not be removed"
+    },
+    "week": {
+      "prev": "Previous week",
+      "next": "Next week",
+      "current": "This week"
+    },
+    "row": {
+      "change": "Choose a different recipe",
+      "delete": "Delete",
+      "deleted": "Removed from the plan"
     },
     "slotPhrase": {
       "dinner": "dinner",
@@ -458,6 +469,7 @@
     },
     "a11y": {
       "planDay": "Plan {{slot}} on {{day}}",
+      "rowMenu": "Actions for {{day}}",
       "unsafeRecipe": "{{title}} — contains {{list}}",
       "cautionRecipe": "{{title}} — may contain {{list}}",
       "unverifiedRecipe": "{{title}} — allergens not checked"

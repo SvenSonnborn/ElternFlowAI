@@ -6,6 +6,7 @@ import {
   formatWeekRange,
   groupByDay,
   nextSlotBoundary,
+  shiftWeek,
   slotForTime,
   toDateKey,
   weekDayKeys,
@@ -208,5 +209,26 @@ describe("formatWeekRange", () => {
   test("zieht ein beliebiges Datum der Woche auf den Montag", () => {
     const sunday = new Date(2026, 4, 17);
     expect(formatWeekRange(sunday, "de")).toBe(formatWeekRange(new Date(2026, 4, 11), "de"));
+  });
+});
+
+describe("shiftWeek", () => {
+  test("landet über die Umstellung auf Winterzeit auf Montag 00:00 lokal", () => {
+    const next = shiftWeek(localDay("2025-10-27"), 1);
+    expect(toDateKey(next)).toBe("2025-11-03");
+    expect(next.getDay()).toBe(1);
+    expect(next.getHours()).toBe(0);
+    expect(next.getMinutes()).toBe(0);
+  });
+
+  test("über die Jahresgrenze", () => {
+    expect(toDateKey(shiftWeek(localDay("2025-12-29"), 1))).toBe("2026-01-05");
+  });
+
+  test("zurück: zwei Wochen sind zwei Montage", () => {
+    const back = shiftWeek(localDay("2025-11-10"), -2);
+    expect(toDateKey(back)).toBe("2025-10-27");
+    expect(back.getDay()).toBe(1);
+    expect(back.getHours()).toBe(0);
   });
 });
