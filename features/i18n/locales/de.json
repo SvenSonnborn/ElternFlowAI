@@ -391,6 +391,23 @@
       "recipeGone": "Dieses Rezept gibt es nicht mehr.",
       "changed": "Der Eintrag wurde inzwischen geändert."
     },
+    "slotPhrase": {
+      "dinner": "das Abendessen",
+      "lunch": "das Mittagessen",
+      "breakfast": "das Frühstück",
+      "snack": "den Snack"
+    },
+    "planning": {
+      "replaceTitle": "Schon etwas geplant",
+      "replaceBody": "Am {{day}} ist für {{slotPhrase}} schon „{{recipe}}“ eingetragen. Möchtest du das ersetzen?",
+      "replaceConfirm": "Ja, ersetzen",
+      "replaceCancel": "Nein",
+      "allergyTitle": "Allergie-Hinweis",
+      "allergyUnsafeBody": "„{{recipe}}“ enthält {{list}}.",
+      "allergyCautionBody": "„{{recipe}}“ enthält möglicherweise {{list}}.",
+      "allergyUnknownBody": "Die Allergien eurer Familie konnten nicht geprüft werden.",
+      "allergyConfirm": "Trotzdem hinzufügen"
+    },
     "plan": {
       "empty": "Für diese Woche ist noch nichts geplant.",
       "emptyDay": "Noch nichts geplant",

@@ -391,6 +391,23 @@
       "recipeGone": "This recipe no longer exists.",
       "changed": "The entry has been changed in the meantime."
     },
+    "slotPhrase": {
+      "dinner": "dinner",
+      "lunch": "lunch",
+      "breakfast": "breakfast",
+      "snack": "a snack"
+    },
+    "planning": {
+      "replaceTitle": "Already planned",
+      "replaceBody": "On {{day}}, “{{recipe}}” is already planned for {{slotPhrase}}. Do you want to replace it?",
+      "replaceConfirm": "Yes, replace",
+      "replaceCancel": "No",
+      "allergyTitle": "Allergy notice",
+      "allergyUnsafeBody": "“{{recipe}}” contains {{list}}.",
+      "allergyCautionBody": "“{{recipe}}” may contain {{list}}.",
+      "allergyUnknownBody": "We couldn't check your family's allergies.",
+      "allergyConfirm": "Add anyway"
+    },
     "plan": {
       "empty": "Nothing planned for this week yet.",
       "emptyDay": "Nothing planned",

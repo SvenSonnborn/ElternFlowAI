@@ -45,6 +45,7 @@ export {
   restoreMealWeek,
   type MealWeekSnapshot,
 } from "./optimistic";
+export { allergyCheck, planningSteps, type AllergyCheck, type PlanningStep } from "./planningSteps";
 export {
   findPendingMealDelete,
   usePendingMealIds,
