@@ -75,9 +75,13 @@ jobs:
 
       - name: Test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        # Bun's test runner (see bunfig.toml preload) — NOT `bun run test`/jest,
-        # which is broken under jest-expo 55. Mirrors the local `bun test` command.
+        # `bun test` für alle `bun:test`-Suiten (siehe bunfig.toml preload);
+        # Komponenten-Tests (`*.jest.tsx`) laufen separat unter Jest.
         run: bun test
+
+      - name: Component tests (jest)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bun run test:rn
 
       # Web smoke build last — the most expensive step. Verifies the web bundle
       # compiles. Uses the Supabase placeholder env above.
