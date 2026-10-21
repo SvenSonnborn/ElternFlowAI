@@ -1,6 +1,6 @@
 import { getISOWeek } from "date-fns";
 import { LinearGradient } from "expo-linear-gradient";
-import { useMemo } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, View } from "react-native";
 
@@ -8,10 +8,11 @@ import { Icon, TopBar } from "@/app-sections/shared";
 import { palette } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
-import { formatWeekRange, useMealPlans, weekStartFor } from "@/features/meals";
+import { formatWeekRange, toDateKey, useMealPlans, weekStartFor } from "@/features/meals";
 import { useToday } from "@/features/shared";
 
 import { RecipeBrowser } from "./RecipeBrowser";
+import { WeekNav } from "./WeekNav";
 import { WeekPlanGrid } from "./WeekPlanGrid";
 
 export function EssenScreen() {
@@ -20,7 +21,11 @@ export function EssenScreen() {
   const lang = i18n.language.startsWith("de") ? "de" : "en";
 
   const today = useToday();
-  const weekStart = useMemo(() => weekStartFor(today), [today]);
+  // Die gewählte Woche gehört dem Nutzer: Start ist die Woche von heute, danach
+  // wird sie nicht mehr nachgezogen — auch nicht um Mitternacht auf Montag, ein
+  // Umspringen unter der Hand risse ihn aus der Woche, die er gerade plant.
+  const [weekStart, setWeekStart] = useState(() => weekStartFor(today));
+  const isCurrentWeek = toDateKey(weekStart) === toDateKey(weekStartFor(today));
   // Der Screen besitzt die Query, obwohl das Raster sie rendert: Wochenlabel
   // und Pull-to-Refresh hängen an derselben Antwort, und `Screen` trägt den
   // `RefreshControl`. Ein Callback nach oben wäre der Umweg.
@@ -44,8 +49,9 @@ export function EssenScreen() {
           range: formatWeekRange(weekStart, lang),
         })}
       />
+      <WeekNav weekStart={weekStart} isCurrentWeek={isCurrentWeek} onChange={setWeekStart} />
 
-      <Pressable className="overflow-hidden rounded-2xl active:opacity-90">
+      <Pressable className="mt-3 overflow-hidden rounded-2xl active:opacity-90">
         <LinearGradient
           colors={[palette.mint[500], palette.mint[700]]}
           start={{ x: 0, y: 0 }}

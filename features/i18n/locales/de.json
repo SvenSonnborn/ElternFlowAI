@@ -389,7 +389,18 @@
       "generic": "Das hat leider nicht geklappt. Versuch es bitte noch einmal.",
       "notAuthenticated": "Du bist nicht angemeldet oder darfst das nicht ändern.",
       "recipeGone": "Dieses Rezept gibt es nicht mehr.",
-      "changed": "Der Eintrag wurde inzwischen geändert."
+      "changed": "Der Eintrag wurde inzwischen geändert.",
+      "deleteFailed": "Eintrag konnte nicht entfernt werden"
+    },
+    "week": {
+      "prev": "Vorherige Woche",
+      "next": "Nächste Woche",
+      "current": "Diese Woche"
+    },
+    "row": {
+      "change": "Anderes Rezept wählen",
+      "delete": "Löschen",
+      "deleted": "Aus dem Plan entfernt"
     },
     "slotPhrase": {
       "dinner": "das Abendessen",
@@ -458,6 +469,7 @@
     },
     "a11y": {
       "planDay": "{{slot}} am {{day}} planen",
+      "rowMenu": "Aktionen für {{day}}",
       "unsafeRecipe": "{{title}} — enthält {{list}}",
       "cautionRecipe": "{{title}} — enthält möglicherweise {{list}}",
       "unverifiedRecipe": "{{title}} — Allergene nicht geprüft"

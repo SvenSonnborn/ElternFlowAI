@@ -10,14 +10,20 @@ import {
   Icon,
   MEAL_PLACEHOLDER_EMOJI,
   recipeA11yLabel,
+  useUndoableDelete,
 } from "@/app-sections/shared";
+import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Text } from "@/design-system/ui";
 import {
+  isOptimisticEntry,
   localize,
+  mapMealError,
   slotForTime,
   useRecipeJudge,
+  useRemoveMeal,
   type MealPlanDay,
+  type MealPlanEntryWithRecipe,
   type RecipeAllergenVerdict,
   type RecipeRow,
 } from "@/features/meals";
@@ -48,12 +54,57 @@ interface WeekPlanGridProps {
  * `refetch` durch einen Callback nach oben zu reichen.
  */
 export function WeekPlanGrid({ days }: WeekPlanGridProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // Behaviour-Rule aus `patterns/meals.md`: vor 11 Frühstück, 11–15 Mittag,
   // sonst Abendessen. Nur als *Startwert* — danach gehört der Tab dem Nutzer,
   // ein Umspringen um 15:00 Uhr unter der Hand wäre übergriffig.
   const [slot, setSlot] = useState<SlotTab>(() => slotForTime(new Date()));
+  // Höchstens ein Menü offen. Es hängt an Woche *und* Tag, damit es beim
+  // Zurückblättern nicht wieder aufspringt; ein Slot-Wechsel schließt es, weil
+  // die Zeile darunter dann ein anderer Eintrag ist.
+  const weekKey = days[0]?.date ?? "";
+  const [open, setOpen] = useState<{ week: string; date: string } | null>(null);
+  const openDate = open?.week === weekKey ? open.date : null;
   const judge = useRecipeJudge();
+  const removeMeal = useRemoveMeal();
+  const undoableDelete = useUndoableDelete();
+
+  const selectSlot = (tab: SlotTab) => {
+    setSlot(tab);
+    setOpen(null);
+  };
+
+  const deleteEntry = (entry: MealPlanEntryWithRecipe, recipe: RecipeRow) => {
+    setOpen(null);
+    const vars = {
+      entryId: entry.id,
+      seenRecipeId: entry.recipe_id,
+      date: entry.date,
+      slot: entry.meal_slot,
+    };
+    undoableDelete({
+      kind: "meal",
+      target: { entryId: entry.id, date: entry.date, slot: entry.meal_slot },
+      title: t("meals.row.deleted"),
+      message: localize(recipe.title, i18n.language),
+      run: () => removeMeal.mutateAsync(vars),
+      errorTitle: t("meals.error.deleteFailed"),
+      formatError: (err) => t(mapMealError(err)),
+    });
+  };
+
+  const changeEntry = (entry: MealPlanEntryWithRecipe) => {
+    setOpen(null);
+    router.push({
+      pathname: "/meal/pick",
+      params: {
+        date: entry.date,
+        slot: entry.meal_slot,
+        entryId: entry.id,
+        seenRecipeId: entry.recipe_id,
+      },
+    });
+  };
 
   const rows = useMemo(
     () =>
@@ -63,10 +114,13 @@ export function WeekPlanGrid({ days }: WeekPlanGridProps) {
         // privates Rezept einer fremden Familie). Praktisch unerreichbar,
         // solange die App nur globale und eigene Rezepte verplant — die Zeile
         // wäre sonst ein Kästchen ohne Titel und ohne Ziel (docs/TODO.md).
-        const recipe = day.slots[slot]?.recipe ?? null;
+        const entry = day.slots[slot] ?? null;
+        const recipe = entry?.recipe ?? null;
         return {
           date: day.date,
           isToday: day.isToday,
+          // Ohne sichtbares Rezept gibt es auch keinen Eintrag zu bearbeiten.
+          entry: recipe ? entry : null,
           recipe,
           verdict: recipe ? judge(recipe) : null,
         };
@@ -84,7 +138,7 @@ export function WeekPlanGrid({ days }: WeekPlanGridProps) {
               key={tab}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
-              onPress={() => setSlot(tab)}
+              onPress={() => selectSlot(tab)}
               // 44 statt der 34 px aus dem Handoff-Layout: dort war die Leiste
               // Dekoration, hier ist sie bedienbar — damit greift die
               // 44×44-Regel aus CLAUDE.md.
@@ -112,7 +166,17 @@ export function WeekPlanGrid({ days }: WeekPlanGridProps) {
 
       <View className="mt-4 gap-2">
         {rows.map((row) => (
-          <DayRow key={row.date} slot={slot} {...row} />
+          <DayRow
+            key={row.date}
+            slot={slot}
+            {...row}
+            menuOpen={openDate === row.date}
+            onToggleMenu={() =>
+              setOpen(openDate === row.date ? null : { week: weekKey, date: row.date })
+            }
+            onChangeEntry={changeEntry}
+            onDeleteEntry={deleteEntry}
+          />
         ))}
       </View>
     </>
@@ -125,11 +189,32 @@ interface DayRowProps {
   /** ISO-Kalendertag, `yyyy-MM-dd`. */
   date: string;
   isToday: boolean;
+  /** Der Eintrag hinter `recipe`; `null`, wo nichts geplant ist. */
+  entry: MealPlanEntryWithRecipe | null;
   recipe: RecipeRow | null;
   verdict: RecipeAllergenVerdict | null;
+  menuOpen: boolean;
+  /**
+   * Bewusst nicht `onPress`: RNTLs `fireEvent.press` läuft zur nächsten
+   * `onPress`-Prop hoch und umginge so ein deaktiviertes inneres `Pressable`.
+   */
+  onToggleMenu: () => void;
+  onChangeEntry: (entry: MealPlanEntryWithRecipe) => void;
+  onDeleteEntry: (entry: MealPlanEntryWithRecipe, recipe: RecipeRow) => void;
 }
 
-function DayRow({ slot, date, isToday, recipe, verdict }: DayRowProps) {
+function DayRow({
+  slot,
+  date,
+  isToday,
+  entry,
+  recipe,
+  verdict,
+  menuOpen,
+  onToggleMenu,
+  onChangeEntry,
+  onDeleteEntry,
+}: DayRowProps) {
   const { t, i18n } = useTranslation();
   const { theme } = useTheme();
   const isGerman = i18n.language.startsWith("de");
@@ -207,23 +292,13 @@ function DayRow({ slot, date, isToday, recipe, verdict }: DayRowProps) {
           {verdict ? <AllergenBadge verdict={verdict} /> : null}
         </View>
       </View>
-
-      {/* Kein `more`-Kebab: Es lag ohne eigenen `onPress` innerhalb des
-          Zeilen-`Pressable` — ein Tap darauf traf die Zeile und öffnete das
-          Rezept. Ein Element, das wie ein Menü aussieht und etwas anderes tut,
-          ist schlechter als keins. Kommt zurück, sobald es eine
-          `meal_plan_entries`-Mutation gibt, an die es sich hängen kann; bis
-          dahin weicht die Zeile von der V1-Anatomie in `patterns/meals.md`
-          ab (docs/TODO.md). Dieselbe Entscheidung wie beim Herz-Button der
-          Rezept-Detailansicht. */}
     </>
   );
 
-  const className = `flex-row items-center gap-3 rounded-2xl border border-line p-3 ${
-    isToday ? "bg-primary-soft" : "bg-card"
-  }`;
+  const containerClass = `rounded-2xl border border-line ${isToday ? "bg-primary-soft" : "bg-card"}`;
+  const dayName = format(parsed, "EEEE", { locale: isGerman ? deLocale : enLocale });
 
-  if (!recipe) {
+  if (!recipe || !entry) {
     return (
       // Ein leerer Tag ist die Einladung, etwas zu planen — Datum und Slot
       // kennt die Zeile bereits, die Auswahl (`/meal/pick`) braucht nur beides.
@@ -232,22 +307,71 @@ function DayRow({ slot, date, isToday, recipe, verdict }: DayRowProps) {
         accessibilityRole="button"
         accessibilityLabel={a11yLabel}
         onPress={() => router.push({ pathname: "/meal/pick", params: { date, slot } })}
-        className={`${className} active:opacity-80`}
+        className={`${containerClass} flex-row items-center gap-3 p-3 active:opacity-80`}
       >
         {body}
       </Pressable>
     );
   }
 
+  // Eine optimistische Zeile gibt es nur im Cache; ihre Id an den Server zu
+  // schicken wäre ein Schuss ins Leere (`isOptimisticEntry`). Bis der Refetch
+  // die echte Id bringt, bleibt die Zeile menülos.
+  const menuAvailable = !isOptimisticEntry(entry);
+
   return (
-    <Pressable
-      accessible
-      accessibilityRole="button"
-      accessibilityLabel={a11yLabel}
-      onPress={() => router.push({ pathname: "/recipe/[id]", params: { id: recipe.id } })}
-      className={`${className} active:opacity-80`}
-    >
-      {body}
-    </Pressable>
+    <View className={containerClass}>
+      <View className="flex-row items-center">
+        <Pressable
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={a11yLabel}
+          onPress={() => router.push({ pathname: "/recipe/[id]", params: { id: recipe.id } })}
+          className="flex-1 flex-row items-center gap-3 p-3 active:opacity-80"
+        >
+          {body}
+        </Pressable>
+        {/* Eigenes Bedienelement *neben* der Zeile, nicht in ihr: Ein Kebab
+            innerhalb des Zeilen-`Pressable` ohne eigenen `onPress` traf bei
+            jedem Tap die Zeile und öffnete das Rezept. Als Geschwister hat es
+            seine eigene 44-Box (ADR-041) und fängt seinen Tap selbst. */}
+        {menuAvailable ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("meals.a11y.rowMenu", { day: dayName })}
+            accessibilityState={{ expanded: menuOpen }}
+            onPress={onToggleMenu}
+            className="items-center justify-center active:opacity-70"
+            style={{ width: touchTarget.min, height: touchTarget.min, marginRight: 4 }}
+          >
+            <Icon name="more-horizontal" size={20} color={theme.inkSecondary} />
+          </Pressable>
+        ) : null}
+      </View>
+      {menuAvailable && menuOpen ? (
+        <View className="flex-row gap-2 border-t border-line px-3 py-2">
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => onChangeEntry(entry)}
+            className="flex-1 items-center justify-center rounded-xl bg-bg-raised px-3 active:opacity-70"
+            style={{ minHeight: touchTarget.min }}
+          >
+            <Text variant="caption" tone="ink">
+              {t("meals.row.change")}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => onDeleteEntry(entry, recipe)}
+            className="flex-1 items-center justify-center rounded-xl bg-danger-soft px-3 active:opacity-70"
+            style={{ minHeight: touchTarget.min }}
+          >
+            <Text variant="caption" tone="danger">
+              {t("meals.row.delete")}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
   );
 }

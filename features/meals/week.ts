@@ -1,4 +1,4 @@
-import { addDays, format, set, startOfDay, startOfWeek } from "date-fns";
+import { addDays, addWeeks, format, set, startOfDay, startOfWeek } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 
 import type { MealPlanDay, MealPlanEntryWithRecipe, MealSlot } from "./types";
@@ -15,6 +15,19 @@ export function toDateKey(date: Date): string {
 /** Der Montag der Woche, in der `date` liegt. DE ist primäre Locale. */
 export function weekStartFor(date: Date): Date {
   return startOfWeek(date, { weekStartsOn: 1 });
+}
+
+/**
+ * Der Montag `delta` Wochen von `weekStart` entfernt (negativ: zurück).
+ *
+ * `addWeeks` rechnet kalendarisch und nicht in 7×24 Stunden, sonst landete die
+ * Umstellung auf Winterzeit bei 23:00 des Vortags — `weekStartFor` zieht
+ * danach noch einmal auf den Montag, falls der Aufrufer keinen übergeben hat.
+ * Das Ergebnis ist immer ein lokaler Montag 00:00, damit `toDateKey` und die
+ * Query-Keys nie auf einen Nachbartag kippen.
+ */
+export function shiftWeek(weekStart: Date, delta: number): Date {
+  return weekStartFor(addWeeks(weekStart, delta));
 }
 
 /** Die sieben Kalendertage einer Woche, Mo–So. */
