@@ -686,6 +686,13 @@ Siebtel und braucht einen nativen Sichtlauf über alle Screens — eigener PR.
 
 **Aufwand L · eigene Iteration mit Spike · entsperrt vier Einträge**
 
+> **Stand 2026-10-21: erledigt** ([ADR-042](./decision-log.md)). Der Weg ist `jest` mit
+> `jest-expo` für `*.jest.tsx`/`*.jest.ts`, alles andere bleibt unter `bun`. Die
+> Hydrations-Invariante ist in `EventEditScreen` (Speichern) und `TaskEditScreen` (Speichern und
+> Löschen) per Regressionstest gesichert. `features/calendar/hooks.ts` lädt unter `jest`. Die
+> Tests für `useFamilyRealtime` und `useEvent` stehen weiter in [TODO.md](./TODO.md), der Pfad
+> dafür steht jetzt.
+
 Ab hier wird Infrastruktur gebaut. Vier Einträge warten explizit auf **einen** fehlenden Pfad: es
 gibt im Repo keine Möglichkeit, React-Komponenten im Test zu rendern.
 
