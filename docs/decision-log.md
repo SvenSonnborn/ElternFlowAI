@@ -1611,3 +1611,4 @@ Der Essensplan war rein lesend. Gebraucht werden zwei Wege: die Wochenplanung (f
 - Änderungen eines anderen Geräts erscheinen erst beim nächsten Laden, ein Live-Sync des Essensplans fehlt. Ebenso fehlen Portionen und Notizen pro Eintrag. Beides steht in [TODO.md](./TODO.md).
 - Eine pausierte oder deaktivierte Allergie-Query zählt im Urteil weiterhin als „keine Allergien". Das betrifft alle Urteile und steht als eigener Punkt in [TODO.md](./TODO.md).
 - Die Fragen an den Designer (Aktionen des Menüs, Wochen blättern in V1, Platz des Einplanen-Knopfs, Text des Tausch-Knopfs, neue Copy-Keys) stehen gesammelt in [TODO.md](./TODO.md).
+- Geprüft per Playwright im Web-Build, mit abgefangenen Schreibzugriffen: Blättern behält den Slot, Einplanen über eine leere Zeile, Menü, Löschen mit Rückgängig, Fehler im Sheet, Einplanen vom Dashboard, Ersetzen-Dialog vom Rezept im Wortlaut. **Nicht geprüft: iOS und Android.**
