@@ -12,6 +12,7 @@ import {
   SectionHeader,
   SyncNotice,
   TopBar,
+  useToast,
 } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Card, Screen, Text } from "@/design-system/ui";
@@ -28,7 +29,12 @@ import {
   segmentTimeLabel,
   useFamilyEvents,
 } from "@/features/calendar";
-import { useMealAlternative, useRecipeJudge, useTodaysMeal } from "@/features/meals";
+import {
+  useMealAlternative,
+  useRecipeJudge,
+  useReplaceMeal,
+  useTodaysMeal,
+} from "@/features/meals";
 import { getSampleFamilyName } from "@/features/sample-data";
 import { useToday } from "@/features/shared";
 import { useFamilyTasks } from "@/features/tasks";
@@ -38,6 +44,7 @@ import { MealHeroCard } from "./MealHeroCard";
 import { MealHeroEmptyCard } from "./MealHeroEmptyCard";
 import { OnboardingResumeCard } from "./OnboardingResumeCard";
 import { PrepRow } from "./PrepRow";
+import { swapMeal } from "./swapMeal";
 import { buildTomorrowPrep } from "./tomorrowPrep";
 
 /**
@@ -75,6 +82,8 @@ export function DashboardScreen() {
   const judge = useRecipeJudge();
   const mealRecipe = mealEntry?.recipe ?? null;
   const mealVerdict = useMemo(() => (mealRecipe ? judge(mealRecipe) : null), [mealRecipe, judge]);
+  const replaceMeal = useReplaceMeal();
+  const toast = useToast();
   // Der Rezept-Pool wird nur geladen, wenn es tatsächlich etwas auszuweichen
   // gibt; der Seed hält den Vorschlag für die Dauer der Mahlzeit fest.
   const alternative = useMealAlternative({
@@ -284,14 +293,30 @@ export function DashboardScreen() {
           onOpenRecipe={() =>
             router.push({ pathname: "/recipe/[id]", params: { id: mealRecipe.id } })
           }
-          onOpenAlternative={
-            alternative
-              ? () => router.push({ pathname: "/recipe/[id]", params: { id: alternative.id } })
+          onSwapAlternative={
+            alternative && mealEntry && !replaceMeal.isPending
+              ? () =>
+                  void swapMeal(
+                    { entry: mealEntry, alternative },
+                    {
+                      replace: replaceMeal.mutateAsync,
+                      showToast: toast.show,
+                      t,
+                      lang: i18n.language,
+                    },
+                  )
               : undefined
           }
         />
       ) : (
-        <MealHeroEmptyCard onPressPlan={() => router.push("/essen")} />
+        <MealHeroEmptyCard
+          onPressPlan={() =>
+            router.push({
+              pathname: "/meal/pick",
+              params: { date: todayKey, slot },
+            })
+          }
+        />
       )}
 
       <SectionHeader title={t("dash.section.tomorrow")} />
