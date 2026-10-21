@@ -99,7 +99,7 @@ module.exports = [
   },
 
   {
-    files: ["__tests__/**", "**/*.{test,spec}.{ts,tsx,js,jsx}"],
+    files: ["__tests__/**", "**/*.{test,spec}.{ts,tsx,js,jsx}", "**/*.jest.{ts,tsx}", "testing/**"],
     rules: {
       "i18next/no-literal-string": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
