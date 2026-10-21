@@ -409,7 +409,6 @@
       "allergyConfirm": "Trotzdem hinzufügen"
     },
     "plan": {
-      "empty": "Für diese Woche ist noch nichts geplant.",
       "emptyDay": "Noch nichts geplant",
       "loadError": "Der Wochenplan konnte nicht geladen werden."
     },
@@ -454,7 +453,11 @@
       "unverified": "nicht geprüft",
       "more": "+{{n}}"
     },
+    "pick": {
+      "title": "{{slot}} · {{day}}"
+    },
     "a11y": {
+      "planDay": "{{slot}} am {{day}} planen",
       "unsafeRecipe": "{{title}} — enthält {{list}}",
       "cautionRecipe": "{{title}} — enthält möglicherweise {{list}}",
       "unverifiedRecipe": "{{title}} — Allergene nicht geprüft"

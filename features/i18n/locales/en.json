@@ -409,7 +409,6 @@
       "allergyConfirm": "Add anyway"
     },
     "plan": {
-      "empty": "Nothing planned for this week yet.",
       "emptyDay": "Nothing planned",
       "loadError": "The weekly plan could not be loaded."
     },
@@ -454,7 +453,11 @@
       "unverified": "not checked",
       "more": "+{{n}}"
     },
+    "pick": {
+      "title": "{{slot}} · {{day}}"
+    },
     "a11y": {
+      "planDay": "Plan {{slot}} on {{day}}",
       "unsafeRecipe": "{{title}} — contains {{list}}",
       "cautionRecipe": "{{title}} — may contain {{list}}",
       "unverifiedRecipe": "{{title}} — allergens not checked"
