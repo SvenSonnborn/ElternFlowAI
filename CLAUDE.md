@@ -100,6 +100,8 @@ app/                     Expo Router routes — THIN re-export files only
 ├─ task/new.tsx           → TaskCreateScreen
 ├─ task/edit/[id].tsx     → TaskEditScreen
 ├─ debug/realtime.tsx     → RealtimeDebugScreen (nur `__DEV__` verlinkt)
+├─ meal/pick.tsx          → MealPickScreen (Rezept für einen festen Tag/Slot wählen)
+├─ meal/schedule.tsx      → MealScheduleScreen (Tag/Slot für ein festes Rezept wählen)
 └─ +not-found.tsx
 
 app-sections/            Real screen implementations
@@ -108,6 +110,8 @@ app-sections/            Real screen implementations
 ├─ debug/                Dev-Werkzeuge (Realtime-Debug) — Einstieg nur unter `__DEV__`
 ├─ event/                Termin anlegen/ansehen/bearbeiten · Scope-Auswahl (`pickScope` →
 │                        ActionSheetIOS auf iOS, sonst scopeSheetStore · ScopeSheet · ScopeSheetHost, ADR-039)
+├─ meal/                 Essen einplanen: Auswahl · Tag/Slot-Wahl · der gemeinsame Einplan-Ablauf
+│                        (`runPlanning` · `useMealPlanning` — Allergie-Hinweis, Ersetzen-Dialog, ADR-043)
 ├─ onboarding/           (5-step flow — to come)
 ├─ modals/
 ├─ task/                 Anlegen/Bearbeiten von Aufgaben (Create · Edit · TaskForm)
@@ -149,6 +153,8 @@ features/                Cross-cutting feature logic
 ├─ children/             Kinderprofile
 ├─ meals/                Meal-Planner-Daten-Layer (Queries · JSONB-Normalisierung · Wochenlogik
 │                        · Ausweichgericht-Auswahl)
+│                        · mutations.ts (MealOps-Schnitt, Schutz über die gesehene `recipe_id`, ADR-043)
+│                        · useMealMutations.ts (Hooks mit Wochen-Patch) · planningSteps.ts (Dialog-Abfolge)
 │  └─ allergens/         EU-14-Vokabular · DE/EN-Begriffslisten · Zutaten-Klassifizierer · Urteil (ADR-014)
 ├─ shared/               Feature-übergreifende Hooks + Typen (useToday · Translate
 │                        · pendingDeletes — verzögerte Löschungen mit Undo-Fenster)
