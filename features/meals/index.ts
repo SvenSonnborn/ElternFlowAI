@@ -19,6 +19,7 @@ export {
 export { pickAlternative } from "./alternative";
 export {
   mapMealError,
+  MealEntryGoneError,
   MealSlotOccupiedError,
   MissingParentError,
   type MealErrorKey,
@@ -43,6 +44,7 @@ export {
   optimisticEntry,
   patchMealWeek,
   restoreMealWeek,
+  slotOccupant,
   type MealWeekSnapshot,
 } from "./optimistic";
 export { allergyCheck, planningSteps, type AllergyCheck, type PlanningStep } from "./planningSteps";

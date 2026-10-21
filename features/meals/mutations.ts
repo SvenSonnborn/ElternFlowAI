@@ -4,7 +4,7 @@ import type { Database } from "@/features/supabase/database.types";
 
 import type { MealPlanEntryWithRecipe, MealSlot, RecipeRow } from "./types";
 
-import { MealSlotOccupiedError } from "./errors";
+import { MealEntryGoneError, MealSlotOccupiedError } from "./errors";
 import { normalizeRecipe } from "./normalize";
 
 const ENTRY_SELECT = "*, recipes(*)";
@@ -24,6 +24,13 @@ export interface ReplaceMealVars {
   date: string;
   slot: MealSlot;
   recipe: RecipeRow;
+  /**
+   * Ob ein inzwischen geleerter Platz eingeplant wird (Standard `true`).
+   * `false` für das Rückgängig des Hero-Tauschs: Es soll den gesehenen Stand
+   * wiederherstellen, nicht einen Platz füllen, den jemand bewusst geleert
+   * hat (Spec 4.6) — dann `MealEntryGoneError`.
+   */
+  planIfGone?: boolean;
 }
 
 export interface RemoveMealVars {
@@ -182,9 +189,10 @@ export async function planMeal(
  * Der Normalfall kostet keinen zusätzlichen Roundtrip.
  *
  * Verfehlt es, gibt es drei Fälle: Der Platz ist leer (jemand hat gelöscht —
- * dann wird eingeplant, die Absicht „dieses Rezept dort" bleibt erfüllbar),
- * er trägt schon das Zielrezept (nichts zu tun) oder ein anderes (fremde
- * Änderung, der Aufrufer fragt neu).
+ * dann wird eingeplant, die Absicht „dieses Rezept dort" bleibt erfüllbar;
+ * mit `planIfGone: false` stattdessen `MealEntryGoneError`), er trägt schon
+ * das Zielrezept (nichts zu tun) oder ein anderes (fremde Änderung, der
+ * Aufrufer fragt neu).
  */
 export async function replaceMeal(
   vars: ReplaceMealVars,
@@ -196,6 +204,7 @@ export async function replaceMeal(
 
   const current = await deps.fetchSlot(vars.date, vars.slot);
   if (!current) {
+    if (vars.planIfGone === false) throw new MealEntryGoneError();
     await planMeal({ date: vars.date, slot: vars.slot, recipe: vars.recipe }, parent, deps);
     return;
   }

@@ -1,7 +1,7 @@
 import { format, parseISO } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, View } from "react-native";
 
@@ -19,11 +19,11 @@ import {
   isOptimisticEntry,
   localize,
   mapMealError,
-  slotForTime,
   useRecipeJudge,
   useRemoveMeal,
   type MealPlanDay,
   type MealPlanEntryWithRecipe,
+  type MealSlot,
   type RecipeAllergenVerdict,
   type RecipeRow,
 } from "@/features/meals";
@@ -38,12 +38,17 @@ import {
  * Abweichung ist abgestimmt und in ADR-017 protokolliert; `patterns/meals.md`
  * gehört dem Designer und wurde deshalb nicht mitgeändert (docs/TODO.md).
  */
-const SLOT_TABS = ["dinner", "lunch", "breakfast", "snack"] as const;
-type SlotTab = (typeof SLOT_TABS)[number];
+const SLOT_TABS: readonly MealSlot[] = ["dinner", "lunch", "breakfast", "snack"];
 
 interface WeekPlanGridProps {
   /** Genau sieben Tage, Mo–So — so, wie `useMealPlans` sie liefert. */
   days: MealPlanDay[];
+  /** Der gewählte Slot-Tab. */
+  slot: MealSlot;
+  onSlotChange: (slot: MealSlot) => void;
+  /** Das Datum der Zeile, deren Menü offen ist — höchstens eine, sonst `null`. */
+  openMenuDate: string | null;
+  onOpenMenuChange: (date: string | null) => void;
 }
 
 /**
@@ -52,30 +57,32 @@ interface WeekPlanGridProps {
  * Nimmt die Tage als Prop statt selbst zu laden, damit der Screen darüber den
  * `RefreshControl` und das Wochenlabel aus derselben Query speisen kann, ohne
  * `refetch` durch einen Callback nach oben zu reichen.
+ *
+ * **Slot-Tab und offenes Menü gehören dem Screen**, nicht dem Raster: Lädt
+ * beim Blättern eine neue Woche, steht statt des Rasters ein Spinner, und
+ * eigener State fiele beim Wiedereinhängen auf den Startwert zurück. Ein
+ * Wochenwechsel schließt das Menü dort (`EssenScreen`), ein Slot-Wechsel
+ * hier — die Zeile darunter ist dann ein anderer Eintrag.
  */
-export function WeekPlanGrid({ days }: WeekPlanGridProps) {
+export function WeekPlanGrid({
+  days,
+  slot,
+  onSlotChange,
+  openMenuDate,
+  onOpenMenuChange,
+}: WeekPlanGridProps) {
   const { t, i18n } = useTranslation();
-  // Behaviour-Rule aus `patterns/meals.md`: vor 11 Frühstück, 11–15 Mittag,
-  // sonst Abendessen. Nur als *Startwert* — danach gehört der Tab dem Nutzer,
-  // ein Umspringen um 15:00 Uhr unter der Hand wäre übergriffig.
-  const [slot, setSlot] = useState<SlotTab>(() => slotForTime(new Date()));
-  // Höchstens ein Menü offen. Es hängt an Woche *und* Tag, damit es beim
-  // Zurückblättern nicht wieder aufspringt; ein Slot-Wechsel schließt es, weil
-  // die Zeile darunter dann ein anderer Eintrag ist.
-  const weekKey = days[0]?.date ?? "";
-  const [open, setOpen] = useState<{ week: string; date: string } | null>(null);
-  const openDate = open?.week === weekKey ? open.date : null;
   const judge = useRecipeJudge();
   const removeMeal = useRemoveMeal();
   const undoableDelete = useUndoableDelete();
 
-  const selectSlot = (tab: SlotTab) => {
-    setSlot(tab);
-    setOpen(null);
+  const selectSlot = (tab: MealSlot) => {
+    onSlotChange(tab);
+    onOpenMenuChange(null);
   };
 
   const deleteEntry = (entry: MealPlanEntryWithRecipe, recipe: RecipeRow) => {
-    setOpen(null);
+    onOpenMenuChange(null);
     const vars = {
       entryId: entry.id,
       seenRecipeId: entry.recipe_id,
@@ -94,7 +101,7 @@ export function WeekPlanGrid({ days }: WeekPlanGridProps) {
   };
 
   const changeEntry = (entry: MealPlanEntryWithRecipe) => {
-    setOpen(null);
+    onOpenMenuChange(null);
     router.push({
       pathname: "/meal/pick",
       params: {
@@ -170,10 +177,8 @@ export function WeekPlanGrid({ days }: WeekPlanGridProps) {
             key={row.date}
             slot={slot}
             {...row}
-            menuOpen={openDate === row.date}
-            onToggleMenu={() =>
-              setOpen(openDate === row.date ? null : { week: weekKey, date: row.date })
-            }
+            menuOpen={openMenuDate === row.date}
+            onToggleMenu={() => onOpenMenuChange(openMenuDate === row.date ? null : row.date)}
             onChangeEntry={changeEntry}
             onDeleteEntry={deleteEntry}
           />
@@ -185,7 +190,7 @@ export function WeekPlanGrid({ days }: WeekPlanGridProps) {
 
 interface DayRowProps {
   /** Der aktive Slot-Tab — eine leere Zeile plant genau diesen Slot. */
-  slot: SlotTab;
+  slot: MealSlot;
   /** ISO-Kalendertag, `yyyy-MM-dd`. */
   date: string;
   isToday: boolean;
@@ -236,9 +241,15 @@ function DayRow({
   }, [recipe, isToday, t]);
 
   const a11yLabel = useMemo(() => {
-    const dayName = format(parsed, "EEEE", { locale: isGerman ? deLocale : enLocale });
-    // Leere Zeile ist ein Knopf: das Label nennt die Handlung, nicht den Zustand.
-    if (!recipe) return t("meals.a11y.planDay", { slot: t(`meals.tabs.${slot}`), day: dayName });
+    const locale = isGerman ? deLocale : enLocale;
+    const dayName = format(parsed, "EEEE", { locale });
+    // Leere Zeile ist ein Knopf: das Label nennt die Handlung, nicht den Zustand
+    // — und das Datum, denn „Mittwoch" allein sagt nicht, welche Woche gerade
+    // offen ist, seit sich blättern lässt. Dasselbe Muster wie im Ersetzen-Dialog.
+    if (!recipe) {
+      const day = format(parsed, isGerman ? "EEEE, d.M." : "EEEE, M/d", { locale });
+      return t("meals.a11y.planDay", { slot: t(`meals.tabs.${slot}`), day });
+    }
     const label = `${dayName}, ${title}`;
     return verdict ? recipeA11yLabel(t, label, verdict) : label;
   }, [parsed, isGerman, title, verdict, recipe, slot, t]);

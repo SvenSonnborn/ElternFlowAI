@@ -3,7 +3,12 @@ import { describe, expect, test } from "bun:test";
 import type { MealOps, MealParent } from "./mutations";
 import type { MealPlanEntryWithRecipe, RecipeRow } from "./types";
 
-import { MealSlotOccupiedError, MissingParentError, mapMealError } from "./errors";
+import {
+  MealEntryGoneError,
+  MealSlotOccupiedError,
+  MissingParentError,
+  mapMealError,
+} from "./errors";
 import { planMeal, removeMeal, replaceMeal } from "./mutations";
 
 const PARENT: MealParent = { id: "parent-1", family_id: "fam-1" };
@@ -29,7 +34,10 @@ function entry(id: string, recipeId: string): MealPlanEntryWithRecipe {
 
 type InsertResult = MealPlanEntryWithRecipe | "taken";
 
-/** Ops als Fakes: Antworten kommen aus Warteschlangen, Aufrufe werden gezählt. */
+/**
+ * Ops als Fakes: Antworten kommen aus Warteschlangen, Aufrufe werden gezählt
+ * bzw. mit ihren Argumenten aufgezeichnet.
+ */
 function fakeOps(opts: {
   inserts?: InsertResult[];
   slots?: (MealPlanEntryWithRecipe | null)[];
@@ -41,8 +49,8 @@ function fakeOps(opts: {
   const calls = {
     insert: [] as Parameters<MealOps["insertEntry"]>[0][],
     fetchSlot: 0,
-    update: 0,
-    del: 0,
+    update: [] as Parameters<MealOps["updateRecipe"]>[],
+    del: [] as Parameters<MealOps["deleteEntry"]>[],
   };
   const ops: MealOps = {
     fetchSlot: () => {
@@ -55,12 +63,12 @@ function fakeOps(opts: {
       if (next === undefined) throw new Error("unexpected insert");
       return Promise.resolve(next);
     },
-    updateRecipe: () => {
-      calls.update += 1;
+    updateRecipe: (...args) => {
+      calls.update.push(args);
       return Promise.resolve(opts.update ?? false);
     },
-    deleteEntry: () => {
-      calls.del += 1;
+    deleteEntry: (...args) => {
+      calls.del.push(args);
       return Promise.resolve(opts.del ?? false);
     },
   };
@@ -127,9 +135,10 @@ describe("replaceMeal", () => {
     recipe: recipe("r-new"),
   };
 
-  test("Treffer: kein fetchSlot", async () => {
+  test("Treffer: kein fetchSlot, CAS auf Eintrag, gesehenes und neues Rezept", async () => {
     const { ops, calls } = fakeOps({ update: true });
     await replaceMeal(vars, PARENT, ops);
+    expect(calls.update).toEqual([["e-1", "r-old", "r-new"]]);
     expect(calls.fetchSlot).toBe(0);
   });
 
@@ -152,6 +161,15 @@ describe("replaceMeal", () => {
     expect(calls.insert[0]?.recipe_id).toBe("r-new");
   });
 
+  test("Fehlschuss, Platz leer, planIfGone: false: MealEntryGoneError, kein Einplanen", async () => {
+    const { ops, calls } = fakeOps({ update: false, slots: [null] });
+    const err = await replaceMeal({ ...vars, planIfGone: false }, PARENT, ops).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(MealEntryGoneError);
+    expect(calls.insert).toHaveLength(0);
+  });
+
   test("Fehlschuss, Platz trägt schon das Zielrezept: Erfolg", async () => {
     const { ops, calls } = fakeOps({ update: false, slots: [entry("e-1", "r-new")] });
     await replaceMeal(vars, PARENT, ops);
@@ -167,9 +185,10 @@ describe("removeMeal", () => {
     slot: "dinner" as const,
   };
 
-  test("Treffer: fertig", async () => {
+  test("Treffer: fertig, CAS auf Eintrag und gesehenes Rezept", async () => {
     const { ops, calls } = fakeOps({ del: true });
     await removeMeal(vars, ops);
+    expect(calls.del).toEqual([["e-1", "r-old"]]);
     expect(calls.fetchSlot).toBe(0);
   });
 
@@ -190,6 +209,7 @@ describe("removeMeal", () => {
 describe("mapMealError", () => {
   test("ordnet Ursachen den Keys zu", () => {
     expect(mapMealError(new MealSlotOccupiedError(entry("e", "r")))).toBe("meals.error.changed");
+    expect(mapMealError(new MealEntryGoneError())).toBe("meals.error.changed");
     expect(mapMealError(new MissingParentError())).toBe("meals.error.notAuthenticated");
     expect(mapMealError({ code: "42501" })).toBe("meals.error.notAuthenticated");
     expect(mapMealError({ code: "23503" })).toBe("meals.error.recipeGone");

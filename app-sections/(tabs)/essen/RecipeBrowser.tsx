@@ -27,7 +27,8 @@ interface RecipeBrowserProps {
   onPick?: (recipe: RecipeRow) => void;
   /**
    * Sperrt die Auswahl (Allergien laden, Schreiben läuft): Tipps werden
-   * ignoriert, die Zeile meldet `disabled`. Wirkt nur mit `onPick`.
+   * ignoriert, die Zeile meldet `disabled` und wird blass — ohne sichtbare
+   * Sperre sähe der ignorierte Tipp aus wie ein Fehler. Wirkt nur mit `onPick`.
    */
   pickDisabled?: boolean;
 }
@@ -120,7 +121,9 @@ function RecipeRowItem({
   const { t } = useTranslation();
   const { theme } = useTheme();
 
-  const dimmed = verdict.status === "unsafe" || verdict.status === "caution";
+  // Blass bei Allergie-Treffer (ADR-014) und, im Auswahlmodus, solange die
+  // Auswahl gesperrt ist.
+  const dimmed = disabled || verdict.status === "unsafe" || verdict.status === "caution";
 
   const a11yLabel = useMemo(() => recipeA11yLabel(t, title, verdict), [t, title, verdict]);
 

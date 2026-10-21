@@ -417,9 +417,9 @@
       "replaceConfirm": "Yes, replace",
       "replaceCancel": "No",
       "allergyTitle": "Allergy notice",
-      "allergyUnsafeBody": "“{{recipe}}” contains {{list}}.",
-      "allergyCautionBody": "“{{recipe}}” may contain {{list}}.",
-      "allergyUnknownBody": "We couldn't check your family's allergies.",
+      "allergyUnsafeBody": "“{{recipe}}” contains {{list}}. Plan it anyway?",
+      "allergyCautionBody": "“{{recipe}}” may contain {{list}}. Plan it anyway?",
+      "allergyUnknownBody": "We couldn't check your family's allergies. Plan it anyway?",
       "allergyConfirm": "Add anyway"
     },
     "plan": {

@@ -9,7 +9,11 @@ import { createTestQueryClient, renderScreen } from "@/testing/renderScreen";
 import { MealPickScreen } from "./MealPickScreen";
 
 const mockPlanRecipe = jest.fn();
-const mockPlanning = { allergiesLoading: false, busy: false };
+const mockPlanning = {
+  allergiesLoading: false,
+  busy: false,
+  error: null as string | null,
+};
 let mockParams: Record<string, string> = {};
 
 jest.mock("@/app-sections/meal/useMealPlanning", () => ({
@@ -55,6 +59,7 @@ beforeEach(() => {
   mockParams = { date: "2026-10-28", slot: "dinner" };
   mockPlanning.allergiesLoading = false;
   mockPlanning.busy = false;
+  mockPlanning.error = null;
   mockPlanRecipe.mockResolvedValue("planned");
 });
 
@@ -95,6 +100,14 @@ describe("MealPickScreen", () => {
       slot: "dinner",
       replaceTarget: { entryId: "e1", seenRecipeId: "r0" },
     });
+  });
+
+  it("zeigt einen Fehler des Einplanens als Zeile im Sheet", async () => {
+    mockPlanning.error = "meals.error.generic";
+    await renderScreen(<MealPickScreen />, { queryClient: seededClient() });
+    expect(
+      screen.getByText("Das hat leider nicht geklappt. Versuch es bitte noch einmal."),
+    ).toBeTruthy();
   });
 
   it("schließt sofort bei ungültigem Datum", async () => {

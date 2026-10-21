@@ -1,9 +1,15 @@
 import { describe, expect, test } from "bun:test";
 
 import type { ShowToastOptions } from "@/app-sections/shared/toastStore";
-import type { MealPlanEntryWithRecipe, RecipeRow } from "@/features/meals";
+import type {
+  MealOps,
+  MealPlanEntryWithRecipe,
+  RecipeRow,
+  ReplaceMealVars,
+} from "@/features/meals";
 
 import { MealSlotOccupiedError } from "@/features/meals/errors";
+import { replaceMeal } from "@/features/meals/mutations";
 
 import { swapMeal, type SwapMealDeps } from "./swapMeal";
 
@@ -65,7 +71,35 @@ describe("swapMeal", () => {
       date: "2026-10-21",
       slot: "dinner",
       recipe: previous,
+      planIfGone: false,
     });
+  });
+
+  test("Rückgängig in einen inzwischen geleerten Platz meldet „geändert“ und plant nichts", async () => {
+    // Das echte `replaceMeal` über Fake-Ops: Erst so zeigt der Test, dass
+    // `planIfGone: false` tatsächlich kein INSERT mehr auslöst.
+    let slotEmptied = false;
+    const inserts: unknown[] = [];
+    const ops: MealOps = {
+      updateRecipe: () => Promise.resolve(!slotEmptied),
+      fetchSlot: () => Promise.resolve(null),
+      insertEntry: (row) => {
+        inserts.push(row);
+        return Promise.resolve("taken");
+      },
+      deleteEntry: () => Promise.resolve(false),
+    };
+    const parent = { id: "p1", family_id: "f1" };
+    const { deps, toasts } = harness((vars) => replaceMeal(vars as ReplaceMealVars, parent, ops));
+    await swapMeal({ entry, alternative }, deps);
+    slotEmptied = true;
+    toasts[0]?.action?.onPress();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(inserts).toHaveLength(0);
+    expect(toasts).toHaveLength(2);
+    expect(toasts[1]?.variant).toBe("error");
+    expect(toasts[1]?.title).toBe("meals.error.changed");
   });
 
   test("hat jemand den Platz inzwischen geändert, meldet Rückgängig das als Fehler-Toast", async () => {

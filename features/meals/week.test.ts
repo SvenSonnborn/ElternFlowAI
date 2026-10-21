@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 
 import type { MealPlanEntryWithRecipe } from "./types";
 
@@ -12,6 +12,18 @@ import {
   weekDayKeys,
   weekStartFor,
 } from "./week";
+
+// Die Datei rechnet in Europe/Berlin, gesetzt vor dem ersten Datum: `bun test`
+// läuft sonst in UTC, und dort gibt es keine Zeitumstellung, die `shiftWeek`
+// kreuzen könnte. Bun liest `TZ` zur Laufzeit und führt die Dateien
+// nacheinander in einem Prozess aus — ohne das Zurücksetzen liefen alle
+// späteren Dateien ebenfalls in Berlin. Ohne gesetztes `TZ` ist Buns Vorgabe
+// UTC; `delete` fiele dagegen auf die Zone des Rechners zurück.
+const previousTZ = process.env.TZ;
+process.env.TZ = "Europe/Berlin";
+afterAll(() => {
+  process.env.TZ = previousTZ ?? "Etc/UTC";
+});
 
 function makeEntry(overrides: Partial<MealPlanEntryWithRecipe> = {}): MealPlanEntryWithRecipe {
   return {
@@ -213,9 +225,25 @@ describe("formatWeekRange", () => {
 });
 
 describe("shiftWeek", () => {
+  // Die Umstellung muss zwischen den beiden Montagen liegen, sonst prüft der
+  // Fall nichts: der Offset-Vergleich belegt, dass die Zone oben greift.
   test("landet über die Umstellung auf Winterzeit auf Montag 00:00 lokal", () => {
-    const next = shiftWeek(localDay("2025-10-27"), 1);
-    expect(toDateKey(next)).toBe("2025-11-03");
+    // Winterzeit ab So 26.10.2025, 03:00.
+    const start = localDay("2025-10-20");
+    const next = shiftWeek(start, 1);
+    expect(next.getTimezoneOffset()).not.toBe(start.getTimezoneOffset());
+    expect(toDateKey(next)).toBe("2025-10-27");
+    expect(next.getDay()).toBe(1);
+    expect(next.getHours()).toBe(0);
+    expect(next.getMinutes()).toBe(0);
+  });
+
+  test("landet über die Umstellung auf Sommerzeit auf Montag 00:00 lokal", () => {
+    // Sommerzeit ab So 29.03.2026, 02:00.
+    const start = localDay("2026-03-23");
+    const next = shiftWeek(start, 1);
+    expect(next.getTimezoneOffset()).not.toBe(start.getTimezoneOffset());
+    expect(toDateKey(next)).toBe("2026-03-30");
     expect(next.getDay()).toBe(1);
     expect(next.getHours()).toBe(0);
     expect(next.getMinutes()).toBe(0);

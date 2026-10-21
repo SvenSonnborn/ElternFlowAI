@@ -413,13 +413,13 @@
     },
     "planning": {
       "replaceTitle": "Schon etwas geplant",
-      "replaceBody": "Am {{day}} ist für {{slotPhrase}} schon „{{recipe}}“ eingetragen. Möchtest du das ersetzen?",
+      "replaceBody": "Am {{day}}, ist für {{slotPhrase}} schon „{{recipe}}“ eingetragen. Möchtest du das ersetzen?",
       "replaceConfirm": "Ja, ersetzen",
       "replaceCancel": "Nein",
       "allergyTitle": "Allergie-Hinweis",
-      "allergyUnsafeBody": "„{{recipe}}“ enthält {{list}}.",
-      "allergyCautionBody": "„{{recipe}}“ enthält möglicherweise {{list}}.",
-      "allergyUnknownBody": "Die Allergien eurer Familie konnten nicht geprüft werden.",
+      "allergyUnsafeBody": "„{{recipe}}“ enthält {{list}}. Trotzdem einplanen?",
+      "allergyCautionBody": "„{{recipe}}“ enthält möglicherweise {{list}}. Trotzdem einplanen?",
+      "allergyUnknownBody": "Die Allergien eurer Familie konnten nicht geprüft werden. Trotzdem einplanen?",
       "allergyConfirm": "Trotzdem hinzufügen"
     },
     "plan": {

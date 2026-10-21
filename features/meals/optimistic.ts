@@ -3,7 +3,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { parseISO } from "date-fns";
 
 import type { MealParent, PlanMealVars } from "./mutations";
-import type { MealPlanEntryWithRecipe, RecipeRow } from "./types";
+import type { MealPlanEntryWithRecipe, MealSlot, RecipeRow } from "./types";
 
 import { mealKeys } from "./queries";
 import { toDateKey, weekStartFor } from "./week";
@@ -20,8 +20,34 @@ export function isOptimisticEntry(entry: { id: string }): boolean {
 }
 
 /**
- * Die vorläufige Zeile für `usePlanMeal`. `id` und `created_at` sind erfunden
- * und werden vom Refetch nach `onSettled` durch die echten ersetzt.
+ * Der Eintrag, den der Einplan-Ablauf auf einem Platz als Belegung behandelt,
+ * oder `null`.
+ *
+ * Zwei Zeilen im Cache zählen nicht. Eine im Undo-Fenster (`pendingIds`): Der
+ * Platz sieht leer aus, also verhält er sich so. Und eine optimistische: Ihre
+ * vorläufige Id ist keine `uuid`, ein Ersetzen darauf endete bei PostgREST in
+ * `22P02` statt in einem Compare-and-Swap-Fehlschuss — und weil `onError` den
+ * Snapshot mit derselben Zeile wiederherstellt, jedes Mal wieder. Ohne
+ * Belegung plant der Ablauf per INSERT ein; ist die echte Zeile inzwischen
+ * geschrieben, trifft er die Eindeutigkeit, und `MealSlotOccupiedError`
+ * bringt sie samt echter Id für den Ersetzen-Dialog mit.
+ */
+export function slotOccupant(
+  entries: readonly MealPlanEntryWithRecipe[] | undefined,
+  pendingIds: ReadonlySet<string>,
+  date: string,
+  slot: MealSlot,
+): MealPlanEntryWithRecipe | null {
+  const entry = entries?.find(
+    (e) => e.date === date && e.meal_slot === slot && !pendingIds.has(e.id),
+  );
+  return entry && !isOptimisticEntry(entry) ? entry : null;
+}
+
+/**
+ * Die vorläufige Zeile für `usePlanMeal`. `id` und `created_at` sind erfunden;
+ * `onSuccess` ersetzt die Zeile durch die vom Server zurückgegebene, der
+ * Refetch nach `onSettled` bestätigt sie.
  */
 export function optimisticEntry(
   vars: PlanMealVars,

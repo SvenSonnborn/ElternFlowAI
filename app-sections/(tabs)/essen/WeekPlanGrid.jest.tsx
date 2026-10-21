@@ -1,11 +1,14 @@
 import { act, fireEvent, screen } from "@testing-library/react-native";
 import { router } from "expo-router";
+import { useState } from "react";
 
 import type { MealPlanDay, MealPlanEntryWithRecipe, MealSlot, RecipeRow } from "@/features/meals";
 
 import {
   mealKeys,
   normalizeRecipeFilter,
+  shiftWeek,
+  slotForTime,
   toDateKey,
   weekDayKeys,
   weekStartFor,
@@ -45,16 +48,31 @@ const emptyWeek: MealPlanDay[] = [
   slots: Object.fromEntries(SLOTS.map((s) => [s, null])) as MealPlanDay["slots"],
 }));
 
+/** Hält Slot und offenes Menü wie `EssenScreen`, damit das Raster allein testbar bleibt. */
+function Grid({ days }: { days: MealPlanDay[] }) {
+  const [slot, setSlot] = useState<MealSlot>(() => slotForTime(new Date()));
+  const [openMenuDate, setOpenMenuDate] = useState<string | null>(null);
+  return (
+    <WeekPlanGrid
+      days={days}
+      slot={slot}
+      onSlotChange={setSlot}
+      openMenuDate={openMenuDate}
+      onOpenMenuChange={setOpenMenuDate}
+    />
+  );
+}
+
 describe("WeekPlanGrid — leere Tage", () => {
   it("rendert bei sieben leeren Tagen sieben Zeilen", async () => {
-    await renderScreen(<WeekPlanGrid days={emptyWeek} />);
+    await renderScreen(<Grid days={emptyWeek} />);
     expect(screen.getAllByText("Noch nichts geplant")).toHaveLength(7);
   });
 
   it("öffnet die Auswahl mit Datum und Slot des Abendessen-Tabs", async () => {
-    await renderScreen(<WeekPlanGrid days={emptyWeek} />);
+    await renderScreen(<Grid days={emptyWeek} />);
     await fireEvent.press(screen.getByRole("tab", { name: "Abendessen" }));
-    await fireEvent.press(screen.getByLabelText("Abendessen am Mittwoch planen"));
+    await fireEvent.press(screen.getByLabelText("Abendessen am Mittwoch, 28.10. planen"));
     expect(router.push).toHaveBeenCalledWith({
       pathname: "/meal/pick",
       params: { date: "2026-10-28", slot: "dinner" },
@@ -122,7 +140,7 @@ describe("WeekPlanGrid — Zeilen-Menü", () => {
   });
 
   it("zeigt Ersetzen und Löschen erst nach dem Öffnen und meldet expanded", async () => {
-    await renderScreen(<WeekPlanGrid days={weekWith(entry())} />);
+    await renderScreen(<Grid days={weekWith(entry())} />);
     await fireEvent.press(screen.getByRole("tab", { name: "Abendessen" }));
     expect(screen.queryByText("Anderes Rezept wählen")).toBeNull();
     const toggle = screen.getByLabelText("Aktionen für Mittwoch");
@@ -136,7 +154,7 @@ describe("WeekPlanGrid — Zeilen-Menü", () => {
   });
 
   it("Anderes Rezept wählen pusht die Auswahl mit Ersetzen-Ziel", async () => {
-    await renderScreen(<WeekPlanGrid days={weekWith(entry())} />);
+    await renderScreen(<Grid days={weekWith(entry())} />);
     await openMenu();
     await fireEvent.press(screen.getByText("Anderes Rezept wählen"));
     expect(router.push).toHaveBeenCalledWith({
@@ -146,7 +164,7 @@ describe("WeekPlanGrid — Zeilen-Menü", () => {
   });
 
   it("Löschen führt die Mutation erst nach dem Undo-Fenster aus", async () => {
-    await renderScreen(<WeekPlanGrid days={weekWith(entry())} />);
+    await renderScreen(<Grid days={weekWith(entry())} />);
     await openMenu();
     await fireEvent.press(screen.getByText("Löschen"));
     expect(mockRemove).not.toHaveBeenCalled();
@@ -165,7 +183,7 @@ describe("WeekPlanGrid — Zeilen-Menü", () => {
     const both = days.map((d) =>
       d.date === second.date ? { ...d, slots: { ...d.slots, dinner: second } } : d,
     );
-    await renderScreen(<WeekPlanGrid days={both} />);
+    await renderScreen(<Grid days={both} />);
     await fireEvent.press(screen.getByRole("tab", { name: "Abendessen" }));
     await fireEvent.press(screen.getByLabelText("Aktionen für Mittwoch"));
     await fireEvent.press(screen.getByLabelText("Aktionen für Donnerstag"));
@@ -176,9 +194,7 @@ describe("WeekPlanGrid — Zeilen-Menü", () => {
   });
 
   it("hat bei einer optimistischen Zeile kein bedienbares Menü", async () => {
-    await renderScreen(
-      <WeekPlanGrid days={weekWith(entry({ id: "optimistic:2026-10-28:dinner" }))} />,
-    );
+    await renderScreen(<Grid days={weekWith(entry({ id: "optimistic:2026-10-28:dinner" }))} />);
     await fireEvent.press(screen.getByRole("tab", { name: "Abendessen" }));
     expect(screen.queryByLabelText("Aktionen für Mittwoch")).toBeNull();
   });
@@ -203,5 +219,64 @@ describe("EssenScreen — gelöschte Zeile", () => {
     await fireEvent.press(screen.getByLabelText(/^Aktionen für /));
     await fireEvent.press(screen.getByText("Löschen"));
     expect(screen.getAllByText("Noch nichts geplant")).toHaveLength(7);
+  });
+});
+
+describe("EssenScreen — Blättern", () => {
+  const start = weekStartFor(new Date());
+  const next = shiftWeek(start, 1);
+
+  function seeded() {
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(mealKeys.recipes(normalizeRecipeFilter({ search: "" })), [nudeln]);
+    return queryClient;
+  }
+
+  it("behält den Slot-Tab, während die neue Woche lädt", async () => {
+    const queryClient = seeded();
+    queryClient.setQueryData(mealKeys.plan(toDateKey(start)), [] as MealPlanEntryWithRecipe[]);
+    // Die nächste Woche lädt schon und antwortet erst auf Zuruf: Der Screen
+    // hängt sich an diesen Abruf, statt einen eigenen (gegen den Supabase-Stub)
+    // zu starten, und zeigt solange den Spinner statt des Rasters.
+    let answer: (entries: MealPlanEntryWithRecipe[]) => void = () => {};
+    void queryClient.prefetchQuery({
+      queryKey: mealKeys.plan(toDateKey(next)),
+      queryFn: () =>
+        new Promise<MealPlanEntryWithRecipe[]>((resolve) => {
+          answer = resolve;
+        }),
+    });
+
+    await renderScreen(<EssenScreen />, { queryClient });
+    await fireEvent.press(screen.getByRole("tab", { name: "Snack" }));
+    await fireEvent.press(screen.getByLabelText("Nächste Woche"));
+    // Das Raster ist abgebaut — genau hier ging der Tab früher verloren.
+    expect(screen.queryByRole("tab", { name: "Snack" })).toBeNull();
+
+    await act(async () => {
+      answer([]);
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("tab", { name: "Snack" }).props.accessibilityState).toMatchObject({
+      selected: true,
+    });
+  });
+
+  it("schließt ein offenes Menü beim Blättern, auch beim Zurückblättern", async () => {
+    const queryClient = seeded();
+    const wednesday = weekDayKeys(start)[2];
+    queryClient.setQueryData(mealKeys.plan(toDateKey(start)), [entry({ date: wednesday })]);
+    queryClient.setQueryData(mealKeys.plan(toDateKey(next)), [] as MealPlanEntryWithRecipe[]);
+
+    await renderScreen(<EssenScreen />, { queryClient });
+    await fireEvent.press(screen.getByRole("tab", { name: "Abendessen" }));
+    await fireEvent.press(screen.getByLabelText(/^Aktionen für /));
+    expect(screen.getByText("Löschen")).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText("Nächste Woche"));
+    expect(screen.queryByText("Löschen")).toBeNull();
+    await fireEvent.press(screen.getByLabelText("Vorherige Woche"));
+    expect(screen.getByLabelText(/^Aktionen für /)).toBeTruthy();
+    expect(screen.queryByText("Löschen")).toBeNull();
   });
 });

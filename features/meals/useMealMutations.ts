@@ -40,6 +40,10 @@ function invalidatePlans(qc: QueryClient): Promise<void> {
  * sie wirft `mutationFn` `MissingParentError`, und es gibt nichts zu patchen;
  * eine erfundene Zeile ohne `family_id` gehörte nie in den Cache.
  *
+ * `onSuccess` tauscht die optimistische Zeile sofort gegen die echte, statt
+ * auf den Refetch zu warten: Bis dahin trüge der Platz eine vorläufige Id,
+ * ohne Menü und ohne Ziel für Ersetzen oder Löschen.
+ *
  * Die Hooks liegen getrennt von `mutations.ts`, weil sie `@/features/auth`
  * brauchen und die reinen Funktionen davon frei bleiben sollen (Tests).
  */
@@ -58,6 +62,7 @@ export function usePlanMeal() {
         applyPlan(entries, optimisticEntry(vars, parent, new Date())),
       );
     },
+    onSuccess: (entry) => patchMealWeek(qc, entry.date, (entries) => applyPlan(entries, entry)),
     onError: (_err, _vars, snapshot) => restoreMealWeek(qc, snapshot),
     onSettled: () => invalidatePlans(qc),
   });
