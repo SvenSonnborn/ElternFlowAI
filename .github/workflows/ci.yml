@@ -76,7 +76,7 @@ jobs:
       - name: Test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         # `bun test` für alle `bun:test`-Suiten (siehe bunfig.toml preload);
-        # Komponenten-Tests (`*.jest.tsx`) laufen separat unter Jest.
+        # Komponenten- und Hook-Tests (`*.jest.tsx`, `*.jest.ts`) laufen separat unter Jest.
         run: bun test
 
       - name: Component tests (jest)
