@@ -15,6 +15,14 @@ import { localize } from "@/features/meals/normalize";
  */
 export const SWAP_UNDO_MS = 8000;
 
+/**
+ * Einträge, deren Tausch gerade läuft. Ein synchroner Riegel, weil das
+ * `isPending` der Mutation erst im nächsten Render greift: Zwei Taps im selben
+ * Frame liefen sonst beide los, und der zweite träfe die schon getauschte Zeile
+ * und meldete fälschlich „geändert".
+ */
+const swapsInFlight = new Set<string>();
+
 export interface SwapMealDeps {
   replace: (vars: ReplaceMealVars) => Promise<unknown>;
   showToast: (options: ShowToastOptions) => void;
@@ -54,11 +62,15 @@ export async function swapMeal(
   const fail = (err: unknown) =>
     showToast({ title: t(mapMealError(err)), variant: "error", position: "bottom" });
 
+  if (swapsInFlight.has(entry.id)) return;
+  swapsInFlight.add(entry.id);
   try {
     await replace({ ...place, seenRecipeId: entry.recipe_id, recipe: alternative });
   } catch (err) {
     fail(err);
     return;
+  } finally {
+    swapsInFlight.delete(entry.id);
   }
 
   showToast({
