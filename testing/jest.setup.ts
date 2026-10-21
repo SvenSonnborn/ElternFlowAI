@@ -1,6 +1,7 @@
 /**
- * Gemeinsames Setup für alle `*.jest.tsx` (`setupFilesAfterEnv`). Der Läufer ist
- * absichtlich streng: kein Netz, keine Konsolenausgabe, keine offenen Timer.
+ * Gemeinsames Setup für alle `*.jest.tsx` und `*.jest.ts` (`setupFilesAfterEnv`).
+ * Der Läufer ist absichtlich streng: kein Netz, keine Konsolenausgabe, keine
+ * offenen Timer.
  */
 import "@testing-library/react-native"; // muss vor dem Wächter unten stehen, s. dort
 import { notifyManager } from "@tanstack/react-query";
