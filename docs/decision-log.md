@@ -1549,3 +1549,28 @@ CLAUDE.md verlangt Touch-Targets von mindestens 44×44. Drei Pillen-Reihen und d
 - ADR-040 hielt fest, die Deckfläche fange Taps ab, nicht Tastatur und Screenreader. Auf Web gilt das nicht mehr; für native Screenreader bleibt es so und steht in [TODO.md](./TODO.md).
 - `features/tasks/queries.ts` importiert jetzt aus `@/features/auth`. Eine Testsuite, die das Modul zur Laufzeit lädt, muss den Barrel mocken; `mutations.test.ts` tut das.
 - Neue Konvention in CLAUDE.md: Tippflächen über die Box, das Maß als Zahl. Die übrigen Stellen, die noch an `hitSlop` hängen, sind als Lücke in [TODO.md](./TODO.md) vermerkt — ebenso, dass `accessibilityState` auf Web nicht im DOM ankommt und der Auswahlzustand der Pillen dort für Screenreader unsichtbar ist.
+
+## ADR-042 — Komponenten-Tests unter `jest` mit `jest-expo`, alles Übrige unter `bun`; getrennt über `*.jest.tsx` (2026-10-21)
+
+### Status
+
+Accepted. Setzt [Roadmap Block 5](./roadmap.md#block-5--der-rn-component-test-pfad-schlussstein) um. Spec: [2026-10-20-rn-component-test-path-design.md](./superpowers/specs/2026-10-20-rn-component-test-path-design.md), mit einer Abweichung (Decision 4).
+
+### Context
+
+Im Repo ließ sich keine React-Native-Komponente im Test rendern. `bun test` liest die Flow-Syntax in `react-native/index.js` nicht, und `features/calendar/hooks.ts` scheitert unter Bun am nativewind-Runtime. Am teuersten war das bei der Hydrations-Invariante ([ADR-031](#adr-031--conflict-detection-updated_at-beleben-dreiwertig-vergleichen-ein-dialog-im-root-layout-2026-09-04) Decision 6): Läsen `EventEditScreen` oder `TaskEditScreen` die Version aus der lebenden Query statt aus der Hydration, träfe das CAS nach einem fremden Refetch anstandslos und überschriebe die fremde Änderung lautlos. Geschützt hat das bisher nur ein Kommentar. Ein Wegwerf-Versuch zeigte, dass `jest` mit `jest-expo` echte Komponenten samt nativewind-Klassen rendert.
+
+### Decisions
+
+1. **Zwei Runner, getrennt über den Dateinamen.** Komponenten- und Hook-Tests heißen `*.jest.tsx` bzw. `*.jest.ts` und liegen neben dem Code, den sie prüfen. Sie laufen unter `jest` mit `jest-expo` (`bun run test:rn`, eigener Schritt in `ci.yml`). Alle übrigen Tests bleiben unter `bun test`. Dessen Erkennung verlangt `.test.` oder `.spec.` im Namen und sieht die `.jest.`-Dateien deshalb nie. Verworfen: Bun mit nachgebautem Preset, denn Flow-Entfernung und die Mocks der nativen Module müssten in Bun neu entstehen. Ebenfalls verworfen: ein DOM-Pfad über react-native-web. Er rendert weder iOS noch Android und löst `.web.tsx` anders auf als die Apps.
+2. **Das Setup unter `testing/` macht Lärm zum Fehler.** Ein Konsolen-Wächter lässt jeden Test scheitern, der `console.error` oder `console.warn` auslöst, auch während des Unmounts. Eine `act()`-Warnung ist damit ein Testfehler. Supabase ist durch einen Stub ersetzt, der bei jeder Benutzung wirft. Der Test-`QueryClient` meldet Fehler aus `queryFn` und `mutationFn` auf der Konsole, damit eine vergessene Vorbefüllung nicht still in einen Fehlerzustand läuft. Erwartet ein Test bewusst eine Fehlerausgabe, schaltet er sie selbst stumm.
+3. **Die Invariante wird am Schreibpfad abgelesen.** Die Tests ersetzen nur die Mutations-Hooks (`jest.mock` mit `requireActual`). Sie legen Fassung A in den Cache, rendern den Screen und legen danach eine neuere Fassung B darüber. Erst dann lösen sie Speichern oder Löschen aus und erwarten die Version von A. Vor der Aktion prüft jeder Test, dass die Query mit B einen Observer hat. Sonst wäre er grün, ohne einen Refetch nachgestellt zu haben. Das Rot vor dem Grün liefert eine Probe: Jeder Screen wurde kurz so verdorben, dass er die Version aus der lebenden Query liest, und die Refetch-Tests wurden rot.
+4. **Die Aufgabenliste wird über ihr Key-Präfix vorbefüllt**, nämlich `setQueryDefaults` mit `initialData`, und der Refetch über `setQueriesData`. **Abweichung von der Spec**, die `setQueryData` auf dem exakten Key vorsah. Der Key trägt ein Datum aus `useToday()`. Ihn im Test nachzurechnen hieße, `DONE_WINDOW_DAYS` zu duplizieren, und um Mitternacht entstünde ein Rennen.
+5. **Löschen läuft ohne Warten** über `flush()` des Pending-Delete-Stores. Das ist der Produktionspfad, den auch das Abmelden nimmt, Fake-Timer sind nicht nötig. Die Bestätigung kommt über einen `Alert`-Spy, weil `jest-expo` als iOS rendert.
+
+### Consequences
+
+- Kein Produktionscode wurde für die Tests umgebaut.
+- `features/calendar/hooks.ts` ist unter `jest` ladbar, unter `bun test` weiterhin nicht. Tests für `useFamilyRealtime`, `useEvent` und weitere Screens sind damit möglich. Sie fehlen noch und stehen in [TODO.md](./TODO.md).
+- Zwei Runner heißen zwei Befehle und zwei CI-Schritte. `jest-expo` hängt am SDK und folgt `expo install --check`. Die Bun-Suiten bleiben von dessen Versionsdrift unberührt.
+- `ci.yml` installiert nur Bun. `jest` läuft dort deshalb mit der Node-Version des Runners, und `@testing-library/react-native` 14 verlangt mindestens Node 22.13.
