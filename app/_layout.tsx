@@ -93,6 +93,19 @@ function ThemedStack() {
             }}
           />
           <Stack.Screen
+            name="meal/schedule"
+            options={{
+              presentation: "formSheet",
+              headerShown: false,
+              gestureEnabled: true,
+              sheetAllowedDetents: [0.9],
+              sheetCornerRadius: 26,
+              sheetGrabberVisible: true,
+              sheetExpandsWhenScrolledToEdge: false,
+              contentStyle: { flex: 1, backgroundColor: theme.card },
+            }}
+          />
+          <Stack.Screen
             name="task/new"
             options={{
               presentation: "formSheet",

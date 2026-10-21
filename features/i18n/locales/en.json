@@ -464,6 +464,14 @@
       "unverified": "not checked",
       "more": "+{{n}}"
     },
+    "schedule": {
+      "cta": "Add to meal plan",
+      "title": "Schedule",
+      "dateLabel": "Date",
+      "slotLabel": "Meal",
+      "submit": "Schedule",
+      "done": "Scheduled: {{slot}} on {{day}}"
+    },
     "pick": {
       "title": "{{slot}} · {{day}}"
     },

@@ -464,6 +464,14 @@
       "unverified": "nicht geprüft",
       "more": "+{{n}}"
     },
+    "schedule": {
+      "cta": "Zum Essensplan hinzufügen",
+      "title": "Einplanen",
+      "dateLabel": "Datum",
+      "slotLabel": "Mahlzeit",
+      "submit": "Einplanen",
+      "done": "Eingeplant: {{slot}} am {{day}}"
+    },
     "pick": {
       "title": "{{slot}} · {{day}}"
     },
