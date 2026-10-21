@@ -126,7 +126,6 @@ describe("TaskEditScreen: baseVersion bleibt die der Hydration", () => {
   afterEach(async () => {
     // Kein 5-Sekunden-Timer offen lassen, keinen Eintrag in den nächsten Test tragen.
     await act(() => usePendingDeleteStore.getState().flush());
-    jest.restoreAllMocks();
   });
 
   it("Speichern, Kontrolle: baseVersion ist updated_at von A", async () => {
