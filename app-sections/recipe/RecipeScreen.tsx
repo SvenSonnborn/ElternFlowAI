@@ -206,7 +206,19 @@ function RecipeContent({ recipe }: { recipe: RecipeRow }) {
         ) : null}
       </ScrollView>
 
-      <View className="flex-row gap-2.5 border-t border-line bg-card px-4 py-3">
+      {/* Eigene Zeile über der Handoff-Fußzeile, die darunter unverändert bleibt. */}
+      <View className="border-t border-line bg-card px-4 pt-3">
+        <Button
+          label={t("meals.schedule.cta")}
+          variant="soft"
+          block
+          onPress={() =>
+            router.push({ pathname: "/meal/schedule", params: { recipeId: recipe.id } })
+          }
+        />
+      </View>
+
+      <View className="flex-row gap-2.5 bg-card px-4 py-3">
         <Button
           label={t("recipe.shopping")}
           variant="soft"
