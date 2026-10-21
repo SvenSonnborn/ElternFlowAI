@@ -12,7 +12,7 @@ import {
   recipeA11yLabel,
 } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
-import { Card, Text } from "@/design-system/ui";
+import { Text } from "@/design-system/ui";
 import {
   localize,
   slotForTime,
@@ -74,8 +74,6 @@ export function WeekPlanGrid({ days }: WeekPlanGridProps) {
     [days, slot, judge],
   );
 
-  const isEmpty = rows.every((row) => row.recipe === null);
-
   return (
     <>
       <View className="mt-4 flex-row gap-1 rounded-xl border border-line bg-bg-raised p-1">
@@ -112,26 +110,18 @@ export function WeekPlanGrid({ days }: WeekPlanGridProps) {
         })}
       </View>
 
-      {isEmpty ? (
-        // Sieben identische Platzhalterzeilen wären nur Rauschen; die Zeilen
-        // halten das Mo–So-Raster erst zusammen, wenn es etwas zu halten gibt.
-        <Card className="mt-4">
-          <Text variant="caption" tone="inkSecondary">
-            {t("meals.plan.empty")}
-          </Text>
-        </Card>
-      ) : (
-        <View className="mt-4 gap-2">
-          {rows.map((row) => (
-            <DayRow key={row.date} {...row} />
-          ))}
-        </View>
-      )}
+      <View className="mt-4 gap-2">
+        {rows.map((row) => (
+          <DayRow key={row.date} slot={slot} {...row} />
+        ))}
+      </View>
     </>
   );
 }
 
 interface DayRowProps {
+  /** Der aktive Slot-Tab — eine leere Zeile plant genau diesen Slot. */
+  slot: SlotTab;
   /** ISO-Kalendertag, `yyyy-MM-dd`. */
   date: string;
   isToday: boolean;
@@ -139,7 +129,7 @@ interface DayRowProps {
   verdict: RecipeAllergenVerdict | null;
 }
 
-function DayRow({ date, isToday, recipe, verdict }: DayRowProps) {
+function DayRow({ slot, date, isToday, recipe, verdict }: DayRowProps) {
   const { t, i18n } = useTranslation();
   const { theme } = useTheme();
   const isGerman = i18n.language.startsWith("de");
@@ -162,9 +152,11 @@ function DayRow({ date, isToday, recipe, verdict }: DayRowProps) {
 
   const a11yLabel = useMemo(() => {
     const dayName = format(parsed, "EEEE", { locale: isGerman ? deLocale : enLocale });
+    // Leere Zeile ist ein Knopf: das Label nennt die Handlung, nicht den Zustand.
+    if (!recipe) return t("meals.a11y.planDay", { slot: t(`meals.tabs.${slot}`), day: dayName });
     const label = `${dayName}, ${title}`;
     return verdict ? recipeA11yLabel(t, label, verdict) : label;
-  }, [parsed, isGerman, title, verdict, t]);
+  }, [parsed, isGerman, title, verdict, recipe, slot, t]);
 
   const body = (
     <>
@@ -233,9 +225,17 @@ function DayRow({ date, isToday, recipe, verdict }: DayRowProps) {
 
   if (!recipe) {
     return (
-      <View accessible accessibilityLabel={a11yLabel} className={className}>
+      // Ein leerer Tag ist die Einladung, etwas zu planen — Datum und Slot
+      // kennt die Zeile bereits, die Auswahl (`/meal/pick`) braucht nur beides.
+      <Pressable
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={a11yLabel}
+        onPress={() => router.push({ pathname: "/meal/pick", params: { date, slot } })}
+        className={`${className} active:opacity-80`}
+      >
         {body}
-      </View>
+      </Pressable>
     );
   }
 

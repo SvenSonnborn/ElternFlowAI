@@ -19,7 +19,25 @@ interface JudgedRecipe {
   verdict: RecipeAllergenVerdict;
 }
 
-export function RecipeBrowser() {
+interface RecipeBrowserProps {
+  /**
+   * Auswahlmodus: ein Tipp ruft `onPick(recipe)` statt die Detailansicht zu
+   * öffnen. Ohne diese Prop verhält sich der Browser wie im Essen-Tab.
+   */
+  onPick?: (recipe: RecipeRow) => void;
+  /**
+   * Sperrt die Auswahl (Allergien laden, Schreiben läuft): Tipps werden
+   * ignoriert, die Zeile meldet `disabled`. Wirkt nur mit `onPick`.
+   */
+  pickDisabled?: boolean;
+}
+
+/**
+ * Rezept-Suche und -Liste. Dient zugleich als Auswahlliste der Einplan-Ansicht
+ * (`/meal/pick`), damit Suche und Allergie-Urteil (ADR-014) nicht doppelt
+ * existieren.
+ */
+export function RecipeBrowser({ onPick, pickDisabled = false }: RecipeBrowserProps = {}) {
   const { t, i18n } = useTranslation();
   const { theme } = useTheme();
   const [search, setSearch] = useState("");
@@ -69,6 +87,8 @@ export function RecipeBrowser() {
           <RecipeRowItem
             key={recipe.id}
             id={recipe.id}
+            onSelect={onPick ? () => onPick(recipe) : undefined}
+            disabled={onPick ? pickDisabled : false}
             title={localize(recipe.title, i18n.language)}
             durationMin={recipe.duration_min}
             verdict={verdict}
@@ -81,12 +101,22 @@ export function RecipeBrowser() {
 
 interface RecipeRowItemProps {
   id: string;
+  /** Gesetzt im Auswahlmodus; sonst öffnet die Zeile die Detailansicht. */
+  onSelect?: () => void;
+  disabled: boolean;
   title: string;
   durationMin: number | null;
   verdict: RecipeAllergenVerdict;
 }
 
-function RecipeRowItem({ id, title, durationMin, verdict }: RecipeRowItemProps) {
+function RecipeRowItem({
+  id,
+  onSelect,
+  disabled,
+  title,
+  durationMin,
+  verdict,
+}: RecipeRowItemProps) {
   const { t } = useTranslation();
   const { theme } = useTheme();
 
@@ -102,7 +132,12 @@ function RecipeRowItem({ id, title, durationMin, verdict }: RecipeRowItemProps) 
       accessible
       accessibilityRole="button"
       accessibilityLabel={a11yLabel}
-      onPress={() => router.push({ pathname: "/recipe/[id]", params: { id } })}
+      accessibilityState={{ disabled }}
+      onPress={
+        disabled
+          ? undefined
+          : (onSelect ?? (() => router.push({ pathname: "/recipe/[id]", params: { id } })))
+      }
       className={`gap-2 rounded-2xl border border-line bg-card p-3 active:opacity-80 ${dimmed ? "opacity-50" : ""}`}
     >
       <Text variant="listTitle" numberOfLines={1}>
