@@ -15,6 +15,12 @@ module.exports = {
   moduleNameMapper: { "^@/(.*)$": "<rootDir>/$1" },
   modulePathIgnorePatterns: ignored.map((p) => `<rootDir>${p}`),
   testPathIgnorePatterns: ["/node_modules/", ...ignored.map((p) => `<rootDir>${p}`)],
+  // Der erste Render eines Screens lädt und transformiert die React-Native-Module erst
+  // dort (lazy), und diese Zeit zählt zum Test. Mit kaltem Transform-Cache kostet das
+  // lokal schon ~1,5 s, auf dem CI-Runner (4 Kerne, alle Suites parallel) mehr als
+  // Jests Standard von 5 s. Die Tests warten nie auf echte Zeit; ein Hänger fiele
+  // weiterhin auf, nur später.
+  testTimeout: 20_000,
   transformIgnorePatterns: [
     "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|nativewind|react-native-css-interop|@tanstack/react-query))",
   ],
