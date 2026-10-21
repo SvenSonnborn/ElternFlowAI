@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, type RenderResult } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -20,10 +20,19 @@ const initialMetrics = {
  * QueryClient für Tests. `staleTime`/`gcTime: Infinity` halten einen per
  * `setQueryData` vorbefüllten Cache frisch und lebendig, sodass die `queryFn`
  * nie anläuft (und kein Garbage-Collection-Timer offen bleibt); `retry: false`
- * lässt Fehler sofort sichtbar werden statt nach Backoff.
+ * lässt Fehler sofort sichtbar werden statt nach Backoff. React Query fängt
+ * Würfe aus `queryFn`/`mutationFn` (auch den des Supabase-Stubs) still ab; die
+ * Caches melden sie deshalb per `console.error`, womit der Konsolen-Wächter aus
+ * `jest.setup.ts` den Test scheitern lässt, statt dass er grün bleibt.
  */
 export function createTestQueryClient(): QueryClient {
   return new QueryClient({
+    queryCache: new QueryCache({
+      onError: (error) => console.error("Query fehlgeschlagen:", error),
+    }),
+    mutationCache: new MutationCache({
+      onError: (error) => console.error("Mutation fehlgeschlagen:", error),
+    }),
     defaultOptions: {
       queries: { retry: false, staleTime: Infinity, gcTime: Infinity },
       mutations: { retry: false },
