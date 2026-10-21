@@ -385,6 +385,12 @@
   "meals": {
     "title": "Meal plan",
     "weekLabel": "Week {{week}} · {{range}}",
+    "error": {
+      "generic": "That didn't work. Please try again.",
+      "notAuthenticated": "You're signed out or not allowed to change this.",
+      "recipeGone": "This recipe no longer exists.",
+      "changed": "The entry has been changed in the meantime."
+    },
     "plan": {
       "empty": "Nothing planned for this week yet.",
       "emptyDay": "Nothing planned",
