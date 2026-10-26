@@ -11,18 +11,20 @@
 -- search_path: pg_get_expr/-def und format_type qualifizieren Namen je nach search_path der Sitzung.
 -- Das CTE `sp` leert ihn transaktionslokal (set_config, is_local = true); jeder Zweig, der solche
 -- Funktionen ruft, hängt per Join an `sp`, damit die Ausgabe in psql und über eine API gleich ist.
+-- REGEL: Jeder Zweig, der pg_get_* oder format_type aufruft, MUSS `sp` joinen (direkt oder über
+-- `rels`, das `sp` enthält und materialisiert ist). Die Neutralisierung hängt allein daran.
 with
 sp as materialized (
   select pg_catalog.set_config('search_path', '', true) as v
 ),
 rels as materialized (
   select c.oid, n.nspname, c.relname, c.relkind::text as relkind, c.relowner, c.relrowsecurity, c.relforcerowsecurity,
-         c.relpersistence::text as relpersistence, c.reloptions, c.relacl
+         c.relpersistence::text as relpersistence, c.relreplident::text as relreplident, c.reloptions, c.relacl
   from sp, pg_catalog.pg_class c
   join pg_catalog.pg_namespace n on n.oid = c.relnamespace
   where n.nspname in ('public', 'private')
     and c.relkind in ('r', 'p', 'v', 'm', 'S', 'f')
-    and not exists (select 1 from pg_catalog.pg_depend d where d.objid = c.oid and d.deptype = 'e')
+    and not exists (select 1 from pg_catalog.pg_depend d where d.classid = 'pg_catalog.pg_class'::regclass and d.objid = c.oid and d.deptype = 'e')
 ),
 acl_rel as (
   select r.oid, r.nspname, r.relname, r.relkind,
@@ -56,6 +58,12 @@ rows_all as (
          'relkind=' || r.relkind || ' owner=' || r.relowner::regrole::text
          || ' rls=' || r.relrowsecurity || ' force_rls=' || r.relforcerowsecurity
          || ' persistence=' || r.relpersistence
+         || ' replident=' || r.relreplident
+         || case when r.relreplident = 'i'
+                 then ':' || coalesce((select ic.relname from pg_catalog.pg_index i
+                                       join pg_catalog.pg_class ic on ic.oid = i.indexrelid
+                                       where i.indrelid = r.oid and i.indisreplident), '')
+                 else '' end
          || ' options=' || coalesce((select string_agg(o, ',' order by o collate "C") from unnest(r.reloptions) o), '')
   from rels r
 
@@ -159,7 +167,7 @@ rows_all as (
   join pg_catalog.pg_language l on l.oid = p.prolang
   where n.nspname in ('public', 'private')
     and p.prokind in ('f', 'p')
-    and not exists (select 1 from pg_catalog.pg_depend d where d.objid = p.oid and d.deptype = 'e')
+    and not exists (select 1 from pg_catalog.pg_depend d where d.classid = 'pg_catalog.pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')
 
   union all
   -- Trigger (benutzerdefinierte, auf public/private; Definition inkl. Funktion, Zeitpunkt, Ereignisse)
@@ -186,7 +194,7 @@ rows_all as (
 
   union all
   -- Default-Privilegien für public/private
-  select 'default_acl', coalesce(n.nspname, '*') || ' for ' || d.defaclrole::regrole::text || ' on ' || d.defaclobjtype::text,
+  select 'default_acl', coalesce(n.nspname, '*global') || ' for ' || d.defaclrole::regrole::text || ' on ' || d.defaclobjtype::text,
          (select coalesce(string_agg(
                    case a.grantee when 0 then 'PUBLIC' else a.grantee::regrole::text end
                    || ':' || a.privilege_type || case when a.is_grantable then '*' else '' end,
@@ -196,23 +204,68 @@ rows_all as (
           from pg_catalog.aclexplode(d.defaclacl) a)
   from pg_catalog.pg_default_acl d
   left join pg_catalog.pg_namespace n on n.oid = d.defaclnamespace
-  where n.nspname in ('public', 'private')
+  where d.defaclnamespace = 0 or n.nspname in ('public', 'private')
 
   union all
   -- Publikationen: Flags
   select 'publication', pb.pubname,
          'owner=' || pb.pubowner::regrole::text || ' all_tables=' || pb.puballtables
          || ' insert=' || pb.pubinsert || ' update=' || pb.pubupdate
-         || ' delete=' || pb.pubdelete || ' truncate=' || pb.pubtruncate
+         || ' delete=' || pb.pubdelete || ' truncate=' || pb.pubtruncate || ' viaroot=' || pb.pubviaroot
   from pg_catalog.pg_publication pb
 
   union all
-  -- Publikationen: enthaltene Tabellen
-  select 'publication_table', pb.pubname || '/' || pn.nspname || '.' || pc.relname, ''
-  from pg_catalog.pg_publication_rel pr
+  -- Publikationen: enthaltene Tabellen mit Zeilenfilter und Spaltenliste
+  select 'publication_table', pb.pubname || '/' || pn.nspname || '.' || pc.relname,
+         'where=' || coalesce(regexp_replace(pg_catalog.pg_get_expr(pr.prqual, pr.prrelid), '\s+', ' ', 'g'), '')
+         || ' columns=' || coalesce((select string_agg(a.attname, ',' order by a.attname collate "C")
+                                     from pg_catalog.pg_attribute a
+                                     where a.attrelid = pr.prrelid and a.attnum = any(pr.prattrs)), '')
+  from sp, pg_catalog.pg_publication_rel pr
   join pg_catalog.pg_publication pb on pb.oid = pr.prpubid
   join pg_catalog.pg_class pc on pc.oid = pr.prrelid
   join pg_catalog.pg_namespace pn on pn.oid = pc.relnamespace
+
+  union all
+  -- Publikationen: Schema-Mitgliedschaft (FOR TABLES IN SCHEMA)
+  select 'publication_schema', pb.pubname || '/' || pn.nspname, ''
+  from pg_catalog.pg_publication_namespace pnn
+  join pg_catalog.pg_publication pb on pb.oid = pnn.pnpubid
+  join pg_catalog.pg_namespace pn on pn.oid = pnn.pnnspid
+
+  union all
+  -- Sequenzen
+  select 'sequence', r.nspname || '.' || r.relname,
+         'type=' || pg_catalog.format_type(sq.seqtypid, null) || ' start=' || sq.seqstart
+         || ' increment=' || sq.seqincrement || ' min=' || sq.seqmin || ' max=' || sq.seqmax
+         || ' cycle=' || sq.seqcycle || ' cache=' || sq.seqcache
+  from rels r
+  join pg_catalog.pg_sequence sq on sq.seqrelid = r.oid
+
+  union all
+  -- Domains: Basistyp, NOT NULL, Default, Check-Constraints
+  select 'domain', n.nspname || '.' || t.typname,
+         'base=' || pg_catalog.format_type(t.typbasetype, t.typtypmod) || ' notnull=' || t.typnotnull
+         || ' default=' || coalesce(t.typdefault, '')
+         || ' checks=' || coalesce((select string_agg(co.conname || ':' ||
+                                      regexp_replace(pg_catalog.pg_get_constraintdef(co.oid), '\s+', ' ', 'g'),
+                                      ';' order by co.conname collate "C")
+                                    from pg_catalog.pg_constraint co where co.contypid = t.oid), '')
+  from sp, pg_catalog.pg_type t
+  join pg_catalog.pg_namespace n on n.oid = t.typnamespace
+  where t.typtype = 'd' and n.nspname in ('public', 'private')
+
+  union all
+  -- Composite-Typen: Attribute in Reihenfolge
+  select 'composite', n.nspname || '.' || t.typname,
+         (select string_agg(at.attname || ' ' || pg_catalog.format_type(at.atttypid, at.atttypmod),
+                            ', ' order by at.attnum)
+          from pg_catalog.pg_attribute at
+          where at.attrelid = t.typrelid and at.attnum > 0 and not at.attisdropped)
+  from sp, pg_catalog.pg_type t
+  join pg_catalog.pg_namespace n on n.oid = t.typnamespace
+  join pg_catalog.pg_class cc on cc.oid = t.typrelid and cc.relkind = 'c'
+  where t.typtype = 'c' and n.nspname in ('public', 'private')
 
   union all
   -- Extensions mit Version und Schema
