@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 
 import type { EventWithRelations } from "@/features/calendar/expand";
 
@@ -10,6 +10,12 @@ import { createTestQueryClient, renderScreen } from "@/testing/renderScreen";
 import { EventEditScreen } from "./EventEditScreen";
 
 const mockUpdateEvent = jest.fn();
+const mockShowToast = jest.fn();
+
+jest.mock("@/app-sections/shared", () => ({
+  ...jest.requireActual<typeof import("@/app-sections/shared")>("@/app-sections/shared"),
+  useToast: () => ({ show: mockShowToast, dismiss: jest.fn() }),
+}));
 
 jest.mock("@/features/calendar", () => ({
   ...jest.requireActual<typeof import("@/features/calendar")>("@/features/calendar"),
@@ -107,5 +113,60 @@ describe("EventEditScreen: baseVersion bleibt die der Hydration", () => {
     expect(vars.baseVersion).toBe(occurrenceVersion(versionA, vars.occurrenceKey));
     expect(vars.baseVersion).not.toBe(occurrenceVersion(versionB, vars.occurrenceKey));
     expect(vars.changes.title).toBe("Elternabend");
+  });
+});
+
+type RetryToast = { action: { label: string; onPress: () => void } };
+
+describe("EventEditScreen: die Kennung gehört zur Absicht, nicht zum Versuch", () => {
+  beforeEach(() => {
+    mockUpdateEvent.mockReset();
+    mockShowToast.mockReset();
+  });
+
+  async function renderLoaded() {
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(calendarKeys.one("e1"), versionA);
+    await renderScreen(<EventEditScreen />, { queryClient });
+  }
+
+  const pressSave = () =>
+    fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.edit.save") }));
+
+  it("Erneut versuchen schickt dieselbe requestId wie der gescheiterte Versuch", async () => {
+    mockUpdateEvent.mockRejectedValueOnce(new Error("Network request failed"));
+    mockUpdateEvent.mockResolvedValue(undefined);
+    await renderLoaded();
+
+    await pressSave();
+    await waitFor(() => expect(mockShowToast).toHaveBeenCalledTimes(1));
+    const toast = mockShowToast.mock.calls[0][0] as RetryToast;
+    expect(toast.action.label).toBe(i18n.t("action.retry"));
+
+    await act(() => {
+      toast.action.onPress();
+    });
+
+    expect(mockUpdateEvent).toHaveBeenCalledTimes(2);
+    const first = mockUpdateEvent.mock.calls[0][0] as { requestId: string };
+    const second = mockUpdateEvent.mock.calls[1][0] as { requestId: string };
+    expect(first.requestId).toEqual(expect.any(String));
+    expect(second.requestId).toBe(first.requestId);
+  });
+
+  it("ein neues Speichern trägt eine andere requestId", async () => {
+    mockUpdateEvent.mockResolvedValue(undefined);
+
+    // Der Screen sperrt ein zweites Speichern; eine neue Absicht ist ein neu geöffneter Screen.
+    await renderLoaded();
+    await pressSave();
+    await screen.unmount();
+    await renderLoaded();
+    await pressSave();
+
+    expect(mockUpdateEvent).toHaveBeenCalledTimes(2);
+    const first = mockUpdateEvent.mock.calls[0][0] as { requestId: string };
+    const second = mockUpdateEvent.mock.calls[1][0] as { requestId: string };
+    expect(second.requestId).not.toBe(first.requestId);
   });
 });
