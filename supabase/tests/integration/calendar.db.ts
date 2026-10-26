@@ -4,6 +4,10 @@
  * `bun run test:db`, nicht über `bun test` — die Endung `.db.ts` hält sie aus
  * dem Einsammeln heraus.
  *
+ * `test:db` listet die `.db.ts`-Dateien explizit, weil `bun test <Verzeichnis>`
+ * sie nicht einsammelt — eine neue Datei muss im Script in `package.json`
+ * ergänzt werden.
+ *
  * Alles geht durch den echten Client-Pfad (`updateEvent`, `createEvent`,
  * `createSupabaseApplyEventChange`, `fetchEventById`), nur mit eingesetzten
  * Clients statt des Modul-Clients. Jeder Test legt seine Termine selbst an und
@@ -52,12 +56,26 @@ beforeAll(async () => {
 afterEach(async () => {
   // Exceptions hängen per Fremdschlüssel an den Terminen; die Titel fangen die
   // abgespaltenen Hälften, deren IDs der Server vergibt.
-  await purgeBookings(created);
-  const { error: byId } = await admin.from("events").delete().in("id", created);
-  if (byId) throw byId;
-  const { error: byTitle } = await admin.from("events").delete().like("title", `${RUN}%`);
-  if (byTitle) throw byTitle;
+  // Jeder Schritt läuft, auch wenn ein früherer wirft; der erste Fehler geht am Ende hoch.
+  const errors: unknown[] = [];
+  const attempt = async (step: () => Promise<unknown>) => {
+    try {
+      await step();
+    } catch (err) {
+      errors.push(err);
+    }
+  };
+  await attempt(() => purgeBookings(created));
+  await attempt(async () => {
+    const { error } = await admin.from("events").delete().in("id", created);
+    if (error) throw error;
+  });
+  await attempt(async () => {
+    const { error } = await admin.from("events").delete().like("title", `${RUN}%`);
+    if (error) throw error;
+  });
   created.length = 0;
+  if (errors.length > 0) throw errors[0];
 });
 
 afterAll(async () => {
@@ -190,6 +208,14 @@ describe("apply_event_change gegen die lokale Instanz", () => {
     expect(applied.map((r) => r.value)).toEqual(["applied"]);
     expect(rejected).toHaveLength(1);
     expect(rejected[0].reason).toMatchObject({ code: "EF409", details: "master" });
+
+    // Die Wirkung in der Datenbank: Der Master trägt die Fassung des Gewinners,
+    // nicht die des Verlierers.
+    const winner = results[0].status === "fulfilled" ? `${RUN} von A` : `${RUN} von B`;
+    const loser = winner === `${RUN} von A` ? `${RUN} von B` : `${RUN} von A`;
+    const master = await load(clientA, id);
+    expect(master.title).toBe(winner);
+    expect(master.title).not.toBe(loser);
   });
 
   it("dieselbe request_id zweimal gleichzeitig: applied + already_applied, Wirkung einmal", async () => {
@@ -234,11 +260,19 @@ describe("apply_event_change gegen die lokale Instanz", () => {
 
     await updateEvent(vars, depsFor(clientA));
     expect(await splitCount()).toBe(1);
+    const afterFirst = await load(clientA, id);
+    // Die Serie wurde abgeschnitten (Zählserie: bleibt nur, was vor dem Schlüssel lag).
+    expect(afterFirst.rrule_count !== 10 || afterFirst.rrule_until !== null).toBe(true);
 
     // Die Antwort ging verloren, der Nutzer tippt „Erneut versuchen": dieselben
     // vars, dieselbe Kennung, aber der Master hat sich inzwischen verändert.
     await updateEvent(vars, depsFor(clientA));
     expect(await splitCount()).toBe(1);
+    const afterSecond = await load(clientA, id);
+    // Kein zweiter Schnitt: Regelfelder gleich, und der Master wurde nicht erneut geschrieben.
+    expect(afterSecond.rrule_count).toBe(afterFirst.rrule_count);
+    expect(afterSecond.rrule_until).toBe(afterFirst.rrule_until);
+    expect(afterSecond.updated_at).toBe(afterFirst.updated_at);
   });
 
   it("Regelwechsel durch A, während B dieselbe Occurrence geändert hat: EventConflictError, Exceptions unverändert", async () => {
@@ -295,6 +329,31 @@ describe("apply_event_change gegen die lokale Instanz", () => {
   });
 });
 
+/** Sendet den Anlege-Aufruf zu `id` ein zweites Mal, mit sonst gleichen Werten. */
+async function seedEventAgain(id: string) {
+  const row = await load(clientA, id);
+  await createEvent(
+    {
+      id,
+      familyId: SEED.familyId,
+      typeId: familyTypeId,
+      childId: null,
+      parentId: null,
+      title: row.title,
+      startAt: START,
+      endAt: END,
+      allDay: false,
+      timezone: "Europe/Berlin",
+      location: null,
+      description: null,
+      recurrence: "none",
+      recurrenceCount: null,
+      createdBy: SEED.parentA,
+    },
+    clientA,
+  );
+}
+
 describe("createEvent gegen die lokale Instanz", () => {
   it("zweimal mit derselben id legt genau einen Termin an", async () => {
     const { id } = await seedEvent();
@@ -330,7 +389,10 @@ describe("createEvent gegen die lokale Instanz", () => {
       },
       clientA,
     ).catch((err: unknown) => err);
+    // Die Fehlerart von `createEvent` für diesen Fall: kein PostgREST-Fehler (kein
+    // `code`), sondern der eigene Wurf der Sichtbarkeitsprüfung.
     expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toContain("gehört einem fremden Termin");
 
     const after = await admin.from("events").select("*").eq("id", SEED.foreignEvent).single();
     if (after.error) throw after.error;
@@ -339,28 +401,3 @@ describe("createEvent gegen die lokale Instanz", () => {
     expect(stray).toHaveLength(0);
   });
 });
-
-/** Sendet den Anlege-Aufruf zu `id` ein zweites Mal, mit sonst gleichen Werten. */
-async function seedEventAgain(id: string) {
-  const row = await load(clientA, id);
-  await createEvent(
-    {
-      id,
-      familyId: SEED.familyId,
-      typeId: familyTypeId,
-      childId: null,
-      parentId: null,
-      title: row.title,
-      startAt: START,
-      endAt: END,
-      allDay: false,
-      timezone: "Europe/Berlin",
-      location: null,
-      description: null,
-      recurrence: "none",
-      recurrenceCount: null,
-      createdBy: SEED.parentA,
-    },
-    clientA,
-  );
-}

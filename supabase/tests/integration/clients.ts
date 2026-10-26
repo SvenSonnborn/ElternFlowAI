@@ -9,6 +9,10 @@
  * Client explizit aus `supabase status -o env` gebaut; `.env.local` und
  * `process.env.EXPO_PUBLIC_*` werden nie gelesen.
  *
+ * **Neue `.db.ts`-Datei:** `bun test <Verzeichnis>` sammelt `.db.ts` nicht ein,
+ * deshalb listet das Script `test:db` in `package.json` die Dateien explizit.
+ * Eine neue Datei muss dort ergänzt werden.
+ *
  * Läuft die lokale Instanz nicht, scheitert der Import laut. Überspringen wäre
  * falsch: Ein grüner Lauf ohne einen einzigen Test sähe aus wie ein bestandener.
  */
@@ -78,10 +82,13 @@ const adminKey = env.SECRET_KEY || required(env, "SERVICE_ROLE_KEY");
 
 // Schutz vor dem Ernstfall: Diese Tests schreiben und löschen Termine. Gegen alles
 // außer der eigenen Maschine laufen sie nie.
-const host = new URL(apiUrl).hostname;
-if (host !== "127.0.0.1" && host !== "localhost") {
-  throw new Error(`Integrationstests laufen nur gegen die lokale Instanz, nicht gegen ${host}`);
+function assertLocal(url: string): void {
+  const host = new URL(url).hostname;
+  if (host !== "127.0.0.1" && host !== "localhost") {
+    throw new Error(`Integrationstests laufen nur gegen die lokale Instanz, nicht gegen ${host}`);
+  }
 }
+assertLocal(apiUrl);
 
 function plainClient(key: string): Client {
   return createClient<Database>(apiUrl, key, {
@@ -106,15 +113,16 @@ export async function signedInClient(email: string, password = SEED.password): P
  * Entfernt die Verbuchungen (`private.event_change_requests`) zu den Terminen
  * `eventIds`.
  *
- * Das Schema `private` ist nicht über die API erreichbar, auch nicht mit dem
- * Service-Role-Schlüssel — deshalb eine direkte Verbindung zur lokalen
- * Datenbank. Nötig ist das Aufräumen, weil `event_id` kein Fremdschlüssel ist:
- * Löscht man die Termine, bleiben die Zeilen stehen. Und sie stehen in der
- * Datenbank, gegen die danach auch `supabase test db` läuft — dessen Test „B
- * sieht keine fremden Verbuchungen" zählt B's sichtbare Zeilen und erwartet 0.
+ * Hygiene: `event_id` ist kein Fremdschlüssel, die Zeilen blieben nach dem
+ * Löschen der Termine stehen und sammelten sich über Läufe an. Gelöscht wird
+ * nur, was zu den Terminen dieses Tests gehört. Das Schema `private` ist nicht
+ * über die API erreichbar, auch nicht mit dem Service-Role-Schlüssel — deshalb
+ * eine direkte Verbindung zur lokalen Datenbank, die denselben Hostschutz
+ * durchläuft wie die API-Clients.
  */
 export async function purgeBookings(eventIds: string[]): Promise<void> {
   if (eventIds.length === 0) return;
+  assertLocal(dbUrl);
   const sql = new Bun.SQL(dbUrl);
   try {
     await sql`delete from private.event_change_requests where event_id = any(${sql.array(eventIds, "uuid")})`;
