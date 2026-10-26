@@ -242,11 +242,20 @@ let sequence = 0;
  * `fetchEventsInRange` liefert — damit sie durch dasselbe `expandEvents` laufen
  * kann wie die echten.
  *
- * Erfunden wird nur die `id` (Präfix `optimistic-`, damit sie in Logs erkennbar
- * ist) und die beiden Zeitstempel; alles andere kommt aus dem Formular oder aus
- * der bereits geladenen Typ-Zeile. Die Feldliste spiegelt bewusst den `insert`
- * in `createEvent` direkt darüber: Weicht sie ab, zeigt der Kalender etwas
- * anderes an, als gleich gespeichert wird.
+ * Erfunden werden nur die `id` und die beiden Zeitstempel; alles andere kommt
+ * aus dem Formular oder aus der bereits geladenen Typ-Zeile. Die Feldliste
+ * spiegelt bewusst den `upsert` in `createEvent` direkt darüber: Weicht sie ab,
+ * zeigt der Kalender etwas anderes an, als gleich gespeichert wird.
+ *
+ * **Warum nicht `vars.id`**, obwohl die echte Zeile genau diese Id bekommt.
+ * `onSettled` invalidiert bei Erfolg zuerst und gibt die optimistische Zeile
+ * erst danach frei, damit kein Frame den alten Stand zeigt. Zwischen dem
+ * gelandeten Refetch und dem `remove` stehen echte und optimistische Zeile also
+ * kurz nebeneinander — `withOptimistic` hängt Creates an, statt nach Id zu
+ * entdoppeln. Mit derselben Id und demselben `start_at` trügen beide denselben
+ * React-Key `${eventId}-${occurrenceKey}-${date}`. Und eine echte UUID verlöre
+ * den Präfix `optimistic-`, an dem `isOptimisticEventId` die Zeile erkennt und
+ * die Navigation zum noch nicht gespeicherten Termin sperrt.
  */
 export function optimisticEventRow(vars: CreateEventVars, type: EventTypeRow): EventWithRelations {
   const rrule = recurrenceToRrule(vars.recurrence, new Date(vars.startAt), vars.timezone);

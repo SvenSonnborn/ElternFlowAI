@@ -276,8 +276,15 @@ describe("optimisticEventRow", () => {
  * `.from().upsert().select()` (das Anlegen) und, nur bei leerer Antwort,
  * `.from().select().eq().maybeSingle()` (die Sichtbarkeitsprüfung). Sie hängen
  * an demselben `from()` und unterscheiden sich an der ersten Methode.
+ * `upsertError` bzw. `lookupError` lassen die jeweilige Kette mit diesem
+ * Fehler antworten, wie PostgREST es tut: `data` null, `error` gesetzt.
  */
-function fakeCreateClient(opts: { upserted: { id: string }[]; visible: { id: string } | null }) {
+function fakeCreateClient(opts: {
+  upserted: { id: string }[];
+  visible: { id: string } | null;
+  upsertError?: Error;
+  lookupError?: Error;
+}) {
   const calls = {
     payload: undefined as Record<string, unknown> | undefined,
     options: undefined as unknown,
@@ -290,7 +297,12 @@ function fakeCreateClient(opts: { upserted: { id: string }[]; visible: { id: str
       calls.lookupEq.push([column, value]);
       return lookup;
     },
-    maybeSingle: () => Promise.resolve({ data: opts.visible, error: null }),
+    maybeSingle: () =>
+      Promise.resolve(
+        opts.lookupError
+          ? { data: null, error: opts.lookupError }
+          : { data: opts.visible, error: null },
+      ),
   };
   const client = {
     from() {
@@ -301,7 +313,11 @@ function fakeCreateClient(opts: { upserted: { id: string }[]; visible: { id: str
           return {
             select(columns: string) {
               calls.returning = columns;
-              return Promise.resolve({ data: opts.upserted, error: null });
+              return Promise.resolve(
+                opts.upsertError
+                  ? { data: null, error: opts.upsertError }
+                  : { data: opts.upserted, error: null },
+              );
             },
           };
         },
@@ -345,5 +361,29 @@ describe("createEvent — Anlegen über die vom Client vergebene id", () => {
 
     // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
     await expect(createEvent(vars(), client)).rejects.toThrow(Error);
+  });
+
+  test("ein Fehler des Anlegens geht unverändert durch, ohne Sichtbarkeitsprüfung", async () => {
+    // Unverändert, weil die Aufrufer am Objekt entscheiden: `code` und
+    // `message` tragen die Fehlermeldung im Screen.
+    const upsertError = Object.assign(new Error("permission denied for table events"), {
+      code: "42501",
+    });
+    const { client, calls } = fakeCreateClient({ upserted: [], visible: null, upsertError });
+
+    // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
+    await expect(createEvent(vars(), client)).rejects.toBe(upsertError);
+    expect(calls.lookupColumns).toBeNull();
+  });
+
+  test('ein Fehler der Sichtbarkeitsprüfung geht unverändert durch, statt als „fremder Termin" zu enden', async () => {
+    // Scheitert die Nachfrage (etwa an der Verbindung), ist über die Zeile
+    // nichts bekannt — die Meldung „gehört einem fremden Termin" wäre geraten.
+    const lookupError = Object.assign(new Error("TypeError: Network request failed"), { code: "" });
+    const { client, calls } = fakeCreateClient({ upserted: [], visible: null, lookupError });
+
+    // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
+    await expect(createEvent(vars(), client)).rejects.toBe(lookupError);
+    expect(calls.lookupColumns).toBe("id");
   });
 });

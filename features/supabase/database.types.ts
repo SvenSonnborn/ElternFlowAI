@@ -5,6 +5,11 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5";
+  };
   public: {
     Tables: {
       children: {
@@ -23,7 +28,6 @@ export type Database = {
           school: string | null;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           allergies?: string[];
           birthday: string;
@@ -74,7 +78,6 @@ export type Database = {
           override: Json | null;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           action: Database["public"]["Enums"]["event_exception_action_enum"];
           created_at?: string;
@@ -110,17 +113,16 @@ export type Database = {
           family_id: string | null;
           icon: string;
           id: string;
-          label: NonNullable<Json>;
+          label: Json;
           slug: string;
         };
-        ComputedFields: never;
         Insert: {
           color: string;
           created_at?: string;
           family_id?: string | null;
           icon: string;
           id?: string;
-          label: NonNullable<Json>;
+          label: Json;
           slug: string;
         };
         Update: {
@@ -129,7 +131,7 @@ export type Database = {
           family_id?: string | null;
           icon?: string;
           id?: string;
-          label?: NonNullable<Json>;
+          label?: Json;
           slug?: string;
         };
         Relationships: [
@@ -165,7 +167,6 @@ export type Database = {
           type_id: string;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           all_day?: boolean;
           child_id?: string | null;
@@ -253,22 +254,21 @@ export type Database = {
           created_at: string;
           id: string;
           name: string;
-          settings: NonNullable<Json>;
+          settings: Json;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           id?: string;
           name: string;
-          settings?: NonNullable<Json>;
+          settings?: Json;
           updated_at?: string;
         };
         Update: {
           created_at?: string;
           id?: string;
           name?: string;
-          settings?: NonNullable<Json>;
+          settings?: Json;
           updated_at?: string;
         };
         Relationships: [];
@@ -282,7 +282,6 @@ export type Database = {
           token: string;
           used_at: string | null;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           created_by?: string | null;
@@ -328,7 +327,6 @@ export type Database = {
           recipe_id: string;
           servings_override: number | null;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           created_by?: string | null;
@@ -391,7 +389,6 @@ export type Database = {
           short: string;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           allergies?: string[];
           auth_user_id: string;
@@ -444,17 +441,16 @@ export type Database = {
           fetched_at: string;
           id: string;
           image_url: string | null;
-          ingredients: NonNullable<Json>;
-          instructions: NonNullable<Json>;
+          ingredients: Json;
+          instructions: Json;
           keywords: string[];
           recipe_dedup_hash: string;
           servings: number | null;
           source: Database["public"]["Enums"]["recipe_source_enum"];
           source_external_id: string | null;
           source_url: string | null;
-          title: NonNullable<Json>;
+          title: Json;
         };
-        ComputedFields: never;
         Insert: {
           contains_allergens?: string[];
           created_at?: string;
@@ -466,15 +462,15 @@ export type Database = {
           fetched_at?: string;
           id?: string;
           image_url?: string | null;
-          ingredients: NonNullable<Json>;
-          instructions: NonNullable<Json>;
+          ingredients: Json;
+          instructions: Json;
           keywords?: string[];
           recipe_dedup_hash: string;
           servings?: number | null;
           source: Database["public"]["Enums"]["recipe_source_enum"];
           source_external_id?: string | null;
           source_url?: string | null;
-          title: NonNullable<Json>;
+          title: Json;
         };
         Update: {
           contains_allergens?: string[];
@@ -487,15 +483,15 @@ export type Database = {
           fetched_at?: string;
           id?: string;
           image_url?: string | null;
-          ingredients?: NonNullable<Json>;
-          instructions?: NonNullable<Json>;
+          ingredients?: Json;
+          instructions?: Json;
           keywords?: string[];
           recipe_dedup_hash?: string;
           servings?: number | null;
           source?: Database["public"]["Enums"]["recipe_source_enum"];
           source_external_id?: string | null;
           source_url?: string | null;
-          title?: NonNullable<Json>;
+          title?: Json;
         };
         Relationships: [
           {
@@ -518,7 +514,6 @@ export type Database = {
           sent_at: string | null;
           task_id: string | null;
         };
-        ComputedFields: never;
         Insert: {
           created_at?: string;
           event_id?: string | null;
@@ -577,17 +572,16 @@ export type Database = {
           family_id: string | null;
           icon: string;
           id: string;
-          label: NonNullable<Json>;
+          label: Json;
           slug: string;
         };
-        ComputedFields: never;
         Insert: {
           color: string;
           created_at?: string;
           family_id?: string | null;
           icon: string;
           id?: string;
-          label: NonNullable<Json>;
+          label: Json;
           slug: string;
         };
         Update: {
@@ -596,7 +590,7 @@ export type Database = {
           family_id?: string | null;
           icon?: string;
           id?: string;
-          label?: NonNullable<Json>;
+          label?: Json;
           slug?: string;
         };
         Relationships: [
@@ -627,7 +621,6 @@ export type Database = {
           type_id: string;
           updated_at: string;
         };
-        ComputedFields: never;
         Insert: {
           child_id?: string | null;
           completed_at?: string | null;
@@ -706,7 +699,12 @@ export type Database = {
     };
     Functions: {
       accept_invitation: {
-        Args: { p_color: string; p_parent_name: string; p_short: string; p_token: string };
+        Args: {
+          p_color: string;
+          p_parent_name: string;
+          p_short: string;
+          p_token: string;
+        };
         Returns: string;
       };
       apply_event_change: {
@@ -721,11 +719,19 @@ export type Database = {
         Returns: string;
       };
       create_family: {
-        Args: { p_color: string; p_family_name: string; p_parent_name: string; p_short: string };
+        Args: {
+          p_color: string;
+          p_family_name: string;
+          p_parent_name: string;
+          p_short: string;
+        };
         Returns: string;
       };
-      current_family_id: { Args: Record<PropertyKey, never>; Returns: string };
-      delete_task: { Args: { p_seen_updated_at: string; p_task_id: string }; Returns: string };
+      current_family_id: { Args: never; Returns: string };
+      delete_task: {
+        Args: { p_seen_updated_at: string; p_task_id: string };
+        Returns: string;
+      };
       regenerate_invitation: { Args: { p_token: string }; Returns: string };
     };
     Enums: {
@@ -754,7 +760,9 @@ export type Tables<
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never) = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R;
@@ -777,7 +785,9 @@ export type TablesInsert<
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never) = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I;
     }
@@ -799,7 +809,9 @@ export type TablesUpdate<
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never) = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U;
     }
@@ -821,7 +833,9 @@ export type Enums<
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never) = never,
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
@@ -835,7 +849,9 @@ export type CompositeTypes<
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never) = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
