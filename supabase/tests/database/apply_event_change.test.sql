@@ -20,7 +20,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(128);
+select plan(132);
 
 -- ── Helfer ──────────────────────────────────────────────────────────────────
 
@@ -88,6 +88,13 @@ begin
   -- Serie mit rrule_count 10 (e3)
   perform pg_temp.clone_event('e3e3e3e3-0000-4000-8000-000000000001', ('e3e3e3e3-0000-4000-8000-1000000000' || n)::uuid)
   from unnest(array['09','10']) as n;
+
+  -- Fall 37: jede übernommene Spalte weicht vom Wert ab, den ein Insert ohne sie bekäme
+  -- (Default oder null). child_id muss null sein (events_one_person_only); dass das Kind
+  -- mitwandert, zeigen die Fälle 10 und 11.
+  perform pg_temp.clone_event('e2e2e2e2-0000-4000-8000-000000000001', 'e2e2e2e2-0000-4000-8000-100000000037',
+    '{"parent_id": "bbbbbbbb-0000-4000-8000-000000000011", "child_id": null, "all_day": true,
+      "timezone": "America/New_York", "rrule_interval": 2, "rrule_until": "2027-03-31T21:59:59.999Z"}');
 
   -- Fall 11: Serie mit UNTIL, damit insert_split_event es übernehmen kann.
   perform pg_temp.clone_event('e2e2e2e2-0000-4000-8000-000000000001', 'e2e2e2e2-0000-4000-8000-100000000011',
@@ -657,6 +664,62 @@ select is(
   (select count(*) from public.events where title = 'Untergeschoben'),
   0::bigint,
   '18 kein Split-Termin angelegt'
+);
+
+-- ── insert_split_event: jede Spalte entschieden ─────────────────────────────
+
+-- 37 Die Fälle 10 und 11 zählen die übernommenen Spalten von Hand auf; eine neue Spalte,
+-- die insert_split_event nicht kennt, fiele dort nicht auf — die abgespaltene Hälfte
+-- bekäme still ihren Default. Dieser Fall vergleicht deshalb die ganze Zeile über
+-- `to_jsonb` und zieht nur die Spalten ab, die der Split bewusst nicht übernimmt:
+-- id, created_at, updated_at (vom Server), title, description, location, start_at,
+-- end_at (aus `changes`), rrule_count (aus dem Schritt) und rrule_until (nur ohne
+-- rrule_count, unten eigens geprüft).
+--
+-- Der Wertvergleich allein reicht nicht: Steht eine neue Spalte im Master auf ihrem
+-- Default, sind Master und Split gleich, ob sie übernommen wird oder nicht. Die erste
+-- Prüfung schreibt daher die Spaltenliste fest — kommt eine Spalte hinzu, schlägt sie
+-- fehl, bis jemand entscheidet, ob der Split sie übernimmt (dann in insert_split_event,
+-- in die Liste unten und mit abweichendem Wert in den Fixture-Patch) oder bewusst nicht
+-- (dann zu den abgezogenen Spalten, mit Grund).
+select is(
+  public.apply_event_change(
+    '0a000000-0000-4000-8000-000000000037', 'e2e2e2e2-0000-4000-8000-100000000037', '2026-11-16',
+    pg_temp.master_version('e2e2e2e2-0000-4000-8000-100000000037'), null,
+    '[{"op":"insert_split_event","changes":{"title":"Vollständig abgespalten","start_at":"2026-11-16T05:00:00.000Z",
+       "end_at":"2026-11-17T04:59:59.999Z","location":"Halle 2","description":"ganztägig"},"rrule_count":null}]'),
+  'applied',
+  '37 insert_split_event aus einer Serie mit Eltern-Zuordnung, ganztägig, fremder Zone → applied'
+);
+
+select is(
+  (select array_agg(k order by k)
+   from public.events m,
+        jsonb_object_keys(to_jsonb(m) - array['id', 'created_at', 'updated_at', 'title', 'description',
+                                              'location', 'start_at', 'end_at', 'rrule_count', 'rrule_until']) k
+   where m.id = 'e2e2e2e2-0000-4000-8000-100000000037'),
+  array['all_day', 'child_id', 'created_by', 'family_id', 'parent_id', 'rrule_byweekday', 'rrule_freq',
+        'rrule_interval', 'timezone', 'type_id'],
+  '37 events hat genau die Spalten, über die für den Split entschieden ist — eine neue gehört hier eingetragen'
+);
+
+select is(
+  (select to_jsonb(s) - array['id', 'created_at', 'updated_at', 'title', 'description', 'location',
+                              'start_at', 'end_at', 'rrule_count', 'rrule_until']
+   from public.events s where s.title = 'Vollständig abgespalten'),
+  (select to_jsonb(m) - array['id', 'created_at', 'updated_at', 'title', 'description', 'location',
+                              'start_at', 'end_at', 'rrule_count', 'rrule_until']
+   from public.events m where m.id = 'e2e2e2e2-0000-4000-8000-100000000037'),
+  '37 die abgespaltene Hälfte trägt jede übernommene Spalte des Masters, auch parent_id, all_day und timezone'
+);
+
+select results_eq(
+  $$ select s.title, s.description, s.location, s.start_at, s.end_at, s.rrule_count, s.rrule_until
+     from public.events s where s.title = 'Vollständig abgespalten' $$,
+  $$ values ('Vollständig abgespalten'::text, 'ganztägig'::text, 'Halle 2'::text,
+             '2026-11-16T05:00:00Z'::timestamptz, '2026-11-17T04:59:59.999Z'::timestamptz, null::integer,
+             '2027-03-31T21:59:59.999Z'::timestamptz) $$,
+  '37 die abgezogenen Spalten kommen aus changes bzw. dem Schritt, rrule_until vom Master'
 );
 
 -- ── Ungültige Eingaben (Review Focus 5): je 22023, nichts verbucht, nichts geändert ──

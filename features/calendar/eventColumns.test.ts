@@ -117,9 +117,13 @@ function eventType(): EventTypeRow {
 
 // Der dritte Schreiber, die abgespaltene Hälfte eines Forward-Splits, lebt seit
 // Block 7 im Server (`insert_split_event` in `apply_event_change`): Er übernimmt
-// alle Spalten außer `changes` und `rrule_count` aus dem gesperrten Master. Dass
-// keine davon verloren geht, prüft Fall 10 in
-// supabase/tests/database/apply_event_change.test.sql.
+// jede Spalte aus dem gesperrten Master außer den Feldern aus `changes`, dem
+// `rrule_count` des Schritts und — ist der gesetzt — `rrule_until`. Dass keine
+// davon verloren geht und eine neu hinzugekommene Spalte nicht still ihren
+// Default bekommt, prüft Fall 37 in
+// supabase/tests/database/apply_event_change.test.sql über die ganze Zeile;
+// die Fälle 10 und 11 decken das Zusammenspiel von `rrule_count` und
+// `rrule_until` ab.
 describe("createEvent und optimisticEventRow — dieselbe Spaltenmenge", () => {
   test("createEvent schreibt jede Spalte, die der Server nicht selbst füllt", async () => {
     const { client, calls } = fakeUpsertClient();

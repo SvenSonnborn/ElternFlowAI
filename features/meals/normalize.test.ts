@@ -221,15 +221,7 @@ describe("normalizeRecipe", () => {
 
   test("überlebt ein durchweg kaputtes Rezept", () => {
     const recipe = normalizeRecipe(
-      makeDbRecipe({
-        title: 42,
-        description: [],
-        ingredients: "nope",
-        // Die Spalte ist NOT NULL, und der Generator typisiert sie inzwischen
-        // als `NonNullable<Json>`. Der Test speist absichtlich, was es laut
-        // Schema nicht geben dürfte.
-        instructions: null as unknown as DbRecipeRow["instructions"],
-      }),
+      makeDbRecipe({ title: 42, description: [], ingredients: "nope", instructions: null }),
     );
 
     expect(recipe.title).toEqual({ de: "" });

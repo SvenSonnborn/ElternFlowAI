@@ -6,10 +6,17 @@
 // Production runs (Metro/Expo) never touch this preload.
 import { mock } from "bun:test";
 
-// Supabase client throws on import if these are missing. Tests don't make real
-// HTTP calls, so any non-empty URL/key is enough to satisfy the boot guard.
-process.env.EXPO_PUBLIC_SUPABASE_URL ??= "https://test.supabase.invalid";
-process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??= "sb_publishable_test";
+// Unconditional, never `??=`: mise loads `.env.local` into every activated
+// shell, and that file points at the LIVE project. With `??=` the real URL won,
+// and any test that reached the module client (`@/features/supabase`) sent its
+// requests to live — it happened once, with anonymous INSERTs that only failed
+// on invalid fixture UUIDs. Tests must never reach a real backend. A test that
+// needs one (the integration tests against the local stack) builds its own
+// client with explicit local values instead of reading this env. The values
+// still satisfy the client's boot guard, which throws when either is missing;
+// `.invalid` is a reserved TLD and never resolves.
+process.env.EXPO_PUBLIC_SUPABASE_URL = "https://test.supabase.invalid";
+process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_test";
 
 void mock.module("react-native", () => ({
   Platform: { OS: "web", select: <T>(o: { web?: T; default?: T }) => o.web ?? o.default },

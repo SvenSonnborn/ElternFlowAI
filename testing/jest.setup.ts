@@ -7,10 +7,15 @@ import "@testing-library/react-native"; // muss vor dem Wächter unten stehen, s
 import { notifyManager } from "@tanstack/react-query";
 import { format } from "node:util";
 
-// Platzhalter wie in `bun.test.preload.ts` — der Supabase-Client wird in
-// Komponenten-Tests ohnehin durch den Stub unten ersetzt.
-process.env.EXPO_PUBLIC_SUPABASE_URL ??= "https://test.supabase.invalid";
-process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??= "sb_publishable_test";
+// Platzhalter wie in `bun.test.preload.ts`, und wie dort unbedingt gesetzt, nie
+// mit `??=`: mise lädt `.env.local` in jede aktivierte Shell, und die zeigt auf
+// das LIVE-Projekt. Mit `??=` gewann die echte URL. Tests dürfen nie ein echtes
+// Backend erreichen — wer eins braucht (Integrationstests gegen die lokale
+// Instanz), baut seinen Client mit expliziten lokalen Werten. Der Stub unten
+// ersetzt den Supabase-Client in Komponenten-Tests ohnehin; die Platzhalter
+// sind die zweite Linie, falls ein Modul an ihm vorbei `createClient` ruft.
+process.env.EXPO_PUBLIC_SUPABASE_URL = "https://test.supabase.invalid";
+process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_test";
 
 jest.mock("@react-native-async-storage/async-storage", () =>
   jest.requireActual<object>("@react-native-async-storage/async-storage/jest/async-storage-mock"),
