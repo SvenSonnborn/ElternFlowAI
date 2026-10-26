@@ -3,11 +3,14 @@
 --
 -- Idempotent und rein additiv: Der Code auf `main` schreibt weiter direkt in die
 -- Tabellen, und das bleibt erlaubt — die RPC läuft mit den Rechten des Aufrufers und
--- braucht dieselben Tabellenrechte wie er.
+-- braucht dieselben Tabellenrechte wie er. Einzige Ausnahme sind die `revoke`s in
+-- Abschnitt 7, die drei Trigger-Funktionen ein Recht nehmen, das niemand braucht.
 --
--- Abschnitte 1–4 legen die Kalender-RPC samt Verbuchung an. Die übrigen Teile dieses
--- Blocks (delete_task, Rechte der Broadcast-Trigger-Funktion, Durchsicht der
--- security-definer-Funktionen) hängen als eigene, nummerierte Abschnitte unten an.
+-- Abschnitte 1–4 legen die Kalender-RPC samt Verbuchung an, 5–6 `delete_task`, 7 nimmt
+-- den Trigger-Funktionen das execute-Recht. Die vier gewollten security-definer-Funktionen
+-- (accept_invitation, create_family, regenerate_invitation, current_family_id) sind für
+-- diesen Block durchgesehen und bleiben unverändert; was die Durchsicht stützt, hält
+-- supabase/tests/database/security.test.sql fest.
 
 -- ── 1. Schema `private` ─────────────────────────────────────────────────────
 --
@@ -601,3 +604,113 @@ revoke all on function public.apply_event_change(uuid, uuid, date, timestamptz, 
   from public, anon;
 grant execute on function public.apply_event_change(uuid, uuid, date, timestamptz, timestamptz, jsonb)
   to authenticated;
+
+-- ── 5. public.delete_task ───────────────────────────────────────────────────
+--
+-- Löscht eine Aufgabe gegen den Stand, den der Client gesehen hat (§7), und sagt dabei
+-- eindeutig, was passiert ist. Das bisherige Compare-and-Swap über PostgREST (ADR-036)
+-- konnte „schon gelöscht" nicht von „kein Zugriff mehr" unterscheiden: Beides waren null
+-- Zeilen und eine leere Nachlese.
+--
+-- Rückgabe:
+--   'deleted'    gelöscht.
+--   'missing'    nicht (mehr) da: schon gelöscht, nie da gewesen oder in einer fremden
+--                Familie. Für den Client ein Erfolg, die Absicht ist erfüllt.
+--   'forbidden'  der Aufrufer hat keine Familie (mehr) oder hat den Zugriff während des
+--                Aufrufs verloren — der Fall „aus der Familie entfernt, während der
+--                Undo-Timer lief".
+-- Fehler:
+--   EF409  Konflikt — die Zeile ist sichtbar, ihr updated_at weicht ab. `detail` = 'task'
+--          wie bei apply_event_change; Inhalte der Zeile nennt die Meldung nie.
+--   22023  p_task_id oder p_seen_updated_at fehlt.
+--
+-- security invoker, damit RLS greift (§7): Ein Abgleich über fremde Familien hinweg würde
+-- die Existenz fremder IDs verraten. Für eine Aufgabe einer fremden Familie kommt deshalb
+-- 'missing' wie für eine unbekannte ID, auch mit falschem Stand — sonst wäre EF409 ein
+-- Orakel dafür, dass es die ID gibt.
+--
+-- Reihenfolge, und warum:
+--
+-- 1. Ohne Familie → 'forbidden' (§7 Schritt 1), bevor die Aufgabe überhaupt gelesen wird.
+--    Ein Nutzer ohne Familie bekommt so für jede ID dieselbe Antwort.
+-- 2. Die Zeile mit `for update` sperren, ERST DANN vergleichen. Ohne Sperre könnte ein
+--    fremdes Update zwischen Vergleich und Löschen committen, und das Löschen träfe dessen
+--    neue Fassung, ohne dass jemand einen Konflikt sähe. Mit ihr wartet der andere
+--    Schreiber, oder dieser Aufruf wartet auf ihn und liest danach dessen Stand. Nicht
+--    sichtbar → 'missing'. Die Sperrstufe ist die, die das DELETE ohnehin braucht; eine
+--    Hochstufung mitten im Aufruf entfällt. `for update` verlangt neben der select- auch
+--    die update-Policy, beide prüfen dieselbe Familie.
+-- 3. Stand vergleichen → EF409 (§7 Schritt 3, „sichtbar, aber anders").
+-- 4. Löschen. Trifft das null Zeilen, obwohl die Zeile gesperrt und damit noch da ist, sieht
+--    das DELETE sie per RLS nicht mehr: Unter READ COMMITTED wertet jedes Statement
+--    `current_family_id()` neu aus, und der Aufrufer hat seine Familie zwischen 2 und 4
+--    verloren. Das ist 'forbidden', nicht 'deleted'.
+
+create or replace function public.delete_task(
+  p_task_id         uuid,
+  p_seen_updated_at timestamptz
+)
+returns text
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_updated_at timestamptz;
+begin
+  if p_task_id is null or p_seen_updated_at is null then
+    raise exception 'delete_task: p_task_id und p_seen_updated_at sind Pflicht' using errcode = '22023';
+  end if;
+
+  -- 1. Ohne Familie.
+  if public.current_family_id() is null then
+    return 'forbidden';
+  end if;
+
+  -- 2. Sperren. RLS gilt: Eine Aufgabe einer fremden Familie ist hier nicht da.
+  select t.updated_at into v_updated_at
+  from public.tasks t
+  where t.id = p_task_id
+  for update of t;
+  if not found then
+    return 'missing';
+  end if;
+
+  -- 3. Vergleichen.
+  if v_updated_at is distinct from p_seen_updated_at then
+    raise exception 'delete_task: Konflikt' using errcode = 'EF409', detail = 'task';
+  end if;
+
+  -- 4. Löschen, mit Trefferprüfung.
+  delete from public.tasks t where t.id = p_task_id;
+  if not found then
+    return 'forbidden';
+  end if;
+
+  return 'deleted';
+end;
+$$;
+
+comment on function public.delete_task(uuid, timestamptz) is
+  'Löscht eine Aufgabe gegen den gesehenen Stand (Spec §7): Zeile sperren, updated_at vergleichen, löschen. Rückgabe deleted | missing (nicht sichtbar: gelöscht, unbekannt oder fremde Familie) | forbidden (keine Familie, oder Zugriff während des Aufrufs verloren). Fehler: EF409 Konflikt (detail task), 22023 fehlende Eingabe. security invoker, RLS gilt.';
+
+-- ── 6. Rechte ───────────────────────────────────────────────────────────────
+
+revoke all on function public.delete_task(uuid, timestamptz) from public, anon;
+grant execute on function public.delete_task(uuid, timestamptz) to authenticated;
+
+-- ── 7. Trigger-Funktionen nicht per RPC ─────────────────────────────────────
+--
+-- `broadcast_family_change()` ist security definer und war über /rest/v1/rpc für anon und
+-- authenticated aufrufbar (Security-Advisor live, §8). Eine Trigger-Funktion braucht das
+-- Recht nicht: Postgres prüft EXECUTE nur bei CREATE TRIGGER, nicht beim Feuern. Dasselbe
+-- gilt für die beiden invoker-Trigger-Funktionen, die ebenfalls niemand direkt aufruft.
+-- supabase/tests/database/security.test.sql belegt, dass alle drei Trigger weiter feuern.
+--
+-- `create or replace` auf eine dieser Funktionen behält die Rechte. Wer eine per `drop` und
+-- `create` neu anlegt, bekommt die Default-Privileges von Supabase zurück und muss das
+-- `revoke` wiederholen; das Inventar in security.test.sql schlägt dann an.
+
+revoke execute on function public.broadcast_family_change() from public, anon, authenticated;
+revoke execute on function public.set_updated_at() from public, anon, authenticated;
+revoke execute on function public.set_reminder_family_id() from public, anon, authenticated;
