@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import type { Database } from "@/features/supabase/database.types";
 
 import { supabase } from "@/features/supabase";
@@ -53,8 +55,18 @@ export async function fetchEventsInRange(
   return data ?? [];
 }
 
-export async function fetchEventById(id: string): Promise<EventWithRelations | null> {
-  const { data, error } = await supabase
+/**
+ * Lädt einen Termin in der Form von `EVENT_SELECT`. `client` ist injizierbar,
+ * damit die Integrationstests gegen die lokale Instanz mit einem eigenen,
+ * angemeldeten Client lesen (wie bei `createEvent`); die App ruft ohne zweites
+ * Argument. Deshalb nie als nacktes `queryFn: fetchEventById` übergeben —
+ * TanStack Query reichte seinen Kontext als zweites Argument durch.
+ */
+export async function fetchEventById(
+  id: string,
+  client: SupabaseClient<Database> = supabase,
+): Promise<EventWithRelations | null> {
+  const { data, error } = await client
     .from("events")
     .select(EVENT_SELECT)
     .eq("id", id)
