@@ -1,0 +1,84 @@
+name: DB
+
+# Bewusst OHNE `paths`-Filter: Dieser Job wird ein Required Check (Ruleset
+# „main protection"). Ein Required Check mit Pfadfilter läuft auf PRs, die
+# nichts an der Datenbank ändern, gar nicht erst — GitHub wertet ihn dann als
+# „ausstehend" und blockiert genau diese PRs für immer. Unbedingt laufen lassen
+# kostet wenige Minuten.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  db:
+    name: Database (migrations · pgTAP · integration)
+    runs-on: ubuntu-latest
+    # Image-Pulls des Supabase-Stacks (~10 Container) und `supabase start`
+    # dominieren mit grob 3-6 Minuten, pgTAP und Integrationstests laufen danach
+    # in unter zwei. 20 Minuten lassen reichlich Luft, ohne einen hängenden
+    # Container-Start eine Stunde lang Runner blockieren zu lassen.
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Kein Git-Schritt folgt dem Checkout, der GITHUB_TOKEN wird also nie
+          # gebraucht — ihn trotzdem in .git/config zu hinterlassen, exponiert ihn
+          # nur gegenüber dem Fremdcode, den dieser Workflow ausführt:
+          # bun-Postinstall-Skripte und die Testläufe selbst.
+          persist-credentials: false
+
+      # Toolchain aus mise.toml (supabase CLI · bun · node), nicht aus YAML:
+      # die CLI-Version bestimmt, wie Migrationen angewendet und Tests
+      # ausgeführt werden, und soll lokal und in CI dieselbe sein. mise.toml
+      # lädt zwar `.env.local` per `[env] _.file`, mise überspringt die Datei
+      # aber still, wenn sie fehlt — in CI gibt es sie nicht (geprüft).
+      - name: Setup toolchain (mise)
+        uses: jdx/mise-action@v4
+        with:
+          # mise selbst gepinnt, siehe native-build.yml: ohne `version` fragt die
+          # Action nach „latest", und ein gemeldetes Release kann noch gar nicht
+          # existieren (2026-09-08, 404 nach 15 Sekunden).
+          version: 2026.10.14
+
+      # Versionsdrift der CLI sieht sonst wie ein Projektfehler aus (andere
+      # Migrationsreihenfolge, andere Lint-Ausgabe). Hart prüfen statt vermuten,
+      # im Stil der Pin-Checks in native-build.yml.
+      - name: Assert supabase CLI pin from mise.toml
+        run: |
+          set -e
+          version="$(supabase --version)"
+          echo "supabase --version: ${version}"
+          if [ "${version}" != "2.121.0" ]; then
+            echo "::error::Expected supabase CLI 2.121.0 (mise.toml pin), got '${version}'."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Genau die Dienste, die supabase/config.toml einschaltet — keine
+      # `-x`-Ausschlüsse. Der Broadcast-Beweis braucht den Realtime-Container,
+      # und der pgTAP-Race-Test spricht per dblink TCP mit den lokalen
+      # Standard-Zugangsdaten (postgres/postgres). Wendet alle Migrationen und
+      # seed.sql an; scheitert eine Migration, scheitert der Job hier.
+      - name: Start local Supabase
+        run: supabase start
+
+      # `--fail-on warning` ist nötig: ohne ihn meldet `db lint` Befunde nur und
+      # beendet sich immer mit 0, der Schritt könnte nie rot werden.
+      - name: Lint schema
+        run: supabase db lint --level warning --fail-on warning
+
+      # `supabase test db` (pgTAP) und danach die Integrationstests gegen den
+      # laufenden Stack; URL und Schlüssel kommen aus `supabase status -o env`,
+      # es braucht keine Secrets.
+      - name: Test database
+        run: bun run test:db
