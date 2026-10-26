@@ -1,10 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
-import { mapTaskError, MissingParentError, TaskConflictError } from "./errors";
+import { mapTaskError, MissingParentError, TaskConflictError, TaskForbiddenError } from "./errors";
 
 describe("mapTaskError", () => {
   test("MissingParentError → hw.error.notAuthenticated", () => {
     expect(mapTaskError(new MissingParentError())).toBe("hw.error.notAuthenticated");
+  });
+
+  test("TaskForbiddenError → hw.error.notAuthenticated", () => {
+    expect(mapTaskError(new TaskForbiddenError())).toBe("hw.error.notAuthenticated");
   });
 
   test("TaskConflictError → hw.error.conflict", () => {

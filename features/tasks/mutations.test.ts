@@ -4,11 +4,11 @@ import { describe, expect, mock, test } from "bun:test";
 
 import type { Database } from "@/features/supabase/database.types";
 
-import type { DeleteTaskVars, TaskOps, UpdateTaskVars } from "./mutations";
+import type { DeleteOutcome, DeleteTaskVars, TaskOps, UpdateTaskVars } from "./mutations";
 import type { TaskChanges } from "./optimistic";
 import type { TaskWithType } from "./types";
 
-import { TaskConflictError, mapTaskError } from "./errors";
+import { TaskConflictError, TaskForbiddenError, mapTaskError } from "./errors";
 
 /**
  * `mutations.ts` imports `useCurrentParent` from `@/features/auth` for
@@ -73,7 +73,7 @@ function makeOps(overrides: Partial<TaskOps> = {}): TaskOps {
   return {
     fetchRow: mock(() => Promise.resolve(null)),
     updateRow: mock(() => Promise.resolve(true)),
-    deleteRow: mock(() => Promise.resolve(true)),
+    deleteRow: mock(() => Promise.resolve<DeleteOutcome>("deleted")),
     ...overrides,
   };
 }
@@ -140,20 +140,33 @@ describe("updateTask", () => {
 const DELETE_VARS: DeleteTaskVars = { taskId: "task-1", baseVersion: BASE_VERSION };
 
 describe("deleteTask", () => {
-  test("das CAS trifft: kein Wurf und keine Nachlese", async () => {
+  test("deleted: kein Wurf und keine Nachlese", async () => {
     const ops = makeOps();
     await deleteTask(DELETE_VARS, ops);
     expect(ops.deleteRow).toHaveBeenCalledWith("task-1", BASE_VERSION);
     expect(ops.fetchRow).not.toHaveBeenCalled();
   });
 
-  test("das CAS verfehlt und die Zeile steht noch: TaskConflictError mit der fremden Fassung", async () => {
-    // Der beobachtete Zwei-Client-Lauf, jetzt automatisiert: A plant eine
-    // Loeschung, B aendert dieselbe Zeile im Undo-Fenster und speichert.
-    // Vorher lief das DELETE durch, ohne dass B ein Wort davon erfuhr.
+  test("missing: schon weg ist ein Erfolg, ohne Nachlese", async () => {
+    // Die Absicht ist erfuellt — gleich wessen DELETE die Aufgabe erwischt hat.
+    // Beim Speichern ist derselbe Fall ein Fehler, weil dort *Inhalt* verloren geht.
+    const ops = makeOps({ deleteRow: mock(() => Promise.resolve<DeleteOutcome>("missing")) });
+    await deleteTask(DELETE_VARS, ops);
+    expect(ops.fetchRow).not.toHaveBeenCalled();
+  });
+
+  test("forbidden: TaskForbiddenError statt stillem Erfolg", async () => {
+    // Der Elternteil wurde aus der Familie entfernt, waehrend der Undo-Timer lief.
+    const ops = makeOps({ deleteRow: mock(() => Promise.resolve<DeleteOutcome>("forbidden")) });
+    const error = await deleteTask(DELETE_VARS, ops).catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(TaskForbiddenError);
+    expect(ops.fetchRow).not.toHaveBeenCalled();
+  });
+
+  test("conflict und die Zeile steht noch: TaskConflictError mit der fremden Fassung", async () => {
     const theirs = makeTask({ title: "Mathe Seite 44", updated_at: THEIR_VERSION });
     const ops = makeOps({
-      deleteRow: mock(() => Promise.resolve(false)),
+      deleteRow: mock(() => Promise.resolve<DeleteOutcome>("conflict")),
       fetchRow: mock(() => Promise.resolve(theirs)),
     });
 
@@ -163,19 +176,11 @@ describe("deleteTask", () => {
     expect((error as TaskConflictError).row).toBe(theirs);
   });
 
-  test("GRENZWAECHTER: das CAS verfehlt und die Zeile ist weg: kein Wurf", async () => {
-    // Die Absicht ist erfuellt — die Aufgabe ist weg, gleich wessen DELETE sie
-    // erwischt hat. Ein Toast „Loeschen fehlgeschlagen" ueber einer Aufgabe,
-    // die nicht mehr existiert, waere schlicht falsch (Spec Decision 4).
-    // Beim Speichern ist derselbe Fall ein Fehler, weil dort *Inhalt*
-    // verlorengeht — siehe den Test darueber.
+  test("conflict, aber die Nachlese findet nichts: Erfolg (in der Zwischenzeit geloescht)", async () => {
     const ops = makeOps({
-      deleteRow: mock(() => Promise.resolve(false)),
+      deleteRow: mock(() => Promise.resolve<DeleteOutcome>("conflict")),
       fetchRow: mock(() => Promise.resolve(null)),
     });
-
-    // Kein `expect(...).resolves` — ein Wurf laesst den Test hier von selbst
-    // fehlschlagen, und das ist die Aussage.
     await deleteTask(DELETE_VARS, ops);
     expect(ops.fetchRow).toHaveBeenCalledWith("task-1");
   });
@@ -268,64 +273,60 @@ describe("createSupabaseTaskOps.updateRow", () => {
   });
 });
 
-/** Wie `fakeUpdateClient`, nur fuer die Kette `.from().delete().eq().eq().select().maybeSingle()`. */
-function fakeDeleteClient(result: { data: { id: string } | null; error: unknown }) {
-  const calls = { table: "", eqCalls: [] as [string, unknown][], selectColumns: "" };
-  const builder = {
-    eq(column: string, value: unknown) {
-      calls.eqCalls.push([column, value]);
-      return builder;
-    },
-    select(columns: string) {
-      calls.selectColumns = columns;
-      return builder;
-    },
-    maybeSingle: () => Promise.resolve(result),
-  };
+/** Doppelgaenger fuer `client.rpc(...)`. */
+function fakeRpcClient(result: { data: unknown; error: unknown }) {
+  const calls = { fn: "", args: undefined as unknown };
   const client = {
-    from(table: string) {
-      calls.table = table;
-      return { delete: () => builder };
+    rpc(fn: string, args: unknown) {
+      calls.fn = fn;
+      calls.args = args;
+      return Promise.resolve(result);
     },
   };
   return { client: client as unknown as SupabaseClient<Database>, calls };
 }
 
 describe("createSupabaseTaskOps.deleteRow", () => {
-  test("filtert auf id UND den gesehenen Stempel und liest die id zurueck", async () => {
-    const { client, calls } = fakeDeleteClient({ data: { id: "task-1" }, error: null });
+  test("ruft delete_task mit Aufgabe und gesehenem Stand", async () => {
+    const { client, calls } = fakeRpcClient({ data: "deleted", error: null });
 
-    const hit = await createSupabaseTaskOps(client).deleteRow("task-1", BASE_VERSION);
-
-    expect(hit).toBe(true);
-    expect(calls.table).toBe("tasks");
-    expect(calls.eqCalls).toEqual([
-      ["id", "task-1"],
-      ["updated_at", BASE_VERSION],
-    ]);
-    // Der Kern des 0-Zeilen-Guards: Ein DELETE ohne `.select(…)` meldet auch
-    // dann Erfolg, wenn es unter RLS oder nach einer Fremdloeschung keine
-    // einzige Zeile getroffen hat.
-    expect(calls.selectColumns).toBe("id");
+    expect(await createSupabaseTaskOps(client).deleteRow("task-1", BASE_VERSION)).toBe("deleted");
+    expect(calls.fn).toBe("delete_task");
+    expect(calls.args).toEqual({ p_task_id: "task-1", p_seen_updated_at: BASE_VERSION });
   });
 
-  test("null Zeilen ergeben false, nicht einen Wurf", async () => {
-    const { client } = fakeDeleteClient({ data: null, error: null });
-    expect(await createSupabaseTaskOps(client).deleteRow("task-1", BASE_VERSION)).toBe(false);
+  test.each(["missing", "forbidden"] as const)("reicht %s durch", async (outcome) => {
+    const { client } = fakeRpcClient({ data: outcome, error: null });
+    expect(await createSupabaseTaskOps(client).deleteRow("task-1", BASE_VERSION)).toBe(outcome);
   });
 
-  test("ein PostgREST-Fehler wird durchgereicht, nicht als Erfolg maskiert", async () => {
-    // Ohne den Wurf faellt `deleteRow` auf `false` zurueck, `deleteTask` liest
-    // nach, und kommt die Nachlese leer zurueck — RLS oder eine echte
-    // Race — meldet das Loeschen Erfolg ueber einem verschluckten Fehler.
-    // Genau die Fehlerklasse, gegen die dieser Zweig gebaut ist.
-    const pgError = { message: "connection reset", code: "08006" };
-    const { client } = fakeDeleteClient({ data: null, error: pgError });
+  test("EF409 (HTTP 400) wird an `code` erkannt und ergibt conflict", async () => {
+    const { client } = fakeRpcClient({
+      data: null,
+      error: { code: "EF409", message: "delete_task: Konflikt", details: "task" },
+    });
+    expect(await createSupabaseTaskOps(client).deleteRow("task-1", BASE_VERSION)).toBe("conflict");
+  });
+
+  test("ein anderer PostgREST-Fehler wird unveraendert geworfen", async () => {
+    const pgError = { message: "p_task_id fehlt", code: "22023" };
+    const { client } = fakeRpcClient({ data: null, error: pgError });
 
     const error = await createSupabaseTaskOps(client)
       .deleteRow("task-1", BASE_VERSION)
       .catch((err: unknown) => err);
 
     expect(error).toBe(pgError);
+  });
+
+  test("ein unbekannter Rueckgabewert wirft, statt als Erfolg durchzugehen", async () => {
+    const { client } = fakeRpcClient({ data: "archived", error: null });
+
+    const error = await createSupabaseTaskOps(client)
+      .deleteRow("task-1", BASE_VERSION)
+      .catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain("archived");
   });
 });
