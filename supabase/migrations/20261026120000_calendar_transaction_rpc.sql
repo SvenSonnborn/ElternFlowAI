@@ -105,8 +105,9 @@ grant select, insert, delete on table private.event_change_requests to authentic
 --          auch wenn der Aufrufer während des Aufrufs seine Familie verliert.
 --   EF409  Konflikt — der gesehene Stand weicht ab. `detail` = 'master' oder
 --          'exception' sagt, welcher; Inhalte der Zeile nennt die Meldung nie.
---   22023  ungültige Eingabe (Schrittformat, Whitelist, Typen, fehlender Schlüssel)
---          oder eine Kennung, die schon für einen anderen Termin verbucht ist.
+--   22023  ungültige Eingabe (fehlende Kennung oder Termin-ID, Schrittformat, Whitelist,
+--          Typen, fehlender Schlüssel, null in einem Pflichtfeld) oder eine Kennung,
+--          die schon für einen anderen Termin verbucht ist.
 --   42501  ohne angemeldeten Nutzer.
 -- Verletzt ein Schritt einen Tabellen-Constraint, kommt dessen SQLSTATE (z. B. 23514).
 --
@@ -175,8 +176,14 @@ begin
     raise exception 'apply_event_change: nicht angemeldet' using errcode = '42501';
   end if;
 
+  -- Beide gehen in die Verbuchung, deren Spalten NOT NULL sind. Ohne die Prüfung endete
+  -- ein null dort als 23502, dessen Meldung die interne Tabelle nennt.
   if p_request_id is null then
     raise exception 'apply_event_change: p_request_id fehlt' using errcode = '22023';
+  end if;
+
+  if p_event_id is null then
+    raise exception 'apply_event_change: p_event_id fehlt' using errcode = '22023';
   end if;
 
   -- 2. Verbuchen.
@@ -287,7 +294,9 @@ begin
         using errcode = '22023';
     end if;
 
-    -- `changes` und `override`: dieselben fünf Felder, Werte Text oder null.
+    -- `changes` und `override`: dieselben fünf Felder, Werte Text oder null. Jedes Feld
+    -- ist optional. Fehlt eines in `changes`, behält `update_master` den Wert der Spalte,
+    -- und `insert_split_event` nimmt ihn vom gesperrten Master (siehe Schritt 7).
     v_fields := case v_op
       when 'modify_occurrence' then v_step -> 'override'
       when 'update_master' then v_step -> 'changes'
@@ -315,6 +324,21 @@ begin
       if v_key is not null then
         raise exception 'apply_event_change: Schritt % (%): Feld "%" muss Text oder null sein', v_index, v_op, v_key
           using errcode = '22023';
+      end if;
+
+      -- `changes` landet in Spalten von `events`, und dort sind `title`, `start_at` und
+      -- `end_at` NOT NULL. Ein explizites null endete sonst erst im Schritt als 23502,
+      -- nach der Sperre. `override` betrifft das nicht: Es wird als JSON gespeichert.
+      if v_op in ('update_master', 'insert_split_event') then
+        select f.key into v_key
+        from jsonb_each(v_fields) as f(key, value)
+        where f.key in ('title', 'start_at', 'end_at')
+          and jsonb_typeof(f.value) = 'null'
+        limit 1;
+        if v_key is not null then
+          raise exception 'apply_event_change: Schritt % (%): Feld "%" darf nicht null sein', v_index, v_op, v_key
+            using errcode = '22023';
+        end if;
       end if;
     end if;
 
@@ -434,10 +458,10 @@ begin
     raise exception 'apply_event_change: Konflikt' using errcode = 'EF409', detail = 'exception';
   end if;
 
-  -- 7. Schritte (§5.3), jeder wie sein bisheriges PostgREST-Gegenstück in
-  --    `createSupabaseEventOps` (features/calendar/recurrence.ts) — mit einem
-  --    Unterschied: Ein Schreibzugriff auf den Master, der null Zeilen trifft, ist hier
-  --    ein Fehler, kein stiller Erfolg.
+  -- 7. Schritte (§5.3), jeder mit der Wirkung seines PostgREST-Aufrufs aus der Zeit vor
+  --    Block 7, als der Client die Schritte einzeln schrieb — mit einem Unterschied: Ein
+  --    Schreibzugriff auf den Master, der null Zeilen trifft, ist hier ein Fehler, kein
+  --    stiller Erfolg.
   --
   --    Die Sperre hält die Zeile fest, nicht die Berechtigung. Unter READ COMMITTED
   --    wertet RLS `current_family_id()` in jedem Statement neu aus; verliert der
@@ -456,7 +480,7 @@ begin
     case v_op
       when 'update_master' then
         -- Nur die mitgeschickten Schlüssel, wie PostgREST `.update(changes)`; ein
-        -- explizites null schreibt null.
+        -- explizites null schreibt null (bei den Pflichtfeldern hat Schritt 4 es abgelehnt).
         v_fields := v_step -> 'changes';
         v_recurrence := coalesce(nullif(v_step -> 'recurrence', 'null'::jsonb), '{}'::jsonb);
         v_byweekday := null;
@@ -562,9 +586,14 @@ begin
 
       when 'insert_split_event' then
         -- Alles außer `changes` und `rrule_count` kommt aus dem in Schritt 5 gelesenen
-        -- Master, nicht vom Client und nicht aus dem Stand nach früheren Schritten —
-        -- wie `insertSplitEvent(master, …)` heute mit dem vorab geladenen Master.
+        -- Master, nicht vom Client und nicht aus dem Stand nach früheren Schritten.
         -- UNTIL gilt nur ohne COUNT (`events_rrule_count_xor_until`).
+        --
+        -- Die fünf Felder aus `changes` gelten je Schlüssel, wie bei `update_master`:
+        -- Ein mitgeschicktes null schreibt null (nur `location` und `description`, die
+        -- Prüfung in Schritt 4 lässt es für die Pflichtfelder nicht durch), ein fehlender
+        -- Schlüssel nimmt den Wert des gesperrten Masters. Der Client schickt heute immer
+        -- alle fünf.
         v_fields := v_step -> 'changes';
         insert into public.events (
           family_id, type_id, child_id, parent_id,
@@ -574,8 +603,11 @@ begin
           created_by
         ) values (
           v_master.family_id, v_master.type_id, v_master.child_id, v_master.parent_id,
-          v_fields ->> 'title', v_fields ->> 'description', v_fields ->> 'location',
-          (v_fields ->> 'start_at')::timestamptz, (v_fields ->> 'end_at')::timestamptz,
+          case when v_fields ? 'title' then v_fields ->> 'title' else v_master.title end,
+          case when v_fields ? 'description' then v_fields ->> 'description' else v_master.description end,
+          case when v_fields ? 'location' then v_fields ->> 'location' else v_master.location end,
+          case when v_fields ? 'start_at' then (v_fields ->> 'start_at')::timestamptz else v_master.start_at end,
+          case when v_fields ? 'end_at' then (v_fields ->> 'end_at')::timestamptz else v_master.end_at end,
           v_master.all_day, v_master.timezone,
           v_master.rrule_freq, v_master.rrule_interval, v_master.rrule_byweekday,
           case when v_step ->> 'rrule_count' is null then v_master.rrule_until end,
