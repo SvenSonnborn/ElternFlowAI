@@ -12,10 +12,13 @@ type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
  * `event_exceptions` ins Leere.
  *
  * Exportiert (und damit umbenannt — `SELECT` sagt außerhalb dieser Datei
- * nichts), seit `createSupabaseEventOps.updateMaster` im Konfliktfall
- * dieselbe Zeile nachliest, die auch die Queries laden. Ein zweiter,
- * handgeführter Spaltenstring dort wäre genau die Divergenz, die
- * `EventWithRelations` unbemerkt falsch werden ließe.
+ * nichts), damit jeder, der einen Master für den Schreibpfad lädt, dieselbe
+ * Zeile bekommt wie die Queries — auch ein Test, der `updateEvent` mit eigenem
+ * Client und eigenem `fetchMaster` gegen die lokale Instanz fährt. Die
+ * Nachlese nach einem Konflikt braucht genau diese Form, weil der
+ * Konflikt-Dialog sie expandiert. Ein zweiter, handgeführter Spaltenstring
+ * wäre genau die Divergenz, die `EventWithRelations` und den Konflikt-Dialog
+ * unbemerkt falsch werden ließe.
  */
 export const EVENT_SELECT = "*, event_types(*), event_exceptions(*)";
 

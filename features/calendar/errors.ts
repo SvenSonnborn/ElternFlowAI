@@ -37,13 +37,14 @@ export class EventNotFoundError extends Error {
  * mit `expandEvents` auflösen und Feld für Feld gegen die eigene Eingabe
  * stellen kann — genau das, was der Vergleichs-Dialog zeigt (ADR-031).
  *
- * `row` ist **nicht** nullable, und das ist eine Zusicherung, kein Zufall:
- * Beide Wege hierher liefern die Zeile — der Pre-Flight in `mutations.ts` den
- * gerade geladenen Master, das Compare-and-Swap in `updateMaster` seit
- * ADR-037 eine Nachlese. Damit beweist der Compiler, was der Dialog braucht:
- * eine frische Basis-Version für „Deine Fassung speichern". Vorher konnte der
- * CAS-Fall `null` liefern, und der Wiederholungsversuch lief zwangsläufig
- * gegen dieselbe veraltete `baseVersion` — bis zum nächsten Refetch.
+ * `row` ist **nicht** nullable, und das ist eine Zusicherung, kein Zufall: Der
+ * einzige Weg hierher ist seit Block 7 ein `EF409` aus `apply_event_change`,
+ * nach dem `mutations.ts` den Master nachliest — fehlt er dabei, wird daraus
+ * `EventNotFoundError`, nicht dieser Fehler. Damit beweist der Compiler, was
+ * der Dialog braucht: eine frische Basis-Version für „Deine Fassung
+ * speichern". Bis ADR-037 konnte ein Konflikt `null` liefern, und der
+ * Wiederholungsversuch lief zwangsläufig gegen dieselbe veraltete
+ * `baseVersion` — bis zum nächsten Refetch.
  */
 export class EventConflictError extends Error {
   constructor(readonly row: EventWithRelations) {

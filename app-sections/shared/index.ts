@@ -24,6 +24,7 @@ export { Field, type FieldProps, type FieldType } from "./Field";
 export { FilterChipRow, type FilterChipOption } from "./FilterChipRow";
 export { Icon, type IconName } from "./Icon";
 export { MEAL_PLACEHOLDER_EMOJI } from "./mealPlaceholder";
+export { newRequestId } from "./newRequestId";
 export {
   MemberPicker,
   type MemberKind,

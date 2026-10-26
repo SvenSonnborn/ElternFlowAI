@@ -1,36 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 import type { Database } from "@/features/supabase/database.types";
 
-import type { EventChanges } from "./recurrence";
-
-import { createSupabaseEventOps } from "./recurrence";
-
-let inserted: { table: string; payload: Record<string, unknown> | undefined } = {
-  table: "",
-  payload: undefined,
-};
-
-const supabase = {
-  from(table: string) {
-    inserted.table = table;
-    return {
-      insert(payload: Record<string, unknown>) {
-        inserted.payload = payload;
-        return Promise.resolve({ error: null });
-      },
-    };
-  },
-};
-
-void mock.module("@/features/supabase", () => ({ supabase }));
-
-// Nach dem Modul-Mock importiert: ein statischer Import würde darüber
-// hochgezogen und `createMutation.ts` griffe den echten Client ab.
-// Gleiches Muster wie in `reminders.test.ts`.
-const { createEvent, optimisticEventRow } = await import("./createMutation");
+import { createEvent, optimisticEventRow } from "./createMutation";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
@@ -67,12 +41,14 @@ const EVENT_ROW_COLUMNS: Record<keyof EventRow, true> = {
 };
 
 /**
- * Spalten, die ein Insert bewusst dem Server überlässt:
- * `id` hat `default gen_random_uuid()`, `created_at` hat `default now()`, und
- * `updated_at` gehört seit ADR-031 dem `set_updated_at`-Trigger. Sie hier zu
- * setzen wäre falsch, nicht nur überflüssig.
+ * Spalten, die ein Insert bewusst dem Server überlässt: `created_at` hat
+ * `default now()`, und `updated_at` gehört seit ADR-031 dem
+ * `set_updated_at`-Trigger. Sie hier zu setzen wäre falsch, nicht nur
+ * überflüssig. `id` gehört seit Block 7 **nicht** mehr dazu: Die App vergibt
+ * sie selbst, damit ein Retry nach verlorener Antwort keinen zweiten Termin
+ * anlegt (Spec §6).
  */
-const SERVER_OWNED: readonly (keyof EventRow)[] = ["id", "created_at", "updated_at"];
+const SERVER_OWNED: readonly (keyof EventRow)[] = ["created_at", "updated_at"];
 
 /** Jede Spalte, die ein Schreiber selbst füllen muss. Sortiert, damit der Vergleich stabil ist. */
 function requiredInsertColumns(): string[] {
@@ -82,19 +58,21 @@ function requiredInsertColumns(): string[] {
 }
 
 /**
- * Doppelgänger des Query-Builders, den `insertSplitEvent` durchläuft
- * (`.from().insert()`). Der echte Aufruf wird direkt `await`-ed, das Fake gibt
- * deshalb eine Promise zurück, kein Builder.
+ * Doppelgänger des Query-Builders, den `createEvent` beim Anlegen durchläuft
+ * (`.from().upsert().select()`). Die Antwort trägt die Zeile, die Sichtbarkeits-
+ * prüfung für eine leere Antwort wird also nie erreicht.
  */
-function fakeInsertClient() {
+function fakeUpsertClient() {
   const calls = { table: "", payload: undefined as Record<string, unknown> | undefined };
   const client = {
     from(table: string) {
       calls.table = table;
       return {
-        insert(payload: Record<string, unknown>) {
+        upsert(payload: Record<string, unknown>) {
           calls.payload = payload;
-          return Promise.resolve({ error: null });
+          return {
+            select: () => Promise.resolve({ data: [{ id: payload.id }], error: null }),
+          };
         },
       };
     },
@@ -102,69 +80,11 @@ function fakeInsertClient() {
   return { client: client as unknown as SupabaseClient<Database>, calls };
 }
 
-function master(overrides: Partial<EventRow> = {}): EventRow {
-  return {
-    id: "evt-1",
-    family_id: "fam-1",
-    type_id: "type-1",
-    child_id: null,
-    parent_id: null,
-    title: "Papas Sportkurs",
-    description: "Turnhalle West",
-    location: "Sportplatz Nord",
-    start_at: "2026-05-04T16:30:00.000Z",
-    end_at: "2026-05-04T17:30:00.000Z",
-    all_day: false,
-    timezone: "Europe/Berlin",
-    rrule_freq: "weekly",
-    rrule_interval: 1,
-    rrule_byweekday: [1],
-    rrule_until: null,
-    rrule_count: null,
-    created_by: "par-1",
-    created_at: "2026-04-20T00:00:00.000Z",
-    updated_at: "2026-05-01T00:00:00.000Z",
-    ...overrides,
-  };
-}
-
-const CHANGES: EventChanges = {
-  title: "Neuer Titel",
-  start_at: "2026-06-15T15:00:00.000Z",
-  end_at: "2026-06-15T16:00:00.000Z",
-  location: "Sportplatz Süd",
-  description: null,
-};
-
-describe("insertSplitEvent — Spaltenvollzähligkeit", () => {
-  test("schreibt jede Spalte, die der Server nicht selbst füllt", async () => {
-    const { client, calls } = fakeInsertClient();
-
-    await createSupabaseEventOps(client).insertSplitEvent(master(), CHANGES, null);
-
-    expect(calls.table).toBe("events");
-    expect(Object.keys(calls.payload ?? {}).sort()).toEqual(requiredInsertColumns());
-  });
-
-  test("die abgespaltene Hälfte behält die Personenzuordnung des Masters", async () => {
-    // Die Vollzähligkeitsprüfung allein wäre mit einem hartkodierten
-    // `parent_id: null` zufrieden. Dieser Test hält den Wert dagegen.
-    const { client, calls } = fakeInsertClient();
-
-    await createSupabaseEventOps(client).insertSplitEvent(
-      master({ parent_id: "par-7" }),
-      CHANGES,
-      null,
-    );
-
-    expect(calls.payload?.parent_id).toBe("par-7");
-  });
-});
-
 type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
 
 function createVars(): Parameters<typeof createEvent>[0] {
   return {
+    id: "3c0f6e2a-8b1d-4f5e-9a7c-1d2e3f4a5b6c",
     familyId: "fam-1",
     typeId: "type-1",
     childId: "child-1",
@@ -195,19 +115,24 @@ function eventType(): EventTypeRow {
   };
 }
 
+// Der dritte Schreiber, die abgespaltene Hälfte eines Forward-Splits, lebt seit
+// Block 7 im Server (`insert_split_event` in `apply_event_change`): Er übernimmt
+// alle Spalten außer `changes` und `rrule_count` aus dem gesperrten Master. Dass
+// keine davon verloren geht, prüft Fall 10 in
+// supabase/tests/database/apply_event_change.test.sql.
 describe("createEvent und optimisticEventRow — dieselbe Spaltenmenge", () => {
   test("createEvent schreibt jede Spalte, die der Server nicht selbst füllt", async () => {
-    inserted = { table: "", payload: undefined };
+    const { client, calls } = fakeUpsertClient();
 
-    await createEvent(createVars());
+    await createEvent(createVars(), client);
 
-    expect(inserted.table).toBe("events");
-    expect(Object.keys(inserted.payload ?? {}).sort()).toEqual(requiredInsertColumns());
+    expect(calls.table).toBe("events");
+    expect(Object.keys(calls.payload ?? {}).sort()).toEqual(requiredInsertColumns());
   });
 
   test("optimisticEventRow deckt jede Spalte von EventRow ab", () => {
     // Die synthetische Zeile geht durch dasselbe `expandEvents` wie die echten
-    // und muss deshalb eine vollständige `EventRow` sein — inklusive der drei
+    // und muss deshalb eine vollständige `EventRow` sein — inklusive der beiden
     // servergefüllten Spalten, die `createEvent` bewusst auslässt.
     const row = optimisticEventRow(createVars(), eventType());
     const columns = Object.keys(row).filter(

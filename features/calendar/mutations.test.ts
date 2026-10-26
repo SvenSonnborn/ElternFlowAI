@@ -2,10 +2,11 @@ import { describe, expect, mock, test } from "bun:test";
 
 import type { Database } from "@/features/supabase/database.types";
 
+import type { ApplyEventChange } from "./eventChange";
 import type { EventWithRelations } from "./expand";
-import type { EventChanges, EventOps } from "./recurrence";
+import type { EventChanges } from "./recurrence";
 
-import { EventConflictError } from "./errors";
+import { EventConflictError, EventNotFoundError } from "./errors";
 import { deleteEvent, updateEvent, type DeleteEventVars, type UpdateEventVars } from "./mutations";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
@@ -17,19 +18,7 @@ const MASTER_START = new Date("2026-05-04T16:30:00.000Z");
 const MASTER_UPDATED_AT = "2026-05-01T00:00:00.000Z";
 const MASTER_VERSION = `${MASTER_UPDATED_AT}|-`;
 
-function makeOps(): EventOps {
-  return {
-    cancelOccurrence: mock(() => Promise.resolve()),
-    modifyOccurrence: mock(() => Promise.resolve()),
-    deleteMaster: mock(() => Promise.resolve()),
-    updateMaster: mock(() => Promise.resolve()),
-    setRruleUntil: mock(() => Promise.resolve()),
-    setRruleCount: mock(() => Promise.resolve()),
-    deleteExceptionsFromDate: mock(() => Promise.resolve()),
-    deleteAllExceptions: mock(() => Promise.resolve()),
-    insertSplitEvent: mock(() => Promise.resolve()),
-  };
-}
+const REQUEST_ID = "6f1c3c1e-0b7a-4a43-9d2a-7f5d0c9e1a11";
 
 function makeMaster(overrides: Partial<EventRow> = {}): EventRow {
   return {
@@ -52,13 +41,38 @@ function makeMaster(overrides: Partial<EventRow> = {}): EventRow {
     rrule_count: null,
     created_by: null,
     created_at: "2026-05-01T00:00:00.000Z",
-    updated_at: "2026-05-01T00:00:00.000Z",
+    updated_at: MASTER_UPDATED_AT,
     ...overrides,
   };
 }
 
 function makeRelations(overrides: Partial<EventRow> = {}): EventWithRelations {
   return { ...makeMaster(overrides), event_types: null, event_exceptions: null };
+}
+
+/**
+ * Ein PostgREST-Fehler, wie `createSupabaseApplyEventChange` ihn weiterwirft —
+ * ein `Error` mit SQLSTATE in `code`, wie `PostgrestError` aus supabase-js.
+ */
+function pgError(code: string, details: string | null = null) {
+  return Object.assign(new Error(`apply_event_change: ${code}`), { code, details, hint: null });
+}
+
+/** `applyChange`, der antwortet wie die RPC — oder mit dem übergebenen Fehler. */
+function makeApply(outcome: "applied" | "already_applied" | Error = "applied") {
+  return mock<ApplyEventChange>(() =>
+    typeof outcome === "string" ? Promise.resolve(outcome) : Promise.reject(outcome),
+  );
+}
+
+/** `fetchMaster`, der der Reihe nach die übergebenen Zeilen liefert. */
+function makeFetch(...rows: (EventWithRelations | null)[]) {
+  let call = 0;
+  return mock((_id: string) => {
+    const row = rows[Math.min(call, rows.length - 1)];
+    call += 1;
+    return Promise.resolve(row);
+  });
 }
 
 const CHANGES: EventChanges = {
@@ -80,100 +94,174 @@ const BASE_VARS: UpdateEventVars = {
   timezone: "Europe/Berlin",
   changes: CHANGES,
   baseVersion: MASTER_VERSION,
+  requestId: REQUEST_ID,
 };
 
 describe("updateEvent", () => {
-  test("scope=forward on recurring → uses refetched master for insertSplitEvent", async () => {
-    const master = makeRelations();
-    const fetchMaster = mock((_id: string) => Promise.resolve(master));
-    const ops = makeOps();
+  test("applyChange bekommt Kennung, Termin, Schlüssel und seen aus baseVersion", async () => {
+    const fetchMaster = makeFetch(makeRelations());
+    const applyChange = makeApply();
 
-    await updateEvent({ ...BASE_VARS, scope: "forward" }, { fetchMaster, ops });
+    await updateEvent(
+      { ...BASE_VARS, baseVersion: "2026-05-01T00:00:00.000Z|2026-05-03T08:00:00.000Z" },
+      { fetchMaster, applyChange },
+    );
 
     expect(fetchMaster).toHaveBeenCalledWith("evt-1");
-    expect(ops.setRruleUntil).toHaveBeenCalledWith("evt-1", "2026-06-14T21:59:59.999Z");
-    expect(ops.insertSplitEvent).toHaveBeenCalledWith(master, CHANGES, null);
-    expect(ops.deleteExceptionsFromDate).toHaveBeenCalledWith("evt-1", "2026-06-15");
+    expect(applyChange).toHaveBeenCalledTimes(1);
+    const args = applyChange.mock.calls[0][0];
+    expect(args.requestId).toBe(REQUEST_ID);
+    expect(args.eventId).toBe("evt-1");
+    expect(args.occurrenceKey).toBe("2026-06-15");
+    expect(args.seen).toEqual({
+      masterUpdatedAt: "2026-05-01T00:00:00.000Z",
+      exceptionUpdatedAt: "2026-05-03T08:00:00.000Z",
+    });
   });
 
-  test("scope=forward on a count-series uses the refetched count for the split", async () => {
-    const master = makeRelations({ rrule_count: 10 });
-    const fetchMaster = mock((_id: string) => Promise.resolve(master));
-    const ops = makeOps();
+  test("ohne Exception in baseVersion ist exceptionUpdatedAt null", async () => {
+    const applyChange = makeApply();
 
-    await updateEvent({ ...BASE_VARS, scope: "forward" }, { fetchMaster, ops });
+    await updateEvent(BASE_VARS, { fetchMaster: makeFetch(makeRelations()), applyChange });
 
-    expect(ops.setRruleCount).toHaveBeenCalledWith("evt-1", 6);
-    expect(ops.insertSplitEvent).toHaveBeenCalledWith(master, CHANGES, 4);
-    expect(ops.setRruleUntil).not.toHaveBeenCalled();
+    expect(applyChange.mock.calls[0][0].seen).toEqual({
+      masterUpdatedAt: MASTER_UPDATED_AT,
+      exceptionUpdatedAt: null,
+    });
   });
 
-  test("throws when fetchMaster returns null", async () => {
-    const fetchMaster = mock((_id: string) => Promise.resolve(null));
-    const ops = makeOps();
+  test("kein clientseitiger Versionsvergleich: ein neuerer Master geht trotzdem an den Server", async () => {
+    // Den Vergleich macht seit Block 7 die Funktion, in derselben Transaktion
+    // wie das Schreiben. `seen` bleibt das, was das Formular gesehen hat.
+    const fetchMaster = makeFetch(makeRelations({ updated_at: "2026-05-02T00:00:00.000Z" }));
+    const applyChange = makeApply();
+
+    await updateEvent(BASE_VARS, { fetchMaster, applyChange });
+
+    expect(applyChange.mock.calls[0][0].seen.masterUpdatedAt).toBe(MASTER_UPDATED_AT);
+  });
+
+  test("already_applied ist ein Erfolg", async () => {
+    const applyChange = makeApply("already_applied");
+    // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
+    await expect(
+      updateEvent(BASE_VARS, { fetchMaster: makeFetch(makeRelations()), applyChange }),
+    ).resolves.toBeUndefined();
+  });
+
+  test("scope=forward auf unbegrenzter Serie → Split-Schritte aus dem geladenen Master", async () => {
+    const applyChange = makeApply();
+
+    await updateEvent(
+      { ...BASE_VARS, scope: "forward" },
+      { fetchMaster: makeFetch(makeRelations()), applyChange },
+    );
+
+    expect(applyChange.mock.calls[0][0].steps).toEqual([
+      { op: "insert_split_event", changes: CHANGES, rrule_count: null },
+      { op: "set_rrule_until", until: "2026-06-14T21:59:59.999Z" },
+      { op: "delete_exceptions_from" },
+    ]);
+  });
+
+  test("scope=forward auf Zählserie nimmt die Zahl des geladenen Masters", async () => {
+    const applyChange = makeApply();
+
+    await updateEvent(
+      { ...BASE_VARS, scope: "forward" },
+      { fetchMaster: makeFetch(makeRelations({ rrule_count: 10 })), applyChange },
+    );
+
+    expect(applyChange.mock.calls[0][0].steps).toEqual([
+      { op: "insert_split_event", changes: CHANGES, rrule_count: 4 },
+      { op: "set_rrule_count", count: 6 },
+      { op: "delete_exceptions_from" },
+    ]);
+  });
+
+  test("fehlender Master → EventNotFoundError, kein applyChange", async () => {
+    const applyChange = makeApply();
 
     // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
-    await expect(updateEvent(BASE_VARS, { fetchMaster, ops })).rejects.toThrow(
-      /Event evt-1 not found/,
-    );
-    expect(ops.updateMaster).not.toHaveBeenCalled();
+    await expect(
+      updateEvent(BASE_VARS, { fetchMaster: makeFetch(null), applyChange }),
+    ).rejects.toBeInstanceOf(EventNotFoundError);
+    expect(applyChange).not.toHaveBeenCalled();
   });
 
-  test("wirft EventConflictError, wenn die Version abweicht", async () => {
-    const master = makeRelations({ updated_at: "2026-05-02T00:00:00.000Z" });
-    const fetchMaster = mock((_id: string) => Promise.resolve(master));
-    const ops = makeOps();
+  test("EF409 → EventConflictError mit der frisch geladenen Zeile", async () => {
+    const foreign = makeRelations({ title: "Fremd", updated_at: "2026-05-02T00:00:00.000Z" });
+    const fetchMaster = makeFetch(makeRelations(), foreign);
 
-    // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
-    await expect(updateEvent(BASE_VARS, { fetchMaster, ops })).rejects.toBeInstanceOf(
-      EventConflictError,
-    );
-    expect(ops.updateMaster).not.toHaveBeenCalled();
-  });
-
-  test("der Konflikt trägt die fremde Fassung mit", async () => {
-    const master = makeRelations({ updated_at: "2026-05-02T00:00:00.000Z", title: "Fremd" });
-    const fetchMaster = mock((_id: string) => Promise.resolve(master));
-
-    const error = await updateEvent(BASE_VARS, { fetchMaster, ops: makeOps() }).catch(
-      (err: unknown) => err,
-    );
+    const error = await updateEvent(BASE_VARS, {
+      fetchMaster,
+      applyChange: makeApply(pgError("EF409", "master")),
+    }).catch((err: unknown) => err);
 
     expect(error).toBeInstanceOf(EventConflictError);
-    expect((error as EventConflictError).row.title).toBe("Fremd");
+    expect((error as EventConflictError).row).toBe(foreign);
+    expect(fetchMaster).toHaveBeenCalledTimes(2);
   });
 
-  test("eine fremde Exception an DIESEM Datum ist ein Konflikt", async () => {
-    const master = makeRelations();
-    master.event_exceptions = [
-      {
-        id: "ex-1",
-        event_id: "evt-1",
-        occurrence_date: "2026-06-15",
-        action: "modified",
-        override: null,
-        created_at: "2026-05-01T00:00:00.000Z",
-        updated_at: "2026-05-03T00:00:00.000Z",
-      },
-    ];
-    const fetchMaster = mock((_id: string) => Promise.resolve(master));
-    const ops = makeOps();
+  test("EF409 und der Master ist danach weg → EventNotFoundError", async () => {
+    const fetchMaster = makeFetch(makeRelations(), null);
 
     // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
-    await expect(updateEvent(BASE_VARS, { fetchMaster, ops })).rejects.toBeInstanceOf(
-      EventConflictError,
-    );
+    await expect(
+      updateEvent(BASE_VARS, {
+        fetchMaster,
+        applyChange: makeApply(pgError("EF409", "exception")),
+      }),
+    ).rejects.toBeInstanceOf(EventNotFoundError);
   });
 
-  test("der Existenz-Check kommt vor dem Versions-Check", async () => {
-    // Ein gelöschter Termin ist „weg", nicht „geändert" — die Meldungen sind
-    // verschieden, und eine fehlende Zeile hat gar keine Version.
-    const fetchMaster = mock((_id: string) => Promise.resolve(null));
+  test("EF404 → EventNotFoundError ohne Nachlese", async () => {
+    const fetchMaster = makeFetch(makeRelations());
 
     // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
-    await expect(updateEvent(BASE_VARS, { fetchMaster, ops: makeOps() })).rejects.toThrow(
-      /Event evt-1 not found/,
-    );
+    await expect(
+      updateEvent(BASE_VARS, { fetchMaster, applyChange: makeApply(pgError("EF404")) }),
+    ).rejects.toBeInstanceOf(EventNotFoundError);
+    expect(fetchMaster).toHaveBeenCalledTimes(1);
+  });
+
+  test("42501 mitten im Aufruf (Familie verloren) → EventNotFoundError", async () => {
+    // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
+    await expect(
+      updateEvent(BASE_VARS, {
+        fetchMaster: makeFetch(makeRelations()),
+        applyChange: makeApply(pgError("42501")),
+      }),
+    ).rejects.toBeInstanceOf(EventNotFoundError);
+  });
+
+  test("andere Codes (40P01, 22023) bleiben unverändert", async () => {
+    // 40P01: Der Server hat zurückgerollt, ein Retry mit derselben Kennung ist
+    // sicher. 22023: ein Client-Fehler, `mapEventError` loggt ihn als generic.
+    for (const code of ["40P01", "22023"]) {
+      const original = pgError(code);
+      const error = await updateEvent(BASE_VARS, {
+        fetchMaster: makeFetch(makeRelations()),
+        applyChange: makeApply(original),
+      }).catch((err: unknown) => err);
+      expect(error).toBe(original);
+    }
+  });
+
+  test("ein Fehler bei der Nachlese wird durchgereicht, nicht als Konflikt maskiert", async () => {
+    const readError = new Error("Failed to fetch");
+    let call = 0;
+    const fetchMaster = mock((_id: string) => {
+      call += 1;
+      return call === 1 ? Promise.resolve(makeRelations()) : Promise.reject(readError);
+    });
+
+    const error = await updateEvent(BASE_VARS, {
+      fetchMaster,
+      applyChange: makeApply(pgError("EF409", "master")),
+    }).catch((err: unknown) => err);
+
+    expect(error).toBe(readError);
   });
 });
 
@@ -183,52 +271,78 @@ const DELETE_VARS: DeleteEventVars = {
   occurrenceKey: "2026-06-15",
   isRecurring: true,
   baseVersion: MASTER_VERSION,
+  requestId: REQUEST_ID,
 };
 
 describe("deleteEvent", () => {
-  test("scope=forward on a count-series shrinks the count instead of writing until", async () => {
-    const fetchMaster = mock((_id: string) => Promise.resolve(makeRelations({ rrule_count: 10 })));
-    const ops = makeOps();
+  test("requestId und seen gehen unverändert an applyChange", async () => {
+    const applyChange = makeApply();
 
-    await deleteEvent({ ...DELETE_VARS, scope: "forward" }, { fetchMaster, ops });
+    await deleteEvent(DELETE_VARS, { fetchMaster: makeFetch(makeRelations()), applyChange });
 
-    expect(fetchMaster).toHaveBeenCalledWith("evt-1");
-    expect(ops.setRruleCount).toHaveBeenCalledWith("evt-1", 6);
-    expect(ops.setRruleUntil).not.toHaveBeenCalled();
-    expect(ops.deleteMaster).not.toHaveBeenCalled();
+    const args = applyChange.mock.calls[0][0];
+    expect(args.requestId).toBe(REQUEST_ID);
+    expect(args.seen).toEqual({ masterUpdatedAt: MASTER_UPDATED_AT, exceptionUpdatedAt: null });
+    expect(args.steps).toEqual([{ op: "delete_master" }]);
   });
 
-  test("scope=forward on an unbounded series still writes until", async () => {
-    const fetchMaster = mock((_id: string) => Promise.resolve(makeRelations()));
-    const ops = makeOps();
+  test("scope=forward auf Zählserie kürzt die Zahl statt until zu schreiben", async () => {
+    const applyChange = makeApply();
 
-    await deleteEvent({ ...DELETE_VARS, scope: "forward" }, { fetchMaster, ops });
+    await deleteEvent(
+      { ...DELETE_VARS, scope: "forward" },
+      { fetchMaster: makeFetch(makeRelations({ rrule_count: 10 })), applyChange },
+    );
 
-    expect(ops.setRruleUntil).toHaveBeenCalledWith("evt-1", "2026-06-14T21:59:59.999Z");
-    expect(ops.setRruleCount).not.toHaveBeenCalled();
+    expect(applyChange.mock.calls[0][0].steps).toEqual([
+      { op: "set_rrule_count", count: 6 },
+      { op: "delete_exceptions_from" },
+    ]);
   });
 
-  test("throws when fetchMaster returns null", async () => {
-    const fetchMaster = mock((_id: string) => Promise.resolve(null));
-    const ops = makeOps();
+  test("scope=forward auf unbegrenzter Serie schreibt weiter until", async () => {
+    const applyChange = makeApply();
+
+    await deleteEvent(
+      { ...DELETE_VARS, scope: "forward" },
+      { fetchMaster: makeFetch(makeRelations()), applyChange },
+    );
+
+    expect(applyChange.mock.calls[0][0].steps).toEqual([
+      { op: "set_rrule_until", until: "2026-06-14T21:59:59.999Z" },
+      { op: "delete_exceptions_from" },
+    ]);
+  });
+
+  test("fehlender Master → EventNotFoundError, kein applyChange", async () => {
+    const applyChange = makeApply();
 
     // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
-    await expect(deleteEvent(DELETE_VARS, { fetchMaster, ops })).rejects.toThrow(
-      /Event evt-1 not found/,
-    );
-    expect(ops.deleteMaster).not.toHaveBeenCalled();
+    await expect(
+      deleteEvent(DELETE_VARS, { fetchMaster: makeFetch(null), applyChange }),
+    ).rejects.toBeInstanceOf(EventNotFoundError);
+    expect(applyChange).not.toHaveBeenCalled();
   });
 
-  test("wirft EventConflictError, wenn die Version abweicht", async () => {
-    const fetchMaster = mock((_id: string) =>
-      Promise.resolve(makeRelations({ updated_at: "2026-05-02T00:00:00.000Z" })),
-    );
-    const ops = makeOps();
+  test("EF409 → EventConflictError mit der frisch geladenen Zeile", async () => {
+    const foreign = makeRelations({ updated_at: "2026-05-02T00:00:00.000Z" });
 
+    const error = await deleteEvent(DELETE_VARS, {
+      fetchMaster: makeFetch(makeRelations(), foreign),
+      applyChange: makeApply(pgError("EF409", "master")),
+    }).catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(EventConflictError);
+    expect((error as EventConflictError).row).toBe(foreign);
+  });
+
+  test("EF404 → EventNotFoundError", async () => {
     // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
-    await expect(deleteEvent(DELETE_VARS, { fetchMaster, ops })).rejects.toBeInstanceOf(
-      EventConflictError,
-    );
-    expect(ops.deleteMaster).not.toHaveBeenCalled();
+    await expect(
+      deleteEvent(DELETE_VARS, {
+        fetchMaster: makeFetch(makeRelations()),
+        applyChange: makeApply(pgError("EF404")),
+      }),
+    ).rejects.toBeInstanceOf(EventNotFoundError);
   });
 });

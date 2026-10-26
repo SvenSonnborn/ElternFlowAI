@@ -10,6 +10,7 @@ import {
   DateTimePickerSheet,
   Field,
   MAX_CONFLICT_AUTO_RETRIES,
+  newRequestId,
   useConflict,
   useToast,
 } from "@/app-sections/shared";
@@ -573,6 +574,12 @@ export function EventEditScreen() {
       },
       recurrence: recurrenceChanges,
       baseVersion,
+      // Eine Kennung für diese Absicht. „Erneut versuchen", das stille
+      // Nachspeichern und „Deine Fassung speichern" schicken `{ ...vars }` und
+      // tragen sie unverändert weiter: Nach einem Konflikt hat der Server nichts
+      // verbucht, und eine Antwort, die verloren ging, quittiert er beim
+      // zweiten Senden mit `already_applied` statt doppelt zu schreiben.
+      requestId: newRequestId(),
     };
     // Sofort schließen: Die Änderung steht dank `onMutate` schon im Kalender.
     goBackOrToKalender();

@@ -5,18 +5,22 @@ import { supabase } from "@/features/supabase";
 import type { EventWithRelations } from "./expand";
 
 import { EventConflictError, EventNotFoundError } from "./errors";
+import {
+  createRecordingEventOps,
+  createSupabaseApplyEventChange,
+  type ApplyEventChange,
+  type EventChangeStep,
+} from "./eventChange";
 import { canApplyOptimistically, useOptimisticEventsStore } from "./optimisticEvents";
 import { calendarKeys, fetchEventById } from "./queries";
 import {
   applyDeleteScope,
   applyEditScope,
-  createSupabaseEventOps,
   type EditScope,
   type EventChanges,
-  type EventOps,
   type RecurrenceChanges,
 } from "./recurrence";
-import { occurrenceVersion } from "./version";
+import { parseOccurrenceVersion } from "./version";
 
 export {
   useCreateEvent,
@@ -36,9 +40,21 @@ export interface DeleteEventVars {
   isRecurring: boolean;
   /**
    * Der Stand, den der Screen beim Laden gesehen hat (`CalendarOccurrence.version`).
-   * Weicht er beim Schreiben ab, hat jemand anderes dazwischen geschrieben.
+   * Weicht er beim Schreiben ab, hat jemand anderes dazwischen geschrieben —
+   * das prüft `apply_event_change` in derselben Transaktion wie das Schreiben.
    */
   baseVersion: string;
+  /**
+   * Die Kennung dieser Nutzer-Absicht, eine zufällige UUID (Spec §6). Erzeugt
+   * wird sie dort, wo die `vars` entstehen (`newRequestId` in
+   * `app-sections/shared`), nicht hier: Nur der Aufrufer weiß, ob ein Senden
+   * eine neue Absicht ist oder dieselbe noch einmal. Dieselbe Absicht erneut zu
+   * senden — „Erneut versuchen", das stille Nachspeichern nach einem Konflikt —
+   * trägt dieselbe Kennung; der Server meldet dann `already_applied`, statt ein
+   * zweites Mal zu schreiben. Nach einem Konflikt ist nichts verbucht, die
+   * Kennung darf also mit neuer `baseVersion` wiederkommen.
+   */
+  requestId: string;
 }
 
 export interface UpdateEventVars extends DeleteEventVars {
@@ -54,28 +70,40 @@ export interface UpdateEventVars extends DeleteEventVars {
   timezone: string;
 }
 
+/**
+ * Was `updateEvent`/`deleteEvent` von außen brauchen. `fetchMaster` lädt die
+ * Zeile in der Form von `EVENT_SELECT` — dieselbe, die der Konflikt-Dialog aus
+ * `EventConflictError.row` expandiert. `applyChange` ist im Betrieb
+ * `createSupabaseApplyEventChange(supabase)`; die Tests setzen ihre eigenen ein.
+ */
 export interface UpdateEventDeps {
   fetchMaster: (eventId: string) => Promise<EventWithRelations | null>;
-  ops: EventOps;
+  applyChange: ApplyEventChange;
 }
 
 /**
- * Lädt den Master, prüft ihn gegen `vars.baseVersion` und delegiert dann an
- * `applyEditScope`. Der Existenz-Check steht bewusst vor dem Versions-Check:
- * „weg" und „geändert" sind verschiedene Meldungen, und eine fehlende Zeile
- * hat keine Version, gegen die verglichen werden könnte. Der Fetch war für
- * `applyEditScope` ohnehin nötig, der Vergleich kostet also nichts zusätzlich
- * — und deckt alle Scopes ab, auch den mehrstufigen Forward-Split, der
- * `updateMaster` (und damit dessen eigenes Compare-and-Swap) gar nicht ruft.
+ * Lädt den Master, zeichnet die Schritte des Scopes auf und schickt sie in
+ * einem Aufruf an `apply_event_change` (Spec §5.4).
+ *
+ * Der Fetch bleibt, weil die Schritte aus dem Master berechnet werden (Anker,
+ * verbrauchte Vorkommen, Zone). Den Versionsvergleich macht dagegen der Server,
+ * gegen `vars.baseVersion` — also gegen das, was das Formular gesehen hat. Weil
+ * `updated_at` nie zurückläuft, prüft das zugleich, dass die Schritte aus einem
+ * unveränderten Master stammen: Hat sich der Master zwischen Formular und
+ * Fetch geändert, weicht er auch von `baseVersion` ab.
+ *
+ * Ein fehlender Master endet ohne RPC als `EventNotFoundError` — es gäbe
+ * nichts, woraus sich Schritte berechnen ließen.
  */
 export async function updateEvent(vars: UpdateEventVars, deps: UpdateEventDeps): Promise<void> {
   const master = await deps.fetchMaster(vars.eventId);
   if (!master) {
     throw new EventNotFoundError(vars.eventId);
   }
-  if (occurrenceVersion(master, vars.occurrenceKey) !== vars.baseVersion) {
-    throw new EventConflictError(master);
-  }
+  const { ops, steps } = createRecordingEventOps({
+    eventId: vars.eventId,
+    occurrenceKey: vars.occurrenceKey,
+  });
   await applyEditScope({
     scope: vars.scope,
     eventId: vars.eventId,
@@ -84,38 +112,95 @@ export async function updateEvent(vars: UpdateEventVars, deps: UpdateEventDeps):
     master,
     changes: vars.changes,
     recurrence: vars.recurrence,
-    ops: deps.ops,
+    ops,
   });
+  await applySteps(vars, steps, deps);
 }
 
-/**
- * Derselbe Pre-Flight wie `updateEvent` — siehe dort für die Begründung der
- * Reihenfolge und warum der Fetch/Vergleich nichts zusätzlich kostet.
- */
+/** Derselbe Ablauf wie `updateEvent`, mit `applyDeleteScope` — siehe dort. */
 export async function deleteEvent(vars: DeleteEventVars, deps: UpdateEventDeps): Promise<void> {
   const master = await deps.fetchMaster(vars.eventId);
   if (!master) {
     throw new EventNotFoundError(vars.eventId);
   }
-  if (occurrenceVersion(master, vars.occurrenceKey) !== vars.baseVersion) {
-    throw new EventConflictError(master);
-  }
+  const { ops, steps } = createRecordingEventOps({
+    eventId: vars.eventId,
+    occurrenceKey: vars.occurrenceKey,
+  });
   await applyDeleteScope({
     scope: vars.scope,
     eventId: vars.eventId,
     occurrenceKey: vars.occurrenceKey,
     isRecurring: vars.isRecurring,
     master,
-    ops: deps.ops,
+    ops,
   });
+  await applySteps(vars, steps, deps);
+}
+
+/** Ein Fehler mit SQLSTATE, wie PostgREST ihn liefert. */
+function sqlState(err: unknown): string | null {
+  if (typeof err !== "object" || err === null || !("code" in err)) return null;
+  return typeof err.code === "string" ? err.code : null;
+}
+
+/**
+ * Schickt die Schritte und bildet die Fehler der Funktion auf die bestehenden
+ * Klassen ab — auf `code`, nie auf den HTTP-Status: PostgREST liefert `EF409`,
+ * `EF404` und `22023` gleichermaßen als 400.
+ *
+ * - `EF409`: Der gesehene Stand weicht ab. Nachgelesen wird, weil der
+ *   Konflikt-Dialog die fremde Fassung braucht und „Deine Fassung speichern"
+ *   eine frische Basis-Version. Ist der Master inzwischen weg, ist das „nicht
+ *   gefunden", nicht „geändert". Ein Fehler der Nachlese geht unverändert
+ *   weiter, statt als Konflikt verkleidet zu werden.
+ * - `EF404`: Termin gelöscht oder per RLS unsichtbar.
+ * - `42501` mitten im Aufruf: Der Aufrufer hat seine Familie verloren, ein
+ *   Insert-Schritt scheitert an RLS. Für ihn ist der Termin damit genauso
+ *   unerreichbar wie bei `EF404`; geschrieben wurde nichts. Derselbe Code
+ *   kommt, wenn die Sitzung zwischen Fetch und Aufruf abläuft — ein Fetch
+ *   ohne Sitzung hätte den Termin per RLS ebenfalls nicht gefunden, die
+ *   Meldung ist also dieselbe wie ein paar Millisekunden früher.
+ * - Alles andere (`40P01` nach einem Deadlock, `22023` als Client-Fehler, ein
+ *   Netzwerkfehler) bleibt unverändert und landet in `mapEventError`. Nach
+ *   `40P01` hat der Server zurückgerollt, ein Retry mit derselben Kennung ist
+ *   also sicher.
+ */
+async function applySteps(
+  vars: DeleteEventVars,
+  steps: EventChangeStep[],
+  deps: UpdateEventDeps,
+): Promise<void> {
+  try {
+    await deps.applyChange({
+      requestId: vars.requestId,
+      eventId: vars.eventId,
+      occurrenceKey: vars.occurrenceKey,
+      seen: parseOccurrenceVersion(vars.baseVersion),
+      steps,
+    });
+  } catch (err) {
+    const code = sqlState(err);
+    if (code === "EF409") {
+      const current = await deps.fetchMaster(vars.eventId);
+      if (!current) throw new EventNotFoundError(vars.eventId);
+      throw new EventConflictError(current);
+    }
+    if (code === "EF404" || code === "42501") {
+      throw new EventNotFoundError(vars.eventId);
+    }
+    throw err;
+  }
 }
 
 export function useDeleteEvent() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (vars: DeleteEventVars) => {
-      const ops = createSupabaseEventOps(supabase);
-      await deleteEvent(vars, { fetchMaster: fetchEventById, ops });
+      await deleteEvent(vars, {
+        fetchMaster: fetchEventById,
+        applyChange: createSupabaseApplyEventChange(supabase),
+      });
     },
     onSuccess: () => {
       // Zurückgegeben statt `void`: der Pending-Delete-Store gibt das Item erst
@@ -155,8 +240,10 @@ export function useUpdateEvent() {
 
   return useMutation({
     mutationFn: async (vars: UpdateEventVars) => {
-      const ops = createSupabaseEventOps(supabase);
-      await updateEvent(vars, { fetchMaster: fetchEventById, ops });
+      await updateEvent(vars, {
+        fetchMaster: fetchEventById,
+        applyChange: createSupabaseApplyEventChange(supabase),
+      });
     },
     onMutate: (vars) => {
       // Lieber gar nichts zeigen als die Nicht-Änderung dessen, was der Nutzer
