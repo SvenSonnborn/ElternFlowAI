@@ -1,6 +1,6 @@
 name: DB
 
-# Bewusst OHNE `paths`-Filter: Dieser Job wird ein Required Check (Ruleset
+# Bewusst OHNE `paths`-Filter: Dieser Job ist ein Required Check (Ruleset
 # „main protection"). Ein Required Check mit Pfadfilter läuft auf PRs, die
 # nichts an der Datenbank ändern, gar nicht erst — GitHub wertet ihn dann als
 # „ausstehend" und blockiert genau diese PRs für immer. Unbedingt laufen lassen
