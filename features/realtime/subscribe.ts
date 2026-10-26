@@ -35,8 +35,8 @@ export interface SubscribeToFamilyChangesArgs {
  * Baut den privaten Familien-Kanal auf und gibt seine Abmeldung zurück.
  *
  * React-frei: Der Client kommt als Parameter, damit ein Test ihn ohne
- * `mock.module` ersetzen kann — dieselbe Form wie `createSupabaseEventOps` in
- * features/calendar/recurrence.ts, und die einzige, in der das Modul hier
+ * `mock.module` ersetzen kann — dieselbe Form wie `createSupabaseApplyEventChange`
+ * in features/calendar/eventChange.ts, und die einzige, in der das Modul hier
  * prüfbar ist (es gibt im Repo keinen Pfad, auf dem RN-Komponenten unter
  * `bun test` rendern).
  *

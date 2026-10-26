@@ -43,13 +43,19 @@ const mockSupabaseStub = () => ({
 jest.mock("@/features/supabase", () => mockSupabaseStub());
 jest.mock("@/features/supabase/client", () => mockSupabaseStub());
 
-// `jest-expo` ersetzt das native Modul hinter `expo-crypto` durch Stubs, und
-// `randomUUID()` liefert dann still `undefined` — `newRequestId()` gäbe jedem
-// Screen eine leere Kennung, ohne dass ein Test es merkt. Node's `randomUUID`
-// ist ebenfalls eine UUID v4 aus einem CSPRNG, also dasselbe Verhalten.
+// `jest-expo` ersetzt das native Modul hinter `expo-crypto` durch Stubs:
+// `randomUUID()` liefert still `undefined`, und `getRandomValues()` füllt
+// nichts. `newRequestId()` wiche dann auf seinen Ausweichweg aus und gäbe jedem
+// Screen dieselbe Kennung aus lauter Nullen, ohne dass ein Test es merkt.
+// Node's `randomUUID` und `getRandomValues` sind ebenfalls CSPRNG-gestützt, also
+// dasselbe Verhalten auf beiden Wegen.
 jest.mock("expo-crypto", () => ({
   ...jest.requireActual<object>("expo-crypto"),
   randomUUID: () => jest.requireActual<{ randomUUID: () => string }>("node:crypto").randomUUID(),
+  getRandomValues: (array: Uint8Array) =>
+    jest
+      .requireActual<{ getRandomValues: (array: Uint8Array) => Uint8Array }>("node:crypto")
+      .getRandomValues(array),
 }));
 
 // React Query bündelt Benachrichtigungen per Timer; das landet außerhalb von
