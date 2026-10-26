@@ -33,17 +33,29 @@ grant usage on schema private to authenticated;
 -- fremder Nutzer, der eine Kennung kennt, sie vorab belegen — der Aufruf ihres
 -- Besitzers träfe dann auf die unsichtbare Zeile und meldete `already_applied`, ohne
 -- je etwas geschrieben zu haben.
+--
+-- `event_id` bindet die Kennung an den Termin, für den sie verbucht wurde. Ein Retry
+-- trägt dieselben `vars`, also denselben Termin; kommt dieselbe Kennung mit einem
+-- anderen Termin, ist das ein Fehler im Client, und ihn mit `already_applied` zu
+-- quittieren hieße, eine nie ausgeführte Änderung als erledigt zu melden. Bewusst KEIN
+-- Fremdschlüssel auf `events`: Nach `delete_master` muss die Verbuchung stehen bleiben,
+-- damit der Retry des Löschens `already_applied` bekommt und nicht „nicht gefunden".
+--
+-- `user_id` hängt dagegen per Fremdschlüssel am Account: Wird er gelöscht, gehen seine
+-- Verbuchungen mit. Die RI-Prüfung beim Einfügen läuft mit den Rechten des Besitzers von
+-- `auth.users`, `authenticated` braucht darauf also kein Recht.
 
 create table if not exists private.event_change_requests (
-  user_id     uuid        not null default auth.uid(),
+  user_id     uuid        not null default auth.uid() references auth.users(id) on delete cascade,
   request_id  uuid        not null,
+  event_id    uuid        not null,
   created_at  timestamptz not null default now(),
 
   primary key (user_id, request_id)
 );
 
 comment on table private.event_change_requests is
-  'Verbuchte Kennungen von apply_event_change (Idempotenz, Spec §6). Nur erfolgreiche Durchläufe bleiben stehen; ein Fehler rollt die Verbuchung mit zurück. Einträge älter als 30 Tage räumt apply_event_change beim nächsten Aufruf desselben Nutzers weg.';
+  'Verbuchte Kennungen von apply_event_change (Idempotenz, Spec §6), je Nutzer und an den Termin gebunden, für den sie verbucht wurden. Nur erfolgreiche Durchläufe bleiben stehen; ein Fehler rollt die Verbuchung mit zurück. Einträge älter als 30 Tage räumt apply_event_change beim nächsten Aufruf desselben Nutzers weg.';
 
 -- Für das Aufräumen: alle eigenen Einträge älter als 30 Tage.
 create index if not exists event_change_requests_user_created_idx
@@ -84,10 +96,12 @@ grant select, insert, delete on table private.event_change_requests to authentic
 --
 -- Rückgabe: 'applied' | 'already_applied'. Fehler (SQLSTATE, PostgREST reicht ihn als
 -- `code` durch, der Client bildet darauf ab):
---   EF404  Termin nicht gefunden — gelöscht oder per RLS unsichtbar (fremde Familie).
+--   EF404  Termin nicht gefunden — gelöscht oder per RLS unsichtbar (fremde Familie),
+--          auch wenn der Aufrufer während des Aufrufs seine Familie verliert.
 --   EF409  Konflikt — der gesehene Stand weicht ab. `detail` = 'master' oder
 --          'exception' sagt, welcher; Inhalte der Zeile nennt die Meldung nie.
---   22023  ungültige Eingabe (Schrittformat, Whitelist, Typen, fehlender Schlüssel).
+--   22023  ungültige Eingabe (Schrittformat, Whitelist, Typen, fehlender Schlüssel)
+--          oder eine Kennung, die schon für einen anderen Termin verbucht ist.
 --   42501  ohne angemeldeten Nutzer.
 -- Verletzt ein Schritt einen Tabellen-Constraint, kommt dessen SQLSTATE (z. B. 23514).
 --
@@ -98,9 +112,11 @@ grant select, insert, delete on table private.event_change_requests to authentic
 --    Aufruf mit derselben Kennung wartet so am Primärschlüssel auf den ersten: Committet
 --    der, meldet er 'already_applied'; rollt der zurück, läuft er normal weiter. Stünde
 --    die Verbuchung am Ende, meldete der zweite einen Konflikt gegen die eigene,
---    erfolgreiche Änderung. Eine schon verbuchte Kennung kehrt ohne jede weitere
---    Prüfung zurück — auch wenn der Termin inzwischen gelöscht ist: Der Retry eines
---    Löschens, dessen Antwort verloren ging, ist ein Erfolg, kein „nicht gefunden".
+--    erfolgreiche Änderung. Eine schon verbuchte Kennung kehrt mit genau einer Prüfung
+--    zurück, enger als §5.2 („ohne weitere Prüfung"): Sie muss für denselben Termin
+--    verbucht sein, sonst 22023. Versionen und Schritte werden nicht verglichen, und der
+--    Termin darf inzwischen gelöscht sein: Der Retry eines Löschens, dessen Antwort
+--    verloren ging, ist ein Erfolg, kein „nicht gefunden".
 -- 3. Eigene Verbuchungen älter als 30 Tage aufräumen, bei jedem Aufruf (§6), auch beim
 --    'already_applied'. Die eigene Kennung ist davon ausgenommen, sonst löschte ein
 --    Retry nach Ablauf genau die Zeile, die ihn gerade abgefangen hat.
@@ -108,7 +124,9 @@ grant select, insert, delete on table private.event_change_requests to authentic
 -- 5. Master sperren (`for update`), dann die Exception an `p_occurrence_key` — immer in
 --    dieser Reihenfolge, damit sich zwei Aufrufe nicht gegenseitig blockieren.
 -- 6. Gesehenen Stand vergleichen.
--- 7. Schritte der Reihe nach ausführen.
+-- 7. Schritte der Reihe nach ausführen. Jeder Schreibzugriff auf den Master muss genau
+--    seine Zeile treffen, und am Ende muss der Aufrufer noch zur Familie des Termins
+--    gehören (siehe dort) — sonst EF404.
 --
 -- Jeder Fehler ab Schritt 2 rollt den ganzen Aufruf zurück, die Verbuchung
 -- eingeschlossen: Nach einem 22023, EF404 oder EF409 steht nichts in der Tabelle, und
@@ -131,6 +149,7 @@ as $$
 declare
   v_uid                   uuid := (select auth.uid());
   v_booked                integer;
+  v_booked_event_id       uuid;
   v_master                public.events%rowtype;
   v_exception_id          uuid;
   v_exception_updated_at  timestamptz;
@@ -156,8 +175,8 @@ begin
   end if;
 
   -- 2. Verbuchen.
-  insert into private.event_change_requests (user_id, request_id)
-  values (v_uid, p_request_id)
+  insert into private.event_change_requests (user_id, request_id, event_id)
+  values (v_uid, p_request_id, p_event_id)
   on conflict (user_id, request_id) do nothing;
   get diagnostics v_booked = row_count;
 
@@ -168,6 +187,17 @@ begin
     and r.request_id <> p_request_id;
 
   if v_booked = 0 then
+    -- Schon verbucht. Nur derselbe Termin gilt als Wiederholung. Fehlt die Zeile hier
+    -- (ein gleichzeitiger Aufruf desselben Nutzers hat sie nach 30 Tagen weggeräumt),
+    -- gilt die Grenze aus §6, und der Aufruf bleibt ein 'already_applied'.
+    select r.event_id into v_booked_event_id
+    from private.event_change_requests r
+    where r.user_id = v_uid
+      and r.request_id = p_request_id;
+    if found and v_booked_event_id is distinct from p_event_id then
+      raise exception 'apply_event_change: Kennung ist schon für einen anderen Termin verbucht'
+        using errcode = '22023';
+    end if;
     return 'already_applied';
   end if;
 
@@ -365,6 +395,14 @@ begin
   -- 5. Sperren, Master vor Exception (§5.2 Schritte 3–4). RLS gilt: Ein Termin einer
   --    fremden Familie ist für diese Abfrage nicht da, und die Meldung unterscheidet
   --    „gibt es nicht" nicht von „darfst du nicht sehen".
+  --
+  --    Bewusst `for update`, nicht `for no key update`, aus zwei Gründen:
+  --    - Es blockiert die Fremdschlüsselprüfung (`for key share`), die jeder neue
+  --      Exception-Insert auf diesen Termin braucht. Ein Schreiber ohne RPC kann so
+  --      während des Aufrufs keine Exception unterschieben.
+  --    - `delete_master` braucht diese Sperrstufe ohnehin. Sie gleich zu nehmen erspart
+  --      eine Hochstufung mitten im Aufruf, die mit wartenden `key share`-Sperren in
+  --      einen Deadlock laufen könnte.
   select e.* into v_master
   from public.events e
   where e.id = p_event_id
@@ -392,13 +430,25 @@ begin
   end if;
 
   -- 7. Schritte (§5.3), jeder wie sein bisheriges PostgREST-Gegenstück in
-  --    `createSupabaseEventOps` (features/calendar/recurrence.ts).
-  for v_step in
-    select s.step
+  --    `createSupabaseEventOps` (features/calendar/recurrence.ts) — mit einem
+  --    Unterschied: Ein Schreibzugriff auf den Master, der null Zeilen trifft, ist hier
+  --    ein Fehler, kein stiller Erfolg.
+  --
+  --    Die Sperre hält die Zeile fest, nicht die Berechtigung. Unter READ COMMITTED
+  --    wertet RLS `current_family_id()` in jedem Statement neu aus; verliert der
+  --    Aufrufer zwischen zwei Schritten seine Familie (die Policy „parents: delete
+  --    self", ein zweites Gerät), sieht der nächste Schritt den Master nicht mehr. Ohne
+  --    die Prüfung wäre das 'applied' mit halb ausgeführten Schritten und stehender
+  --    Verbuchung — genau Lücke 2. Mit ihr rollt EF404 alles zurück. Die
+  --    Einfüge-Schritte (Exception-Upsert, Split) brauchen keine eigene Prüfung: Einen
+  --    Insert ohne Familie lehnt RLS mit 42501 ab, statt ihn still zu verwerfen.
+  for v_step, v_index in
+    select s.step, s.idx
     from jsonb_array_elements(p_steps) with ordinality as s(step, idx)
     order by s.idx
   loop
-    case v_step ->> 'op'
+    v_op := v_step ->> 'op';
+    case v_op
       when 'update_master' then
         -- Nur die mitgeschickten Schlüssel, wie PostgREST `.update(changes)`; ein
         -- explizites null schreibt null.
@@ -431,26 +481,38 @@ begin
           rrule_until     = case when v_recurrence ? 'rrule_until'
                               then (v_recurrence ->> 'rrule_until')::timestamptz else e.rrule_until end
         where e.id = p_event_id;
+        if not found then
+          raise exception 'apply_event_change: Schritt % (%) trifft den Termin nicht mehr', v_index, v_op
+            using errcode = 'EF404';
+        end if;
 
       when 'modify_occurrence', 'cancel_occurrence' then
         -- Upsert wie PostgREST `upsert(…, { onConflict: "event_id,occurrence_date" })`,
         -- mit einer Bedingung: Überschrieben wird nur die Zeile, die Schritt 5 gesperrt
-        -- hat (bzw. die dieser Aufruf selbst geschrieben hat). Legt ein anderer
-        -- Schreiber, der den Master nicht sperrt (der Direktzugriff des Codes auf
-        -- `main`), nach der Prüfung eine Exception an diesem Schlüssel an, wartet der
-        -- Insert auf ihn und findet danach eine fremde Zeile: Konflikt statt stillem
-        -- Überschreiben.
+        -- hat (bzw. die dieser Aufruf selbst geschrieben hat). Jede andere Zeile an
+        -- diesem Schlüssel ist ein Konflikt statt stillem Überschreiben.
+        --
+        -- Wie kommt eine solche Zeile zustande? Ein frischer INSERT aus einer anderen
+        -- Sitzung schafft es nicht: Seine Fremdschlüsselprüfung braucht `for key share`
+        -- auf den Master, und die `for update`-Sperre aus Schritt 5 hält ihn auf. Er
+        -- wartet bis zum Commit, oder er steht mit seinem Indexeintrag schon an diesem
+        -- Schlüssel, dann warten beide aufeinander und Postgres bricht einen der beiden
+        -- mit 40P01 ab. Halb geschrieben bleibt in keinem Fall etwas. Die Bedingung
+        -- greift dort, wo keine Fremdschlüsselprüfung anfällt:
+        -- - eine bestehende Exception dieses Termins, die ein anderer Schreiber per
+        --   UPDATE von `occurrence_date` auf diesen Schlüssel schiebt;
+        -- - Zeilen aus derselben Transaktion (Trigger, frühere Schritte).
         insert into public.event_exceptions as x (event_id, occurrence_date, action, override)
         values (
           p_event_id,
           p_occurrence_key,
-          case v_step ->> 'op'
+          case v_op
             when 'modify_occurrence' then 'modified'::public.event_exception_action_enum
             else 'cancelled'::public.event_exception_action_enum
           end,
           -- Verbatim, nur Schlüssel aus der Whitelist: `"location": null` bleibt als
           -- Schlüssel stehen, wie es `modifyOccurrence` heute schreibt.
-          case when v_step ->> 'op' = 'modify_occurrence' then v_step -> 'override' end
+          case when v_op = 'modify_occurrence' then v_step -> 'override' end
         )
         on conflict (event_id, occurrence_date) do update
           set action = excluded.action,
@@ -464,6 +526,10 @@ begin
       when 'delete_master' then
         -- Die Exceptions gehen per `on delete cascade` mit.
         delete from public.events e where e.id = p_event_id;
+        if not found then
+          raise exception 'apply_event_change: Schritt % (%) trifft den Termin nicht mehr', v_index, v_op
+            using errcode = 'EF404';
+        end if;
 
       when 'delete_all_exceptions' then
         delete from public.event_exceptions x where x.event_id = p_event_id;
@@ -477,9 +543,17 @@ begin
 
       when 'set_rrule_until' then
         update public.events e set rrule_until = (v_step ->> 'until')::timestamptz where e.id = p_event_id;
+        if not found then
+          raise exception 'apply_event_change: Schritt % (%) trifft den Termin nicht mehr', v_index, v_op
+            using errcode = 'EF404';
+        end if;
 
       when 'set_rrule_count' then
         update public.events e set rrule_count = (v_step ->> 'count')::integer where e.id = p_event_id;
+        if not found then
+          raise exception 'apply_event_change: Schritt % (%) trifft den Termin nicht mehr', v_index, v_op
+            using errcode = 'EF404';
+        end if;
 
       when 'insert_split_event' then
         -- Alles außer `changes` und `rrule_count` kommt aus dem in Schritt 5 gelesenen
@@ -506,12 +580,20 @@ begin
     end case;
   end loop;
 
+  -- Löschschritte an den Exceptions dürfen legitim null Zeilen treffen und taugen
+  -- deshalb nicht als Trefferprüfung. Ob der Aufrufer nach dem letzten Schritt noch
+  -- zur Familie des Termins gehört, deckt sie ab: Wer sie verloren hat, hat seine
+  -- letzten Schritte ins Leere geschrieben.
+  if public.current_family_id() is distinct from v_master.family_id then
+    raise exception 'apply_event_change: nicht mehr in der Familie des Termins' using errcode = 'EF404';
+  end if;
+
   return 'applied';
 end;
 $$;
 
 comment on function public.apply_event_change(uuid, uuid, date, timestamptz, timestamptz, jsonb) is
-  'Führt die Schritte einer Kalender-Änderung (Spec §5.3) in einer Transaktion aus: Kennung verbuchen, Master und Exception an p_occurrence_key sperren, gesehenen Stand prüfen, Schritte ausführen. Rückgabe applied | already_applied. Fehler: EF404 nicht gefunden, EF409 Konflikt (detail master | exception), 22023 ungültige Eingabe. security invoker, RLS gilt.';
+  'Führt die Schritte einer Kalender-Änderung (Spec §5.3) in einer Transaktion aus: Kennung verbuchen (an p_event_id gebunden), Master und Exception an p_occurrence_key sperren, gesehenen Stand prüfen, Schritte ausführen. Rückgabe applied | already_applied. Fehler: EF404 nicht gefunden oder nicht mehr erreichbar, EF409 Konflikt (detail master | exception), 22023 ungültige Eingabe oder Kennung eines anderen Termins. security invoker, RLS gilt.';
 
 -- ── 4. Rechte ───────────────────────────────────────────────────────────────
 
