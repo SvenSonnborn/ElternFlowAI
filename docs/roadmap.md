@@ -994,7 +994,7 @@ Alle aus `TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-sco
 - **Tailwind v3 → v4** ([tailwind.config.js](../tailwind.config.js) + [global.css](../global.css)) —
   beim SDK-54→57-Update (ADR-007) bewusst zurückgestellt. Neue CSS-first-Config `@theme`, geändertes
   Content-Scanning, NativeWind-v4-Kompatibilität prüfen. Berührt das Theming-Fundament aus
-  `CLAUDE.md` → Theming (CSS-Variablen + `vars()`), also die Stelle, an der ein Fehler **jeden**
+  `docs/architecture.md` → Theme system (CSS-Variablen + `vars()`), also die Stelle, an der ein Fehler **jeden**
   Screen trifft.
 - **`@expo/vector-icons` → scoped `@react-native-vector-icons/*`** ·
   [Icon.tsx](../app-sections/shared/Icon.tsx) — SDK 56 deprecatet das Bundle-Paket. Codemod
