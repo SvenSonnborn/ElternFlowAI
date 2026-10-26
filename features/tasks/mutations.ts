@@ -10,7 +10,7 @@ import { supabase } from "@/features/supabase";
 import type { TaskChanges } from "./optimistic";
 import type { TaskRow, TaskWithType } from "./types";
 
-import { MissingParentError, TaskConflictError } from "./errors";
+import { MissingParentError, TaskConflictError, TaskForbiddenError } from "./errors";
 import { applyDelete, applyToggle, applyUpdate } from "./optimistic";
 import { TASK_SELECT, taskKeys } from "./queries";
 
@@ -95,11 +95,12 @@ function invalidateTasks(qc: QueryClient): Promise<void> {
  * Compare-and-Swap ist allein durch einen beobachteten Zwei-Client-Lauf
  * belegt statt durch einen Test.
  *
- * **Die Ops melden, die reine Funktion urteilt.** `updateRow`/`deleteRow`
- * geben `true`/`false` zurück, statt bei null Zeilen selbst zu werfen: Das
+ * **Die Ops melden, die reine Funktion urteilt.** `updateRow` gibt
+ * `true`/`false` zurück, statt bei null Zeilen selbst zu werfen: Das
  * Klassifizieren („fremde Änderung" gegen „Zeile weg") braucht einen zweiten
  * Aufruf (`fetchRow`), und eine Op, die eine andere Op ruft, ist keine Op
- * mehr. Der Kalender hat den Wurf **in** `updateMaster` — genau deshalb muss
+ * mehr. `deleteRow` meldet ein {@link DeleteOutcome}, das der Server selbst
+ * klassifiziert hat (`delete_task`); nur beim Konflikt liest `deleteTask` nach. Der Kalender hat den Wurf **in** `updateMaster` — genau deshalb muss
  * ein Fix dort in den Supabase-Adapter hineingreifen statt in die reine
  * Funktion.
  *
@@ -121,22 +122,40 @@ export interface TaskOps {
   fetchRow: (taskId: string) => Promise<TaskWithType | null>;
   /** `true`, wenn das Compare-and-Swap die Zeile getroffen hat. */
   updateRow: (taskId: string, changes: TaskChanges, seenUpdatedAt: string) => Promise<boolean>;
-  /** `true`, wenn das Compare-and-Swap die Zeile getroffen hat. */
-  deleteRow: (taskId: string, seenUpdatedAt: string) => Promise<boolean>;
+  /** Löscht über `delete_task` gegen den gesehenen Stand; der Server klassifiziert. */
+  deleteRow: (taskId: string, seenUpdatedAt: string) => Promise<DeleteOutcome>;
 }
 
 /**
- * Kapselt die PostgREST-Aufrufe von `updateTask` und `deleteTask` — und zwar
+ * Ergebnis von `delete_task`. `deleted`/`missing`/`forbidden` sind die drei
+ * Rückgabewerte der SQL-Funktion; `conflict` ist ihr Fehler `EF409` (Zeile
+ * sichtbar, `updated_at` weicht ab), vom Supabase-Adapter in einen Wert
+ * übersetzt, damit `deleteTask` rein bleibt.
+ */
+export type DeleteOutcome = "deleted" | "missing" | "forbidden" | "conflict";
+
+const DELETE_OUTCOMES: readonly string[] = ["deleted", "missing", "forbidden"];
+
+/**
+ * Kapselt die Datenbankaufrufe von `updateTask` und `deleteTask` — und zwar
  * nur deren: `useCreateTask` und `useToggleTaskDone` sprechen weiterhin direkt
  * mit dem Modul-`supabase` (siehe {@link TaskOps}).
  *
- * `.eq("updated_at", …)` macht aus Update und Delete je ein Compare-and-Swap:
- * Sie treffen die Zeile nur, solange niemand anderes sie seit dem Laden des
+ * **Update:** `.eq("updated_at", …)` macht daraus ein Compare-and-Swap: Es
+ * trifft die Zeile nur, solange niemand anderes sie seit dem Laden des
  * Formulars angefasst hat. `.select("id").maybeSingle()` ist die andere
  * Hälfte davon — **ohne sie meldet PostgREST auch dann `error: null`, wenn
  * null Zeilen getroffen wurden**, und der Aufrufer könnte „gelungen" nicht von
  * „nichts passiert" unterscheiden. Beides zusammen ist das CAS; einzeln ist
  * keines davon etwas wert (ADR-031).
+ *
+ * **Delete:** läuft über die RPC `delete_task`. Ein CAS über PostgREST sah bei
+ * null Zeilen nicht, ob die Aufgabe weg war oder der Zugriff; die Funktion
+ * trennt beides. Der Konflikt kommt als Fehler `EF409` an — PostgREST liefert
+ * ihn als HTTP 400, erkannt wird er deshalb am `code`, nie am Status. Jeder
+ * andere Fehler (auch `22023` bei fehlender Eingabe, ein Client-Fehler) wird
+ * unverändert geworfen, ein unbekannter Rückgabewert ebenfalls: Ihn als Erfolg
+ * zu lesen, hieße, ein Löschen zu melden, das nie bestätigt wurde.
  */
 export function createSupabaseTaskOps(client: SupabaseClient<Database>): TaskOps {
   return {
@@ -163,15 +182,18 @@ export function createSupabaseTaskOps(client: SupabaseClient<Database>): TaskOps
     },
 
     deleteRow: async (taskId, seenUpdatedAt) => {
-      const { data, error } = await client
-        .from("tasks")
-        .delete()
-        .eq("id", taskId)
-        .eq("updated_at", seenUpdatedAt)
-        .select("id")
-        .maybeSingle();
-      if (error) throw error;
-      return data !== null;
+      const { data, error } = await client.rpc("delete_task", {
+        p_task_id: taskId,
+        p_seen_updated_at: seenUpdatedAt,
+      });
+      if (error) {
+        if (error.code === "EF409") return "conflict";
+        throw error;
+      }
+      if (!DELETE_OUTCOMES.includes(data)) {
+        throw new Error(`delete_task returned an unexpected value: ${String(data)}`);
+      }
+      return data as DeleteOutcome;
     },
   };
 }
@@ -204,8 +226,8 @@ export async function updateTask(vars: UpdateTaskVars, deps: TaskOps): Promise<v
 
 /**
  * Löscht die Aufgabe, solange niemand anderes sie seit dem Laden des
- * Formulars angefasst hat — dasselbe Compare-and-Swap wie
- * {@link updateTask}, mit einem Unterschied am Ende.
+ * Formulars angefasst hat — derselbe Stand-Vergleich wie {@link updateTask},
+ * aber vom Server entschieden (`delete_task`).
  *
  * **Eine bereits verschwundene Zeile ist hier ein Erfolg, beim Speichern ein
  * Fehler.** Beim Speichern geht *Inhalt* verloren: Der Nutzer hat etwas
@@ -213,20 +235,22 @@ export async function updateTask(vars: UpdateTaskVars, deps: TaskOps): Promise<v
  * erfüllt — die Aufgabe ist weg, gleich wessen DELETE sie erwischt hat, und
  * eine Fehlermeldung darüber wäre schlicht falsch.
  *
- * Die Grenze davon: Eine RLS-Ablehnung **ohne** Abmeldung (der Elternteil
- * wurde aus der Familie entfernt, während der Undo-Timer lief) ist vom
- * Client aus von „schon gelöscht" nicht zu unterscheiden — beide liefern null
- * Zeilen ohne Fehler und eine leere Nachlese. Sie nimmt hier denselben
- * stillen Weg; siehe `docs/TODO.md`. Der *Abmelde*-Fall ist davon nicht
- * betroffen: `useSignOut` ruft `flush()` vor `signOut`, das DELETE läuft also
- * noch angemeldet.
+ * **`forbidden` ist dagegen ein Fehler:** Der Elternteil wurde aus der Familie
+ * entfernt, während der Undo-Timer lief, die Aufgabe steht also noch. Das ließ
+ * sich über PostgREST nicht von „schon gelöscht" unterscheiden. Der
+ * *Abmelde*-Fall war nie betroffen: `useSignOut` ruft `flush()` vor
+ * `signOut`, das Löschen läuft also noch angemeldet.
+ *
+ * Nur bei `conflict` wird nachgelesen — um die fremde Fassung für den Dialog
+ * zu haben; ist die Zeile inzwischen weg, gilt das wie `missing`.
  */
 export async function deleteTask(vars: DeleteTaskVars, deps: TaskOps): Promise<void> {
-  const hit = await deps.deleteRow(vars.taskId, vars.baseVersion);
-  if (hit) return;
+  const outcome = await deps.deleteRow(vars.taskId, vars.baseVersion);
+  if (outcome === "deleted" || outcome === "missing") return;
+  if (outcome === "forbidden") throw new TaskForbiddenError();
 
   const current = await deps.fetchRow(vars.taskId);
-  if (!current) return; // schon weg — das Ziel ist erreicht
+  if (!current) return; // zwischenzeitlich gelöscht — das Ziel ist erreicht
   throw new TaskConflictError(current);
 }
 

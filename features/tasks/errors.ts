@@ -27,6 +27,21 @@ export class TaskConflictError extends Error {
   }
 }
 
+/**
+ * `delete_task` hat `'forbidden'` gemeldet: Der Aufrufer gehört zu keiner
+ * Familie (mehr), typischerweise weil er entfernt wurde, während der
+ * Undo-Timer des Löschens lief. Eine eigene Klasse statt eines Konflikts, weil
+ * es nichts zu vergleichen gibt — und statt eines stillen Erfolgs, weil die
+ * Aufgabe dann noch existiert. `mapTaskError` legt sie auf denselben Key wie
+ * die RLS-Ablehnung 42501 (`hw.error.notAuthenticated`).
+ */
+export class TaskForbiddenError extends Error {
+  constructor() {
+    super("Not allowed to delete this task");
+    this.name = "TaskForbiddenError";
+  }
+}
+
 export type TaskErrorKey =
   | "hw.error.notAuthenticated"
   | "hw.error.staleReference"
@@ -55,6 +70,7 @@ export function mapTaskError(input: unknown): TaskErrorKey {
   if (!err) return "hw.error.generic";
 
   if (err.name === "MissingParentError") return "hw.error.notAuthenticated";
+  if (err.name === "TaskForbiddenError") return "hw.error.notAuthenticated";
   if (err.name === "TaskConflictError") return "hw.error.conflict";
 
   // Postgres SQLSTATE codes — checked first because they're specific.
