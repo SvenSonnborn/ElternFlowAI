@@ -20,7 +20,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(132);
+select plan(140);
 
 -- ── Helfer ──────────────────────────────────────────────────────────────────
 
@@ -72,6 +72,19 @@ exception when others then
 end;
 $$;
 
+-- Die Meldung eines Aufrufs, für Fälle, in denen zählt, was sie NICHT nennt.
+create function pg_temp.message_of(p_sql text)
+returns text
+language plpgsql
+as $$
+begin
+  execute p_sql;
+  return 'kein Fehler';
+exception when others then
+  return sqlerrm;
+end;
+$$;
+
 -- ── Fixtures (als postgres, BYPASSRLS) ──────────────────────────────────────
 
 do $$
@@ -95,6 +108,12 @@ begin
   perform pg_temp.clone_event('e2e2e2e2-0000-4000-8000-000000000001', 'e2e2e2e2-0000-4000-8000-100000000037',
     '{"parent_id": "bbbbbbbb-0000-4000-8000-000000000011", "child_id": null, "all_day": true,
       "timezone": "America/New_York", "rrule_interval": 2, "rrule_until": "2027-03-31T21:59:59.999Z"}');
+
+  -- Fälle 38, 39: Ort und Beschreibung gesetzt, damit „vom Master" von „null" zu
+  -- unterscheiden ist.
+  perform pg_temp.clone_event('e2e2e2e2-0000-4000-8000-000000000001', ('e2e2e2e2-0000-4000-8000-1000000000' || n)::uuid,
+    '{"location": "Halle 1", "description": "Hallenschuhe"}')
+  from unnest(array['38', '39']) as n;
 
   -- Fall 11: Serie mit UNTIL, damit insert_split_event es übernehmen kann.
   perform pg_temp.clone_event('e2e2e2e2-0000-4000-8000-000000000001', 'e2e2e2e2-0000-4000-8000-100000000011',
@@ -671,10 +690,11 @@ select is(
 -- 37 Die Fälle 10 und 11 zählen die übernommenen Spalten von Hand auf; eine neue Spalte,
 -- die insert_split_event nicht kennt, fiele dort nicht auf — die abgespaltene Hälfte
 -- bekäme still ihren Default. Dieser Fall vergleicht deshalb die ganze Zeile über
--- `to_jsonb` und zieht nur die Spalten ab, die der Split bewusst nicht übernimmt:
+-- `to_jsonb` und zieht nur die Spalten ab, die nicht in jedem Fall vom Master kommen:
 -- id, created_at, updated_at (vom Server), title, description, location, start_at,
--- end_at (aus `changes`), rrule_count (aus dem Schritt) und rrule_until (nur ohne
--- rrule_count, unten eigens geprüft).
+-- end_at (aus `changes`, nur ein fehlender Schlüssel vom Master — Fälle 38 und 39),
+-- rrule_count (aus dem Schritt) und rrule_until (nur ohne rrule_count, unten eigens
+-- geprüft).
 --
 -- Der Wertvergleich allein reicht nicht: Steht eine neue Spalte im Master auf ihrem
 -- Default, sind Master und Split gleich, ob sie übernommen wird oder nicht. Die erste
@@ -720,6 +740,44 @@ select results_eq(
              '2026-11-16T05:00:00Z'::timestamptz, '2026-11-17T04:59:59.999Z'::timestamptz, null::integer,
              '2027-03-31T21:59:59.999Z'::timestamptz) $$,
   '37 die abgezogenen Spalten kommen aus changes bzw. dem Schritt, rrule_until vom Master'
+);
+
+-- 38 Fehlt ein Schlüssel in `changes`, kommt der Wert vom gesperrten Master — je Schlüssel,
+--    wie update_master einen fehlenden Schlüssel stehen lässt. Ohne die Regel würden Ort
+--    und Beschreibung still null und ein fehlender Titel ein roher 23502.
+select is(
+  public.apply_event_change(
+    '0a000000-0000-4000-8000-000000000038', 'e2e2e2e2-0000-4000-8000-100000000038', '2026-11-16',
+    pg_temp.master_version('e2e2e2e2-0000-4000-8000-100000000038'), null,
+    '[{"op":"insert_split_event","changes":{"start_at":"2026-11-16T15:38:00.000Z",
+       "end_at":"2026-11-16T16:38:00.000Z"},"rrule_count":null}]'),
+  'applied',
+  '38 insert_split_event ohne title, location und description → applied'
+);
+
+select results_eq(
+  $$ select s.title, s.location, s.description, s.start_at, s.end_at
+     from public.events s where s.start_at = '2026-11-16T15:38:00Z' $$,
+  $$ values ('Training'::text, 'Halle 1'::text, 'Hallenschuhe'::text,
+             '2026-11-16T15:38:00Z'::timestamptz, '2026-11-16T16:38:00Z'::timestamptz) $$,
+  '38 title, location und description kommen vom Master, start_at und end_at aus changes'
+);
+
+-- 39 Ein mitgeschicktes null ist kein fehlender Schlüssel: `location: null` schreibt null.
+select is(
+  public.apply_event_change(
+    '0a000000-0000-4000-8000-000000000039', 'e2e2e2e2-0000-4000-8000-100000000039', '2026-11-16',
+    pg_temp.master_version('e2e2e2e2-0000-4000-8000-100000000039'), null,
+    '[{"op":"insert_split_event","changes":{"title":"Split 39","location":null},"rrule_count":null}]'),
+  'applied',
+  '39 insert_split_event mit location null und ohne description, start_at, end_at → applied'
+);
+
+select results_eq(
+  $$ select s.location, s.description, s.start_at, s.end_at from public.events s where s.title = 'Split 39' $$,
+  $$ select null::text, 'Hallenschuhe'::text, m.start_at, m.end_at
+     from public.events m where m.id = 'e2e2e2e2-0000-4000-8000-100000000039' $$,
+  '39 location bleibt null, description, start_at und end_at kommen vom Master'
 );
 
 -- ── Ungültige Eingaben (Review Focus 5): je 22023, nichts verbucht, nichts geändert ──
@@ -911,6 +969,43 @@ select throws_ok(
        pg_temp.exception_version('e2e2e2e2-0000-4000-8000-100000000019', '2026-11-09'),
        '[{"op":"set_rrule_until"}]') $$,
   '22023', null, 'fehlender Pflichtschlüssel (until) → 22023'
+);
+
+-- Die Meldung stammt aus der Eingabeprüfung (Schritt 4), nicht aus dem NOT NULL der Spalte.
+select throws_ok(
+  $$ select public.apply_event_change('0b000000-0000-4000-8000-000000000022',
+       'e2e2e2e2-0000-4000-8000-100000000019', '2026-11-09',
+       pg_temp.master_version('e2e2e2e2-0000-4000-8000-100000000019'),
+       pg_temp.exception_version('e2e2e2e2-0000-4000-8000-100000000019', '2026-11-09'),
+       '[{"op":"update_master","changes":{"title":null}}]') $$,
+  '22023', 'apply_event_change: Schritt 1 (update_master): Feld "title" darf nicht null sein',
+  'title null in update_master → 22023 aus der Eingabeprüfung'
+);
+
+select throws_ok(
+  $$ select public.apply_event_change('0b000000-0000-4000-8000-000000000023',
+       'e2e2e2e2-0000-4000-8000-100000000019', '2026-11-09',
+       pg_temp.master_version('e2e2e2e2-0000-4000-8000-100000000019'),
+       pg_temp.exception_version('e2e2e2e2-0000-4000-8000-100000000019', '2026-11-09'),
+       '[{"op":"insert_split_event","changes":{"title":null,"start_at":"2026-11-16T15:00:00.000Z",
+          "end_at":"2026-11-16T16:00:00.000Z","location":null,"description":null},"rrule_count":null}]') $$,
+  '22023', 'apply_event_change: Schritt 1 (insert_split_event): Feld "title" darf nicht null sein',
+  'title null in insert_split_event → 22023 aus der Eingabeprüfung'
+);
+
+select throws_ok(
+  $$ select public.apply_event_change('0b000000-0000-4000-8000-000000000024',
+       null, '2026-11-09', '2026-10-01T00:00:00Z', null,
+       '[{"op":"delete_all_exceptions"}]') $$,
+  '22023', null, 'p_event_id null → 22023'
+);
+
+select unalike(
+  pg_temp.message_of($$ select public.apply_event_change('0b000000-0000-4000-8000-000000000024',
+       null, '2026-11-09', '2026-10-01T00:00:00Z', null,
+       '[{"op":"delete_all_exceptions"}]') $$),
+  '%event_change_requests%',
+  'p_event_id null: die Meldung nennt die interne Verbuchungstabelle nicht'
 );
 
 select results_eq(

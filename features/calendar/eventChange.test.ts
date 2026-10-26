@@ -363,6 +363,25 @@ describe("createRecordingEventOps — explizite null im JSON", () => {
     expect(split?.rrule_count).toBeNull();
   });
 
+  test("insert_split_event schickt alle fünf Felder, auch die leeren", async () => {
+    // Ein fehlender Schlüssel ist für den Server kein Fehler: Er nähme den Wert
+    // des Masters. Ginge `description: null` unterwegs verloren, erbte die
+    // abgespaltene Hälfte still die Beschreibung der alten Serie.
+    const steps = await recordEdit({ scope: "forward", occurrenceKey: "2026-06-15" });
+    const wire = JSON.parse(JSON.stringify(steps)) as {
+      op: string;
+      changes?: Record<string, unknown>;
+    }[];
+    const split = wire.find((step) => step.op === "insert_split_event");
+    expect(split?.changes).toEqual({
+      title: "Neuer Titel",
+      start_at: "2026-06-15T15:00:00.000Z",
+      end_at: "2026-06-15T16:00:00.000Z",
+      location: "Sportplatz Nord",
+      description: null,
+    });
+  });
+
   test("nullbare Felder in changes und recurrence bleiben als null stehen", async () => {
     const steps = await recordEdit({
       scope: "all",
