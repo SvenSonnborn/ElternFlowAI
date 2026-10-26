@@ -14,12 +14,13 @@
 --                                                        097–099 sind die abgewiesenen Aufrufe ohne Fall)
 --               0b000000-0000-4000-8000-0000000000NN    ungültige Eingaben (22023)
 --               0c000000-0000-4000-8000-0000000000NN    vorab angelegte Alt-Verbuchungen (Aufräumen)
+--               0d000000-0000-4000-8000-0000000000NN    Familienverlust während des Aufrufs (Fälle 40–44)
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(108);
+select plan(128);
 
 -- ── Helfer ──────────────────────────────────────────────────────────────────
 
@@ -926,11 +927,11 @@ select is(
   'RF5 nach 22023 ist keine Kennung verbucht'
 );
 
-select is(
-  (select user_id from private.event_change_requests
-   where request_id = '0a000000-0000-4000-8000-000000000001'),
-  'aaaaaaaa-0000-4000-8000-000000000001'::uuid,
-  'die Verbuchung trägt den aufrufenden Nutzer'
+select results_eq(
+  $$ select user_id, event_id from private.event_change_requests
+     where request_id = '0a000000-0000-4000-8000-000000000001' $$,
+  $$ values ('aaaaaaaa-0000-4000-8000-000000000001'::uuid, 'e1e1e1e1-0000-4000-8000-100000000001'::uuid) $$,
+  'die Verbuchung trägt den aufrufenden Nutzer und den Termin'
 );
 
 -- ── Verbuchungen sind privat ────────────────────────────────────────────────
@@ -954,8 +955,9 @@ select is(
 delete from private.event_change_requests;
 
 select throws_ok(
-  $$ insert into private.event_change_requests (user_id, request_id)
-     values ('aaaaaaaa-0000-4000-8000-000000000001', '0a000000-0000-4000-8000-000000000097') $$,
+  $$ insert into private.event_change_requests (user_id, request_id, event_id)
+     values ('aaaaaaaa-0000-4000-8000-000000000001', '0a000000-0000-4000-8000-000000000097',
+             'e1e1e1e1-0000-4000-8000-000000000001') $$,
   '42501', null,
   'B kann keine Kennung im Namen von A verbuchen'
 );
@@ -977,10 +979,13 @@ select is(
 
 -- ── Aufräumen nach 30 Tagen ─────────────────────────────────────────────────
 
-insert into private.event_change_requests (user_id, request_id, created_at) values
-  ('aaaaaaaa-0000-4000-8000-000000000001', '0c000000-0000-4000-8000-000000000001', now() - interval '31 days'),
-  ('aaaaaaaa-0000-4000-8000-000000000001', '0c000000-0000-4000-8000-000000000002', now() - interval '29 days'),
-  ('bbbbbbbb-0000-4000-8000-000000000001', '0c000000-0000-4000-8000-000000000003', now() - interval '31 days');
+insert into private.event_change_requests (user_id, request_id, event_id, created_at) values
+  ('aaaaaaaa-0000-4000-8000-000000000001', '0c000000-0000-4000-8000-000000000001',
+   'e1e1e1e1-0000-4000-8000-000000000001', now() - interval '31 days'),
+  ('aaaaaaaa-0000-4000-8000-000000000001', '0c000000-0000-4000-8000-000000000002',
+   'e1e1e1e1-0000-4000-8000-000000000001', now() - interval '29 days'),
+  ('bbbbbbbb-0000-4000-8000-000000000001', '0c000000-0000-4000-8000-000000000003',
+   'e1e1e1e1-0000-4000-8000-000000000001', now() - interval '31 days');
 
 set local role authenticated;
 set local request.jwt.claims to '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}';
@@ -1003,8 +1008,9 @@ select results_eq(
   '30 der Aufruf räumt die eigene Verbuchung älter als 30 Tage weg, die jüngere und die von B bleiben'
 );
 
-insert into private.event_change_requests (user_id, request_id, created_at) values
-  ('aaaaaaaa-0000-4000-8000-000000000001', '0c000000-0000-4000-8000-000000000004', now() - interval '31 days');
+insert into private.event_change_requests (user_id, request_id, event_id, created_at) values
+  ('aaaaaaaa-0000-4000-8000-000000000001', '0c000000-0000-4000-8000-000000000004',
+   'e1e1e1e1-0000-4000-8000-000000000001', now() - interval '31 days');
 
 set local role authenticated;
 
@@ -1026,28 +1032,32 @@ select is(
   '30 auch ein already_applied räumt auf (§6: bei jedem Aufruf)'
 );
 
--- ── Exception taucht nach der Prüfung auf ───────────────────────────────────
+-- ── Fremde Zeile am Schlüssel nach der Prüfung (Upsert-Bedingung) ──────────
 
--- 31 Ein Schreiber, der den Master nicht sperrt (der Direktzugriff des Codes auf `main`),
--- legt nach der Prüfung eine Exception am Schlüssel an. In einer Sitzung nachgestellt:
--- Ein Trigger auf der Kopie fügt sie beim update_master ein, also zwischen Prüfung und
--- modify_occurrence. Der Upsert darf diese fremde Zeile nicht überschreiben.
-create function pg_temp.sneak_in_exception()
+-- 31 Eine bestehende Exception desselben Termins wird nach der Prüfung per UPDATE von
+-- `occurrence_date` auf den Schlüssel geschoben — der Weg, auf dem eine fremde Zeile die
+-- Upsert-Bedingung tatsächlich erreicht: Ein UPDATE braucht keine Fremdschlüsselprüfung
+-- und wartet deshalb nicht auf die Master-Sperre. Ein frischer INSERT aus einer zweiten
+-- Sitzung kommt dort nicht an (er wartet auf die Sperre oder endet im Deadlock, siehe
+-- Kommentar in der Migration). In einer Sitzung nachgestellt: Ein Trigger auf der Kopie
+-- verschiebt die Exception vom 09.11. auf den 16.11., während update_master läuft, also
+-- zwischen Prüfung und modify_occurrence.
+create function pg_temp.move_exception_onto_key()
 returns trigger
 language plpgsql
 as $$
 begin
-  insert into public.event_exceptions (event_id, occurrence_date, action)
-  values (new.id, '2026-11-16', 'cancelled');
+  update public.event_exceptions set occurrence_date = '2026-11-16'
+  where event_id = new.id and occurrence_date = '2026-11-09';
   return null;
 end;
 $$;
 
-create trigger sneak_in_exception
+create trigger move_exception_onto_key
 after update on public.events
 for each row
 when (new.id = 'e2e2e2e2-0000-4000-8000-100000000031')
-execute function pg_temp.sneak_in_exception();
+execute function pg_temp.move_exception_onto_key();
 
 do $$ begin
   perform pg_temp.clone_event('e2e2e2e2-0000-4000-8000-000000000001', 'e2e2e2e2-0000-4000-8000-100000000031');
@@ -1062,19 +1072,19 @@ select is(
     '[{"op":"update_master","changes":{"title":"Training (A)"}},
       {"op":"modify_occurrence","override":{"title":"Training (A, 16.11.)"}}]') $$),
   'EF409 exception',
-  '31 nach der Prüfung aufgetauchte Exception → EF409 statt stillem Überschreiben'
+  '31 eine nach der Prüfung auf den Schlüssel geschobene Exception → EF409 statt stillem Überschreiben'
 );
 
 select results_eq(
   $$ select title, updated_at < now(),
-            (select count(*) from public.event_exceptions x where x.event_id = e.id)
+            (select array_agg(x.occurrence_date) from public.event_exceptions x where x.event_id = e.id)
      from public.events e where e.id = 'e2e2e2e2-0000-4000-8000-100000000031' $$,
-  $$ values ('Training'::text, true, 1::bigint) $$,
-  '31 der frühere Schritt (update_master) ist mit zurückgerollt'
+  $$ values ('Training'::text, true, array['2026-11-09'::date]) $$,
+  '31 der frühere Schritt (update_master) ist mit zurückgerollt, die Exception liegt wieder am 09.11.'
 );
 
 reset role;
-drop trigger sneak_in_exception on public.events;
+drop trigger move_exception_onto_key on public.events;
 
 -- ── insert_split_event liest den gesperrten Master ──────────────────────────
 
@@ -1106,6 +1116,272 @@ select results_eq(
 );
 
 reset role;
+
+-- ── Weitere Fälle aus dem Review ────────────────────────────────────────────
+
+do $$ begin
+  perform pg_temp.clone_event('e2e2e2e2-0000-4000-8000-000000000001', ('e2e2e2e2-0000-4000-8000-1000000000' || n)::uuid)
+  from unnest(array['33', '34', '36']) as n;
+  perform pg_temp.clone_event('e1e1e1e1-0000-4000-8000-000000000001', ('e1e1e1e1-0000-4000-8000-1000000000' || n)::uuid)
+  from unnest(array['35', '36']) as n;
+end $$;
+
+set local role authenticated;
+
+-- 33 cancel_occurrence auf eine bestehende modified-Exception: Der Override geht mit weg.
+select is(
+  public.apply_event_change(
+    '0a000000-0000-4000-8000-000000000033', 'e2e2e2e2-0000-4000-8000-100000000033', '2026-11-09',
+    pg_temp.master_version('e2e2e2e2-0000-4000-8000-100000000033'),
+    pg_temp.exception_version('e2e2e2e2-0000-4000-8000-100000000033', '2026-11-09'),
+    '[{"op":"cancel_occurrence"}]'),
+  'applied',
+  '33 cancel_occurrence auf eine modified-Exception → applied'
+);
+
+select results_eq(
+  $$ select action::text, override from public.event_exceptions
+     where event_id = 'e2e2e2e2-0000-4000-8000-100000000033' and occurrence_date = '2026-11-09' $$,
+  $$ values ('cancelled'::text, null::jsonb) $$,
+  '33 aus der modified-Exception wird cancelled ohne Override'
+);
+
+-- 34 "recurrence": null zählt wie nicht mitgeschickt.
+select is(
+  public.apply_event_change(
+    '0a000000-0000-4000-8000-000000000034', 'e2e2e2e2-0000-4000-8000-100000000034', '2026-11-16',
+    pg_temp.master_version('e2e2e2e2-0000-4000-8000-100000000034'), null,
+    '[{"op":"update_master","changes":{"title":"Training (34)"},"recurrence":null}]'),
+  'applied',
+  '34 update_master mit recurrence null → applied'
+);
+
+select results_eq(
+  $$ select title, rrule_freq::text, rrule_interval, rrule_byweekday, rrule_count, rrule_until
+     from public.events where id = 'e2e2e2e2-0000-4000-8000-100000000034' $$,
+  $$ values ('Training (34)'::text, 'weekly'::text, 1, array[1], null::integer, null::timestamptz) $$,
+  '34 recurrence null lässt die Regel stehen'
+);
+
+-- 35 Das Aufräumen lässt die eigene, abgelaufene Verbuchung der aufrufenden Kennung stehen.
+reset role;
+insert into private.event_change_requests (user_id, request_id, event_id, created_at) values
+  ('aaaaaaaa-0000-4000-8000-000000000001', '0c000000-0000-4000-8000-000000000005',
+   'e1e1e1e1-0000-4000-8000-100000000035', now() - interval '31 days');
+set local role authenticated;
+
+select is(
+  public.apply_event_change(
+    '0c000000-0000-4000-8000-000000000005', 'e1e1e1e1-0000-4000-8000-100000000035', '2026-11-03',
+    pg_temp.master_version('e1e1e1e1-0000-4000-8000-100000000035'), null,
+    '[{"op":"update_master","changes":{"title":"Einzeltermin (35)"}}]'),
+  'already_applied',
+  '35 Retry mit einer über 30 Tage alten Kennung → already_applied'
+);
+
+select results_eq(
+  $$ select (select count(*) from private.event_change_requests
+             where request_id = '0c000000-0000-4000-8000-000000000005'),
+            (select title from public.events where id = 'e1e1e1e1-0000-4000-8000-100000000035') $$,
+  $$ values (1::bigint, 'Einzeltermin'::text) $$,
+  '35 die Verbuchung, die den Retry abgefangen hat, bleibt stehen, und nichts wird ausgeführt'
+);
+
+-- 36 Die Kennung ist an ihren Termin gebunden.
+select is(
+  public.apply_event_change(
+    '0a000000-0000-4000-8000-000000000036', 'e1e1e1e1-0000-4000-8000-100000000036', '2026-11-03',
+    pg_temp.master_version('e1e1e1e1-0000-4000-8000-100000000036'), null,
+    '[{"op":"update_master","changes":{"title":"Einzeltermin (36)"}}]'),
+  'applied',
+  '36 erster Aufruf → applied'
+);
+
+select throws_ok(
+  $$ select public.apply_event_change(
+       '0a000000-0000-4000-8000-000000000036', 'e2e2e2e2-0000-4000-8000-100000000036', '2026-11-16',
+       pg_temp.master_version('e2e2e2e2-0000-4000-8000-100000000036'), null,
+       '[{"op":"update_master","changes":{"title":"Training (36)"}}]') $$,
+  '22023', 'apply_event_change: Kennung ist schon für einen anderen Termin verbucht',
+  '36 dieselbe Kennung für einen anderen Termin → 22023'
+);
+
+select results_eq(
+  $$ select (select title from public.events where id = 'e2e2e2e2-0000-4000-8000-100000000036'),
+            (select array_agg(event_id) from private.event_change_requests
+             where request_id = '0a000000-0000-4000-8000-000000000036') $$,
+  $$ values ('Training'::text, array['e1e1e1e1-0000-4000-8000-100000000036'::uuid]) $$,
+  '36 der andere Termin ist unverändert, die Verbuchung zeigt weiter auf den ersten'
+);
+
+-- ── Familie während des Aufrufs verloren (Trefferprüfung, Lücke 2) ──────────
+
+-- Nach dem Review-Repro: A verliert ihre Familie mitten im Aufruf („parents: delete
+-- self", ein zweites Gerät). Unter READ COMMITTED sieht der nächste Schritt den Master
+-- per RLS nicht mehr. Die Trigger entfernen A's Eltern-Zeile an genau der Stelle, an der
+-- ein zweites Gerät es könnte, und nur für die Kopien dieses Abschnitts. Die Kopien
+-- gehören B (`created_by`), damit das `on delete set null` von A's Zeile sie nicht anfasst.
+reset role;
+
+do $$ begin
+  perform pg_temp.clone_event('e2e2e2e2-0000-4000-8000-000000000001', ('e2e2e2e2-0000-4000-8000-1000000000' || n)::uuid,
+    '{"created_by": "bbbbbbbb-0000-4000-8000-000000000011"}')
+  from unnest(array['40', '41', '42', '44']) as n;
+  perform pg_temp.clone_event('e3e3e3e3-0000-4000-8000-000000000001', 'e3e3e3e3-0000-4000-8000-100000000043');
+end $$;
+
+create function pg_temp.remove_a()
+returns trigger
+language plpgsql
+as $$
+begin
+  set local role postgres;
+  delete from public.parents where id = 'aaaaaaaa-0000-4000-8000-000000000011';
+  set local role authenticated;
+  return null;
+end;
+$$;
+
+create trigger remove_a_on_exception_delete
+after delete on public.event_exceptions
+for each row
+when (old.event_id in ('e2e2e2e2-0000-4000-8000-100000000040', 'e2e2e2e2-0000-4000-8000-100000000044'))
+execute function pg_temp.remove_a();
+
+create trigger remove_a_on_event_update
+after update on public.events
+for each row
+when (new.id = 'e2e2e2e2-0000-4000-8000-100000000041')
+execute function pg_temp.remove_a();
+
+create trigger remove_a_on_split_insert
+after insert on public.events
+for each row
+when (new.title in ('Split 42', 'Split 43'))
+execute function pg_temp.remove_a();
+
+set local role authenticated;
+
+-- 40 Der Repro: delete_all_exceptions, dann update_master mit neuer Regel.
+select throws_ok(
+  $$ select public.apply_event_change(
+       '0d000000-0000-4000-8000-000000000040', 'e2e2e2e2-0000-4000-8000-100000000040', null,
+       pg_temp.master_version('e2e2e2e2-0000-4000-8000-100000000040'), null,
+       '[{"op":"delete_all_exceptions"},
+         {"op":"update_master","changes":{"title":"Neuer Rhythmus"},
+          "recurrence":{"rrule_freq":"weekly","rrule_interval":2,"rrule_byweekday":[1],
+                        "rrule_count":null,"rrule_until":null}}]') $$,
+  'EF404', 'apply_event_change: Schritt 2 (update_master) trifft den Termin nicht mehr',
+  '40 update_master trifft nach Familienverlust null Zeilen → EF404'
+);
+
+-- 41 Der letzte Schritt löscht Exceptions und darf null Zeilen treffen; die Prüfung der
+--    Familie am Ende fängt es.
+select throws_ok(
+  $$ select public.apply_event_change(
+       '0d000000-0000-4000-8000-000000000041', 'e2e2e2e2-0000-4000-8000-100000000041', '2026-11-09',
+       pg_temp.master_version('e2e2e2e2-0000-4000-8000-100000000041'),
+       pg_temp.exception_version('e2e2e2e2-0000-4000-8000-100000000041', '2026-11-09'),
+       '[{"op":"set_rrule_until","until":"2026-11-08T22:59:59.999Z"},{"op":"delete_exceptions_from"}]') $$,
+  'EF404', 'apply_event_change: nicht mehr in der Familie des Termins',
+  '41 Familienverlust vor einem Löschschritt am Ende → EF404'
+);
+
+-- 42 Forward-Split: set_rrule_until nach dem Split trifft nichts mehr.
+select throws_ok(
+  $$ select public.apply_event_change(
+       '0d000000-0000-4000-8000-000000000042', 'e2e2e2e2-0000-4000-8000-100000000042', '2026-11-16',
+       pg_temp.master_version('e2e2e2e2-0000-4000-8000-100000000042'), null,
+       '[{"op":"insert_split_event","changes":{"title":"Split 42","start_at":"2026-11-16T15:00:00.000Z",
+          "end_at":"2026-11-16T16:00:00.000Z","location":null,"description":null},"rrule_count":null},
+         {"op":"set_rrule_until","until":"2026-11-15T22:59:59.999Z"}]') $$,
+  'EF404', 'apply_event_change: Schritt 2 (set_rrule_until) trifft den Termin nicht mehr',
+  '42 set_rrule_until trifft nach Familienverlust null Zeilen → EF404'
+);
+
+-- 43 Zählbegrenzter Split: set_rrule_count nach dem Split trifft nichts mehr.
+select throws_ok(
+  $$ select public.apply_event_change(
+       '0d000000-0000-4000-8000-000000000043', 'e3e3e3e3-0000-4000-8000-100000000043', '2026-11-17',
+       pg_temp.master_version('e3e3e3e3-0000-4000-8000-100000000043'), null,
+       '[{"op":"insert_split_event","changes":{"title":"Split 43","start_at":"2026-11-17T07:00:00.000Z",
+          "end_at":"2026-11-17T08:00:00.000Z","location":null,"description":null},"rrule_count":8},
+         {"op":"set_rrule_count","count":2}]') $$,
+  'EF404', 'apply_event_change: Schritt 2 (set_rrule_count) trifft den Termin nicht mehr',
+  '43 set_rrule_count trifft nach Familienverlust null Zeilen → EF404'
+);
+
+-- 44 delete_master nach dem Familienverlust.
+select throws_ok(
+  $$ select public.apply_event_change(
+       '0d000000-0000-4000-8000-000000000044', 'e2e2e2e2-0000-4000-8000-100000000044', null,
+       pg_temp.master_version('e2e2e2e2-0000-4000-8000-100000000044'), null,
+       '[{"op":"delete_all_exceptions"},{"op":"delete_master"}]') $$,
+  'EF404', 'apply_event_change: Schritt 2 (delete_master) trifft den Termin nicht mehr',
+  '44 delete_master trifft nach Familienverlust null Zeilen → EF404'
+);
+
+reset role;
+drop trigger remove_a_on_exception_delete on public.event_exceptions;
+drop trigger remove_a_on_event_update on public.events;
+drop trigger remove_a_on_split_insert on public.events;
+
+select results_eq(
+  $$ select title, rrule_interval, updated_at < now(),
+            (select count(*) from public.event_exceptions x where x.event_id = e.id)
+     from public.events e where e.id = 'e2e2e2e2-0000-4000-8000-100000000040' $$,
+  $$ values ('Training'::text, 1, true, 1::bigint) $$,
+  '40 nach dem EF404: Master unverändert, die Exception der Serie noch da'
+);
+
+select results_eq(
+  $$ select e.id, e.updated_at < now(), e.rrule_until, e.rrule_count,
+            (select count(*) from public.event_exceptions x where x.event_id = e.id)
+     from public.events e
+     where e.id in ('e2e2e2e2-0000-4000-8000-100000000041', 'e2e2e2e2-0000-4000-8000-100000000042',
+                    'e3e3e3e3-0000-4000-8000-100000000043', 'e2e2e2e2-0000-4000-8000-100000000044')
+     order by e.id $$,
+  $$ values ('e2e2e2e2-0000-4000-8000-100000000041'::uuid, true, null::timestamptz, null::integer, 1::bigint),
+            ('e2e2e2e2-0000-4000-8000-100000000042'::uuid, true, null::timestamptz, null::integer, 1::bigint),
+            ('e2e2e2e2-0000-4000-8000-100000000044'::uuid, true, null::timestamptz, null::integer, 1::bigint),
+            ('e3e3e3e3-0000-4000-8000-100000000043'::uuid, true, null::timestamptz, 10, 0::bigint) $$,
+  '41–44 nach dem EF404: alle Master und Exceptions unverändert'
+);
+
+select is(
+  (select count(*) from public.events where title in ('Split 42', 'Split 43')),
+  0::bigint,
+  '42–43 die abgespaltene Hälfte ist mit zurückgerollt'
+);
+
+select is(
+  (select count(*) from private.event_change_requests
+   where request_id::text like '0d000000-%'),
+  0::bigint,
+  '40–44 nach dem EF404 ist keine Kennung verbucht'
+);
+
+select is(
+  (select count(*) from public.parents where id = 'aaaaaaaa-0000-4000-8000-000000000011'),
+  1::bigint,
+  '40–44 die Entfernung von A ist mit zurückgerollt'
+);
+
+-- ── Account gelöscht: Verbuchungen gehen mit ───────────────────────────────
+
+-- 45 Läuft zuletzt, weil er C samt Eltern-Zeile entfernt.
+insert into private.event_change_requests (user_id, request_id, event_id) values
+  ('cccccccc-0000-4000-8000-000000000001', '0c000000-0000-4000-8000-000000000006',
+   'e9e9e9e9-0000-4000-8000-000000000001');
+
+delete from auth.users where id = 'cccccccc-0000-4000-8000-000000000001';
+
+select is(
+  (select count(*) from private.event_change_requests
+   where user_id = 'cccccccc-0000-4000-8000-000000000001'),
+  0::bigint,
+  '45 wird der Account gelöscht, gehen seine Verbuchungen mit (on delete cascade)'
+);
 
 select * from finish();
 
