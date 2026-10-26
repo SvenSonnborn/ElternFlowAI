@@ -10,7 +10,7 @@ import type { EventChanges, EventOps, RecurrenceChanges } from "./recurrence";
  * **aufzeichnenden** `EventOps`, der nichts schreibt. Die gesammelten Schritte
  * gehen danach in **einem** Aufruf an `public.apply_event_change`, die sie in
  * einer Transaktion ausführt und dabei gegen den Stand prüft, den das Formular
- * gesehen hat (Spec §5, `supabase/migrations/20261026120000_calendar_transaction_rpc.sql`).
+ * gesehen hat (Spec §5, `supabase/migrations/20261026163759_calendar_transaction_rpc.sql`).
  *
  * Vorher waren das bis zu drei unabhängige PostgREST-Aufrufe: Scheiterte der
  * zweite, blieb der erste stehen, und der Versionsvergleich lief im Client,
