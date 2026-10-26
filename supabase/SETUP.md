@@ -22,7 +22,7 @@ All migrations are committed to the repo. Apply in order via Supabase CLI or MCP
 
 > **Nach jedem MCP `apply_migration`: Version abgleichen.** Der MCP-Server vergibt einen **eigenen** Timestamp und ignoriert den Dateinamen — die Zeile in `supabase_migrations.schema_migrations` heißt danach z. B. `20260601230509`, obwohl die Datei `20260602100000_events_parent_id.sql` ist. Die CLI vergleicht Dateiname-Prefix gegen Remote-Version, hält die Migration deshalb für **nicht angewendet** und würde sie bei `supabase db push` erneut fahren. Da die Basis-Migrationen mit `drop table if exists … cascade` beginnen, hätte das die komplette Datenbank gelöscht.
 >
-> Deshalb: nach jedem `apply_migration` die lokale Datei auf die tatsächlich vergebene Version umbenennen (`list_migrations` zeigt sie) — oder die Zeile per SQL angleichen. Stand 2026-09-02 sind lokal und remote deckungsgleich (18 Migrationen). Historie der Reparaturen: 2026-07-28 der Drift der ersten 13 (8 fehlten ganz, 5 hatten abweichende Versionen); 2026-09-01 `seed_recipes` (lokal `20260814120000` → remote `20260814084006`, eine Altlast, die ADR-022 bereits als unkorrigiert vermerkt hatte) und `realtime_calendar` (lokal `20260901093000` → remote `20260901083335`, direkt beim Anwenden entstanden — der Beleg, dass dieser Abgleich kein Ritual ist); 2026-09-02 `realtime_family_broadcast` (lokal `20260901120000` → remote `20260902065203`, ebenfalls direkt beim Anwenden entstanden, lokale Datei danach umbenannt).
+> Deshalb: nach jedem `apply_migration` die lokale Datei auf die tatsächlich vergebene Version umbenennen (`list_migrations` zeigt sie) — oder die Zeile per SQL angleichen. Stand 2026-09-02 sind lokal und remote deckungsgleich (18 Migrationen). Historie der Reparaturen: 2026-07-28 der Drift der ersten 13 (8 fehlten ganz, 5 hatten abweichende Versionen); 2026-09-01 `seed_recipes` (lokal `20260814120000` → remote `20260814084006`, eine Altlast, die ADR-022 bereits als unkorrigiert vermerkt hatte) und `realtime_calendar` (lokal `20260901093000` → remote `20260901083335`, direkt beim Anwenden entstanden — der Beleg, dass dieser Abgleich kein Ritual ist); 2026-09-02 `realtime_family_broadcast` (lokal `20260901120000` → remote `20260902065203`, ebenfalls direkt beim Anwenden entstanden, lokale Datei danach umbenannt). 2026-10-26 `events_timezone` und `events_timezone_iana_widen` (lokal `20260909115403`/`20260909131523` → remote `20260909115548`/`20260909131554`), aufgefallen erst beim Aufbau der lokalen Supabase (§7), die die Dateinamen wörtlich nimmt.
 >
 > Prüfen lässt sich das jederzeit mit:
 >
@@ -39,7 +39,7 @@ All migrations are committed to the repo. Apply in order via Supabase CLI or MCP
 - ✅ Enable email signups
 - ✅ **Confirm email** (strict mode — required for V1 auth flow)
 - ❌ Enable phone signups
-- ⬜ **Leaked Password Protection** (Authentication → Policies → Password) — prüft neue Passwörter gegen HaveIBeenPwned. Der Security-Advisor meldet die Einstellung am 2026-09-01 als `WARN` (`auth_leaked_password_protection`). Reine Dashboard-Einstellung, von keiner Migration erreichbar; einschalten, sobald jemand am Dashboard ist. Kosten: ein zusätzlicher Roundtrip beim Registrieren, keine Änderung am Auth-Flow.
+- ⬜ **Leaked Password Protection** (Authentication → Policies → Password) — prüft neue Passwörter gegen HaveIBeenPwned. Der Security-Advisor meldet die Einstellung am 2026-09-01 als `WARN` (`auth_leaked_password_protection`). Reine Dashboard-Einstellung, von keiner Migration erreichbar. **Erst ab dem Pro-Plan verfügbar**; das Projekt läuft auf Free (geprüft 2026-10-26), deshalb aus. Mit dem Wechsel auf Pro einschalten. Kosten: ein zusätzlicher Roundtrip beim Registrieren, keine Änderung am Auth-Flow.
 
 ### Authentication → URL Configuration
 
@@ -99,3 +99,54 @@ Leave **disabled** for V1. The Login screen renders these as disabled buttons. A
 - Auth attack surface review (rate limits, captcha for sign-up)
 - Feature-Gruppen des MCP-Servers zuschneiden (`.mcp.json` — `branching` ist aktiviert, aber ungenutzt; CodeRabbit hat das in PR #113 angemerkt, siehe ADR-029)
 - Account-deletion flow (DSGVO Art. 17)
+
+## 7. Lokale Supabase (Docker)
+
+Die Testumgebung für alles, was die Datenbank berührt ([ADR-044](../docs/decision-log.md)). Echte Familiendaten kommen nie hierher; „gleich wie live" heißt Schema und Konfiguration.
+
+**Starten.** Docker Desktop muss laufen. Die CLI ist in [mise.toml](../mise.toml) gepinnt.
+
+```bash
+mise exec -- supabase start        # Stack hoch, Migrationen + seed.sql beim ersten Start
+mise exec -- supabase db reset     # alles neu: Migrationen + Seed, lokale Daten weg
+mise exec -- supabase status       # URLs und Schlüssel
+bun run test:db                    # pgTAP (supabase/tests/database) + Integrationstests
+```
+
+API auf `http://127.0.0.1:54321`, Postgres auf Port `54322` (`postgres`/`postgres`). [config.toml](./config.toml) spiegelt die Auth- und API-Einstellungen von live; jede Abweichung steht dort als Kommentar.
+
+**Konten aus [seed.sql](./seed.sql)** — Passwort für alle drei `lokal-test-1`, nur lokal gültig:
+
+| Konto          | Familie      | Zweck                               |
+| -------------- | ------------ | ----------------------------------- |
+| `a@test.local` | Testfamilie  | erster Client                       |
+| `b@test.local` | Testfamilie  | zweiter Client derselben Familie    |
+| `c@test.local` | Fremdfamilie | Angreifer aus einer anderen Familie |
+
+Die festen UUIDs (Familien, Termine, Aufgaben) stehen im Kopf von `seed.sql`; Tests verlassen sich darauf.
+
+**Die App gegen lokal.** Ein zweites Metro mit den lokalen Werten statt `.env.local`, auf Port 8082 (für den die lokalen Redirect-URLs freigegeben sind) und mit eigenem `TMPDIR`, damit es den Metro-Cache des Live-Metro nicht teilt:
+
+```bash
+eval "$(mise exec -- supabase status -o env | grep -E '^(API_URL|PUBLISHABLE_KEY)=')"
+TMPDIR=/tmp/eltern-metro-lokal EXPO_PUBLIC_SUPABASE_URL="$API_URL" \
+  EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$PUBLISHABLE_KEY" bunx expo start --web --port 8082 --clear
+```
+
+Vor einem Testlauf prüfen, dass das ausgelieferte Bundle `127.0.0.1:54321` enthält und nicht die Live-URL.
+
+**Abgleich mit live.** [parity.sql](./parity.sql) ist eine einzige Abfrage ohne Seiteneffekte. Lokal über `docker exec -i supabase_db_ElternFlowAI psql -U postgres -At -F '|' < supabase/parity.sql`, live rein lesend über den MCP (`execute_sql`); danach zeilenweise vergleichen. Bei einer Abweichung gilt live: Was live hat, kommt als idempotente Nachzieh-Migration ins Repo; was live fehlt, ist ein Fehler auf live.
+
+**Erlaubte Abweichungen:**
+
+1. `public.broadcast_family_change()` — der Rumpf unterscheidet sich nur in Kommentaren; ohne Kommentare ist der md5 gleich. Bleibt so (ADR-030 Decision 16: ein frisches `db push` reproduziert keinen Defekt).
+2. `supabase_realtime_messages_publication` — legt der Realtime-Dienst selbst an, sobald der erste Client ein privates Topic abonniert; lokal also erst nach dem ersten Abo.
+3. Nicht von `parity.sql` erfasst und erwartet verschieden: Postgres-Minor, `site_url` und die zusätzlichen Redirects auf 8082, SMTP (lokal Mailpit), Schutz vor geleakten Passwörtern (§4), die Seed-Daten.
+
+**Rollout einer Migration nach live** — erst nach Abnahme gegen die lokale Instanz:
+
+1. Abgleich lokal gegen live auf dem Stand vor der Migration: gleich bis auf die erlaubten Abweichungen.
+2. `apply_migration` über den MCP, danach die Datei auf die vergebene Version umbenennen (§3) und mit `list_migrations` gegenprüfen.
+3. Abgleich erneut, jetzt mit der neuen Migration; Security-Advisor ohne neue Befunde.
+4. Rauchtest live nur lesend: Funktionen und Rechte da (`has_function_privilege` für `anon` und `authenticated`), PostgREST kennt die neuen RPCs. Keine Schreibzugriffe auf Familiendaten.
+5. `features/supabase/database.types.ts` über den MCP neu erzeugen, Umbenennung committen, CI grün, dann Merge.

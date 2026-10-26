@@ -143,6 +143,28 @@ und invalidiert dann gebündelt. Nach einem Verbindungsverlust lädt es den
 Zustand nach (verpasste Broadcasts kommen nicht nach); hält der Verlust über
 zehn Sekunden an, zeigen Kalender und Dashboard `<SyncNotice />`.
 
+## Schreibpfad Kalender
+
+Eine Kalenderänderung ist **eine** Transaktion auf dem Server ([ADR-044](./decision-log.md)).
+Der Client rechnet wie bisher: `applyEditScope`/`applyDeleteScope` in
+[recurrence.ts](../features/calendar/recurrence.ts) entscheiden aus Master und Scope, was zu tun
+ist, und schreiben in einen aufzeichnenden `EventOps`
+([eventChange.ts](../features/calendar/eventChange.ts)). Die gesammelten Schritte gehen in einem
+Aufruf an `public.apply_event_change`, zusammen mit der Basis-Version des Formulars und einer
+Kennung pro Absicht:
+
+```
+Formular → applyEditScope → Schritte → apply_event_change(Kennung, Termin, Occurrence, Versionen, Schritte)
+                                         └ verbucht Kennung · sperrt Master + Exception · vergleicht · schreibt
+```
+
+Der Server vergleicht die Version, bevor er etwas schreibt (`EF409` → Nachlese → Konfliktdialog),
+und beantwortet eine schon verbuchte Kennung mit `already_applied`. Aufgaben löschen über
+`public.delete_task`. Beide Funktionen laufen mit den Rechten des Aufrufers; RLS bleibt die
+Grenze. Getestet wird die Datenbankseite gegen eine lokale Supabase
+([supabase/SETUP.md](../supabase/SETUP.md) §7): pgTAP und Integrationstests mit zwei Clients über
+`bun run test:db`.
+
 ## What's not here yet
 
 See [decision-log.md](./decision-log.md) for the full out-of-scope list. The
@@ -151,4 +173,4 @@ Voice/LLM, no Expo Notifications, no Edge Functions.
 
 Supabase, the auth flow, onboarding and the settings screen have all landed
 since this list was written (ADR-003, ADR-005, ADR-008); Realtime is wired as
-far as the section above describes. Conflict-Detection (Issue #52) steht seit ADR-031: Ein Schreibvorgang prüft, ob die Zeile noch die Version hat, aus der das Formular stammt. Hat jemand anderes inzwischen ein Feld geändert, das der eigene Schreibvorgang anders setzen würde, zeigt ein Dialog beide Fassungen nebeneinander — bei Terminen seit ADR-038 auch die Wiederholungsregel. Die Einzelheiten stehen in den ADRs 031 und 036–038.
+far as the section above describes. Conflict-Detection (Issue #52) steht seit ADR-031: Ein Schreibvorgang prüft, ob die Zeile noch die Version hat, aus der das Formular stammt — bei Terminen seit ADR-044 der Server in derselben Transaktion, die schreibt. Hat jemand anderes inzwischen ein Feld geändert, das der eigene Schreibvorgang anders setzen würde, zeigt ein Dialog beide Fassungen nebeneinander — bei Terminen seit ADR-038 auch die Wiederholungsregel. Die Einzelheiten stehen in den ADRs 031, 036–038 und 044.
