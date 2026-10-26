@@ -2,7 +2,7 @@
 
 ## High level
 
-Eltern Flow AI is an Expo + React Native app written in TypeScript. The UI is rendered with NativeWind (Tailwind for RN) consuming theme tokens that flip between three palettes. Navigation uses Expo Router with file-based routes — the actual screen implementations live in `app-sections/` and `app/` files are thin re-exports so the URL surface stays small and uniform.
+Eltern Flow AI is an Expo + React Native app written in TypeScript. The UI is rendered with NativeWind (Tailwind for RN) consuming theme tokens that flip between two themes (`light`, `dark`). Navigation uses Expo Router with file-based routes — the actual screen implementations live in `app-sections/` and `app/` files are thin re-exports so the URL surface stays small and uniform.
 
 ```
 ┌────────────────────────────────┐
@@ -46,17 +46,23 @@ Android, ADR-039). Beide lesen einen Store, den die Screens befüllen.
 
 ## Theme system
 
-Three themes (`warmLight`, `softDark`, `pastelBlue`) defined in
-[design-system/themes.ts](../design-system/themes.ts). The same token names are
-used in two places that must stay in sync:
+Two themes — `light` (default) and `dark` — defined in
+[design-system/themes.ts](../design-system/themes.ts) (Handoff-Bundle). Every theme defines the
+full semantic role set: `bg`, `bgRaised`, `card`, `cardSubtle`, `overlay`, `ink`, `inkSecondary`,
+`inkTertiary`, `onMint`, `onOrange`, `primary`, `primarySoft`, `primaryStrong`, `accent`,
+`accentSoft`, `accentStrong`, `success*`, `warning*`, `danger*`, `line`, `lineStrong`, `fabFrom`,
+`fabTo`. The same token names are used in two places that must stay in sync:
 
 - `themes.ts` — JS object consumed by React code via `useTheme()`
 - `tailwind.config.js` — Tailwind colors mapped to CSS variables
 
-`ThemeProvider` writes the active theme's tokens as CSS variables both on the
-web `document.documentElement` and on a wrapper `View` via NativeWind's `vars()`
-helper so that NativeWind classes like `bg-background` always reflect the
-current theme.
+[ThemeProvider.tsx](../design-system/ThemeProvider.tsx) emits the active theme as CSS variables
+(`--bg`, `--card`, `--ink`, `--primary-soft`, …) — on web on `document.documentElement`, on native
+through NativeWind's `vars()` on a wrapper `View`. Tailwind classes (`bg-bg`, `text-ink`,
+`bg-primary-soft`, `border-line`) read those variables, so a theme switch is automatic.
+
+The tab bar (Dashboard · Kalender · Essen · Aufgaben · Familie) takes its labels from the `nav.*`
+i18n keys and its tokens from `DS.components.tabBar`.
 
 ## Routing
 
@@ -71,8 +77,19 @@ current theme.
 
 - **Zustand** — local/UI state. Each store sits next to its feature; the theme
   store lives in `design-system/themeStore.ts`.
-- **TanStack Query** — server state (Supabase reads, Edamam reads, etc.). Will
-  be wired once Supabase is added.
+- **TanStack Query** — server state (Supabase reads). Mounted in
+  `app/_layout.tsx` with the defaults `retry: 1`, `staleTime: 30s`.
+
+## Supabase
+
+Der Client ([features/supabase/](../features/supabase/)) läuft über `@supabase/supabase-js` mit
+AsyncStorage-Sitzung. Das Schema samt RLS-Policies liegt in `supabase/migrations/`, die
+TypeScript-Typen in `features/supabase/database.types.ts` werden daraus generiert. Auth ist
+E-Mail + Passwort mit strikter Bestätigungs-Mail, Passwort-Reset und einem Onboarding in fünf
+Schritten mit Einladung über das Share-Sheet ([ADR-005](./decision-log.md)); welche Route ein
+Nutzer sieht, entscheidet `features/auth/AuthGate`. Für alles, was die Datenbank berührt, gibt es
+eine lokale Supabase im Docker als Testumgebung — gleich in Schema und Konfiguration, nie in Daten
+([supabase/SETUP.md](../supabase/SETUP.md) §7, [ADR-044](./decision-log.md)).
 
 ## Kalender
 
@@ -159,8 +176,11 @@ Formular → applyEditScope → Schritte → apply_event_change(Kennung, Termin,
 ```
 
 Der Server vergleicht die Version, bevor er etwas schreibt (`EF409` → Nachlese → Konfliktdialog),
-und beantwortet eine schon verbuchte Kennung mit `already_applied`. Aufgaben löschen über
-`public.delete_task`. Beide Funktionen laufen mit den Rechten des Aufrufers; RLS bleibt die
+und beantwortet eine schon verbuchte Kennung mit `already_applied`. Aufgaben speichern per
+Compare-and-Swap mit Nachlese ([ADR-036](./decision-log.md)) und löschen über
+`public.delete_task`, beides hinter dem injizierbaren `TaskOps`-Schnitt in
+[features/tasks/mutations.ts](../features/tasks/mutations.ts); ein Löschkonflikt meldet sich als
+Toast mit „Trotzdem löschen". Beide Funktionen laufen mit den Rechten des Aufrufers; RLS bleibt die
 Grenze. Getestet wird die Datenbankseite gegen eine lokale Supabase
 ([supabase/SETUP.md](../supabase/SETUP.md) §7): pgTAP und Integrationstests mit zwei Clients über
 `bun run test:db`.

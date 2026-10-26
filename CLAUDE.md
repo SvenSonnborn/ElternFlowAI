@@ -8,6 +8,83 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 User-facing app name (`app.json`, i18n `app.name`) is just **"Eltern Flow"** — the "AI" suffix is internal. Brand voice: warm, ruhig, modern, vertrauenswürdig. Niemals kindlich-süß. Immer Du, nie Sie. Primary locale **DE**, English is the alternate via switcher.
 
+Diese Datei hält nur Regeln und Fallen, die in jeder Sitzung gelten. Wie etwas gebaut ist, steht hier:
+
+| Thema                                                           | Datei                                                                                |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| App-Architektur, Theming, Supabase, Kalender, Realtime          | [docs/architecture.md](docs/architecture.md)                                         |
+| Vollständiger Ordnerbaum, neue Screens und Features anlegen     | [docs/eltern-flow-ai-project-structure.md](docs/eltern-flow-ai-project-structure.md) |
+| Toolchain, Test-Runner, MCP, CI-Workflows, Renovate, CodeRabbit | [docs/development.md](docs/development.md)                                           |
+| Entscheidungen und ihr Warum                                    | [docs/decision-log.md](docs/decision-log.md)                                         |
+| Lokale Supabase, Testkonten, Migrationen einspielen             | [supabase/SETUP.md](supabase/SETUP.md) §7                                            |
+
+## Arbeitsweise
+
+Vier Regeln gegen typische Fehler von KI-Assistenten beim Programmieren, übernommen aus [forrestchang/andrej-karpathy-skills](https://github.com/forrestchang/andrej-karpathy-skills/blob/main/CLAUDE.md). Sie setzen Sorgfalt vor Tempo; bei trivialen Aufgaben gilt Augenmaß. Wo eine Projektregel weiter unten genauer ist, gilt die Projektregel.
+
+### 1. Erst denken, dann programmieren
+
+**Nichts unterstellen. Unklarheit nicht verstecken. Abwägungen offenlegen.**
+
+Vor der Umsetzung:
+
+- Annahmen ausdrücklich nennen. Bei Unsicherheit fragen.
+- Gibt es mehrere Deutungen, sie vorlegen — nicht stillschweigend eine wählen.
+- Gibt es einen einfacheren Weg, ihn nennen. Widersprechen, wenn es angebracht ist.
+- Ist etwas unklar: anhalten, benennen, was unklar ist, fragen.
+
+### 2. Einfachheit zuerst
+
+**Der kleinste Code, der das Problem löst. Nichts auf Vorrat.**
+
+- Keine Funktionen über das Verlangte hinaus.
+- Keine Abstraktionen für Code, der nur an einer Stelle gebraucht wird.
+- Keine „Flexibilität" oder Konfigurierbarkeit, die niemand verlangt hat.
+- Keine Fehlerbehandlung für Fälle, die nicht eintreten können.
+- Wären aus 200 Zeilen 50 möglich: neu schreiben.
+
+Prüffrage: Würde jemand mit viel Erfahrung das überkompliziert nennen? Dann vereinfachen.
+
+### 3. Gezielte Änderungen
+
+**Nur anfassen, was sein muss. Nur die eigenen Spuren aufräumen.**
+
+Beim Ändern von bestehendem Code:
+
+- Benachbarten Code, Kommentare und Formatierung nicht „verbessern".
+- Nichts umbauen, was nicht kaputt ist.
+- Den vorhandenen Stil übernehmen, auch wenn du es anders machen würdest.
+- Fällt fremder toter Code auf: erwähnen, nicht löschen. Ist es echte Folgearbeit, kommt sie nach `docs/TODO.md` (siehe [Out-of-scope TODOs](#out-of-scope-todos)).
+
+Wenn die eigene Änderung Waisen erzeugt:
+
+- Imports, Variablen und Funktionen entfernen, die _deine_ Änderung unbenutzt gemacht hat.
+- Vorher schon toten Code nur auf Anfrage entfernen.
+
+Der Test: Jede geänderte Zeile lässt sich direkt auf die Anfrage zurückführen. Was die [Documentation discipline](#documentation-discipline) zu einer Änderung verlangt (Docstring, Kommentar, TODO-Eintrag), gehört dazu.
+
+### 4. Zielgerichtet ausführen
+
+**Erfolgskriterien festlegen. Wiederholen, bis sie nachweislich erfüllt sind.**
+
+Aufgaben in prüfbare Ziele übersetzen:
+
+- „Validierung ergänzen" → „Tests für ungültige Eingaben schreiben, dann grün machen"
+- „Den Bug beheben" → „Einen Test schreiben, der ihn nachstellt, dann grün machen"
+- „X umbauen" → „Tests laufen vorher und nachher grün"
+
+Bei mehrstufigen Aufgaben einen kurzen Plan nennen:
+
+```
+1. [Schritt] → prüfen: [Check]
+2. [Schritt] → prüfen: [Check]
+3. [Schritt] → prüfen: [Check]
+```
+
+Prüfen heißt hier: ein Befehl aus [Commands](#commands) mit Exit-Code, nicht Augenschein. Starke Kriterien erlauben selbstständiges Weiterarbeiten; schwache („mach, dass es geht") erzwingen ständige Rückfragen.
+
+**Die Regeln wirken, wenn** Diffs weniger unnötige Änderungen enthalten, seltener wegen Überkomplexität neu geschrieben wird und Rückfragen vor der Umsetzung kommen statt nach dem Fehler.
+
 ## Non-negotiables
 
 1. **The handoff bundle is source of truth.** These files are owned by the designer and are off-limits to edit unless explicitly asked:
@@ -21,7 +98,7 @@ User-facing app name (`app.json`, i18n `app.name`) is just **"Eltern Flow"** —
 
 3. **All UI strings live in i18n catalogs.** Use the keys in `docs/COPY.md` — `nav.*`, `dash.*`, `voice.*`, `auth.*`, `onb.*`, `cal.*`, `meals.*`, `hw.*`, `child.*`, `set.*`, `sync.*`. German in `de.json` is the canonical copy; English mirrors.
 
-   `sample.*` is the one namespace that deliberately does **not** appear in `docs/COPY.md`: it holds QA fixture copy (sample family, sample event titles), which the deck keeps in two explicitly German-only sections rather than as a DE/EN pair. Fixtures read it through an injected `Translate` ([features/shared/translate.ts](features/shared/translate.ts)), never through i18next's module-level `t` — that global returns `undefined`, not the key and not `defaultValue`, until `i18n.init()` has run. See [ADR-020](docs/decision-log.md).
+   `sample.*` is the one exception: QA fixture copy, deliberately absent from `docs/COPY.md`. Fixtures read it through an injected `Translate` ([features/shared/translate.ts](features/shared/translate.ts)), never through i18next's module-level `t` — that returns `undefined` until `i18n.init()` has run ([ADR-020](docs/decision-log.md)).
 
 4. **Touch targets ≥ 44×44.** Mic FAB is 60. Voice overlay mic is 84. Tab bar shows exactly 5 tabs.
 
@@ -46,9 +123,8 @@ supabase start               # Lokale Supabase (Docker) — Testumgebung für al
 bun run test:db              # pgTAP + Integrationstests gegen die lokale Supabase
 ```
 
-`bun test` runs Bun's built-in runner, which understands `describe`/`it`/`expect` and resolves the `@/*` path alias from `tsconfig.json`. The npm `test` script points at `bun test` — matching the `test` step in `ci.yml` — instead of the `jest` binary: test files import from `bun:test` directly, so `npx jest` fails to load most suites (`Cannot find module 'bun:test'`) no matter which `jest`/`jest-expo` version is pinned, and `jest-expo` version drift across SDK bumps (`expo install --fix` has swung it between an SDK-54-incompatible `^55.0.17` and the correct `~54.0.17`) has separately broken the `jest` binary outright with a `clearMocksOnScope` crash. Pointing `test` at `bun test` decouples local (`bun run test`) and CI runs from that per-SDK fragility. Tests that render React Native components or hooks are the exception, because `bun test` cannot load `react-native`. They are named `*.jest.tsx` / `*.jest.ts`, sit next to the code they test, and run under `jest` with the `jest-expo` preset via `bun run test:rn`. Setup and `renderScreen` live in [testing/](testing/), see [ADR-042](docs/decision-log.md). `jest` collects only those files, and `bun test` never sees them. Never put one under `app/`: Expo Router treats every `.tsx` there as a route.
-
-`bun run test:db` braucht den laufenden lokalen Stack ([supabase/SETUP.md](supabase/SETUP.md) §7). Es läuft `supabase test db` (pgTAP unter `supabase/tests/database/`) und danach die Integrationstests `supabase/tests/integration/*.db.ts`, die zwei angemeldete Clients gegeneinander stellen und nur gegen `127.0.0.1`/`localhost` laufen. `bun test` sammelt `.db.ts` nicht ein; das Script nennt jede Datei einzeln, ein neuer Integrationstest muss dort eingetragen werden ([ADR-044](docs/decision-log.md)).
+- **Never `npx jest`.** Test files import from `bun:test`; `bun test` is the runner. Tests that render React Native components or hooks are the exception: named `*.jest.tsx` / `*.jest.ts`, next to the code they test, run via `bun run test:rn`, setup and `renderScreen` in [testing/](testing/) ([ADR-042](docs/decision-log.md)). Never put one under `app/` — Expo Router treats every `.tsx` there as a route.
+- **`bun run test:db`** needs the running local stack and only talks to `127.0.0.1`/`localhost`. `bun test` does not collect `*.db.ts`; a new integration test must be added to the `test:db` script by name ([ADR-044](docs/decision-log.md)).
 
 Web-bundle smoke check end-to-end:
 
@@ -56,13 +132,7 @@ Web-bundle smoke check end-to-end:
 bunx expo export --platform web --output-dir /tmp/eltern-web
 ```
 
-## Local toolchain (mise)
-
-Node, Java, Bun, and the Supabase CLI are pinned per-project in [mise.toml](mise.toml) (managed by [mise](https://mise.jdx.dev)). With mise activated in your shell (`eval "$(mise activate zsh)"`), `cd`-ing into the repo auto-selects **node 24 (LTS)**, **bun 1.3.14** (same version as CI), **JDK 17**, and **supabase 2.121.0** (the CLI that runs the local stack, same version as `db.yml`), and sets `JAVA_HOME`. Run `mise install` once after cloning.
-
-The **JDK 17 pin is what makes the Android build work**: the Gradle wrapper (9.3.1, shipped by the SDK 57 template) runs on JDK 17–25 — JDK 26 needs Gradle 9.4+ —, so the machine default (26) fails Gradle with `Unsupported class file major version 70`. 17 is both React Native's canonical JDK and Gradle 9's floor — bump the `java` pin to 21 if a future SDK's Android build requires it. `ci.yml` is unaffected (it pins Bun via `oven-sh/setup-bun`, not mise), but `native-build.yml` reads its **whole** toolchain from `mise.toml` via `jdx/mise-action` — the native builds are exactly where these pins are load-bearing, so they read the same file the developer's shell does instead of a second copy in YAML ([ADR-016](docs/decision-log.md)).
-
-`mise.toml` also sets **`RCT_USE_PREBUILT_RNCORE=0`** under `[env]`. Since SDK 55, Expo enables prebuilt React Native core (the `React-Core-prebuilt` pod / `React.xcframework`) for iOS by default, but CocoaPods can resolve a stale, version-mismatched prebuilt binary whose headers fail the iOS build (`RCTDevMenuConfiguration` "expected a type" in `EXReactRootViewFactory.h`). This var forces RN to build from source (as SDK 54 did). The generated `ios/Podfile` (line 19) assigns it with `||=` from `podfile_properties['ios.buildReactNativeFromSource'] == 'true' ? '0' : '1'` — a key this project does **not** set, so the value falls back to `'1'` unless the environment provides it. The env var is therefore the only thing holding the pin, which is why `native-build.yml` asserts it explicitly instead of trusting it. The checked-in alternative would be the `expo-build-properties` plugin in `app.json`, which would write that key into `Podfile.properties.json` and make the pin survive without any env var (noted in [docs/TODO.md](docs/TODO.md)). Trade-off: slower iOS builds; revisit when a later SDK's prebuilt RN is stable.
+**Toolchain:** Node, Java, Bun and the Supabase CLI are pinned in [mise.toml](mise.toml) — `mise install` once, mise activated in the shell. Two pins look optional and are not: **JDK 17** (the machine default JDK fails the Gradle build) and **`RCT_USE_PREBUILT_RNCORE=0`** (without it iOS can pull a mismatched prebuilt RN core). Why: [docs/development.md](docs/development.md#toolchain-mise).
 
 ## Tech stack (locked)
 
@@ -73,123 +143,43 @@ The **JDK 17 pin is what makes the Android build work**: the Gradle wrapper (9.3
 - **react-i18next + expo-localization** — DE default, EN switch
 - **react-native-reanimated v4 + react-native-worklets** — last babel plugin must be `react-native-worklets/plugin`
 - **ESLint 9 (flat config)** + Prettier + jest-expo
-- **Supabase JS Client** (`@supabase/supabase-js` + AsyncStorage session) via [features/supabase/](features/supabase/). MCP via den von Supabase gehosteten HTTP-Server (`mcp.supabase.com`, project-scoped) — Konfig in `.mcp.json`, Auth per **Personal Access Token** statt OAuth (ADR-009, seit [ADR-029](docs/decision-log.md) tatsächlich in `.mcp.json` umgesetzt — der Header fehlte bis dahin in jedem Commit): `.mcp.json` expandiert `${SUPABASE_ACCESS_TOKEN}` in den `Authorization`-Header, mise lädt die Variable aus dem gitignorierten `.env.local` (`[env] _.file`). **Ohne eigenen Token in `.env.local` bleibt der Server unverbunden** — der Header schaltet den OAuth-Fallback ab. App-ENV liegt im selben `.env.local` (siehe `.env.example`). Schema mit RLS-Policies in `supabase/migrations/`, TypeScript-Types in `features/supabase/database.types.ts` (generiert). Auth-Flow lebt seit ADR-005 (Email+Passwort, strict Confirm-Email, Reset-Password, 5-Step-Onboarding mit Share-Sheet-Invite, `features/auth/AuthGate`). **Realtime** liefert seit [ADR-030](docs/decision-log.md) echten Live-Sync für Termine (Issue #51 erledigt): Ein `after`-Trigger sendet Änderungen an `events` und `event_exceptions` per `realtime.broadcast_changes()` auf das private Topic `family:<familyId>` — **nicht** mehr über die Publikation `supabase_realtime` (ADR-028 ist in diesem Punkt abgelöst) —, autorisiert über eine RLS-Policy auf `realtime.messages`. Client-seitig hängt [features/realtime/](features/realtime/) als Sync-Schicht über den Features: ein Mountpunkt in `ThemedStack`, 300 ms Sammelfenster, gezielte Invalidierung; Kalender und Dashboard aktualisieren sich damit von selbst und zeigen nach zehn Sekunden ohne Kanal `<SyncNotice />`. Der Dev-Screen unter `/debug/realtime` liest denselben Strom mit. **Conflict-Detection** steht seit [ADR-031](docs/decision-log.md) (Issue #52): ein `before update`-Trigger belebt `updated_at` auf `events`, `event_exceptions` und `tasks`, der Kalender schreibt seit [ADR-044](docs/decision-log.md) jede Änderung als **eine Transaktion** über die RPC `apply_event_change`, die Master und Exception sperrt und gegen die Version des Formulars prüft, bevor sie irgendetwas schreibt — eine Kennung pro Absicht macht „Erneut versuchen" idempotent, und bei einem Konflikt liest der Client die fremde Fassung nach, weshalb `EventConflictError.row` nicht `null` sein kann ([ADR-037](docs/decision-log.md)) —, Aufgaben speichern seit [ADR-036](docs/decision-log.md) per Compare-and-Swap mit Nachlese und löschen seit ADR-044 über die RPC `delete_task`, beides hinter dem injizierbaren `TaskOps`-Schnitt in [features/tasks/mutations.ts](features/tasks/mutations.ts), und ein Löschkonflikt meldet sich als Toast mit „Trotzdem löschen"; weicht ein Feld ab, das jemand anderes geändert hat (dreiwertiger Vergleich `base`/`mine`/`theirs`), zeigt `<ConflictDialogHost />` im Root-Layout den Vergleich — seit [ADR-038](docs/decision-log.md) auch für die Wiederholungsregel —, Löschen meldet sich als Toast. Damit sind die drei Realtime-Iterationen abgeschlossen (#50 Fundament → #51 Live-Sync → #52 Conflict-Detection). **Zeitzone** trägt seit [ADR-033](docs/decision-log.md) jeder Termin selbst (`events.timezone`, IANA-Zone, Default `Europe/Berlin`): Serien werten vollständig in Wandzeit aus statt über `rrule`s `tzid` (die rechnet nur bei Prozess-Zeitzone UTC korrekt, in der Gerätezone einer RN-App also nie), und neue Termine bekommen ihre Zone unsichtbar von `deviceTimeZone()`. **Der Occurrence-Schlüssel** trennt seit [ADR-034](docs/decision-log.md) zwei Daten, die vorher ein Feld waren: `occurrenceKey` (von der Regel erzeugt, in der Zone des Termins gebildet über `zonedDateKey`) benennt die Zeile in `event_exceptions` und ist die Identität einer Occurrence — Versionsvergleich, React-Keys, der Route-Parameter `occ` und der Schreibpfad schlüsseln darauf; `occurrenceDate` bleibt das aufgelöste Anzeigedatum in der Zone des Lesers. Ohne Override sind beide gleich, solange Gerätezone und Terminzone denselben Kalendertag sehen — fällt die Tagesgrenze dazwischen, laufen sie trotz fehlenden Overrides auseinander. **Der Override-Vertrag** (`event_exceptions.override`) liegt seit [ADR-035](docs/decision-log.md) als eigenes Modul in [features/calendar/override.ts](features/calendar/override.ts) und führt `description` mit — eine per „Nur diesen" geänderte Beschreibung erreichte die Anzeige vorher nie —, und ein unparsbarer Datumswert wird dort verworfen, statt über einen `RangeError` den gesamten Kalenderbereich zu leeren. Die **Kandidatenmenge** einer Serie kommt seither aus zwei Quellen statt einer: den Regel-Vorkommen **und** den `modified`-Exceptions, die ein Override in das Fenster geschoben hat — sonst war eine so verschobene Occurrence an beiden Daten unsichtbar. Damit sind alle fünf PRs aus Block 1 der Roadmap („Stiller Datenverlust im Kalender") gelandet. **Lokale Supabase:** Seit [ADR-044](docs/decision-log.md) gibt es einen Docker-Stack über die gepinnte CLI als Testumgebung für alles, was die Datenbank berührt; er gleicht live in Schema und Konfiguration, nie in Daten. Start, Testkonten, Abgleich mit live und den Rollout einer Migration beschreibt [supabase/SETUP.md](supabase/SETUP.md) §7. Edge Functions sind die nächste Iteration.
+- **Supabase** (`@supabase/supabase-js` + AsyncStorage session) via [features/supabase/](features/supabase/). Schema with RLS in `supabase/migrations/`, generated types in `features/supabase/database.types.ts`.
 
 Deferred to later iterations (not yet wired): Edge Functions, gustar.io Worker, Stripe, real STT + LLM, Expo Notifications.
 
+Für diese Versionen ist Trainingswissen oft veraltet — Bibliotheks-Doku über den MCP-Server `context7` holen.
+
+### Datenschicht — Fallen beim Ändern
+
+Wie Kalender, Realtime und Konflikterkennung zusammenspielen, beschreibt [docs/architecture.md](docs/architecture.md). Diese Regeln brechen still, wenn man sie übersieht:
+
+- **Termine schreiben nur über die RPC `apply_event_change`** — eine Transaktion, eine Kennung pro Absicht; Aufgaben speichern per Compare-and-Swap und löschen über `delete_task`, beides hinter `TaskOps` in [features/tasks/mutations.ts](features/tasks/mutations.ts) ([ADR-044](docs/decision-log.md)).
+- **Die Identität einer Occurrence ist `occurrenceKey`** (Zone des Termins), nicht `occurrenceDate` (Anzeige, Zone des Lesers). Versionsvergleich, React-Keys, Route-Parameter `occ` und Schreibpfad schlüsseln darauf ([ADR-034](docs/decision-log.md)).
+- **Serien rechnen in Wandzeit** über [features/calendar/rrule.ts](features/calendar/rrule.ts), nie über `rrule`s `tzid`. Jeder Termin trägt seine Zone in `events.timezone`; neue Termine bekommen sie von `deviceTimeZone()` ([ADR-033](docs/decision-log.md)).
+- **Der Vertrag von `event_exceptions.override`** lebt in [features/calendar/override.ts](features/calendar/override.ts) — dort erweitern, nicht daneben ([ADR-035](docs/decision-log.md)).
+- **Realtime läuft über Broadcast** auf dem privaten Topic `family:<familyId>`, nicht über die Publikation `supabase_realtime`; der eine Mountpunkt ist `useFamilyRealtime()` ([ADR-030](docs/decision-log.md)).
+
 ## MCP-Server
 
-`.mcp.json` ist projekt-scoped und eingecheckt; `.claude/settings.local.json` setzt `enableAllProjectMcpServers: true`, ein neuer Eintrag ist nach Claude-Code-Neustart also ohne Freigabe-Dialog aktiv. Beides sind hosted HTTP-Server — kein `npx`, keine lokale Node-Runtime.
-
-| Server     | URL                                                        | Auth                                                                       |
-| ---------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `supabase` | `mcp.supabase.com` (project-scoped, `features=`-Whitelist) | Personal Access Token — **Pflicht**, ADR-009 + ADR-029                     |
-| `context7` | `mcp.context7.com`                                         | `${CONTEXT7_API_KEY:-}` als `Authorization`-Header — **optional**, ADR-012 |
-
-**Context7** (Upstash) liefert versionsaktuelle Bibliotheks-Dokumentation gegen genau das Problem, das dieses Repo hat: veraltetes Trainingswissen über Expo SDK 57, RN 0.86, NativeWind v4, Reanimated v4. Zwei Tools — `resolve-library-id` (Name → ID wie `/expo/expo`) und `query-docs` (Doku zu einer ID, nach Frage gerankt). Ohne Key verbindet er anonym und teilt das gemeinsame Anonym-Rate-Limit; das `:-`-Default in `.mcp.json` expandiert die fehlende Variable zu einem leeren Header, den Context7 mit `200` beantwortet. Eigenen Key aus <https://context7.com/dashboard> nach `.env.local` legen (siehe `.env.example`), mise exportiert ihn in die Shell.
-
-**Zur `${VAR}`-Expansion in `.mcp.json`** ([ADR-029](docs/decision-log.md)): Eine **nicht gesetzte** Variable lässt die Expansion _nicht_ scheitern — Claude Code lädt den Server, meldet in `claude mcp list` eine Missing-Variable-Warnung für genau diesen Server und sendet den unexpandierten Text `${VAR}` wörtlich. Daraus folgt die Regel für neue Einträge: **`:-` nur für optionale Keys** (Context7 — ein leerer Header ist dort ein gültiger Zustand), **kein Default für Pflicht-Token** (Supabase), weil die benannte Warnung mehr diagnostischen Wert hat als ein stummes `401`. Zweitens hat ein konfiguriertes `headers.Authorization` **Vorrang vor OAuth und schaltet den Fallback ab**: Wird der Header abgelehnt, meldet Claude Code die Verbindung als _failed_ statt als „braucht Authentifizierung". Ein Server mit Header braucht daher zwingend einen gültigen Token — einen Zwischenzustand gibt es nicht.
+`.mcp.json` ist eingecheckt und projekt-scoped, beide Einträge sind gehostete HTTP-Server. **`supabase`** braucht zwingend einen eigenen `SUPABASE_ACCESS_TOKEN` in `.env.local` — ohne bleibt er unverbunden ([ADR-009](docs/decision-log.md), [ADR-029](docs/decision-log.md)). **`context7`** läuft auch ohne Key ([ADR-012](docs/decision-log.md)). Regel für neue Einträge: `${VAR:-}` nur für optionale Keys, **kein Default für Pflicht-Token**. Warum, und wie die `${VAR}`-Expansion sich verhält: [docs/development.md](docs/development.md#mcp-server).
 
 ## Folder structure
 
 ```
-app/                     Expo Router routes — THIN re-export files only
-├─ _layout.tsx           Root stack + providers (QueryClient · i18n · ThemeProvider · SafeArea · GestureHandler · ToastProvider) + <ConflictDialogHost /> + <ScopeSheetHost /> + useFlushPendingDeletes() + useFamilyRealtime()
-├─ (tabs)/_layout.tsx    Bottom tab navigator (5 tabs) + Voice FAB overlay
-├─ (tabs)/index.tsx      → Dashboard
-├─ (tabs)/kalender.tsx
-├─ (tabs)/essen.tsx
-├─ (tabs)/aufgaben.tsx
-├─ (tabs)/familie.tsx
-├─ task/new.tsx           → TaskCreateScreen
-├─ task/edit/[id].tsx     → TaskEditScreen
-├─ debug/realtime.tsx     → RealtimeDebugScreen (nur `__DEV__` verlinkt)
-├─ meal/pick.tsx          → MealPickScreen (Rezept für einen festen Tag/Slot wählen)
-├─ meal/schedule.tsx      → MealScheduleScreen (Tag/Slot für ein festes Rezept wählen)
-└─ +not-found.tsx
-
-app-sections/            Real screen implementations
-├─ (tabs)/<name>/<Name>Screen.tsx
-├─ auth/                 (login & friends — to come)
-├─ debug/                Dev-Werkzeuge (Realtime-Debug) — Einstieg nur unter `__DEV__`
-├─ event/                Termin anlegen/ansehen/bearbeiten · Scope-Auswahl (`pickScope` →
-│                        ActionSheetIOS auf iOS, sonst scopeSheetStore · ScopeSheet · ScopeSheetHost, ADR-039)
-├─ meal/                 Essen einplanen: Auswahl · Tag/Slot-Wahl · der gemeinsame Einplan-Ablauf
-│                        (`runPlanning` · `useMealPlanning` — Allergie-Hinweis, Ersetzen-Dialog, ADR-043)
-├─ onboarding/           (5-step flow — to come)
-├─ modals/
-├─ task/                 Anlegen/Bearbeiten von Aufgaben (Create · Edit · TaskForm)
-└─ shared/               Geteilte Bausteine inkl. Formular-Primitives
-   (DateTimePickerSheet · TypePicker · MemberPicker · Field · confirmDialog
-   · Toast · useUndoableDelete · AllergenBadge · recipeA11y · mealPlaceholder · SyncNotice
-   · conflictStore · ConflictDialog · ConflictDialogHost · newRequestId (Kennung pro Absicht, ADR-044)
-   — von mehr als einem Tab benutzt)
-
-design-system/           Handoff bundle + theming runtime
-├─ colors.ts             Palette + brand aliases (HANDOFF — do not edit)
-├─ typography.ts         Inter scale + named textStyles (HANDOFF)
-├─ spacing.ts            space · radius · shadow · zIndex · motion (HANDOFF)
-├─ themes.ts             lightTheme · darkTheme · themes (HANDOFF)
-├─ components.ts         Variant SPECS for Button/Card/Pill/Field/FAB/… (HANDOFF — NOT React components)
-├─ index.ts              DS barrel (HANDOFF)
-├─ themeStore.ts         Zustand store for active theme
-├─ ThemeProvider.tsx     Injects CSS vars + NativeWind vars from active theme
-└─ ui/                   ← React component implementations (Claude-owned)
-   ├─ Button.tsx · Card.tsx · Screen.tsx · Text.tsx · index.ts
-
-features/                Cross-cutting feature logic
-├─ i18n/                 react-i18next init + de.json + en.json
-├─ auth/                 Session-Store · AuthGate · DeepLinkHandler · Onboarding-Mutations
-├─ calendar/             Queries · Mutations · RRULE-Expansion · Reminder · Pending-Deletes · Optimistic-Overlay
-│                        · rrule.ts (Vertrag: `occurrencesBetween`/`allOccurrences`, wertet in Wandzeit aus, ADR-033)
-│                        · timezone.ts (Instant↔Wandzeit-Umrechnung, `zonedDayBounds`) · deviceTimeZone.ts (Geräte-Zone für neue Termine)
-│                        · override.ts (Vertrag von `event_exceptions.override`, ADR-035)
-│                        · expand.ts (Occurrences aus zwei Kandidatenquellen: Regel + verschobene Exceptions, ADR-035)
-│                        · realtimeKeys.ts (Änderung → Query-Keys, ADR-030)
-│                        · version.ts (Versions-Token, schlüsselt auf `occurrenceKey`, ADR-034) · conflict.ts (Feldvergleich, ADR-031, samt Regel seit ADR-038)
-│                        · rule.ts (der eine Regel-Vergleich — Exceptions löschen und Konflikt melden, ADR-038)
-│                        · eventChange.ts (Schritte aufzeichnen, `apply_event_change` aufrufen, Fehler abbilden, ADR-044)
-├─ realtime/             Sync-Schicht über den Features (ADR-030): Topic · Payload-Normalisierung
-│                        · Kanal (privat, ein Topic pro Familie) · Sammelfenster · Reconnect-Regeln
-│                        · Status-Store · dispatch (kennt die Feature-Mapper) · useFamilyRealtime
-├─ tasks/                Queries · Mutations · Filter · Stats · Pending-Deletes
-│                        · mutations.ts (TaskOps-Schnitt, reine updateTask/deleteTask: CAS beim Speichern, ADR-036; `delete_task` beim Löschen, ADR-044)
-│                        · conflict.ts (Feldvergleich, ADR-031)
-├─ children/             Kinderprofile
-├─ meals/                Meal-Planner-Daten-Layer (Queries · JSONB-Normalisierung · Wochenlogik
-│                        · Ausweichgericht-Auswahl)
-│                        · mutations.ts (MealOps-Schnitt, Schutz über die gesehene `recipe_id`, ADR-043)
-│                        · useMealMutations.ts (Hooks mit Wochen-Patch) · planningSteps.ts (Dialog-Abfolge)
-│  └─ allergens/         EU-14-Vokabular · DE/EN-Begriffslisten · Zutaten-Klassifizierer · Urteil (ADR-014)
-├─ shared/               Feature-übergreifende Hooks + Typen (useToday · Translate
-│                        · pendingDeletes — verzögerte Löschungen mit Undo-Fenster)
-├─ sample-data/          Mock-Daten für noch nicht verdrahtete Screens (Copy aus `sample.*`)
-├─ voice-assistant/      (placeholder)
-├─ supabase/             client.ts (createClient + AsyncStorage session) + barrel
-└─ notifications/        (placeholder)
-
-testing/                 Jest-Setup + renderScreen für Komponenten-Tests (*.jest.tsx, ADR-042)
-
-supabase/                Schema + lokale Supabase (ADR-044; Ablauf in SETUP.md)
-├─ migrations/           Schema mit RLS — Dateinamen tragen die Versionen von live
-├─ config.toml           lokaler Stack, spiegelt die Live-Konfiguration (Abweichungen kommentiert)
-├─ seed.sql              drei Testkonten in zwei Familien, feste UUIDs
-├─ parity.sql            Abgleich Schema + Konfiguration lokal ↔ live
-└─ tests/                database/ (pgTAP) · integration/*.db.ts (zwei Clients) — `bun run test:db`
-
+app/                     Expo Router routes — THIN re-export files; `_layout.tsx` holds navigator + providers
+├─ _layout.tsx           Root stack + providers
+└─ (tabs)/_layout.tsx    Bottom tab navigator (5 tabs) + Voice FAB overlay
+app-sections/            Real screen implementations; shared/ = Bausteine, die mehr als ein Tab benutzt
+design-system/           Handoff tokens (off-limits) · ThemeProvider · themeStore
+└─ ui/                   React component primitives (Claude-owned)
+features/                Cross-cutting feature logic (auth · calendar · realtime · tasks · meals · i18n · supabase …)
+testing/                 Jest-Setup + renderScreen für *.jest.tsx
+supabase/                Migrationen mit RLS · lokaler Stack · Tests
 patterns/                Per-screen design docs (HANDOFF — required reading per screen)
-├─ dashboard.md · dashboard-empty.md · login.md · onboarding.md
-├─ meals.md · calendar.md · homework.md · child-profile.md · settings-voice.md
-
-docs/
-├─ HANDOFF.md            Developer handoff overview (read first when onboarding)
-├─ COPY.md               DE/EN copy decks per screen (i18n source of truth)
-├─ ICONS.md              Icon list + stroke conventions
-├─ architecture.md
-├─ decision-log.md       ADRs (append new entries, don't rewrite history)
-├─ roadmap.md            Abarbeitungsreihenfolge für docs/TODO.md (Blöcke + Blocker)
-└─ eltern-flow-ai-project-structure.md
+docs/                    Handoff-Docs · architecture · development · decision-log · roadmap · TODO
 ```
+
+Detailed tree, module by module: [docs/eltern-flow-ai-project-structure.md](docs/eltern-flow-ai-project-structure.md). A new file goes where that tree says; a new folder updates it.
 
 ## Import patterns
 
@@ -230,30 +220,21 @@ Keeps `app/` as the URL surface and `app-sections/` as the implementation surfac
 
 **Den Root-`<Stack>` nie bedingt ersetzen.** Ein `<Redirect>` oder Splash an seiner Stelle, nachdem er gemountet war, löst beim Login-Übergang eine Render-Schleife aus; wann `AuthGate` ihn trotzdem ersetzt (Kaltstart, keine Sitzung), entscheidet [gateLayout.ts](features/auth/gateLayout.ts) ([ADR-040](docs/decision-log.md)).
 
-## Theming
+## Theming, Voice FAB, State
 
-Two themes — `light` (default) and `dark`. Every theme defines the full semantic role set: `bg`, `bgRaised`, `card`, `cardSubtle`, `overlay`, `ink`, `inkSecondary`, `inkTertiary`, `onMint`, `onOrange`, `primary`, `primarySoft`, `primaryStrong`, `accent`, `accentSoft`, `accentStrong`, `success*`, `warning*`, `danger*`, `line`, `lineStrong`, `fabFrom`, `fabTo`.
-
-These are emitted as CSS variables (`--bg`, `--card`, `--ink`, `--primary-soft`, …) by [ThemeProvider.tsx](design-system/ThemeProvider.tsx) on web + by NativeWind's `vars()` on native. Tailwind classes (`bg-bg`, `text-ink`, `bg-primary-soft`, `border-line`) read the CSS vars, so a theme switch is automatic.
-
-Tab bar (Dashboard · Kalender · Essen · Aufgaben · Familie) uses German labels straight from `nav.*` i18n keys. Tab tokens come from `DS.components.tabBar`.
-
-## Voice FAB
-
-Lives in [app-sections/shared/VoiceAssistantFAB.tsx](app-sections/shared/VoiceAssistantFAB.tsx) and is mounted by `app/(tabs)/_layout.tsx` so it overlays every tab. Spec lives in `DS.components.micFab` (60px, orange gradient, right inset 24, bottom inset 100 — above tab bar). Tapping today opens a placeholder modal. The full overlay (`patterns/settings-voice.md`) will be wired when STT + LLM provider are chosen.
-
-## State
-
-- **Zustand stores** sit next to the feature that owns them. Active theme: [design-system/themeStore.ts](design-system/themeStore.ts).
-- **TanStack Query** is mounted in the root layout but unused until Supabase lands. Default options: `retry: 1`, `staleTime: 30s`.
+- **Theming:** two themes, `light` (default) and `dark`. Colors only through Tailwind classes that read the theme's CSS variables (`bg-bg`, `text-ink`, `bg-primary-soft`, `border-line`), never hard-coded — then a theme switch is automatic ([docs/architecture.md](docs/architecture.md#theme-system)).
+- **Voice FAB:** [VoiceAssistantFAB.tsx](app-sections/shared/VoiceAssistantFAB.tsx), mounted by `app/(tabs)/_layout.tsx`, spec in `DS.components.micFab`. Today it opens a placeholder modal; the full overlay (`patterns/settings-voice.md`) waits for the STT + LLM provider.
+- **State:** Zustand stores sit next to the feature that owns them (active theme: [design-system/themeStore.ts](design-system/themeStore.ts)); server state goes through TanStack Query.
 
 ## Documentation discipline
 
 When you change code that's documented, update the doc before the PR is opened — docstrings and code comments in the same commit as the code, ADRs, roadmap and `docs/architecture.md` once at the end of the branch (see [Wo was steht](#wo-was-steht--eine-heimat-pro-tatsache) below):
 
 - Architectural changes → [docs/architecture.md](docs/architecture.md)
+- Toolchain, CI, Renovate, MCP, CodeRabbit → [docs/development.md](docs/development.md)
+- Folder moves, new folders → [docs/eltern-flow-ai-project-structure.md](docs/eltern-flow-ai-project-structure.md)
 - Decisions worth a paper trail → append a new ADR to [docs/decision-log.md](docs/decision-log.md) (never edit older ADRs — supersede them). The rule protects the _content_ of a decision: its rationale and consequences. Purely editorial repairs that leave the statement intact — dead links, wrong file/path references, typos — are fixed in place; a superseding ADR for a filename typo would be noise and would leave the broken reference in the original.
-- Anything visible to engineers (folder moves, new conventions, renamed routes) → this file
+- A new rule or trap that applies in every session (new convention, renamed route) → this file — kurz, mit Verweis auf die Heimat der Details
 
 When in doubt, the **handoff bundle wins**. CLAUDE.md and decision-log.md adapt around it.
 
@@ -263,6 +244,8 @@ Jede Tatsache hat genau **einen** Ort; andere Dokumente verlinken dorthin, statt
 
 | Was                                | Wo                                                 | Nicht dort                                             |
 | ---------------------------------- | -------------------------------------------------- | ------------------------------------------------------ |
+| Eine Regel für jede Sitzung        | `CLAUDE.md`, kurz, mit Link                        | Beschreibungen des Ist-Zustands, Herleitungen          |
+| Wie etwas gebaut ist (Ist-Zustand) | `docs/architecture.md` · `docs/development.md`     | Begründungen — die stehen im ADR                       |
 | Eine Entscheidung und ihr Warum    | ADR in `docs/decision-log.md`, kurz                | Testzahlen, Zeilennummern, Commit-Hashes, Messtabellen |
 | Eine offene Lücke, vertagte Arbeit | ein Eintrag in `docs/TODO.md`, zwei bis drei Sätze | Herleitungen, Messprotokolle                           |
 | Reihenfolge und Status             | `docs/roadmap.md`                                  | den Text von TODO-Einträgen oder ADRs — verlinken      |
@@ -283,46 +266,33 @@ Was hineingehört, ist das **Nicht-Offensichtliche**: warum es so gebaut ist, we
 
 Ausgenommen sind lokale Helfer, die eine Datei nicht verlässt — insbesondere die `input()`/`parent()`-Fabriken in Testdateien.
 
-Das ist eine **Konvention, kein Gate**: CodeRabbits Docstring-Coverage-Prüfung steht bewusst auf `threshold: 0` (siehe [Code review](#code-review-coderabbit)), weil sie alle vom Diff berührten Funktionen zählt und damit fremde Altlasten als eigenes Finding zurückspielt. Die Disziplin trägt diese Regel hier, nicht die Prüfung.
+Das ist eine **Konvention, kein Gate**: CodeRabbits Docstring-Coverage-Prüfung kann bewusst nicht fehlschlagen ([docs/development.md](docs/development.md#coderabbit)). Die Disziplin trägt diese Regel, nicht die Prüfung.
 
-## CI/CD (GitHub Actions)
+## CI/CD
 
-Sieben PR-getriggerte Workflows liegen in [.github/workflows/](.github/workflows/) (kein `push`-Trigger auf `main` — die PR-Gates davor genügen). Auf **jedem** Pull Request laufen fünf davon als Gate — `ci.yml`, `native-build.yml`, `pr-labeler.yml`, `dependency-review.yml`, `db.yml` („Gate" meint hier: läuft **unbedingt**, im Gegensatz zu den beiden bedingten unten; ihre sieben Jobs sind im Ruleset „main protection" als Required Checks eingetragen und blockieren den Merge — außer für den Repo-Admin, den das Ruleset als Bypass-Actor führt, siehe [docs/TODO.md](docs/TODO.md)); die anderen beiden laufen bedingt: `renovate-validate.yml` nur, wenn die Renovate-Config oder ihr eigener Workflow im Diff liegt, `expo-sdk-sync.yml` nur auf Renovates Expo-SDK-PR — und ist dabei kein Gate, sondern ein mutierender Workflow, der Commits in den PR-Branch pusht:
+Workflows in [.github/workflows/](.github/workflows/), alle PR-getriggert. Required Checks auf jedem PR: `ci.yml` (format → lint → typecheck → test → test:rn → Web-Export), `native-build.yml` (Metro-Bundles für iOS und Android, Android- und iOS-Compile), `db.yml` (lokale Supabase, Schema-Lint, `test:db`), `pr-labeler.yml` (Labels aus dem Branch-Präfix `feat/`, `fix/`, `chore/`, `docs/`, `refactor/`, `test/` …), `dependency-review.yml`. Bedingt: `renovate-validate.yml`, `expo-sdk-sync.yml`. Was jeder tut und warum: [docs/development.md](docs/development.md#cicd-github-actions).
 
-- **`ci.yml`** — ein Job, Steps in dieser Reihenfolge: `format:check` → `lint` → `typecheck` → `test` → `test:rn` (Komponenten-Tests unter `jest`, [ADR-042](docs/decision-log.md)) → `bunx expo export --platform web` (Web-Smoke-Build, als letzter/teuerster Step). Alle Qualitäts- und Build-Steps tragen `if: ${{ !cancelled() && steps.install.outcome == 'success' }}`, damit ein früher Check-Fehler die späteren nicht verdeckt, ein fehlgeschlagener Install sie aber alle überspringt. Der `test`-Step nutzt `bun test` (Buns Runner) — identisch zum npm-`test`-Script (`bun run test` == `bun test`); der `jest`-Binary scheitert an den Bun-nativen `bun:test`-Importen der Testdateien, siehe Tech-Stack-Notiz zu `bun test`. Runtime: Bun `1.3.14` (gepinnt), `bun install --frozen-lockfile`. Supabase-Public-Env kommt als Platzhalter aus dem Workflow-`env:`-Block (CI hat kein `.env.local`, der Client-Factory wirft sonst beim Modul-Load). **Typed-Routes-Caveat:** Expos `.expo/types` sind git-ignored und werden in CI **nicht** erzeugt (`expo export` generiert sie nicht, nur `expo start`), daher laufen type-aware Lint-Regeln in CI ohne die strikte `Href`-Union. Aktuell ohne Divergenz; ein `as never`-Cast in `RegisterScreen` war überflüssig und wurde entfernt (`no-unnecessary-type-assertion` hatte recht). Künftige `as`-Casts auf typisierten Routen bitte vermeiden, sonst weichen lokal/CI ab. **Expo-Ambient-Typen-Caveat:** Aus demselben Grund ist auch `expo-env.d.ts` (git-ignored, von Expo generiert) in CI abwesend — es zieht via `/// <reference types="expo/types" />` sowohl `declare module "*.css"` als auch die `process.env`-Typen herein. Deshalb committen wir [expo-globals.d.ts](expo-globals.d.ts) mit derselben Referenz; ohne sie failt CI-`typecheck` auf `import "@/global.css"` (TS2882) und type-aware Lint flaggt `process.env.EXPO_PUBLIC_*` als `any` (`no-unsafe-*`).
-- **`native-build.yml`** — drei Jobs, bewusst **ohne** `needs:` untereinander: `bundle` (ubuntu, Metro-Export für ios und android), `android` (ubuntu, `expo prebuild` → `./gradlew assembleDebug`) und `ios` (macos, `expo prebuild` → `pod install` → `xcodebuild` für den Simulator). Parallel statt sequenziell, weil Runner-Minuten auf einem **öffentlichen** Repo gratis sind — auch macOS — und damit allein die Wartezeit zählt: die PR-Dauer ist `max()`, nicht `sum()`, und iOS dominiert sie. **Der `bundle`-Job schließt eine eigene Lücke:** `ci.yml`s Web-Export löst `DateTimePickerSheet.web.tsx` auf, das native Geschwister `DateTimePickerSheet.tsx` (ADR-010) wird dort nie gebaut — und die beiden Compile-Jobs schließen sie nicht, weil Debug-Varianten JS gar nicht bundeln, sondern zur Laufzeit von Metro laden. `expo export -p` nimmt genau eine Plattform, daher zwei Aufrufe (`all` würde den Web-Export aus `ci.yml` doppeln). **Toolchain kommt aus `mise.toml`** via `jdx/mise-action@v4` statt aus `oven-sh/setup-bun` wie in `ci.yml` — und **mise selbst ist dort ebenfalls gepinnt** (`version: 2026.10.14` an allen drei Action-Blöcken, ebenso in `db.yml`). Ohne den Pin fragt die Action nach „latest", und mise' Versions-Endpunkt kann eine Version melden, deren GitHub-Release noch gar nicht veröffentlicht ist: Am 2026-09-08 nannte er `2026.9.3`, das Release existierte nicht, und alle drei Jobs starben nach 15 Sekunden an einem 404 beim Download — vor der ersten Zeile Projektcode, mit einem Fehlerbild, das nach kaputtem CI statt nach fremdem Release-Rennen aussieht. Beim Anheben prüfen, dass das Release wirklich existiert. Beide Compile-Jobs prüfen ihren Pin vorab explizit (`java -version` == 17 bzw. `RCT_USE_PREBUILT_RNCORE` == 0), weil beide Fehlerbilder — `Unsupported class file major version` und ein stiller Prebuilt-RNCore-Fallback — nach einem Projektfehler aussehen statt nach Toolchain-Drift. **Ohne Credentials:** Simulator-Destination + `CODE_SIGNING_ALLOWED=NO` heißt keine Zertifikate, keine Provisioning-Profile, kein Secret, kein Expo-Account. **Gemessene Laufzeiten: Metro ~1m15s · Android ~16m35s · iOS ~30m12s** — der iOS-Job bestimmt die PR-Dauer. **Es gibt hier bewusst kein ccache:** zwei Anläufe erzeugten nachweislich null ccache-Aufrufe, weil RNs Wrapper still auf plain clang zurückfällt, wenn `CCACHE_BINARY` den Compiler-Prozess nicht erreicht; die ~50 Zeilen Konfiguration sind wieder entfernt. Wer es erneut versucht, belegt **zuerst**, dass die Variable ankommt. Androids `--build-cache` bleibt — eine Zeile, Wirkung unbewiesen statt widerlegt. Und Vorsicht bei Laufzeit-Vergleichen: im selben Lauf wurde auch der unveränderte Metro-Job 29 % schneller, die Runner-Varianz ist also größer als die meisten Cache-Effekte. Siehe [ADR-016](docs/decision-log.md).
-- **`pr-labeler.yml`** + [.github/labeler.yml](.github/labeler.yml) — setzt Labels automatisch aus dem Branch-Namen (`actions/labeler@v7`, `head-branch`-Regex). Mapping: `feat/`→feature, `fix/`→bug, `chore/`·`ci/`·`build/`→chore, `docs/`→documentation, `refactor/`·`perf/`→refactor, `test/`→test. Die Label-Palette wird einmalig via `bash scripts/setup-labels.sh` (braucht `gh`-Auth) angelegt — das Skript bedient inzwischen zwei Quellen: die Branch-Namen-Labels oben sowie `dependencies`, `security` und `expo-sdk`, die Renovate selbst auf seine PRs setzt (siehe Renovate-Absatz unten). `expo-sdk` ist dabei keine Kosmetik: der Guard von `expo-sdk-sync.yml` prüft exakt dieses Label — fehlt es, feuert der Sync-Workflow nie.
-- **`dependency-review.yml`** — CVE-Gate für neue Dependencies (`actions/dependency-review-action@v5.0.0`, `fail-on-severity: moderate`).
-- **`db.yml`** — ein Job: startet die lokale Supabase im Runner (`supabase start`, CLI aus `mise.toml` per `jdx/mise-action`, vorab gegen den Pin geprüft), lintet das Schema (`supabase db lint --level warning --fail-on warning`, ohne `--fail-on` wäre der Schritt nie rot) und läuft `bun run test:db`; bei Rot sammelt ein Diagnose-Schritt Container-Status und -Logs. Bewusst **ohne** `paths`-Filter: Ein Required Check mit Pfadfilter liefe auf PRs ohne DB-Änderung nie und bliebe dort für immer „ausstehend". Keine Secrets — URL und Schlüssel kommen aus `supabase status` ([ADR-044](docs/decision-log.md)).
-- **`renovate-validate.yml`** — validiert [.github/renovate.json5](.github/renovate.json5) mit dem offiziellen `renovate-config-validator` (`npx --yes --package renovate@latest -- renovate-config-validator --strict --no-global .github/renovate.json5`). Der `@latest`-Dist-Tag ist kein Versions-Pin, sondern erzwingt eine frische npx-Auflösung statt eine gecachte Installation wiederzuverwenden: ein bare `--package renovate` hatte lokal während der Umsetzung einen `renovate@37.440.7` von Juli 2024 aus dem Cache gezogen und einen korrekten Config-Wert fälschlich als ungültig gemeldet. Läuft nur über den `paths:`-Filter, wenn `.github/renovate.json5` **oder** die Workflow-Datei selbst angefasst wird — eine schema-ungültige Config ließe Renovate sonst auf seine Defaults zurückfallen, und Defaults heißt hier, dass die Expo-Regeln nicht greifen.
-- **`expo-sdk-sync.yml`** — läuft ausschließlich auf Renovates Expo-SDK-PR (Guard: PR-Autor `renovate[bot]` + Label `expo-sdk` + kein Fork; das Gate labelt sowohl Major- als auch Minor-Sprünge mit `expo-sdk`, der Workflow feuert also auch auf einem Minor-SDK-PR) und schiebt dort `bunx expo install --fix` nach, damit `react-native`, alle `expo-*`, `react` und `@types/react` auf die vom neuen SDK vorgeschriebenen Versionen kommen. Der Push läuft mit `GITHUB_TOKEN` und triggert daher **keinen** neuen CI-Lauf — den PR nach dem Sync-Commit einmal schließen und wieder öffnen. Der `expo-doctor`-Schritt danach ist reiner Bericht (kein Gate, `continue-on-error: true`) und läuft ohne `tee`/Log-Datei: eine Pipe ohne explizites `shell: bash` (kein `pipefail`) hätte den Exit-Status maskiert und `steps.doctor.outcome` dauerhaft `success` gemeldet.
+Fallen, an denen lokal und CI auseinanderlaufen:
 
-Verhältnis zu CodeRabbit: CI macht die **mechanischen** Gates, der CodeRabbit-Bot das **inhaltliche** Review. Der lokale CodeRabbit-pre-push-Hook bleibt deaktiviert.
+- **Keine `as`-Casts auf typisierten Routen.** CI erzeugt `.expo/types` nicht, type-aware Lint sieht dort andere Typen als lokal.
+- **[expo-globals.d.ts](expo-globals.d.ts) bleibt eingecheckt** — ohne sie scheitert CI-`typecheck` an `import "@/global.css"`.
+- **Grüne `ci.yml` sagt nichts über Native-Builds** — sie endet beim Web-Export. Dafür ist `native-build.yml` da.
+- **Required Checks bekommen keinen `paths`-Filter**, sonst bleiben sie auf PRs ohne passende Änderung für immer „ausstehend".
 
-**Renovate.** Dependency-Updates laufen über die gehostete Mend-Renovate-App; die Konfiguration liegt in [.github/renovate.json5](.github/renovate.json5) (siehe [ADR-013](docs/decision-log.md)). Zwei Eigenschaften sind nicht verhandelbar, ohne den Build zu riskieren: **Expo-SDK-verwaltete Pakete laufen `rangeStrategy: "in-range-only"`** — ihre Versionen bestimmt Expo, nicht npm-latest —, und **`java` in `mise.toml` ist für Renovate deaktiviert**, weil der Gradle-Wrapper JDK ≤ 24 braucht.
-
-**Wer die Expo-Paketliste (Regel 3) anfasst, muss beide Vorgabe-Kanäle kennen** ([ADR-015](docs/decision-log.md)): Expo schreibt Native-Modul-Versionen in `node_modules/expo/bundledNativeModules.json` vor (Web: `api.expo.dev/v2/sdks/<version>/native-modules`), die **Toolchain** dagegen in `relatedPackages` unter `api.expo.dev/v2/versions/latest`. Kanal zwei enthält `jest`, `@types/jest` und `typescript` — Pakete ohne Expo-Namensmuster, die deshalb namentlich in der Liste stehen und dort **nicht** als Versehen wegzuräumen sind. `bunx expo install --check` prüft gegen beide Quellen und ist die schnellste Gegenprobe. Grüne CI ist hier kein Ersatz: `ci.yml` endet beim Web-Export und sieht Native-Bumps nicht. Ein SDK-Sprung (Major **und** Minor, da ein Minor gegen die Tilde-Range ebenfalls out-of-range sein kann) wird von Renovate nur gemeldet (Dependency Dashboard, `dependencyDashboardApproval`) und von `expo-sdk-sync.yml` aufgelöst. Automerge gilt nur für devDependencies (minor+patch), GitHub-Actions und Lockfile-Maintenance; alles andere braucht ein menschliches Review. Die Reihenfolge der acht `packageRules` ist Teil der Semantik — spätere Regeln überschreiben frühere. Unter Bun liest Renovates bun-Manager keine `lockedVersion` aus `bun.lock` (anders als der npm-Manager); In-Range-Patches an Expo-Paketen erscheinen deshalb **nicht** als eigener PR pro Paket, sondern werden von der wöchentlichen, automergten `lockFileMaintenance` aufgesammelt.
+**Renovate** ([.github/renovate.json5](.github/renovate.json5), [ADR-013](docs/decision-log.md), [ADR-015](docs/decision-log.md)): Expo-SDK-verwaltete Pakete laufen `in-range-only`, `java` in `mise.toml` ist für Renovate abgeschaltet. `jest`, `@types/jest` und `typescript` stehen absichtlich in der Expo-Paketliste — nicht wegräumen. Gegenprobe nach jedem Eingriff: `bunx expo install --check`. Der Sync-Commit von `expo-sdk-sync.yml` startet keine neue CI: PR einmal schließen und wieder öffnen.
 
 ## Code review (CodeRabbit)
 
-Before opening a PR / merge request, run a local CodeRabbit pass and address — or consciously dismiss with a reason — its findings:
+Before opening a PR, run a local CodeRabbit pass and address — or consciously dismiss with a reason — its findings:
 
 ```bash
-coderabbit review --base main      # plain text is the default output
+coderabbit review --base main           # plain text is the default output
 coderabbit review --base main --agent   # structured findings, for agent workflows
 ```
 
-`--plain` no longer exists as a flag (plain text became the default); `--agent`
-is the structured counterpart. `coderabbit review findings` reprints the last
-local review without spending a new one.
-
-This catches bugs, security issues, and CLAUDE.md/handoff violations **before** the PR exists, so the PR opens clean. The CodeRabbit GitHub bot then does the team-level review on the PR itself.
-
-- Review config lives in [.coderabbit.yaml](.coderabbit.yaml) — `path_instructions` are mapped to the non-negotiables above (handoff bundle off-limits, i18n enforced, touch targets, Du-Form, routing convention, RLS). Reviews are in German. Update this file when conventions change.
-- **Die Docstring-Coverage-Pre-Merge-Prüfung steht auf `threshold: 0`** ([.coderabbit.yaml](.coderabbit.yaml) — `reviews.pre_merge_checks.docstrings`): sie läuft und meldet ihre Zahl, kann aber nicht fehlschlagen. Gezählt werden alle vom Diff **berührten** Funktionen, nicht nur die neuen — zwei eingefügte Zeilen in einem bestehenden Screen erben dessen fehlenden Docstring als eigenes Finding. Begründung samt Alternativen (`mode: "off"` / `mode: "error"`) steht als Kommentar an der Einstellung. Dass die Prüfung nicht mehr blockt, heißt **nicht**, dass Docstrings optional sind — die Regel steht unter [Documentation discipline → Docstrings](#docstrings) und gilt unabhängig von ihr.
+- Rate limits: the CLI allows about 3 reviews/hour, the GitHub PR bot about 1 per developer/hour — don't loop reviews. `coderabbit review findings` reprints the last local review without spending a new one.
 - To re-trigger the bot's PR review after pushing fixes, comment `@coderabbitai review` on the PR.
-- A **pre-push hook** ([scripts/coderabbit-prepush.sh](scripts/coderabbit-prepush.sh), wired via `simple-git-hooks`) can run this review automatically before each `git push` of a feature branch — **warn-only**, never blocks. **Currently disabled** (early `exit 0` at the top of the script) because we rely on the CodeRabbit GitHub bot's PR reviews instead; re-enable by deleting the two disable lines. When active it skips on `main` and when there are no new commits vs `main`; bypass a single push with `git push --no-verify`. A commented BLOCK variant is in the script if you ever want it to fail the push on findings.
-- Keep it lightweight — don't loop reviews needlessly. Rate limits differ by interface: the CLI allows about 3 reviews/hour, and the GitHub PR bot about 1 review per developer/hour on a rolling window.
+- Review config lives in [.coderabbit.yaml](.coderabbit.yaml) (reviews in German, `path_instructions` mirror the non-negotiables). Update it when conventions change. Pre-push hook and docstring check: [docs/development.md](docs/development.md#coderabbit).
 
 ## Commits
 
