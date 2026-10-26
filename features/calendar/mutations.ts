@@ -155,12 +155,18 @@ function sqlState(err: unknown): string | null {
  *   gefunden", nicht „geändert". Ein Fehler der Nachlese geht unverändert
  *   weiter, statt als Konflikt verkleidet zu werden.
  * - `EF404`: Termin gelöscht oder per RLS unsichtbar.
- * - `42501` mitten im Aufruf: Der Aufrufer hat seine Familie verloren, ein
- *   Insert-Schritt scheitert an RLS. Für ihn ist der Termin damit genauso
- *   unerreichbar wie bei `EF404`; geschrieben wurde nichts. Derselbe Code
- *   kommt, wenn die Sitzung zwischen Fetch und Aufruf abläuft — ein Fetch
- *   ohne Sitzung hätte den Termin per RLS ebenfalls nicht gefunden, die
- *   Meldung ist also dieselbe wie ein paar Millisekunden früher.
+ * - `42501`: Kommt auf drei Wegen, und auf keinem bleibt etwas geschrieben.
+ *   RLS lehnt einen Insert-Schritt ab (Exception-Upsert, Split), weil der
+ *   Aufrufer seine Familie mitten im Aufruf verloren hat — die Transaktion
+ *   rollt zurück. Oder das JWT trägt kein `sub`, und die Funktion bricht in
+ *   ihrem ersten Schritt ab. Oder die Anfrage kommt ganz ohne Sitzung an
+ *   (abgemeldet, Refresh gescheitert) und läuft als `anon`, das kein execute
+ *   auf die Funktion hat. Jedes Mal erreicht dieser Aufrufer den Termin nicht
+ *   mehr, und ein Fetch hätte ihn per RLS ebenso wenig gefunden — deshalb
+ *   `EventNotFoundError` wie bei `EF404`. Ein abgelaufenes JWT landet nicht hier:
+ *   supabase-js erneuert den Token vor der Anfrage, und ein trotzdem
+ *   abgelaufenes weist PostgREST vor dem Funktionsaufruf mit `PGRST303`
+ *   (HTTP 401) ab — das bleibt bei „Alles andere".
  * - Alles andere (`40P01` nach einem Deadlock, `22023` als Client-Fehler, ein
  *   Netzwerkfehler) bleibt unverändert und landet in `mapEventError`. Nach
  *   `40P01` hat der Server zurückgerollt, ein Retry mit derselben Kennung ist
