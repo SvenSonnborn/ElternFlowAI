@@ -39,7 +39,7 @@ jobs:
       # die CLI-Version bestimmt, wie Migrationen angewendet und Tests
       # ausgeführt werden, und soll lokal und in CI dieselbe sein. mise.toml
       # lädt zwar `.env.local` per `[env] _.file`, mise überspringt die Datei
-      # aber still, wenn sie fehlt — in CI gibt es sie nicht (geprüft).
+      # aber still, wenn sie fehlt — in CI gibt es sie nicht.
       - name: Setup toolchain (mise)
         uses: jdx/mise-action@v4
         with:
@@ -82,3 +82,19 @@ jobs:
       # es braucht keine Secrets.
       - name: Test database
         run: bun run test:db
+
+      # Nur bei Rot: Ein Container, der nicht gesund wird, oder ein Realtime-/
+      # dblink-Timing-Fehler hinterlässt sonst nur die CLI-Ausgabe, und der
+      # Runner ist danach weg. `|| true`, damit die Diagnose selbst nie den
+      # eigentlichen Fehler überdeckt. Aufräumen braucht es nicht: Der Runner
+      # ist ephemer.
+      - name: Diagnose on failure
+        if: failure()
+        run: |
+          supabase status || true
+          docker ps -a || true
+          for c in $(docker ps -a --format '{{.Names}}' | grep '^supabase_'); do
+            echo "::group::docker logs ${c}"
+            docker logs --tail 200 "${c}" 2>&1 || true
+            echo "::endgroup::"
+          done
