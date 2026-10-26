@@ -36,7 +36,7 @@ const FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
  * `RangeError` von `Intl.DateTimeFormat` durchzureichen (Befund D, PR #119).
  *
  * `events.timezone` ist nur syntaktisch validiert (Regex-Constraint,
- * `supabase/migrations/20260909131523_events_timezone_iana_widen.sql`) — eine
+ * `supabase/migrations/20260909131554_events_timezone_iana_widen.sql`) — eine
  * Prüfung gegen `pg_timezone_names` scheidet aus: Diese Liste kennt
  * `Europe/Berlin`, aber nicht die Offset-Form `+00:00`, die
  * `deviceTimeZone()`s `Intl`-Fallback unter `TZ=GMT` legitim liefert

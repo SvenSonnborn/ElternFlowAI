@@ -4,7 +4,7 @@
 -- Feste UUIDs (spätere Tasks, pgTAP- und Integrationstests verlassen sich darauf):
 --
 --   Accounts (alle bestätigt, Passwort `lokal-test-1`)
---     A  a@test.local  
+--     A  a@test.local
 --        auth_user  aaaaaaaa-0000-4000-8000-000000000001
 --        parent     aaaaaaaa-0000-4000-8000-000000000011   (Testfamilie)
 --     B  b@test.local
@@ -20,7 +20,7 @@
 --
 --   Kind (Testfamilie)          c1c1c1c1-0000-4000-8000-000000000001   „Mia"
 --
---   Termine (Testfamilie, Typ `family` bzw. `schule` aus type_lookups)
+--   Termine (Testfamilie, Typ `family`, `training` bzw. `schule` aus type_lookups)
 --     Einzeltermin              e1e1e1e1-0000-4000-8000-000000000001   2026-11-03 10:00 Europe/Berlin
 --     Wochenserie, unbegrenzt   e2e2e2e2-0000-4000-8000-000000000001   montags 16:00, ab 2026-11-02
 --       modified-Exception      d1d1d1d1-0000-4000-8000-000000000001   Occurrence 2026-11-09, anderer Titel und Zeit
