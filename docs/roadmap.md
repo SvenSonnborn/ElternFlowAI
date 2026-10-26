@@ -819,6 +819,16 @@ Hero-CTA plant statt zu navigieren · ein ADR hält die Optimistik-Entscheidung 
 
 **Aufwand L · eigene Iteration mit Migration und Zwei-Client-Durchgang**
 
+> **Stand 2026-10-26: erledigt** ([ADR-044](./decision-log.md)). Kalenderänderungen laufen als
+> eine Transaktion über `apply_event_change`: Der Server prüft Master und Exception, bevor er
+> irgendetwas schreibt, und eine Kennung pro Absicht macht „Erneut versuchen" idempotent. Damit
+> sind die beiden Einträge unten und die Serverhälfte von #111 aus [TODO.md](./TODO.md)
+> verschwunden; `createSupabaseEventOps` gibt es nicht mehr. Aufgaben löschen über `delete_task`,
+> das „keine Familie" von „schon weg" unterscheidet. Dazu kamen eine lokale Supabase als
+> Testumgebung, Datenbank-Tests in der CI (`db.yml`) und ein Sicherheitsdurchgang. Die Overlay-
+> Hälfte von #111 bleibt offen, ebenso Änderungen an _anderen_ Occurrences beim Regelwechsel
+> (Spec §5.5, im 🎨-Eintrag zum Konfliktdialog).
+
 Die teuerste verbleibende Korrektheitsbaustelle — und die einzige, die **eine** Lösung für zwei
 Einträge ist. `TODO.md` beschreibt die RPC bei beiden als den sauberen Fix.
 

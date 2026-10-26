@@ -114,7 +114,22 @@ reviews:
     - path: "supabase/migrations/**/*.sql"
       instructions: >-
         Jede Tabelle braucht RLS-Policies. Flagge neue Tabellen ohne RLS, zu
-        permissive Policies und fehlende Indizes auf Foreign Keys.
+        permissive Policies und fehlende Indizes auf Foreign Keys. Funktionen:
+        `security invoker`, außer ein Kommentar begründet `definer`; immer
+        `set search_path = ''` und schema-qualifizierte Namen; `revoke all …
+        from public, anon` und `execute` nur für die Rolle, die es braucht.
+        Fehlercodes dürfen keine fremde Zeile verraten (kein Existenz-Orakel
+        über Familiengrenzen). Migrationen müssen idempotent sein und mit dem
+        Client auf `main` verträglich bleiben (ADR-044).
+
+    - path: "supabase/tests/**"
+      instructions: >-
+        pgTAP unter `database/`, Integrationstests unter `integration/*.db.ts`
+        (laufen über `bun run test:db`, nur gegen `127.0.0.1`/`localhost`). Ein
+        neuer `.db.ts` muss im `test:db`-Script stehen, sonst läuft er nie.
+        Tests ändern Seed-Zeilen nicht und räumen eigene Zeilen auch bei
+        Fehlschlag ab. Flagge Assertions, die nur Rückgabewerte prüfen, wo
+        es um die Wirkung in der Datenbank geht.
 
     # --- Doku-Disziplin ---
     - path: "docs/decision-log.md"
