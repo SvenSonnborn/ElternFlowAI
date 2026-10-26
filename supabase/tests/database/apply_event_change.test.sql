@@ -1010,7 +1010,8 @@ select is(
 );
 
 select is(
-  (select count(*) from private.event_change_requests),
+  (select count(*) from private.event_change_requests
+   where user_id <> 'bbbbbbbb-0000-4000-8000-000000000001'),
   0::bigint,
   'B sieht überhaupt keine fremden Verbuchungen'
 );

@@ -60,13 +60,25 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
-  const { error } = await admin.from("tasks").delete().in("id", createdTasks);
-  if (error) throw error;
+  // Jeder Schritt läuft, auch wenn ein früherer wirft — der Wegwerf-Nutzer wird
+  // in jedem Fall gelöscht. Der erste Fehler geht am Ende hoch.
+  const errors: unknown[] = [];
+  try {
+    const { error } = await admin.from("tasks").delete().in("id", createdTasks);
+    if (error) errors.push(error);
+  } catch (err) {
+    errors.push(err);
+  }
   createdTasks.length = 0;
   for (const userId of createdUsers.splice(0)) {
-    const { error: userError } = await admin.auth.admin.deleteUser(userId);
-    if (userError) throw userError;
+    try {
+      const { error } = await admin.auth.admin.deleteUser(userId);
+      if (error) errors.push(error);
+    } catch (err) {
+      errors.push(err);
+    }
   }
+  if (errors.length > 0) throw errors[0];
 });
 
 afterAll(async () => {
@@ -148,7 +160,7 @@ describe("delete_task gegen die lokale Instanz", () => {
     // ein Wegwerf-Nutzer, der nie ein Elternteil war.
     const task = await seedTask();
     const email = `${RUN}-ohne-familie@test.local`;
-    const password = "lokal-test-1";
+    const password = SEED.password;
     const { data: user, error } = await admin.auth.admin.createUser({
       email,
       password,
