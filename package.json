@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "test:rn": "jest",
+    "test:db": "supabase test db && bun test ./supabase/tests/integration/calendar.db.ts ./supabase/tests/integration/tasks.db.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
