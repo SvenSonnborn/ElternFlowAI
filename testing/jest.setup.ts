@@ -38,6 +38,15 @@ const mockSupabaseStub = () => ({
 jest.mock("@/features/supabase", () => mockSupabaseStub());
 jest.mock("@/features/supabase/client", () => mockSupabaseStub());
 
+// `jest-expo` ersetzt das native Modul hinter `expo-crypto` durch Stubs, und
+// `randomUUID()` liefert dann still `undefined` — `newRequestId()` gäbe jedem
+// Screen eine leere Kennung, ohne dass ein Test es merkt. Node's `randomUUID`
+// ist ebenfalls eine UUID v4 aus einem CSPRNG, also dasselbe Verhalten.
+jest.mock("expo-crypto", () => ({
+  ...jest.requireActual<object>("expo-crypto"),
+  randomUUID: () => jest.requireActual<{ randomUUID: () => string }>("node:crypto").randomUUID(),
+}));
+
 // React Query bündelt Benachrichtigungen per Timer; das landet außerhalb von
 // `act()` und warnt. Synchron zustellen hält React-Updates innerhalb des Tests.
 notifyManager.setScheduler((cb) => cb());

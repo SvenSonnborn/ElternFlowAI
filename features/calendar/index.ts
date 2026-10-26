@@ -56,7 +56,6 @@ export {
 export {
   applyDeleteScope,
   applyEditScope,
-  createSupabaseEventOps,
   type EditScope,
   type EventChanges,
   type EventOps,

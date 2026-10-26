@@ -9,6 +9,7 @@ import {
   ChildAvatar,
   confirmDestructive,
   Icon,
+  newRequestId,
   showAlert,
   useToast,
   useUndoableDelete,
@@ -157,6 +158,14 @@ export function EventDetailScreen() {
         }),
     });
 
+    // Eine Kennung pro Löschabsicht, vergeben, sobald Bestätigung und Scope
+    // feststehen. Sie reist im `run`-Closure mit dem Pending-Eintrag: Den
+    // Commit nach dem Undo-Fenster — ob vom Timer, von `flush()` beim Abmelden
+    // oder beim Wechsel in den Hintergrund — führt der Store genau einmal aus,
+    // mit genau dieser Kennung. Ein „Rückgängig" verwirft den Eintrag samt
+    // Kennung, verbraucht wird sie dann nie. Die Einträge leben nur im
+    // Speicher, persistiert werden muss sie also nicht.
+    const requestId = newRequestId();
     undoableDelete({
       kind: "event",
       target: {
@@ -173,6 +182,7 @@ export function EventDetailScreen() {
           occurrenceKey: data.occurrenceKey,
           isRecurring,
           baseVersion: data.version,
+          requestId,
         }),
       errorTitle: t("cal.delete.error"),
       // Nicht `err.message`: der Fehler-Toast läuft nie ab, eine rohe
@@ -192,6 +202,10 @@ export function EventDetailScreen() {
       errorAction: (err) => {
         if (!(err instanceof EventConflictError)) return undefined;
         const fresh = occurrenceVersion(err.row, data.occurrenceKey);
+        // „Trotzdem löschen" ist eine neue Absicht gegen einen neuen Stand —
+        // eine eigene Kennung, vergeben zusammen mit der frischen
+        // Basis-Version, aus der sie entsteht.
+        const anywayRequestId = newRequestId();
         return {
           label: t("conflict.deleteAnyway"),
           onPress: () => {
@@ -213,6 +227,7 @@ export function EventDetailScreen() {
                 occurrenceKey: data.occurrenceKey,
                 isRecurring,
                 baseVersion: fresh,
+                requestId: anywayRequestId,
               })
               .catch((retryErr: unknown) => {
                 show({

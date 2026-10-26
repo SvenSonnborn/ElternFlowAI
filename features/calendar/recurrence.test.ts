@@ -1,17 +1,10 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import { describe, expect, mock, test } from "bun:test";
 
 import type { Database } from "@/features/supabase/database.types";
 
-import type { EventWithRelations } from "./expand";
-
-import { EventConflictError, EventNotFoundError } from "./errors";
-import { EVENT_SELECT } from "./queries";
 import {
   applyDeleteScope,
   applyEditScope,
-  createSupabaseEventOps,
   type EventChanges,
   type EventOps,
   type RecurrenceChanges,
@@ -73,10 +66,6 @@ function makeMaster(overrides: Partial<EventRow> = {}): EventRow {
     rrule_until: null,
     rrule_count: null,
     created_by: null,
-    // Bewusst ungleich `updated_at`: Die neun CAS-Assertions unten prüfen, dass
-    // `updateMaster` genau den Stempel von `updated_at` durchreicht — mit
-    // identischen Werten hätte ein `master.created_at`-Vertipper unbemerkt
-    // durchgehen können.
     created_at: "2026-04-20T00:00:00.000Z",
     updated_at: MASTER_UPDATED_AT,
     ...overrides,
@@ -259,7 +248,7 @@ describe("applyEditScope", () => {
       master: makeMaster({ rrule_freq: null, rrule_byweekday: null }),
       changes: CHANGES,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES);
   });
 
   test("scope=all → updateMaster", async () => {
@@ -273,7 +262,7 @@ describe("applyEditScope", () => {
       master: makeMaster(),
       changes: CHANGES,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES_ANCHORED, MASTER_UPDATED_AT);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES_ANCHORED);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
   });
 
@@ -310,7 +299,7 @@ describe("applyEditScope", () => {
     // Bleibt literal: „ab diesem Termin" verankert die Serie absichtlich neu —
     // hier liegt der Schnitt am oder vor dem Serienanfang, die „Schwanzhälfte"
     // ist die ganze Serie. Siehe `anchoredChanges` in `recurrence.ts`.
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
   });
 
@@ -327,7 +316,7 @@ describe("applyEditScope", () => {
     });
     // Bleibt literal: Hier gibt es weder Serie noch Serienanfang — der Grund
     // ist schlicht `isRecurring === false`, nicht der Anker aus `anchoredChanges`.
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
     expect(ops.setRruleUntil).not.toHaveBeenCalled();
   });
@@ -368,7 +357,7 @@ describe("applyEditScope", () => {
     // Bleibt literal: „ab diesem Termin" verankert die Serie absichtlich neu —
     // hier liegt der Schnitt am oder vor dem Serienanfang, die „Schwanzhälfte"
     // ist die ganze Serie. Siehe `anchoredChanges` in `recurrence.ts`.
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
     expect(ops.setRruleCount).not.toHaveBeenCalled();
   });
@@ -394,9 +383,10 @@ describe("applyEditScope", () => {
     expect(ops.insertSplitEvent).toHaveBeenCalledWith(master, CHANGES, 2);
   });
 
-  // The split is several non-transactional calls. Creating the tail before
-  // shortening the head means a mid-way failure leaves a visible duplicate
-  // rather than silently dropping every occurrence after the cutoff.
+  // Die Reihenfolge des Splits — erst der Schwanz, dann der Kopf — stammt aus
+  // der Zeit getrennter Aufrufe. Seit Block 7 laufen die Schritte in einer
+  // Transaktion (`apply_event_change`); die Tests halten die Folge trotzdem
+  // fest, weil sie die Schrittfolge ist, die der Server bekommt.
 
   test("scope=forward creates the split event before shortening the count", async () => {
     const { ops, calls } = makeRecordingOps();
@@ -440,8 +430,8 @@ describe("applyEditScope", () => {
   };
 
   test("exceptions are cleared before the rule moves, not after", async () => {
-    // Non-transactional calls: failing here must leave the old rule with its own
-    // exceptions, never a new rule with stale ones.
+    // Seit Block 7 in einer Transaktion; die Folge bleibt die, die der Server
+    // als Schritte bekommt.
     const { ops, calls } = makeRecordingOps();
     await applyEditScope({
       ops,
@@ -468,12 +458,7 @@ describe("applyEditScope", () => {
       changes: CHANGES,
       recurrence: NEW_RULE,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith(
-      "evt-1",
-      CHANGES_ANCHORED,
-      MASTER_UPDATED_AT,
-      NEW_RULE,
-    );
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES_ANCHORED, NEW_RULE);
     expect(ops.deleteAllExceptions).toHaveBeenCalledWith("evt-1");
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
   });
@@ -490,12 +475,7 @@ describe("applyEditScope", () => {
       changes: CHANGES,
       recurrence: NEW_RULE,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith(
-      "evt-1",
-      CHANGES_ANCHORED,
-      MASTER_UPDATED_AT,
-      NEW_RULE,
-    );
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES_ANCHORED, NEW_RULE);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
     expect(ops.setRruleUntil).not.toHaveBeenCalled();
   });
@@ -519,12 +499,7 @@ describe("applyEditScope", () => {
       changes: CHANGES,
       recurrence: unchanged,
     });
-    expect(ops.updateMaster).toHaveBeenCalledWith(
-      "evt-1",
-      CHANGES_ANCHORED,
-      MASTER_UPDATED_AT,
-      unchanged,
-    );
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES_ANCHORED, unchanged);
     expect(ops.deleteAllExceptions).not.toHaveBeenCalled();
   });
 
@@ -620,7 +595,7 @@ describe("applyEditScope", () => {
     });
     // rrule_freq: null heißt keine Regel mehr und damit kein `dtstart` zu
     // schützen — die Eingabe gilt literal, nicht verankert (ADR-032 Decision 3).
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, MASTER_UPDATED_AT, none);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", CHANGES, none);
     expect(ops.deleteAllExceptions).toHaveBeenCalledWith("evt-1");
   });
 
@@ -638,221 +613,6 @@ describe("applyEditScope", () => {
     // All 10 occurrences are before the cutoff → nothing left to split off.
     expect(ops.setRruleCount).toHaveBeenCalledWith("evt-1", 10);
     expect(ops.insertSplitEvent).not.toHaveBeenCalled();
-  });
-
-  test("updateMaster bekommt den Stempel des gelesenen Masters, nicht den des Formulars", async () => {
-    // Das CAS soll das Fenster zwischen *diesem* Lesen und *diesem* Schreiben
-    // schließen — nicht dasselbe prüfen wie der Pre-Flight.
-    const master = makeMaster({ updated_at: "2026-05-09T08:00:00.000Z" });
-    const ops = makeOps();
-
-    await applyEditScope({
-      ops,
-      scope: "all",
-      eventId: "evt-1",
-      occurrenceKey: "2026-06-15",
-      isRecurring: true,
-      master,
-      changes: CHANGES,
-    });
-
-    expect(ops.updateMaster).toHaveBeenCalledWith(
-      "evt-1",
-      CHANGES_ANCHORED,
-      "2026-05-09T08:00:00.000Z",
-    );
-  });
-});
-
-// ── createSupabaseEventOps ────────────────────────────────────────────────
-// Bisher die einzige Suite, die den Supabase-Adapter selbst anfasst: Ohne sie
-// blieben alle Kalender-Tests grün, würde man `.eq("updated_at", …)` oder das
-// `if (!data) throw` aus `updateMaster` entfernen — genau die Hälfte des CAS,
-// die dem Task seinen Namen gibt.
-
-const SEEN_UPDATED_AT = "2026-05-01T00:00:00.000Z";
-
-/**
- * Doppelgänger des Query-Builders, den `updateMaster` durchläuft — inzwischen
- * zwei Ketten statt einer: erst `.from().update().eq().eq().select().maybeSingle()`
- * (das Compare-and-Swap), im Konfliktfall dann `.from().select().eq().maybeSingle()`
- * (die Nachlese). Beide hängen an demselben `from()`, unterscheiden sich aber
- * an der ersten Methode — `update()` gegen `select()` —, und genau daran
- * trennt der Fake sie.
- *
- * `calls.rereadColumns === null` heißt: die Nachlese hat nicht stattgefunden.
- * Das ist die Zusicherung, die den Preis dieser Änderung festhält — ein
- * zusätzlicher Roundtrip ausschließlich im Fehlerfall.
- *
- * Kein `mock.module`: `createSupabaseEventOps` nimmt den Client als Parameter,
- * genau damit ein Test ihn ersetzen kann — gleiches Muster wie `fakeClient` in
- * `features/realtime/subscribe.test.ts`.
- */
-function fakeUpdateClient(
-  result: { data: { id: string } | null; error: unknown },
-  reread: { data: EventWithRelations | null; error: unknown } = { data: null, error: null },
-) {
-  const calls = {
-    table: "",
-    updatePayload: undefined as unknown,
-    eqCalls: [] as [string, unknown][],
-    selectColumns: "",
-    rereadColumns: null as string | null,
-    rereadEqCalls: [] as [string, unknown][],
-  };
-  const updateBuilder = {
-    eq(column: string, value: unknown) {
-      calls.eqCalls.push([column, value]);
-      return updateBuilder;
-    },
-    select(columns: string) {
-      calls.selectColumns = columns;
-      return updateBuilder;
-    },
-    maybeSingle: () => Promise.resolve(result),
-  };
-  const rereadBuilder = {
-    eq(column: string, value: unknown) {
-      calls.rereadEqCalls.push([column, value]);
-      return rereadBuilder;
-    },
-    maybeSingle: () => Promise.resolve(reread),
-  };
-  const client = {
-    from(table: string) {
-      calls.table = table;
-      return {
-        update(payload: unknown) {
-          calls.updatePayload = payload;
-          return updateBuilder;
-        },
-        select(columns: string) {
-          calls.rereadColumns = columns;
-          return rereadBuilder;
-        },
-      };
-    },
-  };
-  return { client: client as unknown as SupabaseClient<Database>, calls };
-}
-
-/**
- * Die fremde Fassung, wie die Nachlese sie liefert — `EventRow` plus Relationen.
- * `updated_at` weicht bewusst von `MASTER_UPDATED_AT` ab: Genau das ist der
- * Zustand, den das Compare-and-Swap erkannt hat.
- */
-function makeForeignRow(): EventWithRelations {
-  return {
-    ...makeMaster({ title: "Fremd geändert", updated_at: "2026-05-02T09:00:00.000Z" }),
-    event_types: null,
-    event_exceptions: null,
-  };
-}
-
-describe("createSupabaseEventOps", () => {
-  test("updateMaster filtert auf id UND den gerade gelesenen Stempel", async () => {
-    const { client, calls } = fakeUpdateClient({ data: { id: "evt-1" }, error: null });
-    const ops = createSupabaseEventOps(client);
-
-    await ops.updateMaster("evt-1", CHANGES, SEEN_UPDATED_AT);
-
-    expect(calls.table).toBe("events");
-    expect(calls.updatePayload).toEqual(CHANGES);
-    expect(calls.eqCalls).toEqual([
-      ["id", "evt-1"],
-      ["updated_at", SEEN_UPDATED_AT],
-    ]);
-    // Ohne `.select("id")` liefert PostgREST bei jedem Update `data: null`,
-    // egal ob das CAS getroffen hat — jedes Speichern würde dann als Konflikt
-    // zurückkommen, samt Nachlese und vollem Vergleichs-Dialog.
-    expect(calls.selectColumns).toBe("id");
-  });
-
-  test("null Zeilen → EventConflictError MIT der fremden Fassung", async () => {
-    const foreign = makeForeignRow();
-    const { client, calls } = fakeUpdateClient(
-      { data: null, error: null },
-      { data: foreign, error: null },
-    );
-    const ops = createSupabaseEventOps(client);
-
-    const error = await ops
-      .updateMaster("evt-1", CHANGES, SEEN_UPDATED_AT)
-      .catch((err: unknown) => err);
-
-    // Vorher warf diese Stelle `EventConflictError(null)`: bekannt war nur,
-    // *dass* jemand dazwischengeschrieben hat, nicht *was*. Der Dialog stand
-    // dann ohne Vergleichszeilen und ohne frische Basis-Version da.
-    expect(error).toBeInstanceOf(EventConflictError);
-    expect((error as EventConflictError).row).toEqual(foreign);
-    // Die Nachlese muss dieselben Spalten holen wie die Queries — sonst ist
-    // die Zeile, die `showConflict` an `expandEvents` weitergibt, unvollständig.
-    expect(calls.rereadColumns).toBe(EVENT_SELECT);
-    expect(calls.rereadEqCalls).toEqual([["id", "evt-1"]]);
-  });
-
-  test("null Zeilen und die Zeile ist weg → EventNotFoundError, kein Konflikt", async () => {
-    const { client } = fakeUpdateClient({ data: null, error: null }, { data: null, error: null });
-    const ops = createSupabaseEventOps(client);
-
-    const error = await ops
-      .updateMaster("evt-1", CHANGES, SEEN_UPDATED_AT)
-      .catch((err: unknown) => err);
-
-    // „Weg" und „geändert" sind verschiedene Meldungen — dieselbe Trennung,
-    // die der Pre-Flight in `mutations.ts` macht.
-    expect(error).toBeInstanceOf(EventNotFoundError);
-  });
-
-  test("Treffer → keine Nachlese", async () => {
-    const { client, calls } = fakeUpdateClient({ data: { id: "evt-1" }, error: null });
-    const ops = createSupabaseEventOps(client);
-
-    await ops.updateMaster("evt-1", CHANGES, SEEN_UPDATED_AT);
-
-    // Der Preis dieser Änderung, festgehalten: ein zusätzlicher Roundtrip
-    // ausschließlich im Fehlerfall. Im Normalfall kostet sie nichts.
-    expect(calls.rereadColumns).toBeNull();
-  });
-
-  test("ein Fehler bei der Nachlese wird durchgereicht, nicht als Konflikt maskiert", async () => {
-    const pgError = { message: "connection reset", code: "08006" };
-    const { client } = fakeUpdateClient(
-      { data: null, error: null },
-      { data: null, error: pgError },
-    );
-    const ops = createSupabaseEventOps(client);
-
-    const error = await ops
-      .updateMaster("evt-1", CHANGES, SEEN_UPDATED_AT)
-      .catch((err: unknown) => err);
-
-    // Ein abgerissenes Netz darf nicht als „jemand anderes war schneller"
-    // erscheinen — der Nutzer bekäme einen Vergleichs-Dialog für ein Problem,
-    // das keiner ist.
-    expect(error).toBe(pgError);
-  });
-
-  test("maybeSingle liefert eine Zeile → kein Wurf", async () => {
-    const { client } = fakeUpdateClient({ data: { id: "evt-1" }, error: null });
-    const ops = createSupabaseEventOps(client);
-
-    // Kein `.resolves`: dieselbe `@typescript-eslint/await-thenable`-Lücke in
-    // @types/bun wie bei `.rejects` (siehe die anderen Suiten). Ein Wurf hier
-    // ließe den Test selbst fehlschlagen.
-    await ops.updateMaster("evt-1", CHANGES, SEEN_UPDATED_AT);
-  });
-
-  test("ein PostgREST-Fehler wird durchgereicht, nicht als Konflikt maskiert", async () => {
-    const pgError = { message: "connection reset", code: "08006" };
-    const { client } = fakeUpdateClient({ data: null, error: pgError });
-    const ops = createSupabaseEventOps(client);
-
-    const error = await ops
-      .updateMaster("evt-1", CHANGES, SEEN_UPDATED_AT)
-      .catch((err: unknown) => err);
-
-    expect(error).toBe(pgError);
   });
 });
 
@@ -907,7 +667,7 @@ describe("applyEditScope — Serienanker", () => {
       changes: ANCHOR_CHANGES,
     });
 
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", ANCHOR_EXPECTED, MASTER_UPDATED_AT);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", ANCHOR_EXPECTED);
   });
 
   test("die Dauer aus der Eingabe gewinnt, nicht die des Masters", async () => {
@@ -928,15 +688,11 @@ describe("applyEditScope — Serienanker", () => {
       changes: longer,
     });
 
-    expect(ops.updateMaster).toHaveBeenCalledWith(
-      "evt-1",
-      {
-        ...longer,
-        start_at: ANCHOR_EXPECTED.start_at,
-        end_at: new Date("2026-05-04T17:30:00.000Z").toISOString(), // 19:30 Europe/Berlin, 04.05.
-      },
-      MASTER_UPDATED_AT,
-    );
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", {
+      ...longer,
+      start_at: ANCHOR_EXPECTED.start_at,
+      end_at: new Date("2026-05-04T17:30:00.000Z").toISOString(), // 19:30 Europe/Berlin, 04.05.
+    });
   });
 
   test("scope=all auf einem Einzeltermin schreibt die Eingabe literal", async () => {
@@ -954,7 +710,7 @@ describe("applyEditScope — Serienanker", () => {
       changes: ANCHOR_CHANGES,
     });
 
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", ANCHOR_CHANGES, MASTER_UPDATED_AT);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", ANCHOR_CHANGES);
   });
 
   test("recurrence → Einzeltermin (rrule_freq null) auf einer Serie schreibt die Eingabe literal", async () => {
@@ -982,7 +738,7 @@ describe("applyEditScope — Serienanker", () => {
       recurrence: none,
     });
 
-    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", ANCHOR_CHANGES, MASTER_UPDATED_AT, none);
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", ANCHOR_CHANGES, none);
   });
 });
 
@@ -1031,15 +787,11 @@ describe("applyEditScope — Schreibpfad rechnet in der Zone des Termins (ADR-03
     // — unter jeder Runner-Zone. Vor dem Fix lieferte das nur unter
     // `TZ=Europe/Berlin` diesen Wert; unter `TZ=America/New_York` kam
     // `start_at: "2026-10-06T17:00:00.000Z"` (19:00 statt 18:00 Berlin) heraus.
-    expect(ops.updateMaster).toHaveBeenCalledWith(
-      "evt-1",
-      {
-        ...unchanged,
-        start_at: "2026-10-06T16:00:00.000Z",
-        end_at: "2026-10-06T17:00:00.000Z",
-      },
-      MASTER_UPDATED_AT,
-    );
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", {
+      ...unchanged,
+      start_at: "2026-10-06T16:00:00.000Z",
+      end_at: "2026-10-06T17:00:00.000Z",
+    });
   });
 });
 
@@ -1088,15 +840,11 @@ describe("applyEditScope — Serienanker rechnet die Dauer in Wandzeit, nicht ab
     // Verankertes Ende: dieselbe Wanduhr-Dauer (74 h) ab dem Anker — der Anker
     // selbst überquert keine Umstellung, eine absolute Addition (75 h) läge
     // fälschlich eine Stunde später (08.06. 21:00 statt der gewählten 20:00).
-    expect(ops.updateMaster).toHaveBeenCalledWith(
-      "evt-1",
-      {
-        ...changes,
-        start_at: "2026-06-05T16:00:00.000Z", // 18:00 Europe/Berlin, 05.06.
-        end_at: "2026-06-08T18:00:00.000Z", // 20:00 Europe/Berlin, 08.06.
-      },
-      MASTER_UPDATED_AT,
-    );
+    expect(ops.updateMaster).toHaveBeenCalledWith("evt-1", {
+      ...changes,
+      start_at: "2026-06-05T16:00:00.000Z", // 18:00 Europe/Berlin, 05.06.
+      end_at: "2026-06-08T18:00:00.000Z", // 20:00 Europe/Berlin, 08.06.
+    });
   });
 });
 

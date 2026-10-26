@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { describe, expect, test } from "bun:test";
 
 import type { Database } from "@/features/supabase/database.types";
@@ -5,6 +7,7 @@ import type { Database } from "@/features/supabase/database.types";
 import type { CreateEventVars } from "./createMutation";
 
 import {
+  createEvent,
   optimisticEventRow,
   parseRecurrenceCount,
   recurrenceToRrule,
@@ -15,6 +18,7 @@ type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
 
 function vars(partial: Partial<CreateEventVars> = {}): CreateEventVars {
   return {
+    id: "0b6c2a9e-5d1f-4c3a-8e7b-2f4d6a8c0e11",
     familyId: "f1",
     typeId: "t1",
     childId: "c1",
@@ -264,5 +268,82 @@ describe("optimisticEventRow", () => {
     const first = optimisticEventRow(v, t);
     const second = optimisticEventRow(v, t);
     expect(first.id).not.toBe(second.id);
+  });
+});
+
+/**
+ * Doppelgänger für die beiden Ketten, die `createEvent` durchläuft:
+ * `.from().upsert().select()` (das Anlegen) und, nur bei leerer Antwort,
+ * `.from().select().eq().maybeSingle()` (die Sichtbarkeitsprüfung). Sie hängen
+ * an demselben `from()` und unterscheiden sich an der ersten Methode.
+ */
+function fakeCreateClient(opts: { upserted: { id: string }[]; visible: { id: string } | null }) {
+  const calls = {
+    payload: undefined as Record<string, unknown> | undefined,
+    options: undefined as unknown,
+    returning: "",
+    lookupColumns: null as string | null,
+    lookupEq: [] as [string, unknown][],
+  };
+  const lookup = {
+    eq(column: string, value: unknown) {
+      calls.lookupEq.push([column, value]);
+      return lookup;
+    },
+    maybeSingle: () => Promise.resolve({ data: opts.visible, error: null }),
+  };
+  const client = {
+    from() {
+      return {
+        upsert(payload: Record<string, unknown>, options: unknown) {
+          calls.payload = payload;
+          calls.options = options;
+          return {
+            select(columns: string) {
+              calls.returning = columns;
+              return Promise.resolve({ data: opts.upserted, error: null });
+            },
+          };
+        },
+        select(columns: string) {
+          calls.lookupColumns = columns;
+          return lookup;
+        },
+      };
+    },
+  };
+  return { client: client as unknown as SupabaseClient<Database>, calls };
+}
+
+describe("createEvent — Anlegen über die vom Client vergebene id", () => {
+  test("schickt vars.id mit und legt per ignoreDuplicates an", async () => {
+    const v = vars();
+    const { client, calls } = fakeCreateClient({ upserted: [{ id: v.id }], visible: null });
+
+    await createEvent(v, client);
+
+    expect(calls.payload?.id).toBe(v.id);
+    expect(calls.options).toEqual({ onConflict: "id", ignoreDuplicates: true });
+    expect(calls.returning).toBe("id");
+    // Eine Zeile kam zurück → angelegt, keine Sichtbarkeitsprüfung.
+    expect(calls.lookupColumns).toBeNull();
+  });
+
+  test("leere Antwort und die Zeile ist sichtbar → Erfolg (Retry nach verlorener Antwort)", async () => {
+    const v = vars();
+    const { client, calls } = fakeCreateClient({ upserted: [], visible: { id: v.id } });
+
+    await createEvent(v, client);
+
+    expect(calls.lookupEq).toEqual([["id", v.id]]);
+  });
+
+  test("leere Antwort und die Zeile ist unsichtbar → Fehler", async () => {
+    // Die id existiert, gehört aber einer fremden Familie: Angelegt wurde
+    // nichts, und ein Erfolg wäre gelogen.
+    const { client } = fakeCreateClient({ upserted: [], visible: null });
+
+    // eslint-disable-next-line @typescript-eslint/await-thenable -- bun:test .rejects chain is not typed as Promise in @types/bun
+    await expect(createEvent(vars(), client)).rejects.toThrow(Error);
   });
 });

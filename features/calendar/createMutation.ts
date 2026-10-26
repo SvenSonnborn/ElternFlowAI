@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { Database } from "@/features/supabase/database.types";
@@ -118,6 +120,13 @@ export function parseRecurrenceCount(text: string): number | null | "invalid" {
 }
 
 export interface CreateEventVars {
+  /**
+   * Die `id` des neuen Termins, von der App vergeben (`newRequestId` in
+   * `app-sections/shared`, Spec §6). Damit ist das Anlegen idempotent: Ein
+   * Retry nach verlorener Antwort trägt dieselben `vars` und legt keinen
+   * zweiten Termin an, die Eindeutigkeit erzwingt der Primärschlüssel.
+   */
+  id: string;
   familyId: string;
   typeId: string;
   childId: string | null;
@@ -136,39 +145,84 @@ export interface CreateEventVars {
   createdBy: string | null;
 }
 
-export async function createEvent(vars: CreateEventVars): Promise<void> {
+/**
+ * Legt einen Termin unter der `id` aus `vars` an — idempotent (Spec §6).
+ *
+ * `upsert` mit `ignoreDuplicates` wird zu `insert … on conflict (id) do
+ * nothing`: Steht die `id` schon, schreibt Postgres nichts und meldet keinen
+ * Fehler, die Antwort ist nur leer. RLS verlangt dafür nichts Zusätzliches —
+ * `do nothing` braucht anders als `do update` weder Update- noch
+ * Select-Policy auf der vorhandenen Zeile.
+ *
+ * Eine leere Antwort heißt deshalb nur „die id gab es schon", nicht „es ist
+ * meiner". Die Sichtbarkeitsprüfung danach trennt die beiden Fälle: Sieht der
+ * Aufrufer die Zeile, ist es sein eigener erster Versuch, dessen Antwort
+ * verloren ging — Erfolg. Sieht er sie nicht, gehört die id einem Termin
+ * einer fremden Familie; angelegt wurde nichts, und ein Erfolg wäre gelogen.
+ * Bei einer UUID v4 aus einem CSPRNG ist das praktisch nur über einen Fehler
+ * im Client erreichbar.
+ *
+ * `client` ist injizierbar, damit die Integrationstests gegen die lokale
+ * Instanz einen eigenen, angemeldeten Client einsetzen können; die App ruft
+ * ohne zweites Argument.
+ */
+export async function createEvent(
+  vars: CreateEventVars,
+  client: SupabaseClient<Database> = supabase,
+): Promise<void> {
   if (vars.childId !== null && vars.parentId !== null) {
     throw new Error("Event can be assigned to either a child or a parent, not both.");
   }
   const rrule = recurrenceToRrule(vars.recurrence, new Date(vars.startAt), vars.timezone);
-  const { error } = await supabase.from("events").insert({
-    family_id: vars.familyId,
-    type_id: vars.typeId,
-    child_id: vars.childId,
-    parent_id: vars.parentId,
-    title: vars.title,
-    description: vars.description,
-    location: vars.location,
-    start_at: vars.startAt,
-    end_at: vars.endAt,
-    all_day: vars.allDay,
-    timezone: vars.timezone,
-    rrule_freq: rrule.rrule_freq,
-    rrule_interval: rrule.rrule_interval,
-    rrule_byweekday: rrule.rrule_byweekday,
-    // Zum Anlegezeitpunkt gibt es nie ein UNTIL (das entsteht erst beim
-    // Forward-Löschen). Explizit `null` statt ausgelassen, damit die drei
-    // Event-Schreiber — hier, `optimisticEventRow` darunter und
-    // `insertSplitEvent` in `recurrence.ts` — dieselbe Spaltenmenge führen;
-    // `eventColumns.test.ts` hält sie darauf fest.
-    rrule_until: null,
-    // A count only means anything on a recurring event; the DB also forbids
-    // pairing it with an until (`events_rrule_count_xor_until`), which nothing
-    // sets at create time.
-    rrule_count: vars.recurrence === "none" ? null : vars.recurrenceCount,
-    created_by: vars.createdBy,
-  });
+  const { data, error } = await client
+    .from("events")
+    .upsert(
+      {
+        id: vars.id,
+        family_id: vars.familyId,
+        type_id: vars.typeId,
+        child_id: vars.childId,
+        parent_id: vars.parentId,
+        title: vars.title,
+        description: vars.description,
+        location: vars.location,
+        start_at: vars.startAt,
+        end_at: vars.endAt,
+        all_day: vars.allDay,
+        timezone: vars.timezone,
+        rrule_freq: rrule.rrule_freq,
+        rrule_interval: rrule.rrule_interval,
+        rrule_byweekday: rrule.rrule_byweekday,
+        // Zum Anlegezeitpunkt gibt es nie ein UNTIL (das entsteht erst beim
+        // Forward-Löschen). Explizit `null` statt ausgelassen, damit die beiden
+        // Event-Schreiber im Client — hier und `optimisticEventRow` darunter —
+        // dieselbe Spaltenmenge führen; `eventColumns.test.ts` hält sie darauf
+        // fest. Der dritte, die abgespaltene Hälfte eines Forward-Splits, lebt
+        // seit Block 7 in `apply_event_change` (`insert_split_event`).
+        rrule_until: null,
+        // A count only means anything on a recurring event; the DB also forbids
+        // pairing it with an until (`events_rrule_count_xor_until`), which nothing
+        // sets at create time.
+        rrule_count: vars.recurrence === "none" ? null : vars.recurrenceCount,
+        created_by: vars.createdBy,
+      },
+      { onConflict: "id", ignoreDuplicates: true },
+    )
+    .select("id");
   if (error) throw error;
+  if (data.length > 0) return;
+
+  const { data: visible, error: lookupError } = await client
+    .from("events")
+    .select("id")
+    .eq("id", vars.id)
+    .maybeSingle();
+  if (lookupError) throw lookupError;
+  if (!visible) {
+    throw new Error(
+      `createEvent: id ${vars.id} gehört einem fremden Termin, angelegt wurde nichts`,
+    );
+  }
 }
 
 // Modul-Sequenz statt einer aus Formularwerten abgeleiteten Id: `startAt` und
@@ -241,7 +295,9 @@ export function useCreateEvent() {
   const remove = useOptimisticEventsStore((state) => state.remove);
 
   return useMutation({
-    mutationFn: createEvent,
+    // Nicht `mutationFn: createEvent`: TanStack ruft mit einem zweiten Argument
+    // (dem Mutations-Kontext), und `createEvent` nähme es als Supabase-Client.
+    mutationFn: (vars: CreateEventVars) => createEvent(vars),
     onMutate: (vars) => {
       // Der Typ kommt aus dem Cache statt aus `useEventTypes()`: `onMutate`
       // braucht kein Abonnement, nur den aktuellen Stand — und ein Import aus

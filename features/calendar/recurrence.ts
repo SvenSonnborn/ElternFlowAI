@@ -1,11 +1,7 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import { addDays, format, parseISO } from "date-fns";
 
 import type { Database } from "@/features/supabase/database.types";
 
-import { EventConflictError, EventNotFoundError } from "./errors";
-import { EVENT_SELECT } from "./queries";
 import { allOccurrences } from "./rrule";
 import { ruleOf, sameRule } from "./rule";
 import {
@@ -45,6 +41,13 @@ export interface RecurrenceChanges {
   rrule_until: string | null;
 }
 
+/**
+ * Die Schreib-Operationen, aus denen `applyEditScope`/`applyDeleteScope` einen
+ * Scope zusammensetzen. Seit Block 7 gibt es genau eine Implementierung, den
+ * aufzeichnenden `createRecordingEventOps` (`eventChange.ts`): Die Ops
+ * schreiben nichts mehr selbst, sondern werden zu Schritten für
+ * `apply_event_change`, die alle in einer Transaktion laufen (Spec §5.4).
+ */
 export interface EventOps {
   /** `occurrenceKey` ist die Zeile in `event_exceptions.occurrence_date` (ADR-034). */
   cancelOccurrence: (eventId: string, occurrenceKey: string) => Promise<void>;
@@ -55,18 +58,14 @@ export interface EventOps {
   ) => Promise<void>;
   deleteMaster: (eventId: string) => Promise<void>;
   /**
-   * `seenUpdatedAt` ist `master.updated_at` aus dem gerade gelesenen Row —
-   * **nicht** die `baseVersion` des Formulars. Der Unterschied ist der Zweck:
-   * Der Pre-Flight in `mutations.ts` prüft gegen das, was das *Formular*
-   * gesehen hat (Fenster: Minuten), dieses Compare-and-Swap gegen das, was
-   * *dieser Schreibvorgang* eine Zeile vorher gelesen hat (Fenster:
-   * Millisekunden). Mit der `baseVersion` prüfte es dieselbe Bedingung zweimal
-   * und schlösse das Fenster nicht, für das es da ist (ADR-031).
+   * Ohne eigenen Versions-Stempel: Das Compare-and-Swap, für das er da war
+   * (ADR-031, ADR-037), prüft seit Block 7 `apply_event_change` gegen die
+   * `baseVersion` des Formulars — in derselben Transaktion wie das Schreiben,
+   * das Fenster zwischen Lesen und Schreiben gibt es also nicht mehr.
    */
   updateMaster: (
     eventId: string,
     changes: EventChanges,
-    seenUpdatedAt: string,
     recurrence?: RecurrenceChanges,
   ) => Promise<void>;
   deleteAllExceptions: (eventId: string) => Promise<void>;
@@ -281,11 +280,12 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
 
   if (recurrence) {
     // Exceptions are keyed by the occurrence dates the *old* rule produced, so a
-    // real rule change clears them — before the rule moves, not after. These are
-    // separate, non-transactional calls: failing here leaves the old rule and its
-    // own exceptions intact, whereas the other order would leave a new rule with
-    // stale exceptions cancelling occurrences the user never touched. Same
-    // damage-minimising reasoning as the forward-split path below.
+    // real rule change clears them — before the rule moves, not after. Die
+    // Reihenfolge stammt aus der Zeit getrennter Aufrufe, als ein Abbruch
+    // dazwischen sonst eine neue Regel mit alten Exceptions hinterlassen hätte.
+    // Seit Block 7 laufen beide Schritte in einer Transaktion
+    // (`apply_event_change`), halb geschrieben bleibt also nichts mehr; die
+    // Reihenfolge bleibt, weil sie die Absicht lesbar macht.
     if (ruleDiffers(master, recurrence)) {
       await ops.deleteAllExceptions(eventId);
     }
@@ -299,7 +299,6 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
     await ops.updateMaster(
       eventId,
       isRecurring && recurrence.rrule_freq !== null ? anchoredChanges(master, changes) : changes,
-      master.updated_at,
       recurrence,
     );
     return;
@@ -310,7 +309,7 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
       await ops.modifyOccurrence(eventId, occurrenceKey, changes);
       return;
     }
-    await ops.updateMaster(eventId, changes, master.updated_at);
+    await ops.updateMaster(eventId, changes);
     return;
   }
 
@@ -318,14 +317,17 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
     if (master.rrule_count != null) {
       const consumed = consumedBefore(master, occurrenceKey);
       if (consumed === 0) {
-        await ops.updateMaster(eventId, changes, master.updated_at);
+        await ops.updateMaster(eventId, changes);
         return;
       }
       const remaining = master.rrule_count - consumed;
-      // Create the tail before shortening the head. These are separate,
-      // non-transactional calls: if the insert fails after the head was already
-      // truncated, the occurrences from the cutoff on are gone for good. The
-      // other order merely risks a visible duplicate the user can delete.
+      // Create the tail before shortening the head. Das war Schadensbegrenzung,
+      // solange die Schritte getrennte Aufrufe waren: Scheiterte der Insert nach
+      // dem Kürzen, waren die Vorkommen ab dem Schnitt verloren. Seit Block 7
+      // läuft alles in einer Transaktion, und `insert_split_event` liest den
+      // Master, wie der Server ihn vor allen Schritten gesperrt hat — die
+      // Reihenfolge ändert am Ergebnis nichts mehr und bleibt der Lesbarkeit
+      // wegen.
       // remaining === 0 → the cutoff sits past the end of the series, so there
       // is nothing left to carry over into a split event.
       if (remaining > 0) {
@@ -337,10 +339,10 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
     }
     const cutoff = dayBefore(occurrenceKey);
     if (cutoff < zonedDateKey(new Date(master.start_at), master.timezone)) {
-      await ops.updateMaster(eventId, changes, master.updated_at);
+      await ops.updateMaster(eventId, changes);
       return;
     }
-    // Tail first — same durability reasoning as the count path above.
+    // Tail first — wie im Zählpfad oben.
     await ops.insertSplitEvent(master, changes, null);
     await ops.setRruleUntil(eventId, endOfDayInstant(cutoff, master.timezone));
     await ops.deleteExceptionsFromDate(eventId, occurrenceKey);
@@ -352,134 +354,5 @@ export async function applyEditScope(args: ApplyEditScopeArgs): Promise<void> {
   // Datumsänderung den Termin tatsächlich (siehe `anchoredChanges`). Auf
   // `isRecurring` allein zu prüfen genügt: „forward" auf einer Serie kehrt in
   // jedem seiner Zweige oben zurück und erreicht diese Zeile nie.
-  await ops.updateMaster(
-    eventId,
-    isRecurring ? anchoredChanges(master, changes) : changes,
-    master.updated_at,
-  );
-}
-
-export function createSupabaseEventOps(client: SupabaseClient<Database>): EventOps {
-  return {
-    cancelOccurrence: async (eventId, occurrenceKey) => {
-      const { error } = await client.from("event_exceptions").upsert(
-        {
-          event_id: eventId,
-          occurrence_date: occurrenceKey,
-          action: "cancelled",
-          override: null,
-        },
-        { onConflict: "event_id,occurrence_date" },
-      );
-      if (error) throw error;
-    },
-
-    modifyOccurrence: async (eventId, occurrenceKey, override) => {
-      const { error } = await client.from("event_exceptions").upsert(
-        {
-          event_id: eventId,
-          occurrence_date: occurrenceKey,
-          action: "modified",
-          override,
-        },
-        { onConflict: "event_id,occurrence_date" },
-      );
-      if (error) throw error;
-    },
-
-    deleteMaster: async (eventId) => {
-      const { error } = await client.from("events").delete().eq("id", eventId);
-      if (error) throw error;
-    },
-
-    updateMaster: async (eventId, changes, seenUpdatedAt, recurrence) => {
-      const { data, error } = await client
-        .from("events")
-        .update(recurrence ? { ...changes, ...recurrence } : changes)
-        .eq("id", eventId)
-        .eq("updated_at", seenUpdatedAt)
-        .select("id")
-        .maybeSingle();
-      if (error) throw error;
-      if (data) return;
-
-      // Null Zeilen heißt: zwischen dem Lesen und diesem Schreiben hat jemand
-      // die Zeile angefasst oder gelöscht. Welches von beidem, sagt erst die
-      // Nachlese — und *was* er geändert hat, braucht der Vergleichs-Dialog,
-      // sonst steht er ohne Zeilen und ohne frische Basis-Version da und
-      // „Deine Fassung speichern" schickt zwangsläufig wieder dieselbe
-      // veraltete `baseVersion`. Derselbe Ablauf wie in `updateTask`
-      // (ADR-031) und `deleteTask` (ADR-036); der zusätzliche Roundtrip fällt
-      // ausschließlich hier im Fehlerfall an.
-      const { data: current, error: readError } = await client
-        .from("events")
-        .select(EVENT_SELECT)
-        .eq("id", eventId)
-        .maybeSingle();
-      if (readError) throw readError;
-      if (!current) throw new EventNotFoundError(eventId);
-      throw new EventConflictError(current);
-    },
-
-    deleteAllExceptions: async (eventId) => {
-      const { error } = await client.from("event_exceptions").delete().eq("event_id", eventId);
-      if (error) throw error;
-    },
-
-    setRruleUntil: async (eventId, until) => {
-      const { error } = await client
-        .from("events")
-        .update({ rrule_until: until })
-        .eq("id", eventId);
-      if (error) throw error;
-    },
-
-    setRruleCount: async (eventId, count) => {
-      const { error } = await client
-        .from("events")
-        .update({ rrule_count: count })
-        .eq("id", eventId);
-      if (error) throw error;
-    },
-
-    deleteExceptionsFromDate: async (eventId, fromDateInclusive) => {
-      const { error } = await client
-        .from("event_exceptions")
-        .delete()
-        .eq("event_id", eventId)
-        .gte("occurrence_date", fromDateInclusive);
-      if (error) throw error;
-    },
-
-    insertSplitEvent: async (master, changes, rruleCount) => {
-      const { error } = await client.from("events").insert({
-        family_id: master.family_id,
-        type_id: master.type_id,
-        child_id: master.child_id,
-        // Die Zuordnung wandert mit. Ohne sie wurde die abgespaltene Hälfte
-        // stillschweigend zum familienweiten Termin — kein Fehler, keine
-        // Meldung, auffallen konnte es erst, wenn die Ansicht nach Person den
-        // Termin nicht mehr fand.
-        parent_id: master.parent_id,
-        title: changes.title,
-        description: changes.description,
-        location: changes.location,
-        start_at: changes.start_at,
-        end_at: changes.end_at,
-        all_day: master.all_day,
-        timezone: master.timezone,
-        rrule_freq: master.rrule_freq,
-        rrule_interval: master.rrule_interval,
-        rrule_byweekday: master.rrule_byweekday,
-        // A series is bounded by UNTIL or COUNT, never both
-        // (`events_rrule_count_xor_until`). An absolute UNTIL still applies to
-        // the tail unchanged; a COUNT was re-derived for the split by the
-        // caller, since count is relative to dtstart and the tail starts later.
-        rrule_until: rruleCount == null ? master.rrule_until : null,
-        rrule_count: rruleCount,
-        created_by: master.created_by,
-      });
-      if (error) throw error;
-    },
-  };
+  await ops.updateMaster(eventId, isRecurring ? anchoredChanges(master, changes) : changes);
 }

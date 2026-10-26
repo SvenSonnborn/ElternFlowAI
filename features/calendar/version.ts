@@ -30,3 +30,32 @@ export function occurrenceVersion(row: EventWithRelations, occurrenceKey: string
   const exception = (row.event_exceptions ?? []).find((ex) => ex.occurrence_date === occurrenceKey);
   return `${row.updated_at}|${exception?.updated_at ?? NO_EXCEPTION}`;
 }
+
+/**
+ * Zerlegt ein `occurrenceVersion`-Token in die beiden Stempel, die
+ * `apply_event_change` als `p_seen_master_updated_at` und
+ * `p_seen_exception_updated_at` prüft (Spec §5.4). Liegt neben
+ * `occurrenceVersion`, damit das Format genau eine Heimat hat.
+ *
+ * `exceptionUpdatedAt: null` heißt „an diesem Schlüssel lag keine Exception" —
+ * genau die Bedeutung, die der Server einem null gibt.
+ *
+ * Wirft `RangeError` statt zu raten: Ein Token, das nicht aus
+ * `occurrenceVersion` stammt, ist ein Fehler im Aufrufer. Ein still
+ * zurechtgebogener Stand ergäbe einen Konflikt, den niemand verursacht hat —
+ * oder, schlimmer, keinen, wo einer war.
+ */
+export function parseOccurrenceVersion(token: string): {
+  masterUpdatedAt: string;
+  exceptionUpdatedAt: string | null;
+} {
+  const parts = token.split("|");
+  if (parts.length !== 2 || parts[0] === "" || parts[1] === "") {
+    throw new RangeError(`parseOccurrenceVersion: kein Versions-Token — "${token}"`);
+  }
+  const [masterUpdatedAt, exception] = parts;
+  return {
+    masterUpdatedAt,
+    exceptionUpdatedAt: exception === NO_EXCEPTION ? null : exception,
+  };
+}

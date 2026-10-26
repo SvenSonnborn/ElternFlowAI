@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { EventWithRelations } from "./expand";
 
-import { occurrenceVersion } from "./version";
+import { occurrenceVersion, parseOccurrenceVersion } from "./version";
 
 function row(exceptions: EventWithRelations["event_exceptions"]): EventWithRelations {
   return {
@@ -73,5 +73,36 @@ describe("occurrenceVersion", () => {
       "2026-06-15",
     );
     expect(after).not.toBe(before);
+  });
+});
+
+describe("parseOccurrenceVersion", () => {
+  test("Rundreise ohne Exception → exceptionUpdatedAt ist null", () => {
+    const token = occurrenceVersion(row(null), "2026-06-15");
+    expect(parseOccurrenceVersion(token)).toEqual({
+      masterUpdatedAt: "2026-06-01T10:00:00.000Z",
+      exceptionUpdatedAt: null,
+    });
+  });
+
+  test("Rundreise mit Exception → beide Stempel", () => {
+    const token = occurrenceVersion(
+      row([exception("2026-06-15", "2026-06-02T09:00:00.000Z")]),
+      "2026-06-15",
+    );
+    expect(parseOccurrenceVersion(token)).toEqual({
+      masterUpdatedAt: "2026-06-01T10:00:00.000Z",
+      exceptionUpdatedAt: "2026-06-02T09:00:00.000Z",
+    });
+  });
+
+  test("ein Token ohne Trenner ist ein RangeError", () => {
+    expect(() => parseOccurrenceVersion("2026-06-01T10:00:00.000Z")).toThrow(RangeError);
+  });
+
+  test("ein Token mit leerer Master-Hälfte oder zwei Trennern ist ein RangeError", () => {
+    expect(() => parseOccurrenceVersion("|-")).toThrow(RangeError);
+    expect(() => parseOccurrenceVersion("a|b|c")).toThrow(RangeError);
+    expect(() => parseOccurrenceVersion("2026-06-01T10:00:00.000Z|")).toThrow(RangeError);
   });
 });

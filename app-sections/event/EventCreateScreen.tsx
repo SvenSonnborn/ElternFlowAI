@@ -11,6 +11,7 @@ import {
   Field,
   Icon,
   MemberPicker,
+  newRequestId,
   TypePicker,
   useToast,
   type MemberOption,
@@ -172,6 +173,10 @@ export function EventCreateScreen() {
     const childId = member?.kind === "child" ? member.id : null;
     const parentId = member?.kind === "parent" ? member.id : null;
     const vars: CreateEventVars = {
+      // Einmal pro Speichern vergeben und mit den `vars` eingefroren: Die
+      // Retry-Aktion im Fehler-Toast schickt dieselben `vars` und damit
+      // dieselbe id — kam der erste Versuch an, entsteht kein zweiter Termin.
+      id: newRequestId(),
       familyId,
       typeId,
       childId,
