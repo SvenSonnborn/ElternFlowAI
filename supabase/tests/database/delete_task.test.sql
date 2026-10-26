@@ -90,8 +90,35 @@ language plpgsql
 as $$
 begin
   perform extensions.dblink_connect('setup', pg_temp.dsn());
+  perform extensions.dblink_exec('setup', $q$set lock_timeout = '10s'$q$);
   perform extensions.dblink_exec('setup', p_sql);
   perform extensions.dblink_disconnect('setup');
+end;
+$$;
+
+-- Räumt nach einem abgebrochenen Wettlauf auf: offene dblink-Sitzungen schließen (eine
+-- offene Transaktion von B rollt damit zurück) und die committeten Wettlauf-Aufgaben
+-- löschen. Wirft selbst nie, damit der ursprüngliche Fehler sichtbar bleibt.
+create function pg_temp.race_cleanup()
+returns void
+language plpgsql
+as $$
+declare
+  v_conn text;
+begin
+  foreach v_conn in array coalesce(extensions.dblink_get_connections(), '{}'::text[]) loop
+    begin
+      perform extensions.dblink_disconnect(v_conn);
+    exception when others then
+      null;
+    end;
+  end loop;
+
+  begin
+    perform pg_temp.committed($q$ delete from public.tasks where id::text like 'a5a5a5a5-%' $q$);
+  exception when others then
+    raise warning 'Wettlauf-Aufgaben a5a5a5a5-… blieben stehen: %', sqlerrm;
+  end;
 end;
 $$;
 
@@ -101,6 +128,9 @@ $$;
 -- an B's Sperre wartet (pg_blocking_pids), committet B — so ist die Reihenfolge fest und der
 -- Test nicht vom Zufall abhängig. Rückgabe ist A's Antwort, ein Fehler als „SQLSTATE
 -- Detail" wie bei error_of. A's Transaktion rollt danach zurück.
+--
+-- Wirft der Ablauf selbst, räumt der Handler auf, bevor er den Fehler weiterreicht: Danach
+-- ist die Testtransaktion abgebrochen, und das Aufräumen am Ende der Datei liefe nicht mehr.
 create function pg_temp.race(p_task uuid, p_b_sql text)
 returns text
 language plpgsql
@@ -114,48 +144,53 @@ declare
   v_result    text;
   v_detail    text;
 begin
-  perform extensions.dblink_connect('b', pg_temp.dsn());
-  perform extensions.dblink_connect('a', pg_temp.dsn());
-  select t.pid into v_b_pid from extensions.dblink('b', 'select pg_backend_pid()') as t(pid integer);
-  select t.pid into v_a_pid from extensions.dblink('a', 'select pg_backend_pid()') as t(pid integer);
-
-  -- Obergrenzen, damit ein Fehler im Ablauf den Testlauf nicht hängen lässt.
-  perform extensions.dblink_exec('a', $q$set lock_timeout = '10s'$q$);
-  perform extensions.dblink_exec('b', $q$set lock_timeout = '10s'$q$);
-
-  perform extensions.dblink_exec('b', 'begin');
-  perform extensions.dblink_exec('b', 'set local role authenticated');
-  perform extensions.dblink_exec('b',
-    $q$set local request.jwt.claims to '{"sub":"bbbbbbbb-0000-4000-8000-000000000001","role":"authenticated"}'$q$);
-  perform extensions.dblink_exec('b', p_b_sql);
-
-  perform extensions.dblink_exec('a', 'begin');
-  perform extensions.dblink_exec('a', 'set local role authenticated');
-  perform extensions.dblink_exec('a',
-    $q$set local request.jwt.claims to '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}'$q$);
-  perform extensions.dblink_send_query('a',
-    format('select public.delete_task(%L::uuid, %L::timestamptz)', p_task, v_seen));
-
-  v_deadline := clock_timestamp() + interval '10 seconds';
-  loop
-    v_waited := v_b_pid = any (pg_blocking_pids(v_a_pid));
-    exit when v_waited or clock_timestamp() > v_deadline;
-    perform pg_sleep(0.01);
-  end loop;
-
-  perform extensions.dblink_exec('b', 'commit');
-
   begin
-    select t.r into v_result from extensions.dblink_get_result('a') as t(r text);
+    perform extensions.dblink_connect('b', pg_temp.dsn());
+    perform extensions.dblink_connect('a', pg_temp.dsn());
+    select t.pid into v_b_pid from extensions.dblink('b', 'select pg_backend_pid()') as t(pid integer);
+    select t.pid into v_a_pid from extensions.dblink('a', 'select pg_backend_pid()') as t(pid integer);
+
+    -- Obergrenzen, damit ein Fehler im Ablauf den Testlauf nicht hängen lässt.
+    perform extensions.dblink_exec('a', $q$set lock_timeout = '10s'$q$);
+    perform extensions.dblink_exec('b', $q$set lock_timeout = '10s'$q$);
+
+    perform extensions.dblink_exec('b', 'begin');
+    perform extensions.dblink_exec('b', 'set local role authenticated');
+    perform extensions.dblink_exec('b',
+      $q$set local request.jwt.claims to '{"sub":"bbbbbbbb-0000-4000-8000-000000000001","role":"authenticated"}'$q$);
+    perform extensions.dblink_exec('b', p_b_sql);
+
+    perform extensions.dblink_exec('a', 'begin');
+    perform extensions.dblink_exec('a', 'set local role authenticated');
+    perform extensions.dblink_exec('a',
+      $q$set local request.jwt.claims to '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}'$q$);
+    perform extensions.dblink_send_query('a',
+      format('select public.delete_task(%L::uuid, %L::timestamptz)', p_task, v_seen));
+
+    v_deadline := clock_timestamp() + interval '10 seconds';
+    loop
+      v_waited := v_b_pid = any (pg_blocking_pids(v_a_pid));
+      exit when v_waited or clock_timestamp() > v_deadline;
+      perform pg_sleep(0.01);
+    end loop;
+
+    perform extensions.dblink_exec('b', 'commit');
+
+    begin
+      select t.r into v_result from extensions.dblink_get_result('a') as t(r text);
+    exception when others then
+      get stacked diagnostics v_detail = pg_exception_detail;
+      v_result := sqlstate || coalesce(' ' || nullif(v_detail, ''), '');
+    end;
+    -- dblink verlangt einen zweiten Abruf, der leer zurückkommt, bevor die Verbindung wieder frei ist.
+    perform 1 from extensions.dblink_get_result('a') as t(r text);
+    perform extensions.dblink_exec('a', 'rollback');
+    perform extensions.dblink_disconnect('a');
+    perform extensions.dblink_disconnect('b');
   exception when others then
-    get stacked diagnostics v_detail = pg_exception_detail;
-    v_result := sqlstate || coalesce(' ' || nullif(v_detail, ''), '');
+    perform pg_temp.race_cleanup();
+    raise;
   end;
-  -- dblink verlangt einen zweiten Abruf, der leer zurückkommt, bevor die Verbindung wieder frei ist.
-  perform 1 from extensions.dblink_get_result('a') as t(r text);
-  perform extensions.dblink_exec('a', 'rollback');
-  perform extensions.dblink_disconnect('a');
-  perform extensions.dblink_disconnect('b');
 
   if not v_waited then
     return 'A hat nicht an der Sperre von B gewartet: ' || coalesce(v_result, 'null');
@@ -259,10 +294,12 @@ $$;
 
 set local role anon;
 
+-- Die Meldung zählt: Hätte anon execute, scheiterte der Aufruf erst an
+-- `current_family_id()` — ebenfalls mit 42501, aber mit dieser Funktion im Text.
 select throws_ok(
   $$ select public.delete_task('a1a1a1a1-0000-4000-8000-100000000001', '2026-10-01T00:00:00Z') $$,
-  '42501', null,
-  'anon kann delete_task nicht aufrufen'
+  '42501', 'permission denied for function delete_task',
+  'anon scheitert schon am fehlenden execute auf delete_task'
 );
 
 reset role;

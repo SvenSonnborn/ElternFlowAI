@@ -163,8 +163,8 @@ select throws_ok(
   $$ select public.apply_event_change('0a000000-0000-4000-8000-000000000098',
        'e1e1e1e1-0000-4000-8000-000000000001', null, '2026-10-01T00:00:00Z', null,
        '[{"op":"delete_master"}]') $$,
-  '42501', null,
-  'anon kann apply_event_change nicht aufrufen'
+  '42501', 'permission denied for function apply_event_change',
+  'anon scheitert schon am fehlenden execute auf apply_event_change'
 );
 
 reset role;

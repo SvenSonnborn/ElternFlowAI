@@ -3,13 +3,15 @@
 --
 -- Idempotent und rein additiv: Der Code auf `main` schreibt weiter direkt in die
 -- Tabellen, und das bleibt erlaubt — die RPC läuft mit den Rechten des Aufrufers und
--- braucht dieselben Tabellenrechte wie er. Einzige Ausnahme sind die `revoke`s in
--- Abschnitt 7, die drei Trigger-Funktionen ein Recht nehmen, das niemand braucht.
+-- braucht dieselben Tabellenrechte wie er. Ausnahmen sind die `revoke`s in Abschnitt 7
+-- und 8: Sie nehmen drei Trigger-Funktionen ein Recht, das niemand braucht, und beim
+-- Anlegen einer Einladung alle Spalten außer `family_id`, die der Client nie schickt.
 --
 -- Abschnitte 1–4 legen die Kalender-RPC samt Verbuchung an, 5–6 `delete_task`, 7 nimmt
--- den Trigger-Funktionen das execute-Recht. Die vier gewollten security-definer-Funktionen
--- (accept_invitation, create_family, regenerate_invitation, current_family_id) sind für
--- diesen Block durchgesehen und bleiben unverändert; was die Durchsicht stützt, hält
+-- den Trigger-Funktionen das execute-Recht, 8 lässt Einladungs-Token nur noch vom Server
+-- kommen. Die vier gewollten security-definer-Funktionen (accept_invitation,
+-- create_family, regenerate_invitation, current_family_id) sind für diesen Block
+-- durchgesehen und bleiben unverändert; was die Durchsicht stützt, hält
 -- supabase/tests/database/security.test.sql fest.
 
 -- ── 1. Schema `private` ─────────────────────────────────────────────────────
@@ -714,3 +716,28 @@ grant execute on function public.delete_task(uuid, timestamptz) to authenticated
 revoke execute on function public.broadcast_family_change() from public, anon, authenticated;
 revoke execute on function public.set_updated_at() from public, anon, authenticated;
 revoke execute on function public.set_reminder_family_id() from public, anon, authenticated;
+
+-- ── 8. Einladungen nur mit Server-Token ─────────────────────────────────────
+--
+-- Die Policy „invitations: insert own family" prüft nur die Familie. Mit dem Tabellenrecht
+-- konnte ein Mitglied deshalb auch `token` und `expires_at` selbst setzen, etwa ein
+-- ratbares Token, das nie abläuft (`'infinity'`). accept_invitation schützt allein die
+-- Zufälligkeit des Tokens vor dem Raten, also muss es vom Server kommen.
+--
+-- `authenticated` darf daher nur noch `family_id` einfügen; `token`, `expires_at`,
+-- `used_at` und `created_at` kommen aus den Defaults. Der Client schickt ohnehin nur
+-- `family_id` (`useCreateInvitation`). `created_by` hat weder Default noch Trigger und
+-- bleibt null wie bei jeder Einladung aus der App; es freizugeben hieße, ein Mitglied eine
+-- Einladung einem anderen Elternteil zuschreiben zu lassen.
+--
+-- Nachträglich ändern lässt sich nichts: Für `family_invitations` gibt es keine
+-- update-Policy. Die beiden security-definer-Funktionen schreiben als Besitzer und bleiben
+-- unberührt — accept_invitation stempelt `used_at`, regenerate_invitation legt das neue
+-- Token per Default an. `anon` verliert das Tabellenrecht ebenfalls; mangels Policy ließ
+-- RLS es auch vorher nicht durch.
+--
+-- Erst das Tabellenrecht entziehen, dann das Spaltenrecht vergeben: Ein `revoke` auf
+-- Tabellenebene nimmt die Spaltenrechte mit, so bleibt die Folge idempotent.
+
+revoke insert on table public.family_invitations from anon, authenticated;
+grant insert (family_id) on table public.family_invitations to authenticated;

@@ -3,7 +3,7 @@
 --
 -- Läuft in einer Transaktion und rollt am Ende zurück; die Seed-Daten bleiben unberührt.
 --
--- Drei Teile:
+-- Vier Teile:
 --   1. Die drei Trigger-Funktionen sind nicht mehr per RPC aufrufbar — und ihre Trigger
 --      feuern trotzdem weiter. Postgres prüft EXECUTE nur bei CREATE TRIGGER.
 --   2. Die vier gewollten security-definer-Funktionen: Einstellungen und Rechte, dazu ein
@@ -11,6 +11,8 @@
 --   3. Das Verhalten, auf dem die Durchsicht ihr „kein Mangel" stützt: Einladung nur mit
 --      gültigem Token und nur einmal, keine Unterscheidung zwischen unbekanntem, abgelaufenem
 --      und benutztem Token, kein zweiter Beitritt, keine fremde Familie.
+--   4. Einladungen nur mit Server-Token: `authenticated` darf beim Anlegen einer Einladung
+--      nur `family_id` setzen, Token und Ablauf kommen aus den Defaults.
 --
 -- Feste Kennungen (Seed-IDs siehe Kopf von supabase/seed.sql):
 --   Einladungen (Testfamilie)   1e000000-0000-4000-8000-0000000000NN   01 gültig, 02 abgelaufen, 03 benutzt
@@ -20,7 +22,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(33);
+select plan(44);
 
 -- ── Helfer ──────────────────────────────────────────────────────────────────
 
@@ -236,6 +238,15 @@ select throws_ok(
   'accept_invitation ohne auth.uid() → 42501'
 );
 
+-- Die eine definer-Funktion ohne eigene `auth.uid()`-Prüfung: Ohne Nutzer ist
+-- `current_family_id()` null, der Filter trifft nichts. Dass das Token danach unverändert
+-- ist, prüft der Stand nach den abgewiesenen Aufrufen unten.
+select throws_ok(
+  $$ select public.regenerate_invitation('1e000000-0000-4000-8000-000000000001') $$,
+  '22023', 'invitation not found',
+  'regenerate_invitation ohne auth.uid() → 22023'
+);
+
 -- A ist schon in einer Familie: keine zweite gründen, keiner zweiten beitreten.
 set local request.jwt.claims to '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}';
 
@@ -286,7 +297,7 @@ select results_eq(
   $$ select family_id, used_at from public.family_invitations
      where token = '1e000000-0000-4000-8000-000000000001' $$,
   $$ values ('f1f1f1f1-0000-4000-8000-000000000001'::uuid, null::timestamptz) $$,
-  'nach den abgewiesenen Aufrufen von A und C ist das gültige Token unverändert'
+  'nach den abgewiesenen Aufrufen ohne Nutzer, von A und von C ist das gültige Token unverändert'
 );
 
 -- B verliert die Familie und tritt per Token wieder bei. Unbekannt, abgelaufen und benutzt
@@ -341,6 +352,117 @@ select throws_ok(
   $$ select public.accept_invitation('1e000000-0000-4000-8000-000000000001', 'Ben', 'BE', '#E8A56A') $$,
   '22023', 'invitation invalid or expired',
   'ein Token gilt nur einmal: derselbe Beitritt noch einmal → 22023'
+);
+
+reset role;
+
+-- ── 4. Einladungen nur mit Server-Token ─────────────────────────────────────
+--
+-- Die Abweisungen prüfen die Meldung mit: Auch RLS antwortet mit 42501, aber anders.
+
+select is(
+  (select array_agg(a.attname::text collate "default" order by a.attname)
+   from pg_attribute a
+   where a.attrelid = 'public.family_invitations'::regclass and a.attnum > 0 and not a.attisdropped
+     and has_column_privilege('authenticated', a.attrelid, a.attnum, 'insert')),
+  array['family_id'],
+  'authenticated darf in family_invitations nur family_id einfügen'
+);
+
+select ok(
+  not has_any_column_privilege('anon', 'public.family_invitations', 'insert'),
+  'anon darf in family_invitations gar nichts einfügen'
+);
+
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}';
+
+select throws_ok(
+  $$ insert into public.family_invitations (family_id, token)
+     values ('f1f1f1f1-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001') $$,
+  '42501', 'permission denied for table family_invitations',
+  'A kann kein eigenes Token setzen'
+);
+
+select throws_ok(
+  $$ insert into public.family_invitations (family_id, expires_at)
+     values ('f1f1f1f1-0000-4000-8000-000000000001', 'infinity') $$,
+  '42501', 'permission denied for table family_invitations',
+  'A kann keinen eigenen Ablauf setzen'
+);
+
+select throws_ok(
+  $$ insert into public.family_invitations (family_id, created_by)
+     values ('f1f1f1f1-0000-4000-8000-000000000001', 'bbbbbbbb-0000-4000-8000-000000000011') $$,
+  '42501', 'permission denied for table family_invitations',
+  'A kann eine Einladung keinem anderen Elternteil zuschreiben'
+);
+
+-- Der Weg des Clients (`useCreateInvitation`): nur family_id, die Zeile kommt per
+-- RETURNING zurück. Das Token merkt sich der Block für die Prüfungen unten; ein Fehler
+-- landet als Text in `pgtap.invite_error`, statt die Datei abzubrechen.
+do $$
+declare
+  v_token uuid;
+begin
+  insert into public.family_invitations (family_id)
+  values ('f1f1f1f1-0000-4000-8000-000000000001')
+  returning token into v_token;
+  perform set_config('pgtap.invite_token', v_token::text, true);
+exception when others then
+  perform set_config('pgtap.invite_error', sqlstate || ' ' || sqlerrm, true);
+end;
+$$;
+
+select is(
+  current_setting('pgtap.invite_error', true),
+  null,
+  'A legt eine Einladung nur mit family_id an, wie der Client'
+);
+
+-- Ohne update-Policy lässt sich auch nachträglich nichts verlängern; der Stand unten zeigt
+-- den Default-Ablauf trotz dieses Versuchs.
+update public.family_invitations set expires_at = 'infinity'
+where token = current_setting('pgtap.invite_token', true)::uuid;
+
+reset role;
+
+select results_eq(
+  $$ select token::text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+            expires_at = now() + interval '7 days', used_at is null, created_by is null
+     from public.family_invitations
+     where token = current_setting('pgtap.invite_token', true)::uuid $$,
+  $$ values (true, true, true, true) $$,
+  'die neue Einladung hat ein zufälliges Token (v4) aus dem Default und läuft in 7 Tagen ab, trotz des Updates von A'
+);
+
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}';
+
+select isnt(
+  public.regenerate_invitation(current_setting('pgtap.invite_token', true)::uuid),
+  current_setting('pgtap.invite_token', true)::uuid,
+  'regenerate_invitation rotiert weiterhin und liefert ein neues Token'
+);
+
+reset role;
+
+select results_eq(
+  $$ select token = current_setting('pgtap.invite_token', true)::uuid,
+            expires_at = now() + interval '7 days', used_at is null
+     from public.family_invitations
+     where family_id = 'f1f1f1f1-0000-4000-8000-000000000001'
+       and token::text not like '1e000000-%' $$,
+  $$ values (false, true, true) $$,
+  'danach steht nur noch das neue Token, mit Default-Ablauf'
+);
+
+set local role anon;
+
+select throws_ok(
+  $$ insert into public.family_invitations (family_id) values ('f1f1f1f1-0000-4000-8000-000000000001') $$,
+  '42501', 'permission denied for table family_invitations',
+  'anon kann keine Einladung anlegen'
 );
 
 reset role;
