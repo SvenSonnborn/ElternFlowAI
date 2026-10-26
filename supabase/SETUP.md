@@ -132,11 +132,15 @@ eval "$(mise exec -- supabase status -o env | grep -E '^(API_URL|PUBLISHABLE_KEY
 TMPDIR=/tmp/eltern-metro-lokal EXPO_PUBLIC_SUPABASE_URL="$API_URL" \
   EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$PUBLISHABLE_KEY" \
   bunx expo export --platform web --output-dir /tmp/eltern-web-lokal --clear
-grep -rqE '[a-z0-9]{20}\.supabase\.co' /tmp/eltern-web-lokal && echo "ABBRUCH: Live-URL im Bundle"
-bunx expo serve /tmp/eltern-web-lokal --port 8082
+if grep -rqE '[a-z0-9]{20}\.supabase\.co' /tmp/eltern-web-lokal; then
+  echo "ABBRUCH: Live-URL im Bundle"
+else
+  echo '{"private":true}' > /tmp/eltern-web-lokal/package.json
+  bunx expo serve /tmp/eltern-web-lokal --port 8082
+fi
 ```
 
-Die Prüfung vor dem Ausliefern ist Pflicht: Sie sucht eine Projekt-URL, nicht nur `supabase.co`, weil supabase-js `*.supabase.co` als Host-Muster mitbringt. Port 8082, weil die lokalen Redirect-URLs dafür freigegeben sind; eigenes `TMPDIR`, damit der Export den Metro-Cache des Dev-Servers nicht teilt. Kein HMR, nach Code-Änderungen neu exportieren.
+Die Prüfung vor dem Ausliefern ist Pflicht: Sie sucht eine Projekt-URL, nicht nur `supabase.co`, weil supabase-js `*.supabase.co` als Host-Muster mitbringt. Port 8082, weil die lokalen Redirect-URLs dafür freigegeben sind; eigenes `TMPDIR`, damit der Export den Metro-Cache des Dev-Servers nicht teilt. Die `package.json` braucht `expo serve`, das von seinem Verzeichnis aus nach oben ein Projekt sucht; dynamische Routen wie `/event/<id>` liefert es beim Direktaufruf als 404, in der App navigiert man dorthin. Kein HMR, nach Code-Änderungen neu exportieren.
 
 **Abgleich mit live.** [parity.sql](./parity.sql) ist eine einzige Abfrage ohne Seiteneffekte. Lokal über `docker exec -i supabase_db_ElternFlowAI psql -U postgres -At -F '|' < supabase/parity.sql`, live rein lesend über den MCP (`execute_sql`); danach zeilenweise vergleichen. Bei einer Abweichung gilt live: Was live hat, kommt als idempotente Nachzieh-Migration ins Repo; was live fehlt, ist ein Fehler auf live.
 
