@@ -91,18 +91,17 @@ function invalidateTasks(qc: QueryClient): Promise<void> {
 /**
  * Der Schnitt, an dem der Schreibpfad die Datenbank berührt — das Gegenstück
  * zu `EventOps` in [features/calendar/recurrence.ts](../calendar/recurrence.ts).
- * Ohne ihn spricht die Mutation direkt mit dem Modul-`supabase`, und ihr
- * Compare-and-Swap ist allein durch einen beobachteten Zwei-Client-Lauf
- * belegt statt durch einen Test.
+ * Ohne ihn spricht die Mutation direkt mit dem Modul-`supabase`, und die
+ * Behandlung eines Konflikts wäre allein durch einen beobachteten
+ * Zwei-Client-Lauf belegt statt durch einen Test.
  *
  * **Die Ops melden, die reine Funktion urteilt.** `updateRow` gibt
  * `true`/`false` zurück, statt bei null Zeilen selbst zu werfen: Das
  * Klassifizieren („fremde Änderung" gegen „Zeile weg") braucht einen zweiten
  * Aufruf (`fetchRow`), und eine Op, die eine andere Op ruft, ist keine Op
  * mehr. `deleteRow` meldet ein {@link DeleteOutcome}, das der Server selbst
- * klassifiziert hat (`delete_task`); nur beim Konflikt liest `deleteTask` nach. Der Kalender hat den Wurf **in** `updateMaster` — genau deshalb muss
- * ein Fix dort in den Supabase-Adapter hineingreifen statt in die reine
- * Funktion.
+ * klassifiziert hat (`delete_task`); nur beim Konflikt liest `deleteTask`
+ * nach.
  *
  * Nur `useUpdateTask` und `useDeleteTask` laufen hierüber. `useCreateTask`
  * und `useToggleTaskDone` bleiben bewusst beim direkten Client: Beide haben

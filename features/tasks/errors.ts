@@ -17,8 +17,9 @@ export class MissingParentError extends Error {
  *
  * Carries their version so the screen can diff it field by field against the
  * user's own input without a second round trip (ADR-031). Unlike the calendar's
- * counterpart, `row` is never null here: the task path detects the conflict via
- * compare-and-swap and then reads the row precisely to fill this in.
+ * counterpart, `row` is never null here: the task path detects the conflict
+ * (compare-and-swap on update, `delete_task`'s `EF409` on delete) and then
+ * reads the row precisely to fill this in.
  */
 export class TaskConflictError extends Error {
   constructor(readonly row: TaskWithType) {
