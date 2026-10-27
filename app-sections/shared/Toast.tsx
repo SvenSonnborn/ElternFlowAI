@@ -92,6 +92,7 @@ export function Toast({ entry, onDismiss }: ToastProps) {
     Animated.timing(progress, {
       toValue: 0,
       duration: reduceMotion === true ? 0 : 120,
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- RN-Typen führen Easing-Funktionen als Methoden; Easing.js benutzt kein `this`
       easing: Easing.in(Easing.quad),
       useNativeDriver: true,
     }).start(() => onDismiss(entry.id));
@@ -108,6 +109,7 @@ export function Toast({ entry, onDismiss }: ToastProps) {
     Animated.timing(progress, {
       toValue: 1,
       duration: reduceMotion ? 0 : 140,
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- RN-Typen führen Easing-Funktionen als Methoden; Easing.js benutzt kein `this`
       easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
@@ -142,6 +144,7 @@ export function Toast({ entry, onDismiss }: ToastProps) {
     const animation = Animated.timing(countdown, {
       toValue: 0,
       duration: remaining,
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- RN-Typen führen Easing-Funktionen als Methoden; Easing.js benutzt kein `this`
       easing: Easing.linear,
       useNativeDriver: true,
     });
