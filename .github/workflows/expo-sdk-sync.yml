@@ -57,7 +57,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.4
 
       # Bewusst ohne --frozen-lockfile: Renovate hat package.json bewegt,
       # bun.lock ist gegenüber der neuen expo-Version veraltet.
