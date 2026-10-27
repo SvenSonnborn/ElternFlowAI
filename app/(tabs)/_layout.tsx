@@ -1,7 +1,5 @@
-import type { ParamListBase } from "expo-router/react-navigation";
-import type { BottomTabOptionsArgs } from "expo-router/tabs";
-
-import { Tabs } from "expo-router";
+import { Tabs, useRoute } from "expo-router";
+import { useNavigationState } from "expo-router/react-navigation";
 import { useTranslation } from "react-i18next";
 import { Platform, View } from "react-native";
 
@@ -16,32 +14,32 @@ function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
 export default function TabsLayout() {
   const { t } = useTranslation();
   const { theme } = useTheme();
+  // Der Zustand des Tab-Navigators steckt im Root-Stack unter dieser Route.
+  // Gelesen wird er hier per Hook statt über `navigation.getState()` im
+  // Options-Callback: expo-router 58 frischt die Quelle von `getState()` erst
+  // im Commit auf, beim Rendern der Optionen läge sie einen Tab-Wechsel zurück.
+  const ownKey = useRoute().key;
+  const focusedRouteKey = useNavigationState((state) => {
+    const tabs = state.routes.find((route) => route.key === ownKey)?.state;
+    return tabs?.index === undefined ? undefined : tabs.routes[tabs.index]?.key;
+  });
 
   return (
     <View style={{ flex: 1 }}>
       <Tabs
-        // Ausdrücklich typisiert: expo-router reicht `navigation` hier als `any`
-        // durch, `getState()` liefert aber den Zustand des Tab-Navigators.
-        screenOptions={({ route, navigation }: BottomTabOptionsArgs<ParamListBase>) => {
-          const state = navigation.getState();
-          return {
-            headerShown: false,
-            tabBarActiveTintColor: theme.primaryStrong,
-            tabBarInactiveTintColor: theme.inkTertiary,
-            tabBarStyle: {
-              backgroundColor: theme.card,
-              borderTopColor: theme.line,
-              paddingTop: 8,
-              height: 72,
-            },
-            tabBarLabelStyle: { fontSize: 11, fontWeight: "500" },
-            sceneStyle: tabSceneStyle({
-              os: Platform.OS,
-              routeKey: route.key,
-              focusedRouteKey: state.routes[state.index]?.key,
-            }),
-          };
-        }}
+        screenOptions={({ route }) => ({
+          headerShown: false,
+          tabBarActiveTintColor: theme.primaryStrong,
+          tabBarInactiveTintColor: theme.inkTertiary,
+          tabBarStyle: {
+            backgroundColor: theme.card,
+            borderTopColor: theme.line,
+            paddingTop: 8,
+            height: 72,
+          },
+          tabBarLabelStyle: { fontSize: 11, fontWeight: "500" },
+          sceneStyle: tabSceneStyle({ os: Platform.OS, routeKey: route.key, focusedRouteKey }),
+        })}
       >
         <Tabs.Screen
           name="index"
