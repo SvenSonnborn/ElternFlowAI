@@ -246,5 +246,19 @@
       matchPackageNames: ["tailwindcss"],
       allowedVersions: "<4",
     },
+    {
+      // 11 — typescript-eslint als Range, nicht gepinnt. eslint-config-expo
+      // bringt @typescript-eslint/eslint-plugin und /parser als eigene
+      // Abhängigkeit mit, eslint.config.js lädt das Plugin über beide Wege.
+      // Hebt Renovate nur typescript-eslint, lässt Bun die Kopie von
+      // eslint-config-expo im Lockfile stehen — zwei Plugin-Versionen unter
+      // einem Namen, ESLint bricht mit `Cannot redefine plugin
+      // "@typescript-eslint"` ab. Mit Range bewegt es nur die
+      // Lockfile-Maintenance, die alle Kopien gemeinsam hebt. Ein Major läuft
+      // über Regel 9 und muss eslint-config-expo ohnehin mitnehmen.
+      description: "typescript-eslint muss dieselbe Version auflösen wie eslint-config-expo",
+      matchPackageNames: ["typescript-eslint"],
+      rangeStrategy: "replace",
+    },
   ],
 }
