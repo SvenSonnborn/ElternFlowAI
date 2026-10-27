@@ -222,9 +222,9 @@
       commitMessageTopic: "Expo SDK",
     },
     {
-      // 7 — JDK bleibt 17: der Gradle-Wrapper (8.14.3) läuft nur auf JDK <= 24.
-      // Ausführliche Begründung im Kommentar in mise.toml.
-      description: "JDK-Pin nicht anfassen (Gradle 8.14.3 braucht JDK <= 24)",
+      // 7 — JDK bleibt 17: der Gradle-Wrapper verträgt nur bestimmte
+      // JDK-Versionen. Welche und warum, steht im Kommentar in mise.toml.
+      description: "JDK-Pin nicht anfassen (Gradle-Wrapper verträgt nicht jedes JDK)",
       matchManagers: ["mise"],
       matchDepNames: ["java"],
       enabled: false,
