@@ -32,6 +32,7 @@ app/                     Expo Router routes — THIN re-export files; `_layout.t
 app-sections/            Real screen implementations
 ├─ (tabs)/<name>/<Name>Screen.tsx
 ├─ auth/                 Login · Registrieren · Passwort zurücksetzen · E-Mail bestätigen (ADR-005)
+├─ child-profile/        ChildProfileScreen
 ├─ debug/                Dev-Werkzeuge (Realtime-Debug) — Einstieg nur unter `__DEV__`
 ├─ event/                Termin anlegen/ansehen/bearbeiten · Scope-Auswahl (`pickScope` →
 │                        ActionSheetIOS auf iOS, sonst scopeSheetStore · ScopeSheet · ScopeSheetHost, ADR-039)
@@ -39,6 +40,9 @@ app-sections/            Real screen implementations
 │                        (`runPlanning` · `useMealPlanning` — Allergie-Hinweis, Ersetzen-Dialog, ADR-043)
 ├─ onboarding/           5-Schritt-Onboarding: Familie · Partner einladen · erstes Kind (ADR-005)
 ├─ modals/
+├─ parent-profile/       ParentProfileScreen
+├─ recipe/               RecipeScreen
+├─ settings/             SettingsScreen
 ├─ task/                 Anlegen/Bearbeiten von Aufgaben (Create · Edit · TaskForm)
 └─ shared/               Geteilte Bausteine inkl. Formular-Primitives
    (DateTimePickerSheet · TypePicker · MemberPicker · Field · confirmDialog
