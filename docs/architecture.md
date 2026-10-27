@@ -2,7 +2,7 @@
 
 ## High level
 
-Eltern Flow AI is an Expo + React Native app written in TypeScript. The UI is rendered with NativeWind (Tailwind for RN) consuming theme tokens that flip between two themes (`light`, `dark`). Navigation uses Expo Router with file-based routes — the actual screen implementations live in `app-sections/` and `app/` files are thin re-exports so the URL surface stays small and uniform.
+Eltern Flow AI is an Expo + React Native app written in TypeScript. The UI is rendered with NativeWind (Tailwind for RN) consuming theme tokens that flip between two themes (`light`, `dark`). Navigation uses Expo Router with file-based routes — the actual screen implementations live in `app-sections/` and the route files in `app/` are thin re-exports so the URL surface stays small and uniform; only the `_layout.tsx` files hold navigation and provider composition.
 
 ```
 ┌────────────────────────────────┐

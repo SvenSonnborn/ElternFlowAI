@@ -6,7 +6,7 @@ folder named here — see `CLAUDE.md` for the "do not silently diverge" rule.
 
 ```
 app/                     Expo Router routes — THIN re-export files; `_layout.tsx` holds navigator + providers
-├─ _layout.tsx           Root stack + providers (QueryClient · i18n · ThemeProvider · SafeArea · GestureHandler · ToastProvider) + <ConflictDialogHost /> + <ScopeSheetHost /> + useFlushPendingDeletes() + useFamilyRealtime()
+├─ _layout.tsx           Root stack + i18n-Init (Import) + providers (QueryClient · ThemeProvider · SafeArea · GestureHandler · ToastProvider) + <ConflictDialogHost /> + <ScopeSheetHost /> + useFlushPendingDeletes() + useFamilyRealtime()
 ├─ (tabs)/_layout.tsx    Bottom tab navigator (5 tabs) + Voice FAB overlay
 ├─ (tabs)/index.tsx      → Dashboard
 ├─ (tabs)/kalender.tsx
