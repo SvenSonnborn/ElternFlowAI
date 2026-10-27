@@ -5,6 +5,7 @@
  */
 import "@testing-library/react-native"; // muss vor dem Wächter unten stehen, s. dort
 import { notifyManager } from "@tanstack/react-query";
+import { dirname } from "node:path";
 import { format } from "node:util";
 
 // Platzhalter wie in `bun.test.preload.ts`, und wie dort unbedingt gesetzt, nie
@@ -57,6 +58,21 @@ jest.mock("expo-crypto", () => ({
       .requireActual<{ getRandomValues: (array: Uint8Array) => Uint8Array }>("node:crypto")
       .getRandomValues(array),
 }));
+
+// jest-expo mockt `react-native/asset-registry`, react-native 0.88 liefert
+// `AssetRegistry` im Index aber direkt aus `src/private/assets/AssetRegistry`,
+// am Mock vorbei. `expo-asset` liest es seit 58.0.16 aus dem Index, und jede
+// Suite mit `@expo/vector-icons` scheitert beim Laden der Schrift mit
+// „Module "1" is missing from the asset registry“. Workaround aus
+// expo/expo#51834; der Pfad wird über das Paketverzeichnis aufgelöst, weil
+// `exports` von react-native ihn nicht freigibt. Fällt weg, sobald jest-expo den
+// Fix (expo/expo#52048) ausliefert, s. docs/TODO.md.
+jest.doMock(
+  require.resolve("react-native/src/private/assets/AssetRegistry", {
+    paths: [dirname(require.resolve("react-native/package.json"))],
+  }),
+  () => ({ AssetRegistry: jest.requireMock<object>("react-native/asset-registry") }),
+);
 
 // React Query bündelt Benachrichtigungen per Timer; das landet außerhalb von
 // `act()` und warnt. Synchron zustellen hält React-Updates innerhalb des Tests.
