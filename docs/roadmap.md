@@ -200,7 +200,8 @@ pass** aktivieren → die sechs Namen oben hinzufügen. Zwei Fallen dabei:
    `Integration`-Eintrag. Nachgeprüft: alle zehn zuletzt gemergten Renovate-PRs wurden von dir von
    Hand gemergt, darunter #86 (`lock file maintenance`) und #75–#79 (Actions) — genau die
    Automerge-Kategorien. Das macht den späteren Block-9-Punkt „`platformAutomerge: true` testen"
-   bis auf Weiteres gegenstandslos.
+   bis auf Weiteres gegenstandslos. **Aufgelöst durch [ADR-045](./decision-log.md):** Renovate merged
+   gar nicht mehr selbst, ein Bypass-Eintrag ist damit überflüssig.
 
 ### 0.2 SDK-Drift einfangen — **erledigt**
 
