@@ -46,7 +46,7 @@ jobs:
           # mise selbst gepinnt, siehe native-build.yml: ohne `version` fragt die
           # Action nach „latest", und ein gemeldetes Release kann noch gar nicht
           # existieren (2026-09-08, 404 nach 15 Sekunden).
-          version: 2026.10.14
+          version: 2026.10.20
 
       # Versionsdrift der CLI sieht sonst wie ein Projektfehler aus (andere
       # Migrationsreihenfolge, andere Lint-Ausgabe). Hart prüfen statt vermuten,
