@@ -1,3 +1,6 @@
+import type { ParamListBase } from "expo-router/react-navigation";
+import type { BottomTabOptionsArgs } from "expo-router/tabs";
+
 import { Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Platform, View } from "react-native";
@@ -17,7 +20,9 @@ export default function TabsLayout() {
   return (
     <View style={{ flex: 1 }}>
       <Tabs
-        screenOptions={({ route, navigation }) => {
+        // Ausdrücklich typisiert: expo-router reicht `navigation` hier als `any`
+        // durch, `getState()` liefert aber den Zustand des Tab-Navigators.
+        screenOptions={({ route, navigation }: BottomTabOptionsArgs<ParamListBase>) => {
           const state = navigation.getState();
           return {
             headerShown: false,

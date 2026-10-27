@@ -27,10 +27,14 @@ const HIDDEN_SCENE = { visibility: "hidden" } as unknown as ViewStyle;
  * dem Schließen, bis er zufällig wieder rendert. Der eigene Zustand des
  * Tab-Navigators hängt nicht am Elternteil.
  * Ohne bekannte fokussierte Route bleibt jede Szene sichtbar. Siehe ADR-041.
+ *
+ * `routeKey` ist `undefined` für eine Route, die expo-router als Platzhalter
+ * beschreibt, weil sie im Zustand noch keine Instanz hat. Sie ist nie die
+ * fokussierte und rendert ohnehin nichts, also gilt sie als verdeckt.
  */
 export function tabSceneStyle(input: {
   os: string;
-  routeKey: string;
+  routeKey: string | undefined;
   focusedRouteKey: string | undefined;
 }): ViewStyle | undefined {
   if (input.os !== "web") return undefined;

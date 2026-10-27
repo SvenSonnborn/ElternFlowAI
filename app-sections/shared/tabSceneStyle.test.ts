@@ -9,6 +9,12 @@ describe("tabSceneStyle", () => {
     });
   });
 
+  test("auf Web ist eine Route ohne Instanz im Zustand unsichtbar", () => {
+    expect(tabSceneStyle({ os: "web", routeKey: undefined, focusedRouteKey: "b" })).toEqual({
+      visibility: "hidden",
+    });
+  });
+
   test("die fokussierte Szene bekommt keinen Stil", () => {
     expect(tabSceneStyle({ os: "web", routeKey: "a", focusedRouteKey: "a" })).toBeUndefined();
   });
