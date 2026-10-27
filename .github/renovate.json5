@@ -2,7 +2,13 @@
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
 
   extends: [
-    "config:recommended",
+    // config:recommended plus Härtung: Actions auf Commit-SHAs, devDependencies
+    // exakt gepinnt, drei Tage Mindestalter für npm-Releases (Sicherheitsupdates
+    // ausgenommen), wöchentliche Lockfile-Maintenance, Hinweise auf verwaiste
+    // Pakete und Config-Migrations-PRs. Ein Migrations-PR kann die Kommentare
+    // dieser Datei verlieren (Renovate schreibt JSON5 dabei teils als JSON) —
+    // die Änderung von Hand übernehmen, nicht mergen.
+    "config:best-practices",
     // Alle Renovate-Commits als `chore(deps): …`. Passend zu CLAUDE.md
     // ("chore = Wartung / Tooling / CI"). Ohne diesen Preset trennt
     // config:recommended nach `fix(deps)` für prod- und `chore(deps)` für
@@ -17,25 +23,15 @@
   prConcurrentLimit: 5,
   prHourlyLimit: 2,
 
-  // Renovate rebased nur bei Konflikt. Notwendig für expo-sdk-sync.yml: dessen
-  // `expo install --fix`-Commit liegt in Renovates eigenem Branch und darf nicht
-  // wegrebased werden.
-  rebaseWhen: "conflicted",
-
   labels: ["chore", "dependencies"],
 
-  // Das Ruleset `main protection` erlaubt ausschließlich Rebase-Merges
-  // (allowed_merge_methods) und erzwingt lineare Historie.
-  automergeStrategy: "rebase",
-  // Renovate merged über die API selbst, damit der Ruleset-Bypass eindeutig auf
-  // den handelnden Actor greift. GitHubs natives Auto-Merge in Kombination mit
-  // Bypass-Actors ist zu unklar dokumentiert, um hier blind darauf zu bauen.
-  // Umstellung auf true steht in docs/TODO.md.
-  platformAutomerge: false,
-
-  lockFileMaintenance: {
-    enabled: true,
-    automerge: true,
+  // Renovate installiert für Lockfile-Updates sonst die neueste Bun-Version.
+  // Schreibt die ein Lockfile-Format, das die Bun-Version der CI noch nicht
+  // liest, scheitert dort `bun install --frozen-lockfile`. Muss deshalb gleich
+  // `bun` in mise.toml und `bun-version:` in den Workflows sein — Regel 8 hebt
+  // alle Fundstellen gemeinsam.
+  constraints: {
+    bun: "1.4.4",
   },
 
   osvVulnerabilityAlerts: true,
@@ -45,46 +41,36 @@
     schedule: [],
   },
 
-  customManagers: [
-    {
-      customType: "regex",
-      // `bun 1.3.10` steht mehrfach im Repo: in mise.toml (sieht Renovates
-      // mise-Manager) und als `bun-version:`-Input in allen
-      // .github/workflows/*.yml (sieht er NICHT — der github-actions-Manager
-      // fasst nur `uses:`-Zeilen an, keine `with:`-Inputs). Ohne diesen
-      // Manager driftet "local == CI" beim ersten Bun-Update auseinander.
-      description: "bun-version: in allen Workflow-Dateien an mise.toml koppeln",
-      managerFilePatterns: ["/^\\.github/workflows/.+\\.ya?ml$/"],
-      matchStrings: ["bun-version:\\s*(?<currentValue>\\S+)"],
-      depNameTemplate: "bun",
-      datasourceTemplate: "github-releases",
-      packageNameTemplate: "oven-sh/bun",
-      extractVersionTemplate: "^bun-v(?<version>.*)$",
-    },
-  ],
-
+  // Kein Automerge, nirgends: Jeder PR wird von Hand gemergt. Grüne CI beweist
+  // nicht, dass ein Update in der App funktioniert — sie sieht weder Expo- und
+  // NativeWind-Kopplungen noch das Laufzeitverhalten auf dem Gerät.
+  //
   // ACHTUNG — die Reihenfolge ist Teil der Semantik: spätere Regeln
-  // überschreiben frühere für die Eigenschaften, die sie setzen. Jede aktive
-  // Regel setzt `automerge` explizit, damit Überlappungen nicht von Defaults
-  // abhängen — Ausnahme ist Regel 7, die den Dep über `enabled: false`
-  // komplett stilllegt, wo automerge gegenstandslos ist.
+  // überschreiben frühere für die Eigenschaften, die sie setzen.
   packageRules: [
     {
-      // 1 — devDependencies sammeln und automergen. Die CI-Gates
-      // (format/lint/typecheck/test/web-build) sind das Sicherheitsnetz.
+      // 1a — devDependencies sammeln: ein PR pro Woche statt einer pro Paket.
       description: "devDependencies (minor+patch)",
       matchDepTypes: ["devDependencies"],
       matchUpdateTypes: ["minor", "patch"],
       groupName: "dev-dependencies",
-      automerge: true,
     },
     {
-      // 2 — Action-Pins. Majors bleiben manuell, die ändern gern Inputs.
+      // 1b — dasselbe für dependencies. Jeder PR durchläuft native-build.yml
+      // (~30 min), Einzel-PRs pro Paket kosten das jedes Mal. Getrennt von 1a,
+      // damit ein Bruch in der App nicht im Tooling-Bump untergeht. Steht vor
+      // Regel 3: Expo-verwaltete Pakete wandern dort in ihre eigene Gruppe.
+      description: "dependencies (minor+patch)",
+      matchDepTypes: ["dependencies"],
+      matchUpdateTypes: ["minor", "patch"],
+      groupName: "dependencies",
+    },
+    {
+      // 2 — Action-Updates sammeln. Majors laufen über Regel 9.
       description: "GitHub Actions (minor/patch/digest)",
       matchManagers: ["github-actions"],
       matchUpdateTypes: ["minor", "patch", "digest"],
       groupName: "github actions",
-      automerge: true,
     },
     {
       // 3 — Von Expo SDK verwaltet: die Version bestimmt das SDK, nicht
@@ -96,16 +82,18 @@
       // `lockedVersion` aus der Lockfile (extrahiert nur package.json), daher
       // taucht ein In-Range-Patch wie `~57.0.7` → 57.0.9 hier nicht als
       // Einzel-Update auf — aktuell gehalten wird das ausschließlich über die
-      // wöchentliche, automerged `lockFileMaintenance` (oben). 58.x
+      // wöchentliche `lockFileMaintenance` (aus config:best-practices). 58.x
       // (SDK-Major) bleibt für diese Gruppe trotzdem tabu — außer für `expo`
       // selbst, das Regel 4 gleich danach wieder aufweicht (Begründung dort).
       // Exakt gepinnte Pakete wie react-native 0.86.0 bewegen sich damit gar
       // nicht — gewollt, denn genau dort bricht ein eigenmächtiger Bump den
       // Native-Build, den die CI (nur Web-Export) nicht prüft.
       //
-      // Steht bewusst NACH Regel 1: jest-expo, eslint-config-expo und
-      // @types/react sind devDeps *und* Expo-verwaltet. Diese Regel gewinnt,
-      // sie landen also ohne Automerge in der Expo-Gruppe.
+      // Steht bewusst NACH Regel 1a/1b: jest-expo, eslint-config-expo und
+      // @types/react sind devDeps *und* Expo-verwaltet, expo-* und react-native
+      // dependencies. Diese Regel gewinnt, sie landen also in der Expo-Gruppe.
+      // Ebenso setzt `in-range-only` hier den `pin` aus config:best-practices
+      // (:pinDevDependencies) außer Kraft — die Tilde-Ranges bleiben.
       //
       // `react-test-renderer` stand hier bis 2026-09-08 mit in der Liste und ist
       // mit dem Paket selbst entfallen: React 19 hat es deprecatet, SDK 57 führt
@@ -114,7 +102,7 @@
       // hatte den Eintrag ausdrücklich nur bis zu dieser Entscheidung behalten.
       // `test-renderer` kommt bewusst NICHT als Ersatz hier herein — es ist ein
       // RNTL-Peer, kein Expo-verwaltetes Paket, und läuft damit richtigerweise
-      // unter Regel 1 (devDeps, Automerge für minor+patch).
+      // unter Regel 1a.
       //
       // WICHTIG für alle, die diese Liste pflegen: Expo schreibt Versionen über
       // ZWEI Kanäle vor, und beide müssen hier abgedeckt sein.
@@ -160,7 +148,6 @@
       ],
       rangeStrategy: "in-range-only",
       groupName: "expo sdk (in-range)",
-      automerge: false,
     },
     {
       // 4 — Override von Regel 3, nur für `expo` selbst. Der Renovate-
@@ -184,17 +171,16 @@
       description: "expo: rangeStrategy-Override, damit Regel 6 Majors und Minors überhaupt sieht",
       matchPackageNames: ["expo"],
       rangeStrategy: "update-lockfile",
-      automerge: false,
     },
     {
       // 5 — Korrigiert Regel 3: deren Regex /^react-native-/ fängt diese beiden
       // mit ein, obwohl Expo sie nicht verwaltet. Zwei benannte Ausnahmen statt
-      // einer gepflegten Zwanzig-Pakete-Liste.
+      // einer gepflegten Zwanzig-Pakete-Liste. `groupName: null` nimmt sie auch
+      // aus Gruppe 1b — beide laufen als Einzel-PR, sie bewegen sich selten.
       description: "Trotz react-native-Präfix nicht von Expo verwaltet",
       matchPackageNames: ["react-native-calendars", "react-native-url-polyfill"],
       rangeStrategy: "replace",
       groupName: null,
-      automerge: false,
     },
     {
       // 6 — Der SDK-Sprung. Renovate hebt NUR `expo`; expo-sdk-sync.yml zieht
@@ -217,7 +203,6 @@
       matchUpdateTypes: ["major", "minor"],
       groupName: null,
       dependencyDashboardApproval: true,
-      automerge: false,
       labels: ["chore", "dependencies", "expo-sdk"],
       commitMessageTopic: "Expo SDK",
     },
@@ -230,13 +215,32 @@
       enabled: false,
     },
     {
-      // 8 — mise.toml und alle Workflow-Dateien müssen dieselbe Bun-Version
-      // tragen. Der customManager oben liefert die weiteren Fundstellen unter
-      // demselben depName, sie landen so gemeinsam in einem PR.
-      description: "Bun-Toolchain (mise.toml + Workflow-Dateien gemeinsam)",
+      // 8 — mise.toml, die Workflow-Dateien und `constraints` oben müssen
+      // dieselbe Bun-Version tragen. Alle drei Manager (mise, github-actions
+      // über den `bun-version:`-Input von oven-sh/setup-bun, renovate-config)
+      // melden sie unter dem depName `bun`; sie landen so in einem PR. Steht
+      // nach Regel 2, deren Actions-Gruppe sonst den Workflow-Anteil abzöge.
+      description: "Bun-Toolchain (mise.toml + Workflows + constraints gemeinsam)",
       matchDepNames: ["bun"],
       groupName: "bun toolchain",
-      automerge: false,
+    },
+    {
+      // 9 — Majors nur auf Zuruf: kein PR, bis die Checkbox im Dependency
+      // Dashboard gesetzt ist. Ein Major ist eine Migration mit eigenem Plan,
+      // kein Wochen-Update; ein offener PR, der monatelang liegt, ist Lärm.
+      // Sicherheitsupdates greift das nicht — vulnerabilityAlerts setzt
+      // dependencyDashboardApproval für sie selbst wieder auf false.
+      description: "Majors nur nach Freigabe im Dependency Dashboard",
+      matchUpdateTypes: ["major"],
+      dependencyDashboardApproval: true,
+    },
+    {
+      // 10 — NativeWind v4 baut auf Tailwind 3.4; v4 braucht die Migration aus
+      // docs/TODO.md (Tailwind v3 → v4), nicht einen Bump. Grüne CI hilft hier
+      // nicht: der Bruch zeigt sich erst im gerenderten Styling.
+      description: "tailwindcss bleibt auf v3 (NativeWind v4)",
+      matchPackageNames: ["tailwindcss"],
+      allowedVersions: "<4",
     },
   ],
 }
