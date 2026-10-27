@@ -67,6 +67,14 @@ jobs:
       - name: expo install --fix
         run: bunx expo install --fix
 
+      # `@react-native/jest-preset` muss exakt zur react-native-Version passen
+      # (jest-expo peert darauf; ein älteres Preset kennt die `exports`-Einstiege
+      # des neuen react-native nicht), aber `expo install --fix` kennt das Paket
+      # nicht, und Renovate hebt den exakten Pin unter `in-range-only` nie.
+      # Deshalb hier auf die Version, die der Schritt davor installiert hat.
+      - name: "@react-native/jest-preset an react-native angleichen"
+        run: bun add --dev --exact "@react-native/jest-preset@$(bun --print 'require("react-native/package.json").version')"
+
       - name: Lockfile nachziehen
         run: bun install
 
