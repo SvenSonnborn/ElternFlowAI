@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # Kein Git-Schritt folgt dem Checkout, der GITHUB_TOKEN wird also nie
           # gebraucht — ihn trotzdem in .git/config zu hinterlassen, exponiert ihn
@@ -41,7 +41,7 @@ jobs:
       # lädt zwar `.env.local` per `[env] _.file`, mise überspringt die Datei
       # aber still, wenn sie fehlt — in CI gibt es sie nicht.
       - name: Setup toolchain (mise)
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           # mise selbst gepinnt, siehe native-build.yml: ohne `version` fragt die
           # Action nach „latest", und ein gemeldetes Release kann noch gar nicht
