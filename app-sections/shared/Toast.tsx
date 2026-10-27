@@ -326,8 +326,8 @@ export function Toast({ entry, onDismiss }: ToastProps) {
             opacity: spec.progressBar.opacity,
             // `scaleX` skaliert in React Native sonst um die Mitte — die
             // Leiste liefe von beiden Seiten nach innen zu statt von rechts
-            // nach links leer. `transformOrigin` gibt es seit RN 0.74, das
-            // Repo steht auf 0.86 (Decision 9 der Spec).
+            // nach links leer. `transformOrigin` gibt es seit RN 0.74
+            // (Decision 9 der Spec).
             transformOrigin: "left",
             transform: [{ scaleX: countdown }],
           }}

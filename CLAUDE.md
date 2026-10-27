@@ -132,12 +132,12 @@ Web-bundle smoke check end-to-end:
 bunx expo export --platform web --output-dir /tmp/eltern-web
 ```
 
-**Toolchain:** Node, Java, Bun and the Supabase CLI are pinned in [mise.toml](mise.toml) — `mise install` once, mise activated in the shell. Two pins look optional and are not: **JDK 17** (the machine default JDK fails the Gradle build) and **`RCT_USE_PREBUILT_RNCORE=0`** (without it iOS can pull a mismatched prebuilt RN core). Why: [docs/development.md](docs/development.md#toolchain-mise).
+**Toolchain:** Node, Java, Bun and the Supabase CLI are pinned in [mise.toml](mise.toml) — `mise install` once, mise activated in the shell. Two pins look optional and are not: **JDK 17** (React Native's reference JDK; the machine default JDK 26 failed the Gradle build up to SDK 57) and **`RCT_USE_PREBUILT_RNCORE=0`** (without it iOS can pull a mismatched prebuilt RN core). Why: [docs/development.md](docs/development.md#toolchain-mise).
 
 ## Tech stack (locked)
 
-- **Expo SDK 57 + Expo Router 57** (file-based, `(tabs)` group, typed routes enabled)
-- React 19.2 + React Native 0.86, **TypeScript ~6.0 (strict)**
+- **Expo SDK 58 + Expo Router 58** (file-based, `(tabs)` group, typed routes enabled)
+- React 19.3 + React Native 0.88, **TypeScript ~6.0 (strict)**
 - **NativeWind v4 + Tailwind 3.4** — utility classes consume CSS variables that flip per theme
 - **Zustand** (local/UI) + **@tanstack/react-query** (server)
 - **react-i18next + expo-localization** — DE default, EN switch
@@ -279,7 +279,7 @@ Fallen, an denen lokal und CI auseinanderlaufen:
 - **Grüne `ci.yml` sagt nichts über Native-Builds** — sie endet beim Web-Export. Dafür ist `native-build.yml` da.
 - **Required Checks bekommen keinen `paths`-Filter**, sonst bleiben sie auf PRs ohne passende Änderung für immer „ausstehend".
 
-**Renovate** ([.github/renovate.json5](.github/renovate.json5), [ADR-013](docs/decision-log.md), [ADR-015](docs/decision-log.md), [ADR-045](docs/decision-log.md)): **Kein Automerge** — jeder Renovate-PR wird von Hand gemergt, grüne CI beweist kein funktionierendes Update. Expo-SDK-verwaltete Pakete laufen `in-range-only` (außer `expo` selbst, siehe [development.md](docs/development.md#renovate)), `java` in `mise.toml` ist für Renovate abgeschaltet. `jest`, `@types/jest` und `typescript` stehen absichtlich in der Expo-Paketliste — nicht wegräumen. Gegenprobe nach jedem Eingriff: `bunx expo install --check`. Der Sync-Commit von `expo-sdk-sync.yml` startet keine neue CI: PR einmal schließen und wieder öffnen.
+**Renovate** ([.github/renovate.json5](.github/renovate.json5), [ADR-013](docs/decision-log.md), [ADR-015](docs/decision-log.md), [ADR-045](docs/decision-log.md)): **Kein Automerge** — jeder Renovate-PR wird von Hand gemergt, grüne CI beweist kein funktionierendes Update. Expo-SDK-verwaltete Pakete laufen `in-range-only` (außer `expo` selbst, siehe [development.md](docs/development.md#renovate)), `java` in `mise.toml` ist für Renovate abgeschaltet. `jest`, `@types/jest` und `typescript` stehen absichtlich in der Expo-Paketliste — nicht wegräumen. Gegenprobe nach jedem Eingriff: `bunx expo install --check`. Die CI zum Sync-Commit von `expo-sdk-sync.yml` wartet auf Freigabe: die Läufe im PR einmal freigeben ([ADR-047](docs/decision-log.md)).
 
 ## Code review (CodeRabbit)
 

@@ -90,7 +90,7 @@
       // wöchentliche `lockFileMaintenance` (aus config:best-practices). 58.x
       // (SDK-Major) bleibt für diese Gruppe trotzdem tabu — außer für `expo`
       // selbst, das Regel 4 gleich danach wieder aufweicht (Begründung dort).
-      // Exakt gepinnte Pakete wie react-native 0.86.0 bewegen sich damit gar
+      // Exakt gepinnte Pakete wie react-native bewegen sich damit gar
       // nicht — gewollt, denn genau dort bricht ein eigenmächtiger Bump den
       // Native-Build, den die CI (nur Web-Export) nicht prüft.
       //
@@ -115,7 +115,7 @@
       //       Web: https://api.expo.dev/v2/sdks/<version>/native-modules
       //   (b) `relatedPackages` der Versions-API — die Toolchain drumherum.
       //       Web: https://api.expo.dev/v2/versions/latest
-      //       → .data.sdkVersions["57.0.0"].relatedPackages
+      //       → .data.sdkVersions["<version>"].relatedPackages
       // Kanal (b) enthält u. a. `jest`, `@types/jest` und `typescript` — Pakete,
       // die kein Expo-Namensmuster tragen und deshalb ohne ausdrücklichen
       // Eintrag durch alle Regex-Patterns fallen. Genau das ist 2026-08-14
@@ -141,8 +141,9 @@
         // Fehltreffer nimmt Regel 5 wieder heraus, so wie bei `/^react-native-/`.
         // `@react-native/jest-preset` fängt das Muster mit — unverändert
         // gegenüber vorher, `/^@react-native\//` traf es ebenfalls, und das ist
-        // gewollt: das Paket ist auf `0.86.0` gepinnt und muss exakt der
-        // react-native-Version folgen, nicht npm-latest. Keine Regel-5-Ausnahme.
+        // gewollt: das Paket ist exakt gepinnt und muss der react-native-Version
+        // folgen, nicht npm-latest. Den Pin hebt expo-sdk-sync.yml beim
+        // SDK-Sprung mit. Keine Regel-5-Ausnahme.
         "/^@react-native[-\\/]/",
         "jest-expo",
         "eslint-config-expo",

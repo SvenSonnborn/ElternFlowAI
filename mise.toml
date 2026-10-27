@@ -2,10 +2,11 @@
 # mise auto-sets JAVA_HOME + PATH when you cd into this project (mise is
 # activated in the shell via `eval "$(mise activate zsh)"`).
 #
-# java 17 — required by the Android Gradle build: the project's Gradle wrapper
-#           (9.3.1, from the SDK 57 template) runs on JDK 17-25 — JDK 26 needs
-#           Gradle 9.4+ — but the machine default is JDK 26 ("Unsupported class
-#           file major version 70"). 17 is both React Native's canonical JDK and
+# java 17 — the Android Gradle build's JDK. The SDK 57 template's Gradle
+#           wrapper (9.3.1) runs on JDK 17-25, so the machine default JDK 26
+#           failed it ("Unsupported class file major version 70"). SDK 58's
+#           template ships Gradle 9.4.1; whether the build now runs on 26 is
+#           untested (docs/TODO.md). 17 is both React Native's canonical JDK and
 #           Gradle 9's own floor. Bump to 21 if a future SDK's Android build
 #           needs it; Renovate is deliberately disabled for this pin (ADR-013).
 # node 24 — current LTS; the Expo/Metro-supported track.

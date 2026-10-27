@@ -962,8 +962,8 @@ Alle aus `TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-sco
   eines eigenen Workflows genügt ein `bunx expo-doctor`-Step auf bereits installierten Dependencies
   (kein Gate, `continue-on-error: true`, wie im Sync-Workflow). Was der Native-Build **nicht**
   abdeckt und nur `expo-doctor` sieht: Paketversionen abseits der SDK-Vorgabe, doppelte/inkompatible
-  Deps, ungültige `app.json`-Felder. Ein Bump kann grün kompilieren und trotzdem von SDK 57
-  abweichen — siehe Block 0.2.
+  Deps, ungültige `app.json`-Felder. Ein Bump kann grün kompilieren und trotzdem von der
+  SDK-Vorgabe abweichen — siehe Block 0.2.
 - **`RCT_USE_PREBUILT_RNCORE` über `expo-build-properties`** — der Pin lebt heute ausschließlich in
   Shell-Umgebungen (mise lokal, `jdx/mise-action` in CI) und **nirgends im eingecheckten Projekt**;
   `ios/Podfile` Zeile 19 fällt ohne die Variable still auf `'1'` zurück. Das Plugin mit
@@ -974,8 +974,9 @@ Alle aus `TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-sco
 - ~~`platformAutomerge: true` testen~~ und ~~Custom-Manager-Regex gegenprüfen~~ — **entfallen**:
   Renovate merged nicht mehr selbst, und der Regex-Manager ist entfernt
   ([ADR-045](./decision-log.md)).
-- **Regel 3 gegen `relatedPackages` abgleichen** — fällig **beim nächsten SDK-Sprung**, nicht davor.
-  Gegenprobe ist `bunx expo install --check`. Bewusst nicht automatisiert.
+- **Regel 3 gegen `relatedPackages` abgleichen** — für SDK 58 **erledigt**, die Liste blieb gleich.
+  Fällt bei jedem SDK-Sprung wieder an; Gegenprobe ist `bunx expo install --check`. Bewusst nicht
+  automatisiert.
 - **`dependency-review.yml` vs. Renovates `vulnerabilityAlerts`** — nach ein paar Monaten prüfen, ob
   beide gebraucht werden. Reine Beobachtung, kein Handgriff.
 
