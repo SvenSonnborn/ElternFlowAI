@@ -153,7 +153,7 @@ Für diese Versionen ist Trainingswissen oft veraltet — Bibliotheks-Doku über
 
 Wie Kalender, Realtime und Konflikterkennung zusammenspielen, beschreibt [docs/architecture.md](docs/architecture.md). Diese Regeln brechen still, wenn man sie übersieht:
 
-- **Termine schreiben nur über die RPC `apply_event_change`** — eine Transaktion, eine Kennung pro Absicht; Aufgaben speichern per Compare-and-Swap und löschen über `delete_task`, beides hinter `TaskOps` in [features/tasks/mutations.ts](features/tasks/mutations.ts) ([ADR-044](docs/decision-log.md)).
+- **Termine schreiben nur über die RPC `apply_event_change`** — eine Transaktion, eine Kennung pro Absicht; eine bearbeitete Aufgabe speichert per Compare-and-Swap (Anlegen und Abhaken schreiben direkt), gelöscht wird über `delete_task`, beides hinter `TaskOps` in [features/tasks/mutations.ts](features/tasks/mutations.ts) ([ADR-044](docs/decision-log.md)).
 - **Die Identität einer Occurrence ist `occurrenceKey`** (Zone des Termins), nicht `occurrenceDate` (Anzeige, Zone des Lesers). Versionsvergleich, React-Keys, Route-Parameter `occ` und Schreibpfad schlüsseln darauf ([ADR-034](docs/decision-log.md)).
 - **Serien rechnen in Wandzeit** über [features/calendar/rrule.ts](features/calendar/rrule.ts), nie über `rrule`s `tzid`. Jeder Termin trägt seine Zone in `events.timezone`; neue Termine bekommen sie von `deviceTimeZone()` ([ADR-033](docs/decision-log.md)).
 - **Der Vertrag von `event_exceptions.override`** lebt in [features/calendar/override.ts](features/calendar/override.ts) — dort erweitern, nicht daneben ([ADR-035](docs/decision-log.md)).
@@ -166,7 +166,7 @@ Wie Kalender, Realtime und Konflikterkennung zusammenspielen, beschreibt [docs/a
 ## Folder structure
 
 ```
-app/                     Expo Router routes — THIN re-export files; `_layout.tsx` holds navigator + providers
+app/                     Expo Router routes — THIN re-export files; `_layout.tsx` holds navigator + providers, `+not-found.tsx` is its own screen
 ├─ _layout.tsx           Root stack + providers
 └─ (tabs)/_layout.tsx    Bottom tab navigator (5 tabs) + Voice FAB overlay
 app-sections/            Real screen implementations; shared/ = Bausteine, die mehr als ein Tab benutzt
@@ -222,7 +222,7 @@ Keeps `app/` as the URL surface and `app-sections/` as the implementation surfac
 
 ## Theming, Voice FAB, State
 
-- **Theming:** two themes, `light` (default) and `dark`. Colors only through Tailwind classes that read the theme's CSS variables (`bg-bg`, `text-ink`, `bg-primary-soft`, `border-line`), never hard-coded — then a theme switch is automatic ([docs/architecture.md](docs/architecture.md#theme-system)).
+- **Theming:** two themes, `light` (default) and `dark`. Colors only through Tailwind classes that read the theme's CSS variables (`bg-bg`, `text-ink`, `bg-primary-soft`, `border-line`) or, where a native prop needs a value, through the semantic tokens from `useTheme()` (`theme.card`, `theme.line`); never hard-coded — then a theme switch is automatic ([docs/architecture.md](docs/architecture.md#theme-system)).
 - **Voice FAB:** [VoiceAssistantFAB.tsx](app-sections/shared/VoiceAssistantFAB.tsx), mounted by `app/(tabs)/_layout.tsx`, spec in `DS.components.micFab`. Today it opens a placeholder modal; the full overlay (`patterns/settings-voice.md`) waits for the STT + LLM provider.
 - **State:** Zustand stores sit next to the feature that owns them (active theme: [design-system/themeStore.ts](design-system/themeStore.ts)); server state goes through TanStack Query.
 
@@ -279,7 +279,7 @@ Fallen, an denen lokal und CI auseinanderlaufen:
 - **Grüne `ci.yml` sagt nichts über Native-Builds** — sie endet beim Web-Export. Dafür ist `native-build.yml` da.
 - **Required Checks bekommen keinen `paths`-Filter**, sonst bleiben sie auf PRs ohne passende Änderung für immer „ausstehend".
 
-**Renovate** ([.github/renovate.json5](.github/renovate.json5), [ADR-013](docs/decision-log.md), [ADR-015](docs/decision-log.md)): Expo-SDK-verwaltete Pakete laufen `in-range-only`, `java` in `mise.toml` ist für Renovate abgeschaltet. `jest`, `@types/jest` und `typescript` stehen absichtlich in der Expo-Paketliste — nicht wegräumen. Gegenprobe nach jedem Eingriff: `bunx expo install --check`. Der Sync-Commit von `expo-sdk-sync.yml` startet keine neue CI: PR einmal schließen und wieder öffnen.
+**Renovate** ([.github/renovate.json5](.github/renovate.json5), [ADR-013](docs/decision-log.md), [ADR-015](docs/decision-log.md)): Expo-SDK-verwaltete Pakete laufen `in-range-only` (außer `expo` selbst, siehe [development.md](docs/development.md#renovate)), `java` in `mise.toml` ist für Renovate abgeschaltet. `jest`, `@types/jest` und `typescript` stehen absichtlich in der Expo-Paketliste — nicht wegräumen. Gegenprobe nach jedem Eingriff: `bunx expo install --check`. Der Sync-Commit von `expo-sdk-sync.yml` startet keine neue CI: PR einmal schließen und wieder öffnen.
 
 ## Code review (CodeRabbit)
 

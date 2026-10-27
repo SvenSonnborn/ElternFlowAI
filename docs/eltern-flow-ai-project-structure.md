@@ -5,20 +5,29 @@ This is the canonical folder layout for the codebase. It is referenced by
 folder named here — see `CLAUDE.md` for the "do not silently diverge" rule.
 
 ```
-app/                     Expo Router routes — THIN re-export files; `_layout.tsx` holds navigator + providers
+app/                     Expo Router routes — THIN re-export files; `_layout.tsx` holds navigator + providers, `+not-found.tsx` is its own screen
 ├─ _layout.tsx           Root stack + i18n-Init (Import) + providers (QueryClient · ThemeProvider · SafeArea · GestureHandler · ToastProvider) + <ConflictDialogHost /> + <ScopeSheetHost /> + useFlushPendingDeletes() + useFamilyRealtime()
+├─ (auth)/               Stack-_layout.tsx + login · register · check-email · reset-password · new-password
+├─ (onboarding)/         Stack-_layout.tsx + [step].tsx → OnboardingStepScreen
 ├─ (tabs)/_layout.tsx    Bottom tab navigator (5 tabs) + Voice FAB overlay
 ├─ (tabs)/index.tsx      → Dashboard
 ├─ (tabs)/kalender.tsx
 ├─ (tabs)/essen.tsx
 ├─ (tabs)/aufgaben.tsx
 ├─ (tabs)/familie.tsx
+├─ event/new.tsx          → EventCreateScreen
+├─ event/[id].tsx         → EventDetailScreen
+├─ event/edit/[id].tsx    → EventEditScreen
 ├─ task/new.tsx           → TaskCreateScreen
 ├─ task/edit/[id].tsx     → TaskEditScreen
+├─ child/new.tsx · child/[id].tsx → ChildProfileScreen
+├─ parent/[id].tsx        → ParentProfileScreen
+├─ recipe/[id].tsx        → RecipeScreen
+├─ settings.tsx           → SettingsScreen
 ├─ debug/realtime.tsx     → RealtimeDebugScreen (nur `__DEV__` verlinkt)
 ├─ meal/pick.tsx          → MealPickScreen (Rezept für einen festen Tag/Slot wählen)
 ├─ meal/schedule.tsx      → MealScheduleScreen (Tag/Slot für ein festes Rezept wählen)
-└─ +not-found.tsx
+└─ +not-found.tsx        NotFoundScreen, eigene Komponente statt Re-Export
 
 app-sections/            Real screen implementations
 ├─ (tabs)/<name>/<Name>Screen.tsx
@@ -97,6 +106,7 @@ docs/
 ├─ HANDOFF.md            Developer handoff overview (read first when onboarding)
 ├─ COPY.md               DE/EN copy decks per screen (i18n source of truth)
 ├─ ICONS.md              Icon list + stroke conventions
+├─ README.md             Design-System-Überblick (Handoff-Bundle)
 ├─ architecture.md
 ├─ decision-log.md       ADRs (append new entries, don't rewrite history)
 ├─ roadmap.md            Abarbeitungsreihenfolge für docs/TODO.md (Blöcke + Blocker)

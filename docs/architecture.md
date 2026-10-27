@@ -2,7 +2,7 @@
 
 ## High level
 
-Eltern Flow AI is an Expo + React Native app written in TypeScript. The UI is rendered with NativeWind (Tailwind for RN) consuming theme tokens that flip between two themes (`light`, `dark`). Navigation uses Expo Router with file-based routes — the actual screen implementations live in `app-sections/` and the route files in `app/` are thin re-exports so the URL surface stays small and uniform; only the `_layout.tsx` files hold navigation and provider composition.
+Eltern Flow AI is an Expo + React Native app written in TypeScript. The UI is rendered with NativeWind (Tailwind for RN) consuming theme tokens that flip between two themes (`light`, `dark`). Navigation uses Expo Router with file-based routes — the actual screen implementations live in `app-sections/` and the route files in `app/` are thin re-exports so the URL surface stays small and uniform; only the `_layout.tsx` files (navigation and provider composition) and `+not-found.tsx` (its own fallback screen) are components of their own.
 
 ```
 ┌────────────────────────────────┐
@@ -62,7 +62,8 @@ through NativeWind's `vars()` on a wrapper `View`. Tailwind classes (`bg-bg`, `t
 `bg-primary-soft`, `border-line`) read those variables, so a theme switch is automatic.
 
 The tab bar (Dashboard · Kalender · Essen · Aufgaben · Familie) takes its labels from the `nav.*`
-i18n keys and its tokens from `DS.components.tabBar`.
+i18n keys and its colors from the semantic theme tokens via `useTheme()`; `DS.components.tabBar`
+is the visual spec it follows, not a value read at runtime.
 
 ## Routing
 
@@ -176,8 +177,9 @@ Formular → applyEditScope → Schritte → apply_event_change(Kennung, Termin,
 ```
 
 Der Server vergleicht die Version, bevor er etwas schreibt (`EF409` → Nachlese → Konfliktdialog),
-und beantwortet eine schon verbuchte Kennung mit `already_applied`. Aufgaben speichern per
-Compare-and-Swap mit Nachlese ([ADR-036](./decision-log.md)) und löschen über
+und beantwortet eine schon verbuchte Kennung mit `already_applied`. Eine bearbeitete
+Aufgabe speichert per Compare-and-Swap mit Nachlese ([ADR-036](./decision-log.md)), Anlegen und
+Abhaken schreiben direkt; gelöscht wird über
 `public.delete_task`, beides hinter dem injizierbaren `TaskOps`-Schnitt in
 [features/tasks/mutations.ts](../features/tasks/mutations.ts); ein Löschkonflikt meldet sich als
 Toast mit „Trotzdem löschen". Beide Funktionen laufen mit den Rechten des Aufrufers; RLS bleibt die
