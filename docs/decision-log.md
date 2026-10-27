@@ -1685,3 +1685,27 @@ Accepted. Supersediert [ADR-013](#adr-013--renovate-als-gehostete-app-expo-kompa
 - Durch das Mindestalter und den Montags-Schedule kommt ein npm-Release bis zu eine Woche später. Für die Lockfile-Maintenance gilt das Mindestalter nicht; offen in [TODO.md](./TODO.md).
 - Die bisher offenen Major-PRs verlieren ihre Grundlage und wandern ins Dashboard.
 - Ein Bun-Bump-PR, der `constraints.bun` nicht mit anhebt, ist ein Fehler in Regel 8 und kein Versehen beim Mergen.
+
+## ADR-046 — Renovate öffnet Majors als PR, ohne Limit offener PRs (2026-10-27)
+
+### Status
+
+Accepted. Supersediert [ADR-045](#adr-045--renovate-ohne-automerge-auf-configbest-practices-mit-fester-bun-version-für-lockfile-updates-2026-10-27) Decision 5 (Majors nur nach Freigabe im Dependency Dashboard) samt der Consequence, dass die offenen Major-PRs ins Dashboard wandern. Alles Übrige aus ADR-045 gilt weiter.
+
+### Context
+
+- **Ein zurückgehaltener Major fällt niemandem auf.** Renovate führt ihn nur als Checkbox im Dashboard-Issue, und eine Änderung an diesem Issue löst keine Benachrichtigung aus. Ob es einen neuen Major gibt, müsste man selbst nachsehen. Ein offener PR dagegen meldet sich, bringt die Release Notes mit und zeigt in der CI, was bricht.
+- **Offene Majors belegen Plätze im Limit offener PRs.** Bleiben sie liegen, bis ihre Migration ansteht, stünden die wöchentlichen Updates dahinter an.
+- **Das Pinnen aus `config:best-practices` stand mit zur Frage**, weil es nach einer Sperre für Majors aussah. Es hängt nicht mit ihnen zusammen: Renovate findet einen Major, ob die Version gepinnt ist oder als Range steht.
+
+### Decisions
+
+1. **Majors kommen als eigener PR, die Regel 9 entfällt.** Ein Major, der noch nicht passt, bleibt offen, bis seine Migration ansteht. Die Nummer 9 bleibt frei, damit die Verweise auf die übrigen Regeln gültig bleiben. Zwei Ausnahmen bleiben: der Expo-SDK-Sprung (Regel 6), weil `expo-sdk-sync.yml` ihn auflöst und er nur zusammen mit allen Expo-Paketen gehen darf, und tailwindcss unter v4 (Regel 10), weil ein v4-PR grün sein und das Styling trotzdem brechen kann.
+2. **`prConcurrentLimit: 0`, also kein Limit offener PRs.** Der Montags-Schedule und die Gruppen halten die Zahl klein; liegende Majors sollen die Wochen-Updates nicht verdrängen.
+3. **Das Pinnen bleibt.** Ein gepinntes devDependency erscheint mit jedem Update als PR mit Changelog. Als Range bewegte es nur die Lockfile-Maintenance, weil Renovates bun-Manager keine `lockedVersion` liest. Ausgenommen ist typescript-eslint (Regel 11), das dieselbe Version auflösen muss wie eslint-config-expo.
+
+### Consequences
+
+- Ein offener Major-PR ist kein Auftrag, ihn zu mergen. Er wird erst mit dem zugehörigen Migrationsschritt gemergt und bis dahin offen gelassen, nicht geschlossen.
+- Renovate rebased offene PRs bei Konflikten, und `bun.lock` ändert sich fast jede Woche. Jeder liegende Major läuft dadurch wiederholt durch `ci.yml` und `native-build.yml`.
+- Sicherheitsupdates laufen unverändert sofort über `vulnerabilityAlerts`.
