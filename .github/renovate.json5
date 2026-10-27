@@ -20,11 +20,12 @@
   // Ein Schwung pro Woche statt Tröpfeln über sieben Tage.
   schedule: ["before 6am on monday"],
 
-  // Ohne Automerge bleiben PRs offen, bis jemand sie mergt. Allein die Gruppen
-  // ergeben an einem Montag rund sechs Kandidaten, dazu Einzel-PRs und offene
-  // Migrationen. Was im Fenster am Montag nicht entsteht, wartet eine Woche —
-  // deshalb kein Stundenlimit (der Default wäre 2) und Platz für zehn offene PRs.
-  prConcurrentLimit: 10,
+  // Ohne Automerge bleiben PRs offen, bis jemand sie mergt, und ein Major, der
+  // noch nicht passt, bleibt bewusst liegen. Ein Limit offener PRs füllten
+  // genau diese liegenden Majors, und die Wochen-Updates stünden dahinter an.
+  // Was im Fenster am Montag nicht entsteht, wartet eine Woche. Deshalb beide
+  // Limits aus: 0 heißt unbegrenzt, die Defaults wären 10 und 2.
+  prConcurrentLimit: 0,
   prHourlyLimit: 0,
 
   labels: ["chore", "dependencies"],
@@ -70,7 +71,7 @@
       groupName: "dependencies",
     },
     {
-      // 2 — Action-Updates sammeln. Majors laufen über Regel 9.
+      // 2 — Action-Updates sammeln. Majors kommen als eigener PR.
       description: "GitHub Actions (minor/patch/digest)",
       matchManagers: ["github-actions"],
       matchUpdateTypes: ["minor", "patch", "digest"],
@@ -228,16 +229,8 @@
       matchDepNames: ["bun"],
       groupName: "bun toolchain",
     },
-    {
-      // 9 — Majors nur auf Zuruf: kein PR, bis die Checkbox im Dependency
-      // Dashboard gesetzt ist. Ein Major ist eine Migration mit eigenem Plan,
-      // kein Wochen-Update; ein offener PR, der monatelang liegt, ist Lärm.
-      // Sicherheitsupdates greift das nicht — vulnerabilityAlerts setzt
-      // dependencyDashboardApproval für sie selbst wieder auf false.
-      description: "Majors nur nach Freigabe im Dependency Dashboard",
-      matchUpdateTypes: ["major"],
-      dependencyDashboardApproval: true,
-    },
+    // 9 — entfallen (ADR-046), Majors kommen als PR. Die Nummer bleibt frei,
+    // weil ADRs und Doku die übrigen Regeln mit ihrer Nummer zitieren.
     {
       // 10 — NativeWind v4 baut auf Tailwind 3.4; v4 braucht die Migration aus
       // docs/TODO.md (Tailwind v3 → v4), nicht einen Bump. Grüne CI hilft hier
@@ -254,8 +247,8 @@
       // eslint-config-expo im Lockfile stehen — zwei Plugin-Versionen unter
       // einem Namen, ESLint bricht mit `Cannot redefine plugin
       // "@typescript-eslint"` ab. Mit Range bewegt es nur die
-      // Lockfile-Maintenance, die alle Kopien gemeinsam hebt. Ein Major läuft
-      // über Regel 9 und muss eslint-config-expo ohnehin mitnehmen.
+      // Lockfile-Maintenance, die alle Kopien gemeinsam hebt. Ein Major kommt
+      // weiter als PR und muss eslint-config-expo ohnehin mitnehmen.
       description: "typescript-eslint muss dieselbe Version auflösen wie eslint-config-expo",
       matchPackageNames: ["typescript-eslint"],
       rangeStrategy: "replace",
