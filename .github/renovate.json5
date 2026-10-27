@@ -20,8 +20,12 @@
   // Ein Schwung pro Woche statt Tröpfeln über sieben Tage.
   schedule: ["before 6am on monday"],
 
-  prConcurrentLimit: 5,
-  prHourlyLimit: 2,
+  // Ohne Automerge bleiben PRs offen, bis jemand sie mergt. Allein die Gruppen
+  // ergeben an einem Montag rund sechs Kandidaten, dazu Einzel-PRs und offene
+  // Migrationen. Was im Fenster am Montag nicht entsteht, wartet eine Woche —
+  // deshalb kein Stundenlimit (der Default wäre 2) und Platz für zehn offene PRs.
+  prConcurrentLimit: 10,
+  prHourlyLimit: 0,
 
   labels: ["chore", "dependencies"],
 
