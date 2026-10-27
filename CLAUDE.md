@@ -279,7 +279,7 @@ Fallen, an denen lokal und CI auseinanderlaufen:
 - **Grüne `ci.yml` sagt nichts über Native-Builds** — sie endet beim Web-Export. Dafür ist `native-build.yml` da.
 - **Required Checks bekommen keinen `paths`-Filter**, sonst bleiben sie auf PRs ohne passende Änderung für immer „ausstehend".
 
-**Renovate** ([.github/renovate.json5](.github/renovate.json5), [ADR-013](docs/decision-log.md), [ADR-015](docs/decision-log.md)): Expo-SDK-verwaltete Pakete laufen `in-range-only` (außer `expo` selbst, siehe [development.md](docs/development.md#renovate)), `java` in `mise.toml` ist für Renovate abgeschaltet. `jest`, `@types/jest` und `typescript` stehen absichtlich in der Expo-Paketliste — nicht wegräumen. Gegenprobe nach jedem Eingriff: `bunx expo install --check`. Der Sync-Commit von `expo-sdk-sync.yml` startet keine neue CI: PR einmal schließen und wieder öffnen.
+**Renovate** ([.github/renovate.json5](.github/renovate.json5), [ADR-013](docs/decision-log.md), [ADR-015](docs/decision-log.md), [ADR-045](docs/decision-log.md)): **Kein Automerge** — jeder Renovate-PR wird von Hand gemergt, grüne CI beweist kein funktionierendes Update. Expo-SDK-verwaltete Pakete laufen `in-range-only` (außer `expo` selbst, siehe [development.md](docs/development.md#renovate)), `java` in `mise.toml` ist für Renovate abgeschaltet. `jest`, `@types/jest` und `typescript` stehen absichtlich in der Expo-Paketliste — nicht wegräumen. Gegenprobe nach jedem Eingriff: `bunx expo install --check`. Der Sync-Commit von `expo-sdk-sync.yml` startet keine neue CI: PR einmal schließen und wieder öffnen.
 
 ## Code review (CodeRabbit)
 

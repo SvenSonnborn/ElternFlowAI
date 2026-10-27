@@ -1650,3 +1650,38 @@ Eine Kalenderänderung bestand aus bis zu drei einzelnen PostgREST-Aufrufen. Nur
 - `cancel_occurrence` schreibt `override = null` auch über eine vorhandene `modified`-Zeile; der alte `upsert` ließ das Feld stehen. Ohne Wirkung, denn eine abgesagte Occurrence liest kein Override.
 - Offen bleiben, je mit Eintrag in [TODO.md](./TODO.md): Änderungen an _anderen_ Occurrences derselben Serie prüft ein Regelwechsel nicht (Spec §5.5, im 🎨-Eintrag zum Konfliktdialog), ein eigener Text für `forbidden`, die Overlay-Hälfte von #111, die Rechte von `anon`/`authenticated` auf `public`. Der Schutz vor geleakten Passwörtern braucht den Pro-Plan und steht in [supabase/SETUP.md](../supabase/SETUP.md) §4.
 - `features/supabase/database.types.ts` trägt die zwei Funktionen von Hand im Stil des Generators; nach dem Rollout wird die Datei über den MCP neu erzeugt.
+
+---
+
+## ADR-045 — Renovate ohne Automerge, auf `config:best-practices`, mit fester Bun-Version für Lockfile-Updates (2026-10-27)
+
+### Status
+
+Accepted. Supersediert [ADR-013](#adr-013--renovate-als-gehostete-app-expo-kompatibilität-bleibt-bei-expo-install---fix-2026-08-13) Decision 4 (Automerge-Umfang, Renovate als Bypass-Actor) samt der Consequence zum Bypass-Actor und Decision 5 (`customManagers` für `bun-version:`). Alles Übrige aus ADR-013 und [ADR-015](#adr-015--renovate-expos-versionshoheit-deckt-beide-vorgabe-kanäle-ab-2026-08-14) gilt weiter.
+
+### Context
+
+- **Der Automerge hat nie gegriffen.** Renovate wurde nie als Bypass-Actor im Ruleset eingetragen; jeder Renovate-PR wurde von Hand gemergt. Die Config behauptete eine Automatik, die es nicht gab.
+- **Grüne CI ist kein Funktionsnachweis.** Ein tailwindcss-v4-PR kann alle Checks bestehen und das Styling trotzdem brechen, weil NativeWind v4 auf Tailwind 3.4 baut. Dasselbe gilt für Kopplungen an das Expo-SDK und für Laufzeitverhalten, das weder Web-Export noch Native-Compile sehen.
+- **Die Lockfile-Maintenance schlug wochenlang fehl.** Ohne Vorgabe installiert Renovate die neueste Bun-Version. Die schrieb ein Lockfile-Format, das die Bun-Version der CI nicht lesen konnte (`Unknown lockfile version`). Weil Renovates bun-Manager keine `lockedVersion` liest, kommen In-Range-Patches der Expo-Pakete nur über diese Maintenance — sie standen damit ebenfalls still.
+- **Exakt gepinnte dependencies erzeugen je einen Einzel-PR**, und jeder durchläuft `native-build.yml` mit rund 30 Minuten.
+- **Majors lagen monatelang als offene PRs** (eslint v10, tailwindcss v4), obwohl keiner davon ohne eigenen Migrationsschritt mergebar war.
+- Renovates `github-actions`-Manager liest den `bun-version:`-Input von `oven-sh/setup-bun` inzwischen selbst; der Regex-Manager aus ADR-013 meldete dieselben Fundstellen ein zweites Mal.
+
+### Decisions
+
+1. **Kein Automerge, an keiner Stelle.** Jeder Renovate-PR wird von einem Menschen gemergt, der die Änderung kennt. Die Alternative — Renovate als Bypass-Actor eintragen — hätte den ursprünglich geplanten Zustand hergestellt, aber genau die Fälle aus dem Context automatisch gemergt. `automerge`, `automergeStrategy` und `platformAutomerge` sind entfernt statt auf `false` gesetzt; der Default ist aus.
+2. **`config:best-practices` statt `config:recommended`.** Übernommen wird alles, was der Preset mitbringt: Actions auf Commit-SHAs, gepinnte devDependencies, drei Tage Mindestalter für npm-Releases, wöchentliche Lockfile-Maintenance, Hinweise auf verwaiste Pakete und Config-Migrations-PRs. Regel 3 setzt `in-range-only` über den Pin, die Expo-Toolchain behält ihre Tilde-Ranges. Ein Migrations-PR kann die JSON5-Kommentare verlieren und wird deshalb von Hand übernommen, nicht gemergt.
+3. **`constraints.bun` steht auf derselben Version wie `mise.toml` und die Workflows.** Renovate schreibt Lockfiles damit mit der Bun-Version, die CI liest. Der `renovate-config`-Manager meldet die Constraint unter dem depName `bun`, Regel 8 hebt sie mit den übrigen Fundstellen in einem PR.
+4. **Neue Gruppe `dependencies` (minor+patch) als Regel 1b**, vor der Expo-Regel, die ihre Pakete wieder herausnimmt. Die Zählung 1a/1b statt einer Umnummerierung hält die Regelnummern gültig, auf die ADR-013, ADR-015 und die Doku verweisen.
+5. **Majors nur nach Freigabe im Dependency Dashboard (Regel 9).** Ein Major ist eine Migration mit eigenem Plan, kein Wochen-Update. Sicherheitsupdates sind ausgenommen, weil `vulnerabilityAlerts` die Freigabepflicht für sie zurücksetzt.
+6. **tailwindcss bleibt per `allowedVersions: "<4"` auf v3 (Regel 10)**, bis die Tailwind-Migration aus [TODO.md](./TODO.md) die Sperre im selben PR aufhebt.
+7. **Der Regex-Manager entfällt, `rebaseWhen` steht auf dem Default.** Ohne Automerge und ohne „up to date"-Pflicht im Ruleset rebased `auto` ohnehin nur bei Konflikten, und einen Branch mit fremdem Commit — den Sync-Commit aus `expo-sdk-sync.yml` — fasst Renovate nicht an.
+
+### Consequences
+
+- Jeder Montag bringt Handarbeit. Die Gruppen halten sie klein: `dev-dependencies`, `dependencies`, `github actions`, `expo sdk (in-range)`, `bun toolchain` und die Lockfile-Maintenance, dazu wenige Einzel-PRs.
+- Der erste Lauf öffnet einen großen PR „Pin dependencies" mit den Action-Digests und den devDependency-Pins. Danach laufen Digest-Updates in der Gruppe `github actions`.
+- Durch das Mindestalter und den Montags-Schedule kommt ein npm-Release bis zu eine Woche später. Für die Lockfile-Maintenance gilt das Mindestalter nicht; offen in [TODO.md](./TODO.md).
+- Die bisher offenen Major-PRs verlieren ihre Grundlage und wandern ins Dashboard.
+- Ein Bun-Bump-PR, der `constraints.bun` nicht mit anhebt, ist ein Fehler in Regel 8 und kein Versehen beim Mergen.

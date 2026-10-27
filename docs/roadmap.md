@@ -955,10 +955,8 @@ heute · `familyMutations.ts` heißt so · der Kompositions-Test läuft.
 Alle aus `TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-scope-items) und
 [Renovate](./TODO.md#renovate--dependencies-siehe-adr-013).
 
-- **Actions auf Commit-SHA pinnen** — heute Major-Tags (`@v4`/`@v5`). Härtet gegen kompromittierte
-  Tag-Re-Points. Verstärkt sich mit Renovate: Regel 2 merged `digest`-Updates automatisch, **greift
-  aber erst, sobald die Actions überhaupt auf SHAs stehen**. Danach hält Renovate sie von selbst
-  aktuell — einmal Aufwand, dauerhaft gepflegt.
+- **Actions auf Commit-SHA pinnen** — **erledigt über Renovate** ([ADR-045](./decision-log.md)):
+  `config:best-practices` öffnet den Pin-PR und hält die Digests danach aktuell.
 - **`expo-doctor`-Step im `bundle`-Job** — der Vorschlag ist seit ADR-016 billiger geworden: statt
   eines eigenen Workflows genügt ein `bunx expo-doctor`-Step auf bereits installierten Dependencies
   (kein Gate, `continue-on-error: true`, wie im Sync-Workflow). Was der Native-Build **nicht**
@@ -972,14 +970,9 @@ Alle aus `TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-sco
   `Podfile.properties.json`, der Pin überlebte jeden Aufrufweg, und die Assertion im `ios`-Job würde
   von einer Notwendigkeit zur Redundanz. Braucht einen eigenen Native-Build-Nachweis — den es seit
   ADR-016 gibt.
-- **`platformAutomerge: true` testen** — Startvorsicht, keine Dauerlösung. „Sobald ein Monat
-  Automerge sauber gelaufen ist" gegen `true` testen. Der Zeitpunkt ist erreicht, wenn Block 0.1
-  Required Checks gesetzt hat — GitHubs natives Auto-Merge hält den PR dann offen, bis alles grün
-  ist, statt Renovate auf einen Poll-Zyklus warten zu lassen.
-- **Custom-Manager-Regex beim nächsten Bun-Bump gegenprüfen** — hängt an der Textform der
-  `bun-version:`-Zeilen; wird eine umformatiert, greift der Manager still nicht mehr. Kein
-  Merkposten für „irgendwann", sondern eine **Prüfung im nächsten Bun-PR**: stehen alle Fundstellen
-  (`mise.toml` + jede `bun-version:`-Zeile) im selben PR?
+- ~~`platformAutomerge: true` testen~~ und ~~Custom-Manager-Regex gegenprüfen~~ — **entfallen**:
+  Renovate merged nicht mehr selbst, und der Regex-Manager ist entfernt
+  ([ADR-045](./decision-log.md)).
 - **Regel 3 gegen `relatedPackages` abgleichen** — fällig **beim nächsten SDK-Sprung**, nicht davor.
   Gegenprobe ist `bunx expo install --check`. Bewusst nicht automatisiert.
 - **`dependency-review.yml` vs. Renovates `vulnerabilityAlerts`** — nach ein paar Monaten prüfen, ob
