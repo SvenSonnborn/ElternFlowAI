@@ -1709,3 +1709,29 @@ Accepted. Supersediert [ADR-045](#adr-045--renovate-ohne-automerge-auf-configbes
 - Ein offener Major-PR ist kein Auftrag, ihn zu mergen. Er wird erst mit dem zugehörigen Migrationsschritt gemergt und bis dahin offen gelassen, nicht geschlossen.
 - Renovate rebased offene PRs bei Konflikten, und `bun.lock` ändert sich fast jede Woche. Jeder liegende Major läuft dadurch wiederholt durch `ci.yml` und `native-build.yml`.
 - Sicherheitsupdates laufen unverändert sofort über `vulnerabilityAlerts`.
+
+## ADR-047 — Expo SDK 58: der Sync hebt das Jest-Preset mit, die Tab-Szene liest den Navigationszustand, die CI nach dem Sync wartet auf Freigabe (2026-10-27)
+
+### Status
+
+Accepted. Supersediert in [ADR-013](#adr-013--renovate-als-gehostete-app-expo-kompatibilität-bleibt-bei-expo-install---fix-2026-08-13) die Consequence, der Sync-Push löse keine Workflow-Läufe aus und der PR sei danach zu schließen und wieder zu öffnen. Präzisiert [ADR-041](#adr-041--touch-targets-über-die-box-statt-über-hitslop-verdeckte-szenen-und-der-screen-unter-der-gate-deckfläche-verlassen-auf-web-die-tab-reihenfolge-2026-10-05) Decision 4 in der Frage, woher die fokussierte Szene kommt. Alles Übrige aus beiden gilt weiter.
+
+### Context
+
+- **Renovates SDK-PR hebt das Repo auf SDK 58** (react-native 0.88, React 19.3, expo-router 58). Nach `expo install --fix` brachen trotzdem `test:rn`, der Typecheck und auf Web die Sichtbarkeit der Tab-Szenen.
+- **`@react-native/jest-preset` blieb auf dem alten Pin.** `expo install --fix` kennt das Paket nicht, und Renovate hebt den exakten Pin unter `in-range-only` nie. Das alte Preset kennt die `exports`-Einstiege des neuen react-native nicht.
+- **jest-expo 58 mockt den `AssetRegistry` an einer Stelle, die react-native 0.88 nicht mehr liest** (expo/expo#51834).
+- **expo-router 58 frischt die Quelle von `navigation.getState()` erst im Commit auf** (per `useInsertionEffect`). Im Options-Callback des Tab-Navigators liegt der Zustand damit einen Tab-Wechsel zurück, und auf Web blieb die falsche Szene sichtbar.
+- **Der Sync-Push erzeugt sehr wohl Workflow-Läufe.** Jeder Push von `expo-sdk-sync.yml` auf den SDK-PR legte `pull_request`-Läufe an, die auf Freigabe warteten (`action_required`). Nach einer Freigabe liefen sie über den vollständigen Diff, ohne Schließen und Wiederöffnen.
+
+### Decisions
+
+1. **`expo-sdk-sync.yml` setzt `@react-native/jest-preset` exakt auf die installierte react-native-Version**, direkt nach `expo install --fix`. Renovates Regel 3 bleibt, wie sie ist; der Pin bewegt sich nur mit dem SDK-Sprung.
+2. **Das Jest-Setup biegt den internen Pfad auf den `AssetRegistry`-Mock um**, bis eine jest-expo-Version den Fix mitbringt. Das Entfernen steht in `docs/TODO.md`.
+3. **Das Tab-Layout liest die fokussierte Route per `useNavigationState` aus dem Root-Stack** und reicht sie an `tabSceneStyle`. Der Kern von ADR-041 Decision 4 bleibt: nicht `isFocused()`. Neu ist, dass auch `getState()` im Options-Callback als Quelle ausscheidet. Ein RN-Test hält Tab-Wechsel und das Schließen eines Root-Screens fest.
+4. **Nach dem Sync-Push genügt die Freigabe der wartenden Läufe.** Kein GitHub-App-Token, um sie zu sparen: ein Klick pro SDK-Sprung rechtfertigt kein Secret, das der gehosteten Renovate-Variante ihren Vorteil nähme. Der TODO-Eintrag dazu entfällt.
+
+### Consequences
+
+- Bis zur Freigabe fehlt der Gate-Lauf über den vollständigen Diff. Der Kommentar des Sync-Workflows im PR weist darauf hin.
+- Der freigegebene Lauf startet auch `expo-sdk-sync.yml` erneut (`synchronize`). Er findet keinen Diff und pusht nicht; die Schleife, gegen die ADR-013 die Token-Eigenschaft anführte, verhindert jetzt die Idempotenz des Workflows.

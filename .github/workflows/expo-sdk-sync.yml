@@ -10,10 +10,8 @@ name: Expo SDK Sync
 # gehosteten Mend-App nicht verfügbar. Siehe ADR-013.
 on:
   pull_request:
-    # Bewusst OHNE `reopened`: die dokumentierte Abhilfe gegen den fehlenden
-    # CI-Retrigger (siehe Kommentar am "PR kommentieren"-Schritt unten) ist,
-    # den PR einmal zu schließen und wieder zu öffnen. Der Sync soll dabei
-    # nicht erneut auf seinem eigenen, bereits gepushten Commit feuern.
+    # Ohne `reopened`: der Sync braucht nur die Momente, in denen Renovate
+    # den PR anlegt, labelt oder neu pusht.
     types: [opened, labeled, synchronize]
 
 permissions:
@@ -24,8 +22,8 @@ permissions:
 # pro Label ein eigenes `labeled`-Event auslöst — plus `opened`. Es landen also
 # bis zu vier Runs in derselben Concurrency-Gruppe. `cancel-in-progress: false`,
 # weil ein abgebrochener Run, der schon gepusht, aber den Schritt "PR
-# kommentieren" noch nicht erreicht hat, diesen Hinweis auf Schließen/
-# Wiederöffnen sonst verschluckt — und die Required Status Checks auf `main`
+# kommentieren" noch nicht erreicht hat, diesen Hinweis auf die Freigabe der
+# CI-Läufe sonst verschluckt — und die Required Status Checks auf `main`
 # binden den Repo-Admin nicht, für ihn ist der Kommentar also die gesamte
 # Absicherung. Serialisierung kostet
 # dafür nur ein paar Runner-Minuten: die Runs sind idempotent, ein zweiter
@@ -129,7 +127,7 @@ jobs:
             echo
             echo "\`expo-doctor\`: **$DOCTOR_OUTCOME** (nur Bericht, kein Gate — Details im Job-Log)."
             echo
-            echo "> Der Push lief mit \`GITHUB_TOKEN\` und triggert daher **keinen** neuen CI-Lauf."
-            echo "> PR einmal schließen und wieder öffnen, damit die Gates über den vollständigen Diff laufen."
+            echo "> Der Push lief mit \`GITHUB_TOKEN\`: die CI-Läufe dazu warten auf Freigabe."
+            echo "> Sie einmal freigeben, damit die Gates über den vollständigen Diff laufen."
           } > "$RUNNER_TEMP/comment.md"
           gh pr comment "$PR_NUMBER" --body-file "$RUNNER_TEMP/comment.md"
