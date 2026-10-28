@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { router } from "expo-router";
 
+import type { DateTimePickerSheetProps } from "@/app-sections/shared";
 import type { EditScope } from "@/features/calendar";
 import type { EventWithRelations } from "@/features/calendar/expand";
 
@@ -13,10 +14,16 @@ import { EventEditScreen } from "./EventEditScreen";
 
 const mockUpdateEvent = jest.fn();
 const mockShowToast = jest.fn();
+/** Die Props des zuletzt gerenderten Pickers; über sein `onPick` wählt ein Test den Tag. */
+let mockPickerProps: DateTimePickerSheetProps | null = null;
 
 jest.mock("@/app-sections/shared", () => ({
   ...jest.requireActual<typeof import("@/app-sections/shared")>("@/app-sections/shared"),
   useToast: () => ({ show: mockShowToast, dismiss: jest.fn() }),
+  DateTimePickerSheet: (props: DateTimePickerSheetProps) => {
+    mockPickerProps = props;
+    return null;
+  },
 }));
 
 jest.mock("@/features/calendar", () => ({
@@ -303,5 +310,44 @@ describe("EventEditScreen: Schließen nach dem Speichern", () => {
 
     expect(router.replace).toHaveBeenCalledWith("/(tabs)/kalender");
     expect(router.dismiss).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Ganztägig am 28.10. in Auckland (UTC+13). Für jeden Leser außerhalb von UTC+13
+ * beginnt der Termin an einem anderen Uhrzeit-Punkt als 00:00 — der Fall, in dem
+ * „lokal derselbe Tag" und „in der Terminzone derselbe Tag" auseinanderfallen.
+ */
+const allDayAuckland: EventWithRelations = {
+  ...versionA,
+  all_day: true,
+  timezone: "Pacific/Auckland",
+  start_at: "2026-10-27T11:00:00.000Z",
+  end_at: "2026-10-28T10:59:00.000Z",
+};
+
+describe("EventEditScreen: Ganztägig, gelesen aus einer anderen Zone", () => {
+  beforeEach(() => {
+    mockUpdateEvent.mockReset();
+    mockUpdateEvent.mockResolvedValue(undefined);
+  });
+
+  it("ein Enddatum vor dem Start in der Terminzone sperrt das Speichern", async () => {
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(calendarKeys.one("e1"), allDayAuckland);
+    await renderScreen(<EventEditScreen />, { queryClient });
+    const error = i18n.t("cal.edit.error.invalidDateRange");
+    expect(screen.queryByText(error)).toBeNull();
+
+    // Ende auf den lokalen Tag des Starts: Die Uhrzeit des Endes bleibt, das Ende liegt
+    // eine Minute vor dem Start — lokal derselbe Tag, in Auckland der 27. vor dem 28.
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.edit.fieldEndDate") }));
+    await act(() => {
+      mockPickerProps?.onPick(new Date(allDayAuckland.start_at));
+    });
+
+    expect(screen.getByText(error)).toBeTruthy();
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.edit.save") }));
+    expect(mockUpdateEvent).not.toHaveBeenCalled();
   });
 });

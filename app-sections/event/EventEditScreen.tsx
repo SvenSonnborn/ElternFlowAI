@@ -230,8 +230,18 @@ export function EventEditScreen() {
   // Aus `initial`, nicht aus `occurrence`: siehe `source` oben.
   const allDay = initial?.allDay ?? false;
 
+  // Re-snap rather than trust the state: the date pickers can move an all-day
+  // event across days, and its times must stay 00:00 → 23:59 in the event's
+  // zone (ADR-049). That snap can invert a range the local-day check accepts:
+  // read from another zone, an end on the start's local day may fall on the day
+  // before in the event's zone — so `dateError` checks the snapped range too.
+  const finalRange = allDay && initial ? toAllDayRange(range, initial.occurrence.timezone) : range;
+
   const titleError = !title.trim() ? t("cal.edit.error.titleRequired") : "";
-  const dateError = isDateRangeInvalid(range) ? t("cal.edit.error.invalidDateRange") : "";
+  const dateError =
+    isDateRangeInvalid(range) || (allDay && finalRange.endAt < finalRange.startAt)
+      ? t("cal.edit.error.invalidDateRange")
+      : "";
   const timeError =
     !dateError && isTimeRangeInvalid(range, allDay) ? t("cal.edit.error.invalidTimeRange") : "";
   const parsedCount = recurrence === "none" ? null : parseRecurrenceCount(countText);
@@ -589,9 +599,6 @@ export function EventEditScreen() {
       }
       scope = chosen;
     }
-    // Re-snap rather than trust the state: the date pickers can move an all-day
-    // event across days, and its times must stay 00:00 → 23:59.
-    const final = allDay ? toAllDayRange(range, initial.occurrence.timezone) : range;
     const vars = {
       scope,
       eventId: initial.eventId,
@@ -604,8 +611,8 @@ export function EventEditScreen() {
       timezone: initial.occurrence.timezone,
       changes: {
         title: title.trim(),
-        start_at: final.startAt.toISOString(),
-        end_at: final.endAt.toISOString(),
+        start_at: finalRange.startAt.toISOString(),
+        end_at: finalRange.endAt.toISOString(),
         location: location.trim() || null,
         description: notes.trim() || null,
       },
