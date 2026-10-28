@@ -77,9 +77,12 @@ describe("range validation", () => {
 
 describe("toAllDayRange", () => {
   test("widens to 00:00 on the first day and 23:59 on the last", () => {
-    const next = toAllDayRange(makeRange("2026-06-03T09:00:00", "2026-06-05T17:00:00"), "Etc/UTC");
-    expect(next.startAt.toISOString()).toBe(new Date("2026-06-03T00:00:00").toISOString());
-    expect(next.endAt.toISOString()).toBe(new Date("2026-06-05T23:59:00").toISOString());
+    const next = toAllDayRange(
+      makeRange("2026-06-03T09:00:00.000Z", "2026-06-05T17:00:00.000Z"),
+      "Etc/UTC",
+    );
+    expect(next.startAt.toISOString()).toBe("2026-06-03T00:00:00.000Z");
+    expect(next.endAt.toISOString()).toBe("2026-06-05T23:59:00.000Z");
   });
 
   const cases: [string, [string, string], string, [string, string]][] = [
