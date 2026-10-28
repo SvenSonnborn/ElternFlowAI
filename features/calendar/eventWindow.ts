@@ -1,6 +1,7 @@
 import { addDays, max as dateMax, min as dateMin } from "date-fns";
 
 import type { EventWithRelations } from "./expand";
+import type { CalendarOccurrence } from "./types";
 
 import { overrideInterval } from "./override";
 import { zonedDayBounds } from "./timezone";
@@ -14,35 +15,23 @@ import { zonedDayBounds } from "./timezone";
  * Ohne `occurrenceKey` genügt ein Jahr um den Serienstart. Mit einem
  * `occurrenceKey` muss das Fenster zusätzlich sicher den angeforderten
  * Regel-Tag abdecken — sonst läuft `expandEvents` bei einer weit in der
- * Zukunft liegenden Occurrence (>366 Tage) leer, `find` schlägt fehl, und der
- * `expanded[0]`-Fallback zeigt eine **andere** Occurrence derselben Serie.
+ * Zukunft liegenden Occurrence (>366 Tage) leer, und `pickOccurrence` findet
+ * sie nicht.
  *
  * Die Tagesgrenzen kommen aus `zonedDayBounds` ([timezone.ts](./timezone.ts))
  * und entstehen dort in `timeZone`, nicht in der Zone des Lesers (ADR-034,
- * Befund B aus PR #121): Ein Leser westlich der Terminzone verpasste sonst den
- * frühen Teil des angeforderten Tages — ein Berliner Termin um 23:30 liegt für
- * einen Leser in `America/New_York` schon am Vortag —, das Fenster verfehlte
- * die Occurrence, und `find` liefe ins Leere. Ein Schlüssel, der nicht der Form
- * `yyyy-MM-dd` entspricht, liefert dort `null` und fällt hier auf dasselbe
- * Standardfenster zurück wie gar kein Schlüssel. Das ist **keine**
- * Eingabe-Validierung, sondern nur Totalität: Die eigentliche Validierung —
- * einen kaputten `occ`-Link als solchen melden, statt still eine andere
- * Occurrence zu zeigen — gehört an die Route und bleibt offen, siehe
- * `docs/TODO.md`.
+ * Befund B aus PR #121): Ein Berliner Termin um 23:30 liegt für einen Leser in
+ * `America/New_York` schon am Vortag, das Fenster verfehlte sonst die
+ * Occurrence. Ein Schlüssel, der nicht der Form `yyyy-MM-dd` entspricht,
+ * liefert dort `null` und fällt auf das Standardfenster zurück — das macht die
+ * Funktion total; den kaputten Link meldet `pickOccurrence`.
  *
  * Seit ADR-035 deckt das Fenster zusätzlich das Intervall ab, das ein
- * `modified`-Override der angeforderten Occurrence beansprucht: Ein Override
- * kann eine Occurrence aus dem um ihr Regel-Datum gebauten Fenster hinaus
- * verschieben — `expandEvents` erzeugt sie dann zwar, der Fensterfilter
- * verwirft sie aber wieder, `find` läuft leer, und der `expanded[0]`-Fallback
- * zeigt stillschweigend eine **andere** Occurrence derselben Serie
- * (nachgemessen, Spec §6.9 Nr. 2) — dieselbe Klasse wie Befund B aus PR #121,
- * nur für den verschobenen statt den unverschobenen Fall. Dabei zählt **nur**
- * der Override der angeforderten Occurrence, sonst zöge eine einzige weit
- * verschobene Exception das Fenster jedes Detail-Aufrufs derselben Serie mit,
- * und `expandEvents` expandierte Jahre statt Tage. Und die Weitung wirkt in
- * **beide** Richtungen, weil ein Override ebenso in die Vergangenheit wie in
- * die Zukunft verschieben kann.
+ * `modified`-Override der angeforderten Occurrence beansprucht — in **beide**
+ * Richtungen. Dabei zählt **nur** der Override der angeforderten Occurrence,
+ * sonst zöge eine einzige weit verschobene Exception das Fenster jedes
+ * Detail-Aufrufs derselben Serie mit, und `expandEvents` expandierte Jahre
+ * statt Tage.
  *
  * Als eigenes Modul statt inline in `hooks.ts`: `hooks.ts` importiert über
  * `design-system/ThemeProvider` transitiv `nativewind`, das beim Laden
@@ -63,16 +52,10 @@ export function eventLookupWindow(
   const starts = [addDays(masterStart, -1), bounds.start];
   const ends = [addDays(masterStart, 366), bounds.end];
 
-  // Ein Override kann genau diese Occurrence aus dem Fenster schieben, das um
-  // ihr Regel-Datum gebaut wurde. `expandEvents` erzeugt sie dann zwar, der
-  // Fensterfilter verwirft sie aber wieder, `find` läuft leer, und der
-  // `expanded[0]`-Fallback zeigt stillschweigend eine ANDERE Occurrence
-  // derselben Serie (nachgemessen, Spec §6.9 Nr. 2) — dieselbe Klasse wie
-  // Befund B aus PR #121, nur für den verschobenen Fall.
-  //
-  // Nur der Override DIESER Occurrence weitet: Sonst zöge eine einzige weit
-  // verschobene Exception das Fenster jedes Detail-Aufrufs derselben Serie mit
-  // sich, und `expandEvents` expandierte Jahre statt Tage.
+  // Ein Override kann genau diese Occurrence aus dem um ihr Regel-Datum
+  // gebauten Fenster schieben; `expandEvents` erzeugt sie, der Fensterfilter
+  // verwirft sie wieder. Nur der Override DIESER Occurrence weitet (siehe
+  // JSDoc).
   //
   // Beide Grenzen bekommen beide Werte, weil `overrideInterval` ein
   // invertiertes Intervall nicht abfängt (`end_at` vor `start_at`): Ein
@@ -92,4 +75,27 @@ export function eventLookupWindow(
   }
 
   return { start: dateMin(starts), end: dateMax(ends) };
+}
+
+/**
+ * Wählt aus den expandierten Occurrences eines einzelnen Masters die, die der
+ * Routen-Parameter `occ` benennt.
+ *
+ * Ohne `occurrenceKey` ist es die erste. Ein Einzeltermin ignoriert den
+ * `occurrenceKey`: Ein verschobener Einzeltermin trägt in der Route noch seinen
+ * alten Schlüssel. Bei einer Serie zählt nur der exakte Treffer auf
+ * `occurrenceKey` (ADR-034) — ein unbekannter oder unparsbarer Schlüssel liefert
+ * `null`, nie eine andere Occurrence der Serie, denn darauf könnte ein
+ * anschließendes „Nur diesen" die falsche Exception schreiben oder löschen.
+ *
+ * `null` führt in `cal.error.eventGone` bzw. in den `!occurrence`-Zweig von
+ * `EventEditScreen`; das ist die richtige Meldung für einen kaputten Link.
+ */
+export function pickOccurrence(
+  expanded: readonly CalendarOccurrence[],
+  occurrenceKey?: string,
+): CalendarOccurrence | null {
+  const first = expanded[0] ?? null;
+  if (!occurrenceKey || first?.isRecurring === false) return first;
+  return expanded.find((o) => o.occurrenceKey === occurrenceKey) ?? null;
 }

@@ -2,9 +2,12 @@ import { describe, expect, test } from "bun:test";
 
 import type { Database } from "@/features/supabase/database.types";
 
+import { lightTheme } from "@/design-system/themes";
+
 import type { EventWithRelations } from "./expand";
 
-import { eventLookupWindow } from "./eventWindow";
+import { eventLookupWindow, pickOccurrence } from "./eventWindow";
+import { expandEvents } from "./expand";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 type EventExceptionRow = Database["public"]["Tables"]["event_exceptions"]["Row"];
@@ -221,5 +224,44 @@ describe("eventLookupWindow deckt das Override-Intervall mit ab (ADR-035)", () =
     ];
     const { end } = eventLookupWindow(row, "2026-06-15");
     expect(end.toISOString()).toBe("2027-05-05T16:30:00.000Z");
+  });
+});
+
+describe("pickOccurrence", () => {
+  function expandSeries(row: EventWithRelations, occurrenceKey?: string) {
+    const { start, end } = eventLookupWindow(row, occurrenceKey);
+    return expandEvents([row], start, end, lightTheme);
+  }
+
+  test("Serie mit bekanntem occ: genau diese Occurrence", () => {
+    const expanded = expandSeries(makeRow(), "2026-05-18");
+    expect(pickOccurrence(expanded, "2026-05-18")?.occurrenceKey).toBe("2026-05-18");
+  });
+
+  test("Serie mit unbekanntem occ (ein Dienstag): null", () => {
+    const expanded = expandSeries(makeRow(), "2026-05-05");
+    expect(pickOccurrence(expanded, "2026-05-05")).toBeNull();
+  });
+
+  test("Serie mit unparsbarem occ: null", () => {
+    const expanded = expandSeries(makeRow(), "kaputt");
+    expect(expanded.length).toBeGreaterThan(1);
+    expect(pickOccurrence(expanded, "kaputt")).toBeNull();
+  });
+
+  test("Serie ohne occ: die erste", () => {
+    const expanded = expandSeries(makeRow());
+    expect(pickOccurrence(expanded)).toBe(expanded[0]);
+  });
+
+  test("Einzeltermin mit veraltetem occ: seine einzige Occurrence", () => {
+    const expanded = expandSeries(makeRow({ rrule_freq: null }), "2026-04-01");
+    expect(expanded).toHaveLength(1);
+    expect(pickOccurrence(expanded, "2026-04-01")).toBe(expanded[0]);
+  });
+
+  test("leere Liste: null", () => {
+    expect(pickOccurrence([], "2026-05-04")).toBeNull();
+    expect(pickOccurrence([])).toBeNull();
   });
 });
