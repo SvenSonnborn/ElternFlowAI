@@ -76,6 +76,8 @@ export function EventCreateScreen() {
   const submitLock = useRef(createSubmitLock()).current;
 
   const [title, setTitle] = useState("");
+  // „Titel fehlt“ erst nach der ersten Eingabe; Speichern bleibt trotzdem gesperrt.
+  const [titleTouched, setTitleTouched] = useState(false);
   const [range, setRange] = useState<DateRange>(() => initialRange(paramDate));
   const [allDay, setAllDay] = useState(false);
   const [location, setLocation] = useState("");
@@ -114,7 +116,8 @@ export function EventCreateScreen() {
     );
   }, [occurrences, startAt, endAt, member, allDay]);
 
-  const titleError = !title.trim() ? t("cal.edit.error.titleRequired") : "";
+  const titleMissing = !title.trim();
+  const titleError = titleTouched && titleMissing ? t("cal.edit.error.titleRequired") : "";
   const dateError = isDateRangeInvalid(range) ? t("cal.edit.error.invalidDateRange") : "";
   const timeError =
     !dateError && isTimeRangeInvalid(range, allDay) ? t("cal.edit.error.invalidTimeRange") : "";
@@ -122,7 +125,7 @@ export function EventCreateScreen() {
   const parsedCount = recurrence === "none" ? null : parseRecurrenceCount(countText);
   const countError = parsedCount === "invalid" ? t("cal.create.error.invalidCount") : "";
   const canSave =
-    !titleError && !dateError && !timeError && !typeError && !countError && !!familyId;
+    !titleMissing && !dateError && !timeError && !typeError && !countError && !!familyId;
 
   /**
    * Schickt die Mutation und meldet einen Fehlschlag selbst.
@@ -288,7 +291,10 @@ export function EventCreateScreen() {
         <Field
           label={t("cal.edit.fieldTitle")}
           value={title}
-          onChangeText={setTitle}
+          onChangeText={(v) => {
+            setTitle(v);
+            setTitleTouched(true);
+          }}
           error={titleError}
         />
 
