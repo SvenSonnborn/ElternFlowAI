@@ -93,6 +93,11 @@ features/                Cross-cutting feature logic
 ├─ supabase/             client.ts (createClient + AsyncStorage session) + barrel
 └─ notifications/        (placeholder)
 
+scripts/                 Shell-Werkzeuge für CI und Repo-Pflege
+├─ coderabbit-prepush.sh Pre-Push-Review gegen `main` (warn-only, derzeit deaktiviert)
+├─ native-build-key.sh   Schlüssel der Marke „nativ grün gebaut" für `native-build.yml` (ADR-048)
+└─ setup-labels.sh       legt die PR-Labels an, die Labeler und Renovate setzen
+
 testing/                 Jest-Setup + renderScreen für Komponenten-Tests (*.jest.tsx, ADR-042)
 
 supabase/                Schema + lokale Supabase (ADR-044; Ablauf in SETUP.md)

@@ -1762,3 +1762,28 @@ Accepted. Ersetzt in [ADR-016](#adr-016--native-build-gate-auf-jedem-pr-auf-gith
 - **Der Wochenbuild frischt keine Marke auf.** Cache-Schlüssel sind unveränderlich, Speichern unter einem vorhandenen Schlüssel ist ein No-op; der Wochenbuild legt nur eine verdrängte Marke neu an.
 - **Ein übersprungener iOS-Job braucht trotzdem einen macOS-Runner**, weil er unter seinem Required-Check-Namen berichten muss. Bei knappen Runnern kann er minutenlang warten, obwohl seine Arbeit Sekunden dauert. Das zu vermeiden bräuchte `needs:` oder ein Job-`if`, was die Required-Check-Regeln ausschließen.
 - **Der erste Lauf nach jeder Änderung am Schlüssel baut voll**, und die Marken aus `main` entstehen erst mit dem ersten Push dorthin.
+
+## ADR-049 — Stille Fehler: kein Rückfall in `useEvent`, Ganztägig in der Terminzone, Allergien „unbekannt" statt „keine" (2026-10-28)
+
+### Status
+
+Accepted.
+
+### Context
+
+Drei Fehler lieferten still falsche Daten, ohne Meldung und plausibel aussehend: Fehlten die Familien-Allergien, weil eine Abfrage pausiert oder deaktiviert war, galten sie als „keine", und der Rezept-Browser zeigte „sicher". `toAllDayRange` schnappte in der Zone des Geräts und verschob einen unverändert gespeicherten ganztägigen Termin um bis zu einen Tag, für alle Familienmitglieder. `useEvent` fiel bei einer nicht gefundenen Occurrence auf die erste der Serie zurück, sodass ein folgendes „Nur diesen" die falsche traf.
+
+### Decisions
+
+1. **Allergien ohne Daten gelten als unbekannt.** Die Regel steht an einer Stelle und gilt für das Rezept-Urteil, das Ausweichgericht und das Einplanen. Ein Fehler und Fehlen ohne laufenden Abruf sind `unknown` (Einplanen fragt nach, „Trotzdem hinzufügen" bleibt möglich), nur ein laufender Abruf ist `loading`. Ein pausierter Zustand zählt als `unknown`, nicht als lädt, sonst wartete das Einplanen offline ohne Ende.
+2. **Ganztägig schnappt in der Zone des Termins.** `toAllDayRange` bekommt die Zone als Pflichtparameter; Bearbeiten übergibt die Terminzone, Anlegen `deviceTimeZone()`. Ein unverändert gespeicherter Termin bleibt in jeder Gerätezone bit-genau erhalten.
+3. **`useEvent` fällt nicht mehr zurück.** Ein Termin ohne Wiederholungsregel ignoriert `occ` und zeigt seine eine Occurrence. Eine Serie mit `occ` liefert genau diese Occurrence, sonst `null`; ein kaputter oder unbekannter `occ` führt damit in den vorhandenen Zustand „Der Termin existiert nicht mehr.". Eine Serie ohne `occ` zeigt die erste.
+4. **Nach `forward` oder `all` schließen Bearbeiten und Detail gemeinsam** (`dismiss(2)`, `closeAfterSave` in `EventEditScreen`), damit kein verwaistes Detail bleibt. Die Entscheidung traf Sven. Es greift nur, wenn direkt unter dem Bearbeiten-Sheet das Detail desselben Termins liegt. Steht dieses Detail ohne Tab darunter (Neuladen oder Deep-Link), ließe `dismiss(2)` es stehen; dann `dismissAll` und `replace("/(tabs)/kalender")`. Scope `this` und Einzeltermine kehren wie bisher ins Detail zurück.
+5. **Zwei kleine Fehler aus demselben Bereich:** Das optimistische Update einer Aufgabe setzt das eingebettete `task_types` aus dem Cache; fehlt der Typ dort, wird es `null`, denn kurz kein Badge ist besser als ein falsches. Der Fehler beim Schalten einer Erinnerung zeigt eine übersetzte Meldung statt der rohen Server-Antwort.
+
+### Consequences
+
+- **Das Anzeige-Modell ganztägiger Termine bleibt, wie es ist.** Ein Leser in einer anderen Zone sieht einen Ganztages-Termin weiterhin über zwei seiner Tage. Das zonenlose Datum berührt Expansion, Raster und Formular und ist ein eigenes Thema.
+- **Alte, schon verschobene Termine werden nicht repariert.** Man kann sie von gewollten nicht unterscheiden; der Fix verschiebt sie nur nicht weiter.
+- **Alte Deep-Links**, die zufällig die Nachbar-Occurrence einer Serie treffen, bleiben ein offener Punkt in `docs/TODO.md`.
+- **Der 0-Zeilen-Guard von `useToggleTaskDone` bleibt offen**, weil eine Meldung neue Copy bräuchte.

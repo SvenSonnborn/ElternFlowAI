@@ -121,6 +121,16 @@ Einschätzung („ein Großteil davon können wir jetzt schon umsetzen") trifft 
 Der große Rest teilt sich in Anbieter-Blockaden (Sprachassistent, gustar.io, Notifications, Stripe)
 und Designer-Punkte, die zwar nicht _von uns_ erledigt werden, aber in den Blöcken mitlaufen.
 
+### Die nächsten Branches (Stand 2026-10-28)
+
+1. `fix/stille-fehler` ([ADR-049](./decision-log.md))
+2. 8.3 Kalender-Cache (Doppelanzeige und [#111](https://github.com/SvenSonnborn/ElternFlowAI/issues/111) zusammen)
+3. Realtime (Test und `setAuth`-Retry)
+4. DB-Aufräumen (pg_cron für Einladungen, `anon`-Rechte, Einladungs-Kurzschluss)
+5. Entscheidung [4.1](#41-inlinerem-entscheiden--offen-entscheidung-bei-dir) `inlineRem`
+6. a11y nativ (`hitSlop` zur Box, `aria-*`, Field-Label, `AuthGate`, Serifenschrift im Web)
+7. Block 9 (`expo-doctor`, `ci.yml`-Cache nur lesen)
+
 ### Schlusssteine — was am meisten entsperrt
 
 Drei Einzelposten tragen überproportional:
@@ -879,7 +889,7 @@ wiederholt und um die fünf Ops erweitert · ADR-031 wird **superseded**, nicht 
 
 **Aufwand S–M · blockiert nichts · zehn Einträge**
 
-### 8.1 Der Docs-Pass — **S, ein Commit**
+### 8.1 Der Docs-Pass — **erledigt**
 
 Drei Einträge, die `TODO.md` selbst als „eigener Docs-Pass" zusammenfasst:
 
@@ -967,6 +977,8 @@ Alle aus `TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-sco
 - ~~`platformAutomerge: true` testen~~ und ~~Custom-Manager-Regex gegenprüfen~~ — **entfallen**:
   Renovate merged nicht mehr selbst, und der Regex-Manager ist entfernt
   ([ADR-045](./decision-log.md)).
+- ~~`RCT_USE_PREBUILT_RNCORE` über `expo-build-properties` setzen~~ — **entfallen**:
+  Der Pin ist weg und Expos Default gilt ([ADR-048](./decision-log.md)).
 - **Regel 3 gegen `relatedPackages` abgleichen** — für SDK 58 **erledigt**, die Liste blieb gleich.
   Fällt bei jedem SDK-Sprung wieder an; Gegenprobe ist `bunx expo install --check`. Bewusst nicht
   automatisiert.
