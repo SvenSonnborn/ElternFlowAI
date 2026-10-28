@@ -83,3 +83,22 @@ describe("EventCreateScreen: die id gehört zur Absicht, nicht zum Versuch", () 
     expect(second.id).not.toBe(first.id);
   });
 });
+
+describe("EventCreateScreen: „Titel fehlt“ erst nach Berührung", () => {
+  it("zeigt „Titel fehlt“ nicht vor der ersten Eingabe", async () => {
+    await renderScreen(<EventCreateScreen />);
+
+    expect(screen.queryByText(i18n.t("cal.edit.error.titleRequired"))).toBeNull();
+    expect(screen.getByRole("button", { name: i18n.t("cal.create.save") })).toBeDisabled();
+  });
+
+  it("zeigt „Titel fehlt“, nachdem der Titel geleert wurde", async () => {
+    await renderScreen(<EventCreateScreen />);
+
+    const field = screen.getAllByDisplayValue("")[0];
+    await fireEvent.changeText(field, "Z");
+    await fireEvent.changeText(screen.getByDisplayValue("Z"), "");
+
+    expect(screen.getByText(i18n.t("cal.edit.error.titleRequired"))).toBeTruthy();
+  });
+});
