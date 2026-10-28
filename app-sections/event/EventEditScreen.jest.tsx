@@ -62,6 +62,7 @@ jest.mock("expo-router", () => ({
     push: jest.fn(),
   },
   Stack: { Screen: () => null },
+  useRoute: () => ({ key: "own-key" }),
   usePreventRemove: (prevent: boolean) => {
     mockPrevent = prevent;
     return mockDisable;

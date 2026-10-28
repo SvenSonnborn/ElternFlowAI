@@ -35,6 +35,7 @@ jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({}),
   router: { canGoBack: () => true, back: jest.fn(), replace: jest.fn(), push: jest.fn() },
   Stack: { Screen: () => null },
+  useRoute: () => ({ key: "own-key" }),
   usePreventRemove: (prevent: boolean) => {
     mockPrevent = prevent;
     return mockDisable;

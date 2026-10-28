@@ -1,6 +1,7 @@
-import { usePreventRemove } from "expo-router";
+import { usePreventRemove, useRoute } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Platform } from "react-native";
 
 import { confirmDestructive } from "./confirmDialog";
 
@@ -16,14 +17,30 @@ import { confirmDestructive } from "./confirmDialog";
  * Navigations-Reducer die Sperrliste beim nächsten Render liest; `repeat()` in
  * der Bestätigung arbeitet intern genauso.
  *
+ * `allowLeave()` ist einseitig: Die Sperre kommt für diesen Mount nicht
+ * zurück. Deshalb nur unmittelbar vor einer Navigation aufrufen, die nicht
+ * scheitern kann.
+ *
  * Plattformen: iOS fängt das Wegwischen über `preventNativeDismiss`, auf Web
- * kommt `beforeunload` hinzu; Android-Wischen bleibt ohne Rückfrage (docs/TODO.md).
+ * kommt `beforeunload` hinzu. Auf Android verwirft Wischen und Scrim-Tipp
+ * ohne Rückfrage: Das Sheet ist nativ schon geschlossen, wenn die Sperre
+ * greifen könnte, und eine Rückfrage danach ließe bei „Weiter bearbeiten“ eine
+ * Geisterroute zurück (docs/TODO.md). Der native Dismiss ist die POP-Aktion
+ * mit der eigenen Route als `source` (`makePopAction` des NativeStack);
+ * „Abbrechen“ und die Zurück-Taste sind `GO_BACK` und fragen weiter.
  */
 export function useDiscardGuard(dirty: boolean): () => void {
   const { t } = useTranslation();
   const [leaving, setLeaving] = useState(false);
+  const { key: routeKey } = useRoute();
 
-  const disablePrevention = usePreventRemove(dirty && !leaving, ({ repeat }) => {
+  const disablePrevention = usePreventRemove(dirty && !leaving, ({ data, repeat }) => {
+    const { action } = data;
+    if (Platform.OS === "android" && action.type === "POP" && action.source === routeKey) {
+      setLeaving(true);
+      repeat();
+      return;
+    }
     void confirmDestructive({
       title: t("form.discard.title"),
       body: t("form.discard.body"),

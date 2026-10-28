@@ -1,4 +1,5 @@
 import { act, renderHook } from "@testing-library/react-native";
+import { Platform } from "react-native";
 
 import i18n from "@/features/i18n";
 
@@ -11,6 +12,7 @@ const mockDisable = jest.fn();
 const mockConfirm = jest.fn<Promise<boolean>, [unknown]>();
 
 jest.mock("expo-router", () => ({
+  useRoute: () => ({ key: "own-key" }),
   usePreventRemove: (prevent: boolean, cb: typeof mockCallback) => {
     mockPrevent = prevent;
     mockCallback = cb;
@@ -87,5 +89,55 @@ describe("useDiscardGuard", () => {
 
     expect(mockDisable).toHaveBeenCalledTimes(1);
     expect(mockPrevent).toBe(false);
+  });
+
+  describe("nativer Dismiss auf Android", () => {
+    const originalOS = Platform.OS;
+    const nativeDismiss = { type: "POP", payload: { count: 1 }, source: "own-key" };
+    afterEach(() => {
+      Platform.OS = originalOS;
+    });
+
+    it("Android: Wischen der eigenen Route verwirft ohne Rückfrage", async () => {
+      Platform.OS = "android";
+      const repeat = jest.fn();
+      await renderHook(() => useDiscardGuard(true));
+
+      await act(() => {
+        mockCallback?.({ data: { action: nativeDismiss }, repeat });
+      });
+
+      expect(mockConfirm).not.toHaveBeenCalled();
+      expect(repeat).toHaveBeenCalledTimes(1);
+      expect(mockPrevent).toBe(false);
+    });
+
+    it("Android: „Abbrechen“ (GO_BACK) fragt", async () => {
+      Platform.OS = "android";
+      mockConfirm.mockResolvedValue(false);
+      const repeat = jest.fn();
+      await renderHook(() => useDiscardGuard(true));
+
+      await act(() => {
+        mockCallback?.({ data: { action: { type: "GO_BACK" } }, repeat });
+      });
+
+      expect(mockConfirm).toHaveBeenCalledTimes(1);
+      expect(repeat).not.toHaveBeenCalled();
+    });
+
+    it("iOS: dieselbe POP-Aktion fragt", async () => {
+      Platform.OS = "ios";
+      mockConfirm.mockResolvedValue(false);
+      const repeat = jest.fn();
+      await renderHook(() => useDiscardGuard(true));
+
+      await act(() => {
+        mockCallback?.({ data: { action: nativeDismiss }, repeat });
+      });
+
+      expect(mockConfirm).toHaveBeenCalledTimes(1);
+      expect(repeat).not.toHaveBeenCalled();
+    });
   });
 });
