@@ -40,6 +40,7 @@ import { useToday } from "@/features/shared";
 import { useFamilyTasks } from "@/features/tasks";
 
 import { buildAvatarRow } from "./avatarRow";
+import { greetingKey } from "./greeting";
 import { MealHeroCard } from "./MealHeroCard";
 import { MealHeroEmptyCard } from "./MealHeroEmptyCard";
 import { OnboardingResumeCard } from "./OnboardingResumeCard";
@@ -109,7 +110,9 @@ export function DashboardScreen() {
     pendingInviteCount: pendingInvitations.data?.length,
   });
 
-  const greeting = t("dash.greeting.morning", { name: parent.data?.short ?? "" });
+  const greeting = t(`dash.greeting.${greetingKey(new Date())}`, {
+    name: parent.data?.short ?? "",
+  });
   const subtitle = t("dash.subtitle", {
     family: getSampleFamilyName(t),
     date: format(today, "EEEE, d. MMMM", { locale: dateLocale }),
