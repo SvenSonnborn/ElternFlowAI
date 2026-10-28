@@ -15,10 +15,10 @@ import { useFamilyAllergies } from "./useFamilyAllergies";
  * ein `useMemo` beim Aufrufer nicht bei jedem Render neu rechnet.
  */
 export function useRecipeJudge(): (recipe: JudgeableRecipe) => RecipeAllergenVerdict {
-  const { keys, isLoading, error } = useFamilyAllergies();
+  const allergies = useFamilyAllergies();
 
   return useCallback(
-    (recipe: JudgeableRecipe) => judgeWithAllergyState(recipe, { keys, isLoading, error }),
-    [keys, isLoading, error],
+    (recipe: JudgeableRecipe) => judgeWithAllergyState(recipe, allergies),
+    [allergies],
   );
 }

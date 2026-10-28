@@ -43,8 +43,8 @@ export function RecipeBrowser({ onPick, pickDisabled = false }: RecipeBrowserPro
   const { theme } = useTheme();
   const [search, setSearch] = useState("");
 
-  // Der Urteiler kennt den Ladezustand der Familien-Allergien und sagt "nicht
-  // geprüft", solange er unbekannt ist — die Regel liegt in `judgeWithAllergyState`.
+  // Der Urteiler kennt den Zustand der Familien-Allergien (laden, unbekannt)
+  // und sagt "nicht geprüft", solange sie nicht bekannt sind — die Regel liegt in `judgeWithAllergyState`.
   const judge = useRecipeJudge();
   const { data, isLoading, error } = useRecipes({ search });
 

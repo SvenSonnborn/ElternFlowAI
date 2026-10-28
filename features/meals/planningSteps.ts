@@ -15,15 +15,15 @@ export type AllergyCheck =
 /**
  * Übersetzt Urteil und Ladezustand in das, was der Einplan-Ablauf braucht.
  *
- * Anders als `judgeWithAllergyState` (das Laden und Fehler beide zu
+ * Anders als `judgeWithAllergyState` (das `loading` und `unknown` beide zu
  * `unverified` faltet) trennt es die beiden Fälle: Laden sperrt das Einplanen,
- * ein Fehler fragt nach („konnten nicht geprüft werden"). `unverified` aus
+ * unbekannte Allergien (Fehler, offline, nie geladen) fragen nach („konnten
+ * nicht geprüft werden"). `unverified` aus
  * `judgeRecipe` ist dagegen **kein** Hinweis — die Heuristik kann Abwesenheit
  * nie belegen, und ein Dialog bei jedem Rezept ohne Deklaration wäre Lärm.
  */
 export function allergyCheck(recipe: JudgeableRecipe, allergies: FamilyAllergyState): AllergyCheck {
-  if (allergies.isLoading) return { kind: "loading" };
-  if (allergies.error) return { kind: "unknown" };
+  if (allergies.kind !== "known") return { kind: allergies.kind };
 
   const verdict = judgeRecipe(recipe, allergies.keys);
   if (verdict.status === "unsafe" || verdict.status === "caution") {

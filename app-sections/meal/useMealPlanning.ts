@@ -159,5 +159,5 @@ export function useMealPlanning(): {
     [allergies, confirm, plan, replace, queryClient],
   );
 
-  return { planRecipe, allergiesLoading: allergies.isLoading, busy, error };
+  return { planRecipe, allergiesLoading: allergies.kind === "loading", busy, error };
 }

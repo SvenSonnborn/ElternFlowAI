@@ -74,18 +74,52 @@ export function judgeRecipe(
     : { status: "unverified" };
 }
 
-/** Was `useFamilyAllergies` liefert — als Parameter, damit die Regel ohne React testbar bleibt. */
-export interface FamilyAllergyState {
-  readonly keys: readonly AllergenKey[];
-  readonly isLoading: boolean;
+/**
+ * Was `useFamilyAllergies` liefert — als Parameter, damit die Regel ohne React
+ * testbar bleibt. `keys` gibt es nur im Zustand `known`: so kann kein Aufrufer
+ * ein leeres Array als „keine Allergien" lesen, wenn die Daten fehlen.
+ */
+export type FamilyAllergyState =
+  | { readonly kind: "known"; readonly keys: readonly AllergenKey[] }
+  | { readonly kind: "loading" }
+  | { readonly kind: "unknown" };
+
+/** Der Teil einer TanStack-Query, den `familyAllergyKind` braucht. */
+export interface AllergySource {
+  readonly data: unknown;
   readonly error: unknown;
+  readonly isFetching: boolean;
 }
 
 /**
- * Das Urteil **inklusive** des Ladezustands der Familien-Allergien.
+ * Verdichtet die Query-Kette hinter den Familien-Allergien (Elternteil, Kinder,
+ * Eltern) zu einem Zustand. Die erste passende Regel gewinnt:
+ *
+ * 1. irgendein `error` → `unknown`
+ * 2. überall `data !== undefined` → `known` (`null` zählt: ein Elternteil ohne
+ *    Zeile ist eine Antwort)
+ * 3. irgendein `isFetching` → `loading`
+ * 4. sonst → `unknown`
+ *
+ * Regel 3 nutzt `isFetching` statt `isLoading` und gilt über die **ganze**
+ * Kette: Kinder und Eltern sind deaktiviert, bis das Elternteil seine
+ * `family_id` liefert; in der Lücke dazwischen lädt keine von ihnen, die Kette
+ * aber sehr wohl. Regel 4 fängt pausierte (Web offline) und deaktivierte
+ * Queries ohne Daten ab — sie gelten bewusst als unbekannt, nicht als „lädt":
+ * sonst wartete das Einplanen offline endlos.
+ */
+export function familyAllergyKind(sources: readonly AllergySource[]): FamilyAllergyState["kind"] {
+  if (sources.some((source) => Boolean(source.error))) return "unknown";
+  if (sources.every((source) => source.data !== undefined)) return "known";
+  if (sources.some((source) => source.isFetching)) return "loading";
+  return "unknown";
+}
+
+/**
+ * Das Urteil **inklusive** des Zustands der Familien-Allergien.
  *
  * Ein leeres `keys` heißt für `judgeRecipe` „diese Familie hat keine Allergien"
- * und ergibt `safe` — im Lade- oder Fehlerfall wäre das eine Entwarnung, die
+ * und ergibt `safe` — bei `loading` und `unknown` wäre das eine Entwarnung, die
  * niemand geben kann. Bei einem Gesundheitsfeature ist das die falsche
  * Richtung: solange wir es nicht wissen, sagen wir „nicht geprüft".
  *
@@ -96,9 +130,7 @@ export function judgeWithAllergyState(
   recipe: JudgeableRecipe,
   allergies: FamilyAllergyState,
 ): RecipeAllergenVerdict {
-  // Truthiness statt `!== undefined`: `useFamilyAllergies` faltet drei
-  // Query-Fehler mit `??` zusammen, im Erfolgsfall steht dort also `null`.
-  if (allergies.isLoading || Boolean(allergies.error)) return { status: "unverified" };
+  if (allergies.kind !== "known") return { status: "unverified" };
   return judgeRecipe(recipe, allergies.keys);
 }
 

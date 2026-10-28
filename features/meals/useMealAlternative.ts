@@ -40,7 +40,7 @@ export function useMealAlternative({
   excludeId,
   seed,
 }: UseMealAlternativeParams): RecipeRow | null {
-  const { keys, isLoading, error } = useFamilyAllergies();
+  const allergies = useFamilyAllergies();
 
   const { data } = useQuery({
     queryKey: mealKeys.recipes(POOL_FILTER),
@@ -48,11 +48,16 @@ export function useMealAlternative({
     // Ein unbekannter Allergie-Zustand ist keine Grundlage für einen
     // Vorschlag: `judgeRecipe` läse ein leeres `keys` als „diese Familie hat
     // keine Allergien" und nennte jedes Rezept sicher.
-    enabled: enabled && !isLoading && !error,
+    enabled: enabled && allergies.kind === "known",
   });
 
   return useMemo(
-    () => (data ? pickAlternative(data, keys, { seed, excludeId }) : null),
-    [data, keys, seed, excludeId],
+    // Cache-Daten kommen auch bei `enabled: false` — der Browser füllt den
+    // Eintrag —, deshalb sperrt `enabled` allein nicht.
+    () =>
+      data && allergies.kind === "known"
+        ? pickAlternative(data, allergies.keys, { seed, excludeId })
+        : null,
+    [data, allergies, seed, excludeId],
   );
 }

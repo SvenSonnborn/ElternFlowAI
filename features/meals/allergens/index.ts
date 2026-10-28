@@ -1,12 +1,14 @@
 export { scanIngredients, scanText, type TermMatch } from "./classify";
 export { fold } from "./fold";
 export {
+  familyAllergyKind,
   isRecipeSafeForFamily,
   judgeRecipe,
   judgeWithAllergyState,
   matchedAllergens,
   type AllergenHit,
   type AllergenSource,
+  type AllergySource,
   type FamilyAllergyState,
   type JudgeableRecipe,
   type RecipeAllergenVerdict,
