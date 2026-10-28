@@ -7,6 +7,8 @@
 # Im Schlüssel: der Fingerprint von @expo/fingerprint (native Paketversionen,
 # app.json samt Config-Plugins und referenzierten Dateien, Autolinking), dazu
 # mise.toml, native-build.yml und dieses Skript, bei iOS die Xcode-Version.
+# Die Versionsfelder (expo.version, ios.buildNumber, android.versionCode)
+# streicht das Preset `balanced`; sie können keinen Compile brechen.
 # Bewusst nicht: bun.lock (sonst baute jeder reine JS-Bump voll; native Pakete
 # stecken über ihre Version schon im Fingerprint) und das Ubuntu-Image des
 # Android-Runners (sonst nach jedem Image-Update ungültig). Diese Lücke deckt
@@ -25,7 +27,9 @@ case "$platform" in
     ;;
 esac
 
-cd "$(dirname "$0")/.."
+# Ohne CDPATH: Mit einem exportierten CDPATH, das `.` enthält, schriebe `cd`
+# den Zielpfad auf stdout, und die Ausgabe hätte zwei Zeilen.
+CDPATH= cd -- "$(dirname -- "$0")/.." >/dev/null
 
 # Nach `expo prebuild` hasht der Fingerprint das generierte Verzeichnis als
 # `bareNativeDir` mit; der Schlüssel hinge dann an einem zufälligen
@@ -35,8 +39,21 @@ if [ -d "$platform" ]; then
   exit 1
 fi
 
+# @expo/fingerprint schluckt zwei Fehler und liefert trotzdem einen gültigen
+# Hash: Lädt die Expo-Config nicht oder scheitert das Autolinking, fehlen nur
+# deren Quellen. Deshalb müssen beide in der Ausgabe stehen.
 fingerprint="$(node_modules/.bin/fingerprint fingerprint:generate --platform "$platform" |
-  node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).hash)')"
+  node -e '
+    const fp = JSON.parse(require("fs").readFileSync(0, "utf8"));
+    const ids = fp.sources.map((source) => source.id);
+    for (const id of ["expoConfig", `expoAutolinkingConfig:${process.argv[1]}`]) {
+      if (!ids.includes(id)) {
+        console.error(`native-build-key: Fingerprint ohne Quelle ${id}.`);
+        process.exit(1);
+      }
+    }
+    process.stdout.write(fp.hash);
+  ' "$platform")"
 hex40='^[0-9a-f]{40}$'
 if ! [[ $fingerprint =~ $hex40 ]]; then
   echo "native-build-key: unerwarteter Fingerprint-Hash '${fingerprint}'." >&2
