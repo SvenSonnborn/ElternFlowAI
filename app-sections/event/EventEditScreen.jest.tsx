@@ -1,5 +1,7 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { router } from "expo-router";
 
+import type { EditScope } from "@/features/calendar";
 import type { EventWithRelations } from "@/features/calendar/expand";
 
 import { occurrenceVersion } from "@/features/calendar";
@@ -22,10 +24,40 @@ jest.mock("@/features/calendar", () => ({
   useUpdateEvent: () => ({ mutateAsync: mockUpdateEvent, isPending: false, error: null }),
 }));
 
+type NavState = {
+  index: number;
+  routes: { name: string; params?: { id: string } }[];
+};
+
+const editRoute = { name: "event/edit/[id]", params: { id: "e1" } };
+
+/** Kalender-Tab, darüber das Detail-Sheet von e1, darüber dessen Bearbeiten-Sheet. */
+function stackedOverDetail(detailId = "e1"): NavState {
+  return {
+    index: 2,
+    routes: [{ name: "(tabs)" }, { name: "event/[id]", params: { id: detailId } }, editRoute],
+  };
+}
+
+let mockNavState: NavState = stackedOverDetail();
+
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ id: "e1" }),
-  router: { canGoBack: () => true, back: jest.fn(), replace: jest.fn(), push: jest.fn() },
+  useNavigation: () => ({ getState: () => mockNavState }),
+  router: {
+    canGoBack: jest.fn(() => true),
+    back: jest.fn(),
+    dismiss: jest.fn(),
+    replace: jest.fn(),
+    push: jest.fn(),
+  },
   Stack: { Screen: () => null },
+}));
+
+const mockPickScope = jest.fn<Promise<EditScope | null>, []>();
+
+jest.mock("./scopeDialog", () => ({
+  pickScope: () => mockPickScope(),
 }));
 
 /** Einzeltermin "Elternabend" in der Fassung, aus der das Formular entsteht. */
@@ -60,6 +92,9 @@ const versionB: EventWithRelations = {
   title: "Elternabend (verschoben)",
   updated_at: "2026-10-01T09:00:00.000Z",
 };
+
+/** Derselbe Termin als wöchentliche Serie: Speichern fragt nach dem Scope. */
+const seriesA: EventWithRelations = { ...versionA, rrule_freq: "weekly" };
 
 type SaveVars = {
   baseVersion: string;
@@ -168,5 +203,74 @@ describe("EventEditScreen: die Kennung gehört zur Absicht, nicht zum Versuch", 
     const first = mockUpdateEvent.mock.calls[0][0] as { requestId: string };
     const second = mockUpdateEvent.mock.calls[1][0] as { requestId: string };
     expect(second.requestId).not.toBe(first.requestId);
+  });
+});
+
+describe("EventEditScreen: Schließen nach dem Speichern", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateEvent.mockReset();
+    mockUpdateEvent.mockResolvedValue(undefined);
+    mockPickScope.mockReset();
+    jest.mocked(router.canGoBack).mockReturnValue(true);
+    mockNavState = stackedOverDetail();
+  });
+
+  /** Speichert `row` unverändert; eine Serie beantwortet den Scope-Dialog mit `scope`. */
+  async function save(row: EventWithRelations, scope?: EditScope) {
+    if (scope) mockPickScope.mockResolvedValue(scope);
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(calendarKeys.one("e1"), row);
+    await renderScreen(<EventEditScreen />, { queryClient });
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.edit.save") }));
+    await waitFor(() => expect(mockUpdateEvent).toHaveBeenCalledTimes(1));
+  }
+
+  it("Serie, „dieser und folgende“ schließt beide", async () => {
+    await save(seriesA, "forward");
+
+    expect(savedVars().scope).toBe("forward");
+    expect(router.dismiss).toHaveBeenCalledWith(2);
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it("Serie, „alle“ schließt beide", async () => {
+    await save(seriesA, "all");
+
+    expect(savedVars().scope).toBe("all");
+    expect(router.dismiss).toHaveBeenCalledWith(2);
+  });
+
+  it("Serie, „nur diesen“ kehrt ins Detail zurück", async () => {
+    await save(seriesA, "this");
+
+    expect(savedVars().scope).toBe("this");
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(router.dismiss).not.toHaveBeenCalled();
+  });
+
+  it("Einzeltermin kehrt ins Detail zurück", async () => {
+    await save(versionA);
+
+    expect(mockPickScope).not.toHaveBeenCalled();
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(router.dismiss).not.toHaveBeenCalled();
+  });
+
+  it("darunter liegt das Detail eines anderen Termins", async () => {
+    mockNavState = stackedOverDetail("e2");
+    await save(seriesA, "forward");
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(router.dismiss).not.toHaveBeenCalled();
+  });
+
+  it("Kaltstart-Deep-Link ohne Verlauf", async () => {
+    mockNavState = { index: 0, routes: [editRoute] };
+    jest.mocked(router.canGoBack).mockReturnValue(false);
+    await save(seriesA, "forward");
+
+    expect(router.replace).toHaveBeenCalledWith("/(tabs)/kalender");
+    expect(router.dismiss).not.toHaveBeenCalled();
   });
 });
