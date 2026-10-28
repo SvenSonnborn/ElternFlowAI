@@ -8,7 +8,7 @@ import { useCurrentParent } from "@/features/auth";
 import { supabase } from "@/features/supabase";
 
 import type { TaskChanges } from "./optimistic";
-import type { TaskRow, TaskWithType } from "./types";
+import type { TaskRow, TaskTypeRow, TaskWithType } from "./types";
 
 import { MissingParentError, TaskConflictError, TaskForbiddenError } from "./errors";
 import { applyDelete, applyToggle, applyUpdate } from "./optimistic";
@@ -293,8 +293,10 @@ export function useUpdateTask() {
 
   return useMutation({
     mutationFn: (vars: UpdateTaskVars) => updateTask(vars, createSupabaseTaskOps(supabase)),
-    onMutate: (vars) =>
-      patchTaskCaches(qc, (tasks) => applyUpdate(tasks, vars.taskId, vars.changes)),
+    onMutate: (vars) => {
+      const types = qc.getQueryData<TaskTypeRow[]>(taskKeys.types);
+      return patchTaskCaches(qc, (tasks) => applyUpdate(tasks, vars.taskId, vars.changes, types));
+    },
     onError: (_err, _vars, snapshot) => restoreTaskCaches(qc, snapshot),
     onSettled: () => invalidateTasks(qc),
   });
