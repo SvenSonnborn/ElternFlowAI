@@ -103,7 +103,9 @@ export function EventDetailScreen() {
         onError: (err) => {
           showAlert({
             title: t("cal.detail.reminderError"),
-            body: err instanceof Error ? err.message : undefined,
+            // Nicht `err.message`: PostgREST antwortet englisch, wie beim
+            // Lösch-Pfad klassifiziert `mapEventError` die Ursache.
+            body: t(mapEventError(err)),
           });
         },
       },
