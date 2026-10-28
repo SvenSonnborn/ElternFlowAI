@@ -178,14 +178,16 @@ jobs:
       # Schlüssel des nativen Stands aus scripts/native-build-key.sh: der
       # Fingerprint von @expo/fingerprint (native Paketversionen, app.json
       # samt Config-Plugins, Autolinking) plus mise.toml, diese Datei und das
-      # Skript. Bewusst nicht drin: bun.lock — sonst baute jeder reine JS-Bump
-      # voll, native Pakete stecken über ihre Version schon im Fingerprint —
-      # und das Ubuntu-Image, sonst wäre der Schlüssel nach jedem Image-Update
-      # ungültig. Diese Lücke deckt der Wochenbuild ab, der immer baut.
-      # Berechnet vor dem Prebuild, weil der Fingerprint ein vorhandenes
-      # `android/` mithashen würde. Zuweisung statt `echo "key=$(…)"`, damit
-      # `bash -e` abbricht, wenn das Skript scheitert: Ein leerer Schlüssel
-      # darf nie entstehen.
+      # Skript. Die Versionsfelder (expo.version, ios.buildNumber,
+      # android.versionCode) streicht das Preset `balanced`; sie können keinen
+      # Compile brechen. Bewusst nicht drin: bun.lock — sonst baute jeder
+      # reine JS-Bump voll, native Pakete stecken über ihre Version schon im
+      # Fingerprint — und das Ubuntu-Image, sonst wäre der Schlüssel nach
+      # jedem Image-Update ungültig. Diese Lücke deckt der Wochenbuild ab, der
+      # immer baut. Berechnet vor dem Prebuild, weil der Fingerprint ein
+      # vorhandenes `android/` mithashen würde. Zuweisung statt
+      # `echo "key=$(…)"`, damit `bash -e` abbricht, wenn das Skript
+      # scheitert: Ein leerer Schlüssel darf nie entstehen.
       - name: Native build key
         id: native-key
         run: |
@@ -346,9 +348,10 @@ jobs:
 
       # Schlüssel, Marke und Entscheidung wie im Android-Job, Begründung dort.
       # Bei iOS steckt zusätzlich die Xcode-Version im Schlüssel, ein
-      # Runner-Image mit neuem Xcode baut also voll. Nicht drin sind die Pods
-      # vom CocoaPods-CDN (Versionen fest aus den RN-Podspecs); deren Drift
-      # deckt der Wochenbuild ab.
+      # Runner-Image mit neuem Xcode baut also voll. Die Versionen der fünf
+      # Pods vom CocoaPods-CDN legen die RN-Podspecs fest; driften kann nur,
+      # was das CDN ausliefert, und das macOS-Image abseits von Xcode
+      # (CocoaPods, Ruby). Beides deckt der Wochenbuild ab.
       - name: Native build key
         id: native-key
         run: |
