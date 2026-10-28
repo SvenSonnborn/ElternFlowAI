@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { router } from "expo-router";
 
 import i18n from "@/features/i18n";
 import { renderScreen } from "@/testing/renderScreen";
@@ -27,10 +28,17 @@ jest.mock("@/features/calendar", () => ({
   useFamilyEvents: () => ({ data: [] }),
 }));
 
+let mockPrevent: boolean | undefined;
+const mockDisable = jest.fn();
+
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({}),
   router: { canGoBack: () => true, back: jest.fn(), replace: jest.fn(), push: jest.fn() },
   Stack: { Screen: () => null },
+  usePreventRemove: (prevent: boolean) => {
+    mockPrevent = prevent;
+    return mockDisable;
+  },
 }));
 
 type RetryToast = { action: { label: string; onPress: () => void } };
@@ -100,5 +108,34 @@ describe("EventCreateScreen: „Titel fehlt“ erst nach Berührung", () => {
     await fireEvent.changeText(screen.getByDisplayValue("Z"), "");
 
     expect(screen.getByText(i18n.t("cal.edit.error.titleRequired"))).toBeTruthy();
+  });
+});
+
+describe("EventCreateScreen: Rückfrage vor dem Verwerfen", () => {
+  beforeEach(() => {
+    mockCreateEvent.mockReset();
+    mockCreateEvent.mockResolvedValue(undefined);
+    mockDisable.mockReset();
+    jest.mocked(router.back).mockReset();
+  });
+
+  it("frisches Formular sperrt das Schließen nicht", async () => {
+    await renderScreen(<EventCreateScreen />);
+    expect(mockPrevent).toBe(false);
+  });
+
+  it("Eingabe sperrt das Schließen", async () => {
+    await renderScreen(<EventCreateScreen />);
+    await fireEvent.changeText(screen.getAllByDisplayValue("")[0], "Zahnarzt");
+    expect(mockPrevent).toBe(true);
+  });
+
+  it("Speichern hebt die Sperre vor dem Schließen auf", async () => {
+    await fillAndSave();
+    expect(mockDisable).toHaveBeenCalledTimes(1);
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(mockDisable.mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(router.back).mock.invocationCallOrder[0],
+    );
   });
 });
