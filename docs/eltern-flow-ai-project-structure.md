@@ -64,7 +64,7 @@ design-system/           Handoff bundle + theming runtime
 
 features/                Cross-cutting feature logic
 ├─ i18n/                 react-i18next init + de.json + en.json
-├─ auth/                 Session-Store · AuthGate · DeepLinkHandler · Onboarding-Mutations
+├─ auth/                 Session-Store · AuthGate · DeepLinkHandler · Familien-Queries und -Mutations
 ├─ calendar/             Queries · Mutations · RRULE-Expansion · Reminder · Pending-Deletes · Optimistic-Overlay
 │                        · rrule.ts (Vertrag: `occurrencesBetween`/`allOccurrences`, wertet in Wandzeit aus, ADR-033)
 │                        · timezone.ts (Instant↔Wandzeit-Umrechnung, `zonedDayBounds`) · deviceTimeZone.ts (Geräte-Zone für neue Termine)
