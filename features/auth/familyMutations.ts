@@ -288,8 +288,8 @@ export function useRegenerateInvitation() {
 /**
  * Withdraws a pending invitation: the row is deleted, so its deep link stops
  * resolving in `accept_invitation`. Deleting rather than stamping `used_at`
- * keeps the partial unique index free for the next invite — a revoked token is
- * not a used one, and the family should be able to invite again right away.
+ * keeps `used_at` meaning "someone joined with this token" — a revoked token
+ * is not a used one.
  */
 export function useRevokeInvitation() {
   const qc = useQueryClient();
