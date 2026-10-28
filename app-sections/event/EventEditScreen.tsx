@@ -253,8 +253,12 @@ export function EventEditScreen() {
   // Der Ausgangsstand ist `initial` (eingefroren, siehe `source`): Weder die
   // Hydration noch ein Refetch danach zählt als Änderung. Ganztägig, Typ und
   // Person ändert dieses Formular nicht, sie stehen auf beiden Seiten gleich.
+  // `occurrence != null`: Nach einem Remote-Löschen zeigt der Screen das
+  // Nicht-gefunden-Panel, `initial` bleibt aber eingefroren, und „Schließen“
+  // soll dort nicht nach Änderungen fragen.
   const allowLeave = useDiscardGuard(
-    hydrated &&
+    occurrence != null &&
+      hydrated &&
       initial != null &&
       eventFormChanged(
         {
