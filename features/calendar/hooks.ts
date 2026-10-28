@@ -9,7 +9,7 @@ import { useTheme } from "@/design-system/ThemeProvider";
 import type { DaySegment } from "./spans";
 import type { CalendarOccurrence, MarkedDates } from "./types";
 
-import { eventLookupWindow } from "./eventWindow";
+import { eventLookupWindow, pickOccurrence } from "./eventWindow";
 import { expandEvents } from "./expand";
 import { useOptimisticEvents, visibleOccurrences } from "./optimisticEvents";
 import { usePendingEventDeletes } from "./pendingDeletes";
@@ -111,43 +111,15 @@ export function useEvent(id: string, occurrenceKey?: string): UseEventResult {
   const occurrence = useMemo<CalendarOccurrence | null>(() => {
     const row = query.data;
     if (!row) return null;
-    // Das Suchfenster muss den angeforderten Regel-Tag in `row.timezone`
-    // abdecken, nicht in der Zone des Lesers — sonst läuft `find` unten für
-    // eine weit in der Zukunft liegende Occurrence (>366 Tage) leer, und der
-    // `expanded[0]`-Fallback zeigt stillschweigend eine **andere** Occurrence
-    // (Befund B, PR #121). Seit ADR-035 deckt das Fenster außerdem das
-    // Override-Intervall der angeforderten Occurrence ab. Siehe
-    // `eventWindow.ts` für die Begründung und warum die Funktion dort statt
-    // hier steht.
-    const { start: fallbackStart, end: fallbackEnd } = eventLookupWindow(row, occurrenceKey);
-    const expanded = expandEvents([row], fallbackStart, fallbackEnd, theme);
-    if (occurrenceKey) {
-      // Match auf `occurrenceKey`, nicht auf das aufgelöste Anzeigedatum: Der
-      // Routen-Parameter `occ` benennt die Exception-Zeile, und nur der
-      // Schlüssel identifiziert die richtige Occurrence, wenn eine Verschiebung
-      // Schlüssel und Anzeigedatum hat auseinanderlaufen lassen (ADR-034).
-      //
-      // Ein Deep-Link aus der Zeit vor ADR-034 trägt noch ein aufgelöstes
-      // Datum statt eines Schlüssels — gebildet in der **Gerätezone** des
-      // Erstellers. Für eine Occurrence ohne eigene Verschiebung sind Datum
-      // und Schlüssel gleich, der Link trifft also weiterhin.
-      //
-      // Bei einer verschobenen Occurrence ist der Fall nicht so harmlos, wie
-      // „findet nichts, fällt zurück" klingt: Weicht die Gerätezone des
-      // Öffners von `row.timezone` über eine Tagesgrenze hinweg ab (täglicher
-      // Berliner Termin um 00:30, Leser in `America/New_York`), kann das alte
-      // Datum zufällig mit dem `occurrenceKey` der **Nachbar-Occurrence**
-      // übereinstimmen. `find` trifft dann still die falsche Zeile statt gar
-      // keine — der Nutzer landet auf einem plausiblen, aber falschen Termin,
-      // und ein anschließendes „Nur diesen" schriebe oder löschte die
-      // Exception des Nachbarn statt der gemeinten. Nur ein echter
-      // Nicht-Treffer fällt auf `expanded[0]` zurück — dasselbe Verhalten wie
-      // bei jedem unbekannten `occ`. Schmaler Vektor (keine Push- oder
-      // Mail-Deep-Links, nur Browser-Tab oder Lesezeichen); kein Fix hier,
-      // siehe docs/TODO.md.
-      return expanded.find((o) => o.occurrenceKey === occurrenceKey) ?? expanded[0] ?? null;
-    }
-    return expanded[0] ?? null;
+    // Das Fenster deckt den angeforderten Regel-Tag in `row.timezone` ab, siehe
+    // `eventLookupWindow`.
+    const { start, end } = eventLookupWindow(row, occurrenceKey);
+    const expanded = expandEvents([row], start, end, theme);
+    // Match auf `occurrenceKey`, nicht auf das aufgelöste Anzeigedatum: Der
+    // Routen-Parameter `occ` benennt die Exception-Zeile (ADR-034). Links von
+    // vor ADR-034 tragen ein Datum in der Gerätezone des Erstellers und können
+    // die Nachbar-Occurrence treffen, siehe docs/TODO.md.
+    return pickOccurrence(expanded, occurrenceKey);
   }, [query.data, occurrenceKey, theme]);
 
   return {
