@@ -13,6 +13,7 @@ import {
   MemberPicker,
   newRequestId,
   TypePicker,
+  useDiscardGuard,
   useToast,
   type MemberOption,
   type SelectedMember,
@@ -41,6 +42,7 @@ import {
   type RecurrenceOption,
 } from "@/features/calendar";
 
+import { eventFormChanged } from "./eventFormChanged";
 import { RecurrenceCountField } from "./RecurrenceCountField";
 import { RecurrenceRadio } from "./RecurrenceRadio";
 import { createSubmitLock } from "./submitLock";
@@ -78,7 +80,11 @@ export function EventCreateScreen() {
   const [title, setTitle] = useState("");
   // „Titel fehlt“ erst nach der ersten Eingabe; Speichern bleibt trotzdem gesperrt.
   const [titleTouched, setTitleTouched] = useState(false);
-  const [range, setRange] = useState<DateRange>(() => initialRange(paramDate));
+  // Der Ausgangsstand für „geändert?“ (`eventFormChanged`): derselbe Wert, mit
+  // dem `range` startet, einmal gemerkt, damit ein Re-Render keinen neuen
+  // `new Date()` als Vergleich nimmt.
+  const [pristineRange] = useState(() => initialRange(paramDate));
+  const [range, setRange] = useState<DateRange>(pristineRange);
   const [allDay, setAllDay] = useState(false);
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
@@ -90,10 +96,14 @@ export function EventCreateScreen() {
   const [typeHydrated, setTypeHydrated] = useState(false);
   const { startAt, endAt } = range;
 
+  // Der automatisch gesetzte Typ ist der Ausgangsstand, keine Eingabe: Ein
+  // frisch geöffnetes Formular soll ohne Rückfrage schließen.
+  const defaultTypeId = eventTypes.data
+    ? ((eventTypes.data.find((tp) => tp.slug === "family") ?? eventTypes.data[0])?.id ?? null)
+    : null;
+
   if (eventTypes.data && !typeHydrated) {
-    const defaultType =
-      eventTypes.data.find((tp) => tp.slug === "family") ?? eventTypes.data[0] ?? null;
-    setTypeId(defaultType?.id ?? null);
+    setTypeId(defaultTypeId);
     setTypeHydrated(true);
   }
 
@@ -126,6 +136,35 @@ export function EventCreateScreen() {
   const countError = parsedCount === "invalid" ? t("cal.create.error.invalidCount") : "";
   const canSave =
     !titleMissing && !dateError && !timeError && !typeError && !countError && !!familyId;
+
+  const allowLeave = useDiscardGuard(
+    eventFormChanged(
+      {
+        title,
+        startAt,
+        endAt,
+        allDay,
+        location,
+        notes,
+        typeId,
+        memberId: member?.id ?? null,
+        recurrence,
+        countText,
+      },
+      {
+        title: "",
+        startAt: pristineRange.startAt,
+        endAt: pristineRange.endAt,
+        allDay: false,
+        location: "",
+        notes: "",
+        typeId: defaultTypeId,
+        memberId: null,
+        recurrence: "none",
+        countText: "",
+      },
+    ),
+  );
 
   /**
    * Schickt die Mutation und meldet einen Fehlschlag selbst.
@@ -198,6 +237,8 @@ export function EventCreateScreen() {
       createdBy: parent.data?.id ?? null,
     };
     // Sofort schließen: Der Termin steht dank `onMutate` schon im Kalender.
+    // Die Sperre fällt davor, sonst fragte das Schließen nach dem Speichern.
+    allowLeave();
     goBackOrToKalender();
     void save(vars);
   }

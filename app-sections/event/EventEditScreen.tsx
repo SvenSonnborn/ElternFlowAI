@@ -12,6 +12,7 @@ import {
   MAX_CONFLICT_AUTO_RETRIES,
   newRequestId,
   useConflict,
+  useDiscardGuard,
   useToast,
 } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
@@ -42,6 +43,7 @@ import {
   type RecurrenceOption,
 } from "@/features/calendar";
 
+import { eventFormChanged } from "./eventFormChanged";
 import {
   recurrenceConflictRows,
   recurrenceRowsWithoutOccurrence,
@@ -247,6 +249,40 @@ export function EventEditScreen() {
   const parsedCount = recurrence === "none" ? null : parseRecurrenceCount(countText);
   const countError = parsedCount === "invalid" ? t("cal.create.error.invalidCount") : "";
   const canSave = hydrated && !titleError && !dateError && !timeError && !countError;
+
+  // Der Ausgangsstand ist `initial` (eingefroren, siehe `source`): Weder die
+  // Hydration noch ein Refetch danach zählt als Änderung. Ganztägig, Typ und
+  // Person ändert dieses Formular nicht, sie stehen auf beiden Seiten gleich.
+  const allowLeave = useDiscardGuard(
+    hydrated &&
+      initial != null &&
+      eventFormChanged(
+        {
+          title,
+          startAt,
+          endAt,
+          allDay,
+          location,
+          notes,
+          typeId: null,
+          memberId: null,
+          recurrence,
+          countText,
+        },
+        {
+          title: initial.title,
+          startAt: initial.startAt,
+          endAt: initial.endAt,
+          allDay,
+          location: initial.location,
+          notes: initial.notes,
+          typeId: null,
+          memberId: null,
+          recurrence: initial.recurrence ?? "none",
+          countText: initial.countText,
+        },
+      ),
+  );
 
   /**
    * The series rule, rebuilt from the radio. `null` when the user left the
@@ -548,6 +584,10 @@ export function EventEditScreen() {
   // aufs Detail schließen und es durch den Kalender ersetzen. Optimistisch wie
   // das Schließen selbst, vor der Server-Antwort (ADR-027).
   function closeAfterSave(closesSeries: boolean) {
+    // Als Erstes, vor jedem Navigationsaufruf unten — auch vor `dismiss(2)`.
+    // Hier und nicht am Anfang von `onSave`: Bricht jemand die Scope-Auswahl
+    // ab, bleibt das Formular offen und geändert, die Sperre muss stehen.
+    allowLeave();
     const state = navigation.getState();
     const index = state?.index ?? 0;
     const below = state?.routes[index - 1];

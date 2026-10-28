@@ -47,6 +47,8 @@ function stackedOverDetail(detailId = "e1"): NavState {
 }
 
 let mockNavState: NavState = stackedOverDetail();
+let mockPrevent: boolean | undefined;
+const mockDisable = jest.fn();
 
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ id: "e1" }),
@@ -60,6 +62,10 @@ jest.mock("expo-router", () => ({
     push: jest.fn(),
   },
   Stack: { Screen: () => null },
+  usePreventRemove: (prevent: boolean) => {
+    mockPrevent = prevent;
+    return mockDisable;
+  },
 }));
 
 const mockPickScope = jest.fn<Promise<EditScope | null>, []>();
@@ -310,6 +316,90 @@ describe("EventEditScreen: Schließen nach dem Speichern", () => {
 
     expect(router.replace).toHaveBeenCalledWith("/(tabs)/kalender");
     expect(router.dismiss).not.toHaveBeenCalled();
+  });
+});
+
+describe("EventEditScreen: Rückfrage vor dem Verwerfen", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateEvent.mockReset();
+    mockUpdateEvent.mockResolvedValue(undefined);
+    mockPickScope.mockReset();
+    jest.mocked(router.canGoBack).mockReturnValue(true);
+    mockNavState = stackedOverDetail();
+    mockPrevent = undefined;
+  });
+
+  /** Rendert `row` und tippt einen anderen Titel. */
+  async function renderEdited(row: EventWithRelations) {
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(calendarKeys.one("e1"), row);
+    await renderScreen(<EventEditScreen />, { queryClient });
+    await fireEvent.changeText(screen.getByDisplayValue("Elternabend"), "Elternabend 2");
+    return queryClient;
+  }
+
+  it("hydriertes Formular sperrt nicht", async () => {
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(calendarKeys.one("e1"), versionA);
+    await renderScreen(<EventEditScreen />, { queryClient });
+    expect(screen.getByDisplayValue("Elternabend")).toBeTruthy();
+    expect(mockPrevent).toBe(false);
+  });
+
+  it("ein Fremd-Refetch nach der Hydration sperrt nicht", async () => {
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(calendarKeys.one("e1"), versionA);
+    await renderScreen(<EventEditScreen />, { queryClient });
+
+    await act(() => {
+      queryClient.setQueryData(calendarKeys.one("e1"), versionB);
+    });
+
+    expect(mockPrevent).toBe(false);
+  });
+
+  it("Titeländerung sperrt", async () => {
+    await renderEdited(versionA);
+    expect(mockPrevent).toBe(true);
+  });
+
+  it("Speichern hebt die Sperre vor dem Schließen auf (router.back)", async () => {
+    await renderEdited(versionA);
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.edit.save") }));
+    await waitFor(() => expect(mockUpdateEvent).toHaveBeenCalledTimes(1));
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(mockDisable).toHaveBeenCalledTimes(1);
+    expect(mockDisable.mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(router.back).mock.invocationCallOrder[0],
+    );
+    expect(mockPrevent).toBe(false);
+  });
+
+  it("Speichern hebt die Sperre vor dem Schließen auf (dismiss(2) über dem Detail)", async () => {
+    mockPickScope.mockResolvedValue("forward");
+    await renderEdited(seriesA);
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.edit.save") }));
+    await waitFor(() => expect(mockUpdateEvent).toHaveBeenCalledTimes(1));
+
+    expect(router.dismiss).toHaveBeenCalledWith(2);
+    expect(mockDisable).toHaveBeenCalledTimes(1);
+    expect(mockDisable.mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(router.dismiss).mock.invocationCallOrder[0],
+    );
+    expect(mockPrevent).toBe(false);
+  });
+
+  it("Abbruch der Scope-Auswahl lässt die Sperre stehen", async () => {
+    mockPickScope.mockResolvedValue(null);
+    await renderEdited(seriesA);
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.edit.save") }));
+    await waitFor(() => expect(mockPickScope).toHaveBeenCalledTimes(1));
+
+    expect(mockUpdateEvent).not.toHaveBeenCalled();
+    expect(mockDisable).not.toHaveBeenCalled();
+    expect(mockPrevent).toBe(true);
   });
 });
 
