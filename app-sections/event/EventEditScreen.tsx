@@ -523,7 +523,8 @@ export function EventEditScreen() {
     else router.replace("/(tabs)/kalender");
   }
 
-  // Nach „Diesen und folgende" oder „Alle" (dazu zählt jede Regeländerung)
+  // Nach „Diesen und folgende" oder „Alle" (dazu zählt jede Regeländerung, auch die
+  // eines Einzeltermins, der damit zur Serie wird)
   // gehört die Occurrence im Detail-Sheet darunter oft nicht mehr zu diesem
   // Termin: Nach dem Split liegt sie im neuen Termin, `useEvent` findet sie
   // unter der alten Id nicht mehr, und das Sheet bliebe verwaist. Darum
@@ -618,8 +619,9 @@ export function EventEditScreen() {
       requestId: newRequestId(),
     };
     // Sofort schließen: Die Änderung steht dank `onMutate` schon im Kalender.
-    // Eine Regeländerung hat `scope` oben schon auf „all" gesetzt.
-    closeAfterSave(isRecurring && scope !== "this");
+    // Bei einer Serie hat eine Regeländerung `scope` oben schon auf „all" gesetzt;
+    // ein Einzeltermin zählt erst mit neuer Regel als Serie.
+    closeAfterSave(isRecurring ? scope !== "this" : recurrenceChanges !== null);
     void save(vars);
   }
 
