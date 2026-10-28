@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams, useNavigation } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, View } from "react-native";
@@ -73,6 +73,7 @@ export function EventEditScreen() {
   const dateLocale = lang === "de" ? deLocale : enLocale;
 
   const { data: occurrence, isLoading } = useEvent(id ?? "", occ);
+  const navigation = useNavigation();
   const { show } = useToast();
   const conflict = useConflict();
   const updateMutation = useUpdateEvent();
@@ -138,10 +139,14 @@ export function EventEditScreen() {
    *   schickte `vars.recurrence` mit, und `deleteAllExceptions`
    *   (`features/calendar/recurrence.ts`) löschte beim Speichern **sämtliche**
    *   Ausnahmen der Serie, um die alte Regel zurückzuschreiben.
-   * - Fällt die angeforderte Occurrence durch eine fremde Regeländerung weg,
-   *   liefert `useEvent` `expanded[0]` — eine **andere** Occurrence. Ein live
+   * - Macht eine fremde Regeländerung aus der Serie einen Einzeltermin,
+   *   liefert `useEvent` dessen einzige Occurrence, denn `pickOccurrence`
+   *   (`features/calendar/eventWindow.ts`) übergeht bei einem Einzeltermin den
+   *   Schlüssel — eine **andere** Occurrence als die angeforderte. Ein live
    *   gelesenes `occurrenceKey` schriebe die Exception bei Scope „Nur diesen"
-   *   dann auf eine fremde Zeile.
+   *   dann auf eine fremde Zeile. (Fällt die Occurrence dagegen aus einer
+   *   weiterbestehenden Serie, liefert `useEvent` `null`, und der Screen
+   *   wechselt in seinen `!occurrence`-Zweig.)
    *
    * ADR-031 Decision 6 fasst die Invariante zusammen: `baseVersion` ist die
    * Version, aus der der Formular-State entstand — und der Formular-State ist
@@ -383,7 +388,7 @@ export function EventEditScreen() {
       // Match auf `occurrenceKey`: Nur der Schlüssel identifiziert dieselbe
       // Occurrence zuverlässig, wenn eine Verschiebung ihn vom aufgelösten
       // Anzeigedatum hat auseinanderlaufen lassen (ADR-034) — derselbe Grund
-      // wie beim `find` in `useEvent` (`features/calendar/hooks.ts`).
+      // wie bei `pickOccurrence` (`features/calendar/eventWindow.ts`).
       const theirs: CalendarOccurrence | null =
         expanded.find((o) => o.occurrenceKey === vars.occurrenceKey) ?? null;
 
@@ -518,6 +523,29 @@ export function EventEditScreen() {
     else router.replace("/(tabs)/kalender");
   }
 
+  // Nach „Diesen und folgende" oder „Alle" (dazu zählt jede Regeländerung)
+  // gehört die Occurrence im Detail-Sheet darunter oft nicht mehr zu diesem
+  // Termin: Nach dem Split liegt sie im neuen Termin, `useEvent` findet sie
+  // unter der alten Id nicht mehr, und das Sheet bliebe verwaist. Darum
+  // schließt es mit. `dismiss(2)` statt eines festen Ziels, damit der Nutzer
+  // auf dem Tab landet, von dem aus er das Detail geöffnet hat (Kalender oder
+  // Dashboard). Nur wenn direkt darunter das Detail **dieses** Termins liegt:
+  // Ein anderes Sheet darunter bleibt stehen, und ohne Verlauf
+  // (Kaltstart-Deep-Link) greift `goBackOrToKalender`. Optimistisch wie das
+  // Schließen selbst, vor der Server-Antwort (ADR-027).
+  function closeAfterSave(closesSeries: boolean) {
+    const state = navigation.getState();
+    const below = state?.routes[state.index - 1];
+    const params = below?.params;
+    const detailBelow =
+      below?.name === "event/[id]" &&
+      params !== undefined &&
+      "id" in params &&
+      params.id === initial?.eventId;
+    if (closesSeries && detailBelow) router.dismiss(2);
+    else goBackOrToKalender();
+  }
+
   async function onSave() {
     // `initial` statt `occurrence`: nach der Hydration ist das der eingefrorene
     // Stand (siehe `source` oben), und `canSave` verlangt `hydrated`.
@@ -582,7 +610,8 @@ export function EventEditScreen() {
       requestId: newRequestId(),
     };
     // Sofort schließen: Die Änderung steht dank `onMutate` schon im Kalender.
-    goBackOrToKalender();
+    // Eine Regeländerung hat `scope` oben schon auf „all" gesetzt.
+    closeAfterSave(isRecurring && scope !== "this");
     void save(vars);
   }
 
