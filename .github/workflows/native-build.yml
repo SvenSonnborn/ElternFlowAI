@@ -20,7 +20,9 @@ concurrency:
 
 # Caches: Nur `main` schreibt (die `actions/cache/save`-Steps am Jobende), PRs
 # lesen nur. Ein PR-Cache ist für andere PRs unsichtbar und verdrängte bei
-# 10 GB Repo-Limit die nützlichen von `main`.
+# 10 GB Repo-Limit die nützlichen von `main`. Einzige Ausnahme ist die winzige
+# Marke „nativer Stand grün gebaut" der Compile-Jobs, die jedes Ereignis
+# schreibt (siehe `native-key` im Android-Job).
 
 # Same Supabase placeholders as ci.yml. Strictly only the `bundle` job needs
 # them: Metro inlines EXPO_PUBLIC_* at bundle time, so leaving them unset would
@@ -173,17 +175,67 @@ jobs:
         id: install
         run: bun install --frozen-lockfile
 
+      # Schlüssel des nativen Stands aus scripts/native-build-key.sh: der
+      # Fingerprint von @expo/fingerprint (native Paketversionen, app.json
+      # samt Config-Plugins, Autolinking) plus mise.toml, diese Datei und das
+      # Skript. Bewusst nicht drin: bun.lock — sonst baute jeder reine JS-Bump
+      # voll, native Pakete stecken über ihre Version schon im Fingerprint —
+      # und das Ubuntu-Image, sonst wäre der Schlüssel nach jedem Image-Update
+      # ungültig. Diese Lücke deckt der Wochenbuild ab, der immer baut.
+      # Berechnet vor dem Prebuild, weil der Fingerprint ein vorhandenes
+      # `android/` mithashen würde. Zuweisung statt `echo "key=$(…)"`, damit
+      # `bash -e` abbricht, wenn das Skript scheitert: Ein leerer Schlüssel
+      # darf nie entstehen.
+      - name: Native build key
+        id: native-key
+        run: |
+          key="$(bash scripts/native-build-key.sh android)"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      # Die Marke ist ein Cache-Eintrag unter diesem Schlüssel; `lookup-only`
+      # prüft nur, ob es ihn gibt. Ein PR sieht seine eigenen Marken und die
+      # aus `main`, ein Push auf `main` nur die aus `main`.
+      - name: Look up native build marker
+        id: marker
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .native-build-marker
+          key: ${{ steps.native-key.outputs.key }}
+          lookup-only: true
+
+      # `schedule` und `workflow_dispatch` bauen immer: Der Wochenbuild fängt
+      # Drift, die nicht im Schlüssel steht, der manuelle Lauf prüft den
+      # Vollbuild-Pfad. Übersprungen wird per `if` an jedem folgenden Step,
+      # nicht am Job: Eine Job-Bedingung bräuchte `needs:` auf einen eigenen
+      # Schlüssel-Job. So endet der Job unter seinem Namen grün, wie es der
+      # Required Check erwartet.
+      - name: Decide whether to build
+        id: decide
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MARKER_HIT: ${{ steps.marker.outputs.cache-hit }}
+          NATIVE_KEY: ${{ steps.native-key.outputs.key }}
+        run: |
+          if [ "$EVENT_NAME" = schedule ] || [ "$EVENT_NAME" = workflow_dispatch ] || [ "$MARKER_HIT" != true ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Android: Derselbe native Stand wurde bereits grün gebaut (Schlüssel $NATIVE_KEY), Prebuild und Compile entfallen."
+          fi
+
       # `android/` is gitignored (CNG), so it never exists in a fresh checkout.
       # `--clean` states the invariant anyway: CI always compiles a freshly
       # generated native project, never a stale one. `--no-install` skips the
       # package-manager run that `bun install` above already did.
       - name: Prebuild (android)
+        if: steps.decide.outputs.build == 'true'
         run: bunx expo prebuild --platform android --no-install --clean
 
       # Restored AFTER prebuild: `--clean` wipes the native directory, so a
       # cache seeded before it would be thrown away.
       - name: Cache Gradle
         id: gradle-cache
+        if: steps.decide.outputs.build == 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
@@ -205,6 +257,7 @@ jobs:
       # Kotlin-/Java-Compile und Resource-Tasks, NICHT die CMake/NDK-Schritte —
       # `externalNativeBuild`-Tasks sind nicht cachebar.
       - name: Gradle assembleDebug
+        if: steps.decide.outputs.build == 'true'
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --stacktrace --build-cache
 
@@ -213,13 +266,37 @@ jobs:
       # schreibt der `bundle`-Job. `path` muss dem Restore-Step entsprechen,
       # sonst ist der gespeicherte Eintrag für ihn unsichtbar.
       - name: Save Gradle cache (main only)
-        if: github.ref == 'refs/heads/main' && steps.gradle-cache.outputs.cache-hit != 'true'
+        if: steps.decide.outputs.build == 'true' && github.ref == 'refs/heads/main' && steps.gradle-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: ${{ steps.gradle-cache.outputs.cache-primary-key }}
+
+      # Die Marke entsteht erst nach dem Compile und ohne `always()` oder
+      # `!cancelled()`: Das implizite `success()` lässt einen roten oder
+      # abgebrochenen Lauf keine Marke hinterlassen. Anders als die großen
+      # Caches wird sie auf jedem Ereignis gespeichert, auch auf PRs — die
+      # Datei ist winzig, und ein PR-Eintrag lässt die weiteren Pushes
+      # desselben PRs überspringen. Gab es sie schon (Vollbuild per `schedule`
+      # oder `workflow_dispatch`), bleibt sie stehen; Cache-Einträge sind
+      # unveränderlich. `path` muss exakt dem Lookup oben entsprechen: GitHub
+      # versioniert Cache-Einträge über den Pfad, bei Abweichung träfe der
+      # Lookup nie, und es würde still nie übersprungen.
+      - name: Write native build marker
+        if: steps.decide.outputs.build == 'true' && steps.marker.outputs.cache-hit != 'true'
+        env:
+          NATIVE_KEY: ${{ steps.native-key.outputs.key }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: printf '%s\n%s\n' "$NATIVE_KEY" "$COMMIT_SHA" > .native-build-marker
+
+      - name: Save native build marker
+        if: steps.decide.outputs.build == 'true' && steps.marker.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .native-build-marker
+          key: ${{ steps.native-key.outputs.key }}
 
   ios:
     name: iOS (prebuild · pod install · xcodebuild)
@@ -267,9 +344,43 @@ jobs:
         id: install
         run: bun install --frozen-lockfile
 
+      # Schlüssel, Marke und Entscheidung wie im Android-Job, Begründung dort.
+      # Bei iOS steckt zusätzlich die Xcode-Version im Schlüssel, ein
+      # Runner-Image mit neuem Xcode baut also voll. Nicht drin sind die Pods
+      # vom CocoaPods-CDN (Versionen fest aus den RN-Podspecs); deren Drift
+      # deckt der Wochenbuild ab.
+      - name: Native build key
+        id: native-key
+        run: |
+          key="$(bash scripts/native-build-key.sh ios)"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Look up native build marker
+        id: marker
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .native-build-marker
+          key: ${{ steps.native-key.outputs.key }}
+          lookup-only: true
+
+      - name: Decide whether to build
+        id: decide
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MARKER_HIT: ${{ steps.marker.outputs.cache-hit }}
+          NATIVE_KEY: ${{ steps.native-key.outputs.key }}
+        run: |
+          if [ "$EVENT_NAME" = schedule ] || [ "$EVENT_NAME" = workflow_dispatch ] || [ "$MARKER_HIT" != true ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::iOS: Derselbe native Stand wurde bereits grün gebaut (Schlüssel $NATIVE_KEY), Prebuild und Compile entfallen."
+          fi
+
       # `--no-install` skips BOTH the package-manager run and `pod install`;
       # pods are installed explicitly below, after the CocoaPods cache is back.
       - name: Prebuild (ios)
+        if: steps.decide.outputs.build == 'true'
         run: bunx expo prebuild --platform ios --no-install --clean
 
       # Keyed on bun.lock + app.json rather than Podfile.lock: the lockfile is
@@ -279,6 +390,7 @@ jobs:
       # Version ist die Fehlerklasse aus ADR-007.
       - name: Cache CocoaPods
         id: pods-cache
+        if: steps.decide.outputs.build == 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
@@ -288,6 +400,7 @@ jobs:
             pods-${{ runner.os }}-
 
       - name: Pod install
+        if: steps.decide.outputs.build == 'true'
         working-directory: ios
         run: pod install
 
@@ -305,6 +418,7 @@ jobs:
       # No pipe into a log formatter on purpose: a pipeline without `pipefail`
       # masks the exit status, the same trap expo-sdk-sync.yml documents.
       - name: Xcodebuild (simulator, unsigned)
+        if: steps.decide.outputs.build == 'true'
         run: |
           xcodebuild \
             -workspace ios/ElternFlowAI.xcworkspace \
@@ -320,9 +434,25 @@ jobs:
       # Compile einen Cache schreibt. `path` muss dem Restore-Step entsprechen,
       # sonst ist der gespeicherte Eintrag für ihn unsichtbar.
       - name: Save CocoaPods cache (main only)
-        if: github.ref == 'refs/heads/main' && steps.pods-cache.outputs.cache-hit != 'true'
+        if: steps.decide.outputs.build == 'true' && github.ref == 'refs/heads/main' && steps.pods-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/Library/Caches/CocoaPods
           key: ${{ steps.pods-cache.outputs.cache-primary-key }}
+
+      # Wie im Android-Job: nur nach erfolgreichem Compile, auf jedem
+      # Ereignis, `path` exakt wie im Lookup.
+      - name: Write native build marker
+        if: steps.decide.outputs.build == 'true' && steps.marker.outputs.cache-hit != 'true'
+        env:
+          NATIVE_KEY: ${{ steps.native-key.outputs.key }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: printf '%s\n%s\n' "$NATIVE_KEY" "$COMMIT_SHA" > .native-build-marker
+
+      - name: Save native build marker
+        if: steps.decide.outputs.build == 'true' && steps.marker.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .native-build-marker
+          key: ${{ steps.native-key.outputs.key }}
