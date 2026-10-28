@@ -426,10 +426,10 @@ export function EventEditScreen() {
       // aus der Formular-Range (`const { startAt, endAt } = range` oben im
       // Screen), nicht `vars.changes.start_at`:
       // `buildRecurrenceChanges` hat die Regel mit genau diesem Wert gebaut.
-      // Bei einem ganztägigen Termin ist `vars.changes.start_at` bereits
-      // `toAllDayRange(range).startAt` — auf Mitternacht in der
-      // **Gerätezone** geschnappt, nicht in `vars.timezone` — und hätte den
-      // Wochentag falsch verankert.
+      // Bei einem ganztägigen Termin ist `vars.changes.start_at` der auf
+      // Mitternacht geschnappte Start (`toAllDayRange`), am selben Tag in
+      // `vars.timezone` wie `range.startAt`. `range.startAt` bleibt der Wert
+      // der Wahl, weil die Regel damit gebaut wurde.
       const mineRuleSide = vars.recurrence
         ? { recurrence: vars.recurrence, startAt, timezone: vars.timezone }
         : null;
@@ -554,7 +554,7 @@ export function EventEditScreen() {
     }
     // Re-snap rather than trust the state: the date pickers can move an all-day
     // event across days, and its times must stay 00:00 → 23:59.
-    const final = allDay ? toAllDayRange(range) : range;
+    const final = allDay ? toAllDayRange(range, initial.occurrence.timezone) : range;
     const vars = {
       scope,
       eventId: initial.eventId,

@@ -1,5 +1,7 @@
 import { addDays, differenceInCalendarDays, set, startOfDay } from "date-fns";
 
+import { floatingToInstant, zonedDateKey } from "./timezone";
+
 /** The four pickers a start/end range exposes in the create and edit forms. */
 export type RangeField = "startDate" | "endDate" | "startTime" | "endTime";
 
@@ -73,11 +75,23 @@ export function isTimeRangeInvalid(range: DateRange, allDay: boolean): boolean {
   return range.endAt.getTime() <= range.startAt.getTime();
 }
 
-/** Widens a range to whole days, for events flagged all-day. */
-export function toAllDayRange(range: DateRange): DateRange {
+/**
+ * Widens a range to whole days **in `timeZone`** (the event's own zone,
+ * `events.timezone`), not in the reader's device zone (ADR-033/034).
+ *
+ * - Saving an unchanged all-day event from any device zone yields bit-for-bit
+ *   the same instants: the day is read in `timeZone`, so the reader's zone
+ *   never enters the calculation.
+ * - The end stays 23:59, not 23:59:59.999, because `spans.ts` relies on it.
+ * - In a midnight DST gap `floatingToInstant` picks the later instant, as
+ *   `zonedDayBounds` does.
+ */
+export function toAllDayRange(range: DateRange, timeZone: string): DateRange {
+  const at = (instant: Date, time: string) =>
+    floatingToInstant(new Date(`${zonedDateKey(instant, timeZone)}T${time}Z`), timeZone);
   return {
-    startAt: startOfDay(range.startAt),
-    endAt: set(range.endAt, { hours: 23, minutes: 59, seconds: 0, milliseconds: 0 }),
+    startAt: at(range.startAt, "00:00:00.000"),
+    endAt: at(range.endAt, "23:59:00.000"),
   };
 }
 

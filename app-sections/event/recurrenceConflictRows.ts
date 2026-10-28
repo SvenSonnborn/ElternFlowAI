@@ -17,9 +17,9 @@ interface MineSide {
   /**
    * Der Start, mit dem `buildRecurrenceChanges` die Regel gebaut hat — die
    * Formular-Range (`range.startAt`), **nicht** `vars.changes.start_at`: Bei
-   * einem ganztägigen Termin ist das bereits `toAllDayRange(range).startAt`,
-   * auf Mitternacht in der Gerätezone geschnappt statt in `timezone`, und
-   * hätte den Wochentag hier falsch verankert.
+   * einem ganztägigen Termin ist das `toAllDayRange(range).startAt`, am selben
+   * Tag in `timezone` wie `range.startAt`. Gewählt wird `range.startAt`, weil
+   * `buildRecurrenceChanges` die Regel mit genau diesem Wert gebaut hat.
    */
   startAt: Date;
   /** Die Zone des Termins (`vars.timezone`) — dort prüft `rruleToRecurrence` den Wochentag. */
