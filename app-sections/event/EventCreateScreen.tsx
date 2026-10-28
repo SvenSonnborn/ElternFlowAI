@@ -97,7 +97,9 @@ export function EventCreateScreen() {
 
   const occurrences = useFamilyEvents(startAt).data;
   const conflicts = useMemo(() => {
-    const checked = allDay ? toAllDayRange({ startAt, endAt }) : { startAt, endAt };
+    const checked = allDay
+      ? toAllDayRange({ startAt, endAt }, deviceTimeZone())
+      : { startAt, endAt };
     const samePerson = (o: { childId: string | null; parentId: string | null }) => {
       if (member === null) return true; // family-wide event conflicts with everything
       if (o.childId === null && o.parentId === null) return true; // existing family-wide conflicts with anyone
@@ -169,7 +171,7 @@ export function EventCreateScreen() {
     // identischen Termin angelegt. `tryLock()` prüft synchron, ob bereits ein
     // Speichern läuft, und bricht in diesem Fall folgenlos ab.
     if (!submitLock.tryLock()) return;
-    const final = allDay ? toAllDayRange(range) : range;
+    const final = allDay ? toAllDayRange(range, deviceTimeZone()) : range;
     const childId = member?.kind === "child" ? member.id : null;
     const parentId = member?.kind === "parent" ? member.id : null;
     const vars: CreateEventVars = {
