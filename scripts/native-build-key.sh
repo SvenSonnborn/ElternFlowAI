@@ -6,13 +6,17 @@
 #
 # Im Schlüssel: der Fingerprint von @expo/fingerprint (native Paketversionen,
 # app.json samt Config-Plugins und referenzierten Dateien, Autolinking), dazu
-# mise.toml, native-build.yml und dieses Skript, bei iOS die Xcode-Version.
+# mise.toml, bun.lock, native-build.yml und dieses Skript, bei iOS die
+# Xcode-Version. bun.lock ist drin, weil der Fingerprint native Pakete nur als
+# name@version kennt; die Werkzeuge, die Prebuild und Autolinking ausführen
+# (@expo/cli, @expo/prebuild-config, @expo/config-plugins,
+# expo-modules-autolinking) und deren Abhängigkeiten stehen nur dort. Jede
+# Abhängigkeitsänderung baut daher voll, reine TypeScript-Änderungen nicht.
 # Die Versionsfelder (expo.version, ios.buildNumber, android.versionCode)
 # streicht das Preset `balanced`; sie können keinen Compile brechen.
-# Bewusst nicht: bun.lock (sonst baute jeder reine JS-Bump voll; native Pakete
-# stecken über ihre Version schon im Fingerprint) und das Ubuntu-Image des
-# Android-Runners (sonst nach jedem Image-Update ungültig). Diese Lücke deckt
-# der Wochenbuild ab, der die Marke ignoriert.
+# Bewusst nicht: das Ubuntu-Image des Android-Runners (sonst nach jedem
+# Image-Update ungültig). Diese Lücke deckt der Wochenbuild ab, der die Marke
+# ignoriert.
 #
 # Scheitert ein Bestandteil, endet das Skript mit Exit ≠ 0 und ohne Ausgabe:
 # Ein leerer oder konstanter Schlüssel ließe ab dann jeden Lauf überspringen.
@@ -60,7 +64,7 @@ if ! [[ $fingerprint =~ $hex40 ]]; then
   exit 1
 fi
 
-files="$(shasum -a 256 mise.toml .github/workflows/native-build.yml scripts/native-build-key.sh)"
+files="$(shasum -a 256 mise.toml bun.lock .github/workflows/native-build.yml scripts/native-build-key.sh)"
 
 xcode=""
 if [ "$platform" = ios ]; then
