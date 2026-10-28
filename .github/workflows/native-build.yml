@@ -281,6 +281,11 @@ jobs:
       # being asked — producing an installable artifact is a separate concern
       # (see docs/TODO.md on EAS).
       #
+      # ARCHS=arm64: Die generische Simulator-Destination hat keine aktive
+      # Architektur, Xcode baut deshalb arm64 und x86_64. Der Runner ist arm64,
+      # x86_64 prüft nichts zusätzlich und kostet nur Compile-Zeit; arm64 ist
+      # zugleich die Architektur der Geräte.
+      #
       # No pipe into a log formatter on purpose: a pipeline without `pipefail`
       # masks the exit status, the same trap expo-sdk-sync.yml documents.
       - name: Xcodebuild (simulator, unsigned)
@@ -292,4 +297,5 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath ios/build \
             CODE_SIGNING_ALLOWED=NO \
+            ARCHS=arm64 \
             build
