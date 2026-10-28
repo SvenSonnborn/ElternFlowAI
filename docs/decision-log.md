@@ -1809,5 +1809,5 @@ Drei Dinge fielen im Betrieb auf: Das Dashboard begrüßte um jede Uhrzeit mit �
 ### Consequences
 
 - **Ein Wechsel der Begrüßung zeigt sich erst beim nächsten Render.** Bleibt das Dashboard über 11:00 oder 18:00 hinweg unverändert offen, steht die alte Begrüßung bis dahin; ein Timer dafür wäre mehr Aufwand, als die Stelle wert ist.
-- **Auf Android lässt sich ein `formSheet` ohne Rückfrage wegwischen.** `preventNativeDismiss` in react-native-screens gilt nur auf iOS; die Zurück-Taste läuft über React Navigation und ist gesperrt. Die Lücke steht in `docs/TODO.md`.
+- **Auf Android verwirft das Wegwischen eines geänderten `formSheet` ohne Rückfrage.** `preventNativeDismiss` in react-native-screens gibt es nur auf iOS; wenn die Sperre auf Android greifen könnte, ist das Sheet nativ schon geschlossen, und eine Rückfrage danach ließe bei „Weiter bearbeiten“ eine Geisterroute zurück. `useDiscardGuard` lässt diesen Dismiss deshalb bewusst durch; die Zurück-Taste und „Abbrechen“ fragen weiter. Am Gerät ungeprüft, Einzelheiten in `docs/TODO.md`.
 - **Jeder neue Weg, ein gesperrtes Sheet programmatisch zu schließen, muss `allowLeave()` zuerst aufrufen,** sonst fragt die App nach dem Speichern „Änderungen verwerfen?".
