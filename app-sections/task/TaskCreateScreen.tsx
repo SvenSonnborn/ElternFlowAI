@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { TaskFormState } from "@/features/tasks";
 
+import { useDiscardGuard } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren } from "@/features/auth";
@@ -13,6 +14,7 @@ import {
   emptyTaskForm,
   hasTaskFormErrors,
   mapTaskError,
+  taskFormChanged,
   toCreateVars,
   useCreateTask,
   useTaskTypes,
@@ -32,7 +34,14 @@ export function TaskCreateScreen() {
   const createMutation = useCreateTask();
 
   const [state, setState] = useState<TaskFormState>(() => emptyTaskForm(new Date()));
+  // Ausgangsstand für „geändert?" (`taskFormChanged`): erst mit dem
+  // automatisch gesetzten Standardtyp, damit ein frisch geöffnetes Formular
+  // ohne Rückfrage schließt.
+  const [pristine, setPristine] = useState<TaskFormState>(state);
   const [typeHydrated, setTypeHydrated] = useState(false);
+  // „Titel fehlt" erst nach der ersten Titeländerung; `canSave` sperrt
+  // trotzdem von Anfang an.
+  const [titleTouched, setTitleTouched] = useState(false);
 
   // Render-phase hydration, same as EventCreateScreen: the default type is
   // only knowable once the lookup has loaded, and an effect would render one
@@ -40,6 +49,7 @@ export function TaskCreateScreen() {
   if (types.data && !typeHydrated) {
     const preferred = types.data.find((type) => type.slug === "hausaufgaben") ?? types.data[0];
     setState((prev) => ({ ...prev, typeId: preferred?.id ?? null }));
+    setPristine((prev) => ({ ...prev, typeId: preferred?.id ?? null }));
     setTypeHydrated(true);
   }
 
@@ -47,6 +57,7 @@ export function TaskCreateScreen() {
   // a computed key with a generic type widens the spread's inferred type and
   // TypeScript stops seeing it as a TaskFormState.
   function handleChange<K extends keyof TaskFormState>(key: K, value: TaskFormState[K]) {
+    if (key === "title") setTitleTouched(true);
     setState((prev) => {
       const next: TaskFormState = { ...prev };
       next[key] = value;
@@ -58,6 +69,7 @@ export function TaskCreateScreen() {
 
   const errors = validateTaskForm(state);
   const canSave = !hasTaskFormErrors(errors) && !createMutation.isPending;
+  const allowLeave = useDiscardGuard(taskFormChanged(state, pristine));
 
   // No history to fall back to on a cold-start deep link straight to
   // `/task/new` — `router.back()` alone would strand the sheet with no way
@@ -70,7 +82,12 @@ export function TaskCreateScreen() {
   function onSave() {
     const vars = toCreateVars(state);
     if (!vars || createMutation.isPending) return;
-    createMutation.mutate(vars, { onSuccess: goBackOrToTasks });
+    createMutation.mutate(vars, {
+      onSuccess: () => {
+        allowLeave();
+        goBackOrToTasks();
+      },
+    });
   }
 
   return (
@@ -137,7 +154,7 @@ export function TaskCreateScreen() {
             types={typeItems}
             childOptions={childOptions}
             errors={{
-              title: errors.title ? t(errors.title) : undefined,
+              title: titleTouched && errors.title ? t(errors.title) : undefined,
               typeId: errors.typeId ? t(errors.typeId) : undefined,
               dueDate: errors.dueDate ? t(errors.dueDate) : undefined,
             }}

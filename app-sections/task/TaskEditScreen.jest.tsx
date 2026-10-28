@@ -1,4 +1,5 @@
-import { act, fireEvent, screen } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { router } from "expo-router";
 import { Alert, type AlertButton } from "react-native";
 
 import type { TaskTypeRow, TaskWithType } from "@/features/tasks";
@@ -19,10 +20,17 @@ jest.mock("@/features/tasks", () => ({
   useDeleteTask: () => ({ mutateAsync: mockDeleteTask }),
 }));
 
+let mockPrevent: boolean | undefined;
+const mockDisable = jest.fn();
+
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ id: "t1" }),
   router: { canGoBack: () => true, back: jest.fn(), replace: jest.fn(), push: jest.fn() },
   Stack: { Screen: () => null },
+  usePreventRemove: (prevent: boolean) => {
+    mockPrevent = prevent;
+    return mockDisable;
+  },
 }));
 
 /** Aufgabe "Mathe Übungsblatt" in der Fassung, aus der das Formular entsteht. */
@@ -173,5 +181,40 @@ describe("TaskEditScreen: baseVersion bleibt die der Hydration", () => {
     const vars = deletedVars();
     expect(vars).toEqual({ taskId: "t1", baseVersion: taskA.updated_at });
     expect(vars.baseVersion).not.toBe(taskB.updated_at);
+  });
+});
+
+describe("TaskEditScreen: Verwerfen-Rückfrage", () => {
+  beforeEach(() => {
+    mockUpdateTask.mockReset();
+    mockUpdateTask.mockResolvedValue(undefined);
+    mockDisable.mockReset();
+    jest.mocked(router.back).mockClear();
+    mockPrevent = undefined;
+  });
+
+  it("hydriertes Formular sperrt nicht", async () => {
+    await renderScreen(<TaskEditScreen />, { queryClient: seededClient() });
+    expect(screen.getByDisplayValue("Mathe Übungsblatt")).toBeTruthy();
+    expect(mockPrevent).toBe(false);
+  });
+
+  it("Titeländerung sperrt", async () => {
+    await renderScreen(<TaskEditScreen />, { queryClient: seededClient() });
+    await fireEvent.changeText(screen.getByDisplayValue("Mathe Übungsblatt"), "Mathe 2");
+    expect(mockPrevent).toBe(true);
+  });
+
+  it("Speichern hebt die Sperre vor dem Schließen auf", async () => {
+    await renderScreen(<TaskEditScreen />, { queryClient: seededClient() });
+    await fireEvent.changeText(screen.getByDisplayValue("Mathe Übungsblatt"), "Mathe 2");
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("hw.edit.save") }));
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+
+    expect(mockDisable).toHaveBeenCalledTimes(1);
+    expect(mockDisable.mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(router.back).mock.invocationCallOrder[0],
+    );
+    expect(mockPrevent).toBe(false);
   });
 });

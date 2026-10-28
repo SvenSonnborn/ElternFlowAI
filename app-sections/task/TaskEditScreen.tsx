@@ -8,6 +8,7 @@ import {
   confirmDestructive,
   MAX_CONFLICT_AUTO_RETRIES,
   useConflict,
+  useDiscardGuard,
   useToast,
   useUndoableDelete,
   type ConflictRow,
@@ -21,6 +22,7 @@ import {
   hasTaskFormErrors,
   mapTaskError,
   TaskConflictError,
+  taskFormChanged,
   taskToForm,
   toTaskChanges,
   useDeleteTask,
@@ -105,9 +107,15 @@ export function TaskEditScreen() {
   // *ich* etwas geändert habe) von echten Konflikten (`theirs` weicht von
   // *dieser* Basis ab) zu unterscheiden — siehe `conflict.ts`.
   const [baseTask, setBaseTask] = useState<TaskWithType | null>(null);
+  // Ausgangsstand für „geändert?" (`taskFormChanged`): derselbe Moment und
+  // dieselbe Quelle wie `baseTask`, daher eingefroren — ein Refetch nach der
+  // Hydration zählt nicht als Änderung. `null` vor der Hydration.
+  const [pristine, setPristine] = useState<TaskFormState | null>(null);
 
   if (task && !hydrated) {
-    setState(taskToForm(task));
+    const initial = taskToForm(task);
+    setState(initial);
+    setPristine(initial);
     setBaseVersion(task.updated_at);
     setBaseTask(task);
     setHydrated(true);
@@ -128,6 +136,7 @@ export function TaskEditScreen() {
 
   const errors = validateTaskForm(state);
   const canSave = hydrated && !hasTaskFormErrors(errors) && !updateMutation.isPending;
+  const allowLeave = useDiscardGuard(pristine !== null && taskFormChanged(state, pristine));
 
   // No history to fall back to on a cold-start deep link straight to
   // `/task/edit/[id]` — `router.back()` alone would strand the sheet with no
@@ -167,7 +176,10 @@ export function TaskEditScreen() {
       () => {
         // Nach einem Konflikt hat `showConflict` den Screen schon verlassen —
         // ein zweites `goBackOrToTasks()` poppte sonst einen fremden Screen weg.
-        if (!leftAfterConflict.current) goBackOrToTasks();
+        if (!leftAfterConflict.current) {
+          allowLeave();
+          goBackOrToTasks();
+        }
       },
       (err: unknown) => {
         if (err instanceof TaskConflictError) {
@@ -306,6 +318,7 @@ export function TaskEditScreen() {
     // Screen weg. Das Ref hält beides auseinander und verhindert zugleich,
     // dass ein erfolgreicher Retry ein zweites Mal navigiert.
     leftAfterConflict.current = true;
+    allowLeave();
     goBackOrToTasks();
   }
 
@@ -405,6 +418,7 @@ export function TaskEditScreen() {
         };
       },
     });
+    allowLeave();
     goBackOrToTasks();
   }
 

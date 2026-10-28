@@ -34,6 +34,7 @@ export {
 export {
   emptyTaskForm,
   hasTaskFormErrors,
+  taskFormChanged,
   taskToForm,
   toCreateVars,
   toTaskChanges,
