@@ -3,13 +3,24 @@ name: Native Build
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# Nur PRs brechen einander ab. Der Event-Name in der Gruppe hält einen Push auf
+# `main` aus der Gruppe des Wochenbuilds heraus, sodass er ihn nicht abbricht.
 concurrency:
-  group: native-build-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: native-build-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Caches: Nur `main` schreibt (die `actions/cache/save`-Steps am Jobende), PRs
+# lesen nur. Ein PR-Cache ist für andere PRs unsichtbar und verdrängte bei
+# 10 GB Repo-Limit die nützlichen von `main`.
 
 # Same Supabase placeholders as ci.yml. Strictly only the `bundle` job needs
 # them: Metro inlines EXPO_PUBLIC_* at bundle time, so leaving them unset would
@@ -64,7 +75,8 @@ jobs:
           version: 2026.10.20
 
       - name: Cache Bun dependencies
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        id: bun-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('**/bun.lock') }}
@@ -89,6 +101,16 @@ jobs:
       - name: Metro bundle (Android)
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bunx expo export --platform android --output-dir dist-android
+
+      # Kein `always()`: Das implizite `success()` verhindert, dass ein roter
+      # Lauf einen Cache schreibt. `path` muss dem Restore-Step entsprechen,
+      # sonst ist der gespeicherte Eintrag für ihn unsichtbar.
+      - name: Save Bun cache (main only)
+        if: github.ref == 'refs/heads/main' && steps.bun-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-cache.outputs.cache-primary-key }}
 
   android:
     name: Android (prebuild · assembleDebug)
@@ -139,7 +161,8 @@ jobs:
           fi
 
       - name: Cache Bun dependencies
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        id: bun-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('**/bun.lock') }}
@@ -160,7 +183,8 @@ jobs:
       # Restored AFTER prebuild: `--clean` wipes the native directory, so a
       # cache seeded before it would be thrown away.
       - name: Cache Gradle
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        id: gradle-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/.gradle/caches
@@ -183,6 +207,19 @@ jobs:
       - name: Gradle assembleDebug
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --stacktrace --build-cache
+
+      # Kein `always()`: Das implizite `success()` verhindert, dass ein roter
+      # Compile einen Cache schreibt. Bun wird hier nur geladen; den Schlüssel
+      # schreibt der `bundle`-Job. `path` muss dem Restore-Step entsprechen,
+      # sonst ist der gespeicherte Eintrag für ihn unsichtbar.
+      - name: Save Gradle cache (main only)
+        if: github.ref == 'refs/heads/main' && steps.gradle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ steps.gradle-cache.outputs.cache-primary-key }}
 
   ios:
     name: iOS (prebuild · pod install · xcodebuild)
@@ -226,14 +263,6 @@ jobs:
           # https://github.com/jdx/mise/releases
           version: 2026.10.20
 
-      - name: Cache Bun dependencies
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('**/bun.lock') }}
-          restore-keys: |
-            bun-${{ runner.os }}-
-
       - name: Install dependencies
         id: install
         run: bun install --frozen-lockfile
@@ -249,7 +278,8 @@ jobs:
       # Fallback-Schlüssel wiederhergestelltes `Pods` mit Binaries einer anderen
       # Version ist die Fehlerklasse aus ADR-007.
       - name: Cache CocoaPods
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        id: pods-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/Library/Caches/CocoaPods
@@ -285,3 +315,14 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             ARCHS=arm64 \
             build
+
+      # Kein `always()`: Das implizite `success()` verhindert, dass ein roter
+      # Compile einen Cache schreibt. `path` muss dem Restore-Step entsprechen,
+      # sonst ist der gespeicherte Eintrag für ihn unsichtbar.
+      - name: Save CocoaPods cache (main only)
+        if: github.ref == 'refs/heads/main' && steps.pods-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+          key: ${{ steps.pods-cache.outputs.cache-primary-key }}
