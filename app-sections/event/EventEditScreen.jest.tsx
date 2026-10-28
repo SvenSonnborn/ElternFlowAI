@@ -365,6 +365,17 @@ describe("EventEditScreen: Rückfrage vor dem Verwerfen", () => {
     expect(mockPrevent).toBe(true);
   });
 
+  it("Termin remote gelöscht nach einer Änderung: keine Sperre mehr", async () => {
+    const queryClient = await renderEdited(versionA);
+    expect(mockPrevent).toBe(true);
+
+    await act(() => {
+      queryClient.setQueryData(calendarKeys.one("e1"), null);
+    });
+
+    expect(mockPrevent).toBe(false);
+  });
+
   it("Speichern hebt die Sperre vor dem Schließen auf (router.back)", async () => {
     await renderEdited(versionA);
     await fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.edit.save") }));
