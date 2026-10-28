@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { TaskWithType } from "./types";
+import type { TaskTypeRow, TaskWithType } from "./types";
 
 import { applyDelete, applyToggle, applyUpdate } from "./optimistic";
 
@@ -87,11 +87,25 @@ describe("applyToggle", () => {
   });
 });
 
+const typeOne: TaskTypeRow = {
+  id: "type-1",
+  slug: "homework",
+  label: { de: "Hausaufgabe", en: "Homework" },
+  color: "#111111",
+  icon: "book",
+  family_id: null,
+  created_at: "2026-07-01T08:00:00.000Z",
+};
+const typeTwo: TaskTypeRow = { ...typeOne, id: "type-2", slug: "test", color: "#222222" };
+
 describe("applyUpdate", () => {
   test("overwrites only the fields it was given", () => {
-    const result = applyUpdate([makeTask({ id: "a", subject: "Mathe" })], "a", {
-      title: "Deutsch Diktat",
-    });
+    const result = applyUpdate(
+      [makeTask({ id: "a", subject: "Mathe" })],
+      "a",
+      { title: "Deutsch Diktat" },
+      undefined,
+    );
 
     expect(result[0].title).toBe("Deutsch Diktat");
     expect(result[0].subject).toBe("Mathe");
@@ -99,16 +113,19 @@ describe("applyUpdate", () => {
   });
 
   test("can null a nullable column", () => {
-    const result = applyUpdate([makeTask({ id: "a", child_id: "child-1" })], "a", {
-      child_id: null,
-    });
+    const result = applyUpdate(
+      [makeTask({ id: "a", child_id: "child-1" })],
+      "a",
+      { child_id: null },
+      undefined,
+    );
 
     expect(result[0].child_id).toBeNull();
   });
 
   test("leaves other rows untouched", () => {
     const other = makeTask({ id: "b" });
-    const result = applyUpdate([makeTask({ id: "a" }), other], "a", { title: "Neu" });
+    const result = applyUpdate([makeTask({ id: "a" }), other], "a", { title: "Neu" }, undefined);
 
     expect(result[1]).toBe(other);
   });
@@ -116,14 +133,36 @@ describe("applyUpdate", () => {
   test("an unknown id returns the very same array instance", () => {
     const tasks = [makeTask({ id: "a" })];
 
-    expect(applyUpdate(tasks, "nope", { title: "Neu" })).toBe(tasks);
+    expect(applyUpdate(tasks, "nope", { title: "Neu" }, undefined)).toBe(tasks);
   });
 
   test("does not mutate the input array or its elements", () => {
     const task = makeTask({ id: "a" });
-    applyUpdate([task], "a", { title: "Neu" });
+    applyUpdate([task], "a", { title: "Neu" }, undefined);
 
     expect(task.title).toBe("Mathe Übungsblatt");
+  });
+});
+
+describe("applyUpdate: eingebetteter Aufgabentyp", () => {
+  const task = makeTask({ id: "a", type_id: "type-1", task_types: typeOne });
+
+  test("Typwechsel setzt die Zeile des neuen Typs", () => {
+    const result = applyUpdate([task], "a", { type_id: "type-2" }, [typeOne, typeTwo]);
+
+    expect(result[0].task_types).toBe(typeTwo);
+  });
+
+  test("Typwechsel ohne Typen im Cache setzt null statt alt", () => {
+    const result = applyUpdate([task], "a", { type_id: "type-2" }, undefined);
+
+    expect(result[0].task_types).toBeNull();
+  });
+
+  test("unveränderte type_id lässt das Embed stehen", () => {
+    const result = applyUpdate([task], "a", { type_id: "type-1", title: "x" }, undefined);
+
+    expect(result[0].task_types).toBe(typeOne);
   });
 });
 

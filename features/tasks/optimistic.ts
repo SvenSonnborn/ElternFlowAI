@@ -1,4 +1,4 @@
-import type { TaskUpdate, TaskWithType } from "./types";
+import type { TaskTypeRow, TaskUpdate, TaskWithType } from "./types";
 
 /**
  * What an update is allowed to change. `is_done`, `completed_at` and
@@ -50,12 +50,29 @@ export function applyToggle(
   }));
 }
 
+/**
+ * Beim Typwechsel wird auch das eingebettete `task_types` ersetzt, sonst zeigt
+ * das Fach-Badge bis zum Refetch den alten Typ. `types` ist der Cache von
+ * `useTaskTypes()` und kann fehlen; dann wird das Embed `null` — lieber kurz
+ * kein Badge als ein falsches. Dasselbe Prinzip wie in `useCreateEvent`.
+ * Ohne Typwechsel bleibt das Embed unberührt.
+ */
 export function applyUpdate(
   tasks: TaskWithType[],
   taskId: string,
   changes: TaskChanges,
+  types: readonly TaskTypeRow[] | undefined,
 ): TaskWithType[] {
-  return replaceTask(tasks, taskId, (task) => ({ ...task, ...changes }));
+  return replaceTask(tasks, taskId, (task) => {
+    const typeChanged = changes.type_id !== undefined && changes.type_id !== task.type_id;
+    return {
+      ...task,
+      ...changes,
+      ...(typeChanged
+        ? { task_types: types?.find((type) => type.id === changes.type_id) ?? null }
+        : {}),
+    };
+  });
 }
 
 export function applyDelete(tasks: TaskWithType[], taskId: string): TaskWithType[] {
