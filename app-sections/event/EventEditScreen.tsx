@@ -527,23 +527,31 @@ export function EventEditScreen() {
   // gehört die Occurrence im Detail-Sheet darunter oft nicht mehr zu diesem
   // Termin: Nach dem Split liegt sie im neuen Termin, `useEvent` findet sie
   // unter der alten Id nicht mehr, und das Sheet bliebe verwaist. Darum
-  // schließt es mit. `dismiss(2)` statt eines festen Ziels, damit der Nutzer
-  // auf dem Tab landet, von dem aus er das Detail geöffnet hat (Kalender oder
-  // Dashboard). Nur wenn direkt darunter das Detail **dieses** Termins liegt:
-  // Ein anderes Sheet darunter bleibt stehen, und ohne Verlauf
-  // (Kaltstart-Deep-Link) greift `goBackOrToKalender`. Optimistisch wie das
-  // Schließen selbst, vor der Server-Antwort (ADR-027).
+  // schließt es mit — nur wenn direkt darunter das Detail **dieses** Termins
+  // liegt. Ein anderes Sheet darunter bleibt stehen; liegt das Bearbeiten-Sheet
+  // allein im Stack (Kaltstart-Deep-Link), greift `goBackOrToKalender`.
+  // `dismiss(2)` statt eines festen Ziels, damit der Nutzer auf dem Tab landet,
+  // von dem aus er das Detail geöffnet hat (Kalender oder Dashboard). Ist das
+  // Detail selbst die unterste Route (Kaltstart, Neuladen auf Web), ließe
+  // `dismiss(2)` es stehen, weil `POP` immer eine Route übrig lässt: Dann bis
+  // aufs Detail schließen und es durch den Kalender ersetzen. Optimistisch wie
+  // das Schließen selbst, vor der Server-Antwort (ADR-027).
   function closeAfterSave(closesSeries: boolean) {
     const state = navigation.getState();
-    const below = state?.routes[state.index - 1];
+    const index = state?.index ?? 0;
+    const below = state?.routes[index - 1];
     const params = below?.params;
     const detailBelow =
       below?.name === "event/[id]" &&
       params !== undefined &&
       "id" in params &&
       params.id === initial?.eventId;
-    if (closesSeries && detailBelow) router.dismiss(2);
-    else goBackOrToKalender();
+    if (!closesSeries || !detailBelow) goBackOrToKalender();
+    else if (index > 1) router.dismiss(2);
+    else {
+      router.dismissAll();
+      router.replace("/(tabs)/kalender");
+    }
   }
 
   async function onSave() {

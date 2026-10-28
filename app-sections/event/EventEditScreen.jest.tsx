@@ -48,6 +48,7 @@ jest.mock("expo-router", () => ({
     canGoBack: jest.fn(() => true),
     back: jest.fn(),
     dismiss: jest.fn(),
+    dismissAll: jest.fn(),
     replace: jest.fn(),
     push: jest.fn(),
   },
@@ -263,6 +264,23 @@ describe("EventEditScreen: Schließen nach dem Speichern", () => {
 
     expect(router.back).toHaveBeenCalledTimes(1);
     expect(router.dismiss).not.toHaveBeenCalled();
+  });
+
+  it("Detail ganz unten im Stack (Kaltstart, Neuladen auf Web) schließt beide und landet im Kalender", async () => {
+    mockNavState = {
+      index: 1,
+      routes: [{ name: "event/[id]", params: { id: "e1" } }, editRoute],
+    };
+    await save(seriesA, "forward");
+
+    // `dismiss(2)` ließe hier das Detail stehen: `POP` hält immer eine Route.
+    expect(router.dismiss).not.toHaveBeenCalled();
+    expect(router.dismissAll).toHaveBeenCalledTimes(1);
+    expect(router.replace).toHaveBeenCalledWith("/(tabs)/kalender");
+    // Erst bis aufs Detail schließen, dann das Detail ersetzen — umgekehrt bliebe es übrig.
+    expect(jest.mocked(router.dismissAll).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(router.replace).mock.invocationCallOrder[0],
+    );
   });
 
   it("Kaltstart-Deep-Link ohne Verlauf", async () => {
