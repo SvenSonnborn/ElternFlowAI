@@ -50,47 +50,51 @@ Der iOS-Job bestimmt die Wartezeit jedes PRs: heute 41–47 min, davon 38–42 m
 - `RCT_USE_PREBUILT_RNCORE = "0"` samt Kommentarblock aus `mise.toml` entfernen. Das generierte `ios/Podfile` fällt dann auf `'1'` zurück, `EXPO_USE_PRECOMPILED_MODULES` steht dort bereits auf `'1'`.
 - Der Step „Assert RN-from-source pin from mise.toml" im iOS-Job entfällt.
 - `ios/Pods` wird nicht mehr gecacht, nur noch `~/Library/Caches/CocoaPods`. Ein über den Fallback-Schlüssel wiederhergestelltes `Pods` mit Binaries einer anderen Version ist genau die Fehlerklasse aus ADR-007.
-- Sind die Prebuilds nicht zum Laufen zu bringen, ohne in einen eigenen Untersuchungsstrang abzubiegen: diesen Schritt zurücknehmen, die übrigen weiterführen, Befund an Sven.
+- „Läuft" heißt: grüner Compile plus die Log-Zeilen aus dem Nachweis. Die Dauer wird gemessen, ist aber kein Abbruchkriterium. Bleibt der Build nach Ursachenanalyse und zwei Korrekturversuchen rot (meine Wahl): diesen Schritt zurücknehmen, die übrigen weiterführen, Befund an Sven.
 - Lokale Folge für Sven: beim nächsten iOS-Build `bunx expo prebuild --platform ios --clean`, damit `pod install` ohne den alten Pin läuft. Gehört in die PR-Beschreibung.
 
 ### 3. Überspringen bei unverändertem nativen Stand — iOS und Android
 
-**Schlüssel pro Plattform** = Fingerprint von `@expo/fingerprint` (`fingerprint:generate --platform ios|android`, kommt mit `expo` mit, liegt nach `bun install` in `node_modules`) + Hash von `mise.toml` und `native-build.yml` + bei iOS die Xcode-Version (`xcodebuild -version`).
+Android bekommt denselben Mechanismus (meine Wahl): Sonst bestimmt Android mit ~20 min die Wartezeit, sobald iOS schnell ist.
+
+**Schlüssel pro Plattform** = Fingerprint von `@expo/fingerprint` (`fingerprint:generate --platform ios|android`, kommt mit `expo` mit, liegt nach `bun install` in `node_modules`) + Hash von `mise.toml` und `native-build.yml` + bei iOS die Xcode-Version (`xcodebuild -version`). Die Bestandteile werden zu einem kurzen Hash zusammengefasst; GitHub begrenzt Cache-Schlüssel auf 512 Zeichen.
 
 - Berechnet **nach** `bun install` und **vor** `expo prebuild`: Existiert `ios/` bzw. `android/`, hasht der Fingerprint das generierte Verzeichnis mit (lokal beobachtet als Quelle `bareNativeDir`).
-- Der Fingerprint erfasst heute (lokal gemessen): alle 26 nativen Pakete mit Version einschließlich React Native, `app.json` samt Config-Plugins, von der Config referenzierte Dateien (Icon, Splash), die Autolinking-Konfiguration, `package.json`-Skripte, `.gitignore`. Eigene native Ordner, Patches oder eigene Codegen-Specs gibt es im Projekt nicht. `mise.toml`, Workflow und Xcode-Version erfasst er nicht — deshalb die Zusätze.
+- Der Fingerprint erfasst heute (lokal gemessen): alle 26 autolinkten Pakete einschließlich React Native und transitiver wie `react-native-worklets`, jeweils über den Inhalt ihrer `package.json` (also die Version); `app.json` samt Config-Plugins, von der Config referenzierte Dateien (Icon, Splash), die Autolinking-Konfiguration, `package.json`-Skripte, `.gitignore`. Eigene native Ordner, Patches oder eigene Codegen-Specs gibt es im Projekt nicht — Paketinhalt ändert sich also nur mit der Version. `mise.toml`, Workflow und Xcode-Version erfasst er nicht — deshalb die Zusätze.
+- `bun.lock` kommt **nicht** in den Schlüssel (meine Wahl): Sonst baute jeder reine JS-Dependency-Bump voll, und das sind die meisten Renovate-PRs. Was davon nativ ist, steckt bereits über die Paketversionen im Fingerprint.
+- Jede Änderung an `native-build.yml` oder `mise.toml` erzwingt einen vollen Build. Das ist gewollt: Beide definieren den Build.
 
-**Marke** = Cache-Eintrag mit einer kleinen Datei, Schlüssel `native-build-<plattform>-<schlüssel>`. Nachschlagen mit `actions/cache/restore` und `lookup-only: true`.
+**Marke** = Cache-Eintrag mit einer kleinen Datei, Schlüssel `native-build-<plattform>-<schlüssel>`. Nachschlagen mit `actions/cache/restore` und `lookup-only: true`. Ein PR sieht dabei seine eigenen Marken und die aus `main`, ein Push auf `main` nur die aus `main`.
 
 - **Treffer** (nur auf `pull_request` und `push`): Prebuild, Pod install, Gradle- und Pods-Cache und Compile entfallen. Der Job endet grün und nennt in einer Notiz (`::notice::` oder Step Summary) den Schlüssel. Die Schritte bis zur Schlüsselberechnung, einschließlich der JDK-Assertion, laufen weiter.
-- **Kein Treffer:** voller Build; die Marke wird nur bei Erfolg gespeichert. Gespeichert wird bei jedem Ereignis, auch auf PRs — ein PR-Eintrag lässt spätere Pushes desselben PRs überspringen und kostet nichts.
+- **Kein Treffer:** voller Build. Die Marke wird nach dem Compile und nur unter `success()` gespeichert; ein fehlgeschlagener oder abgebrochener Lauf hinterlässt keine. Gespeichert wird bei jedem Ereignis, auch auf PRs — ein PR-Eintrag lässt spätere Pushes desselben PRs überspringen und kostet nichts.
 
-**Warum das sicher ist** (mit Sven besprochen): Ein Compile-Fehler kann nur aus etwas entstehen, das im Schlüssel steckt. TypeScript erreicht weder Xcode noch Gradle; TS-Fehler fängt `typecheck`, kaputte Imports der `bundle`-Job, der auf jedem PR für iOS und Android bündelt. Was übrig bleibt, ist Drift von außen, die kein PR verursacht: ein neues Runner-Image (für iOS über die Xcode-Version im Schlüssel abgedeckt) und die fünf Pods vom CocoaPods-CDN (boost, fmt, glog, DoubleConversion, SocketRocket — Versionen fest aus den RN-Podspecs). Dafür der Wochenbuild.
+**Warum das sicher ist** (mit Sven besprochen): Ein Compile-Fehler kann nur aus etwas entstehen, das im Schlüssel steckt. TypeScript erreicht weder Xcode noch Gradle; TS-Fehler fängt `typecheck`, kaputte Imports der `bundle`-Job, der auf jedem PR für iOS und Android bündelt. Was übrig bleibt, ist Drift von außen, die kein PR verursacht: ein neues Runner-Image (für iOS über die Xcode-Version im Schlüssel abgedeckt) und die fünf Pods vom CocoaPods-CDN (boost, fmt, glog, DoubleConversion, SocketRocket — Versionen fest aus den RN-Podspecs). Für Android steht das Ubuntu-Image (SDK, Build-Tools) bewusst nicht im Schlüssel, sonst wäre er nach jedem wöchentlichen Image-Update ungültig. Für beides gibt es den Wochenbuild.
 
 ### 4. Trigger
 
-- `push` auf `main`: baut nach dem Merge und legt Marken und Caches im `main`-Bereich an, den alle PRs lesen. PR-Einträge sind für `main` und andere PRs unsichtbar, also baut der erste Push nach einem nativen Merge voll.
+- `push` auf `main`: baut nach dem Merge und legt Marken und Caches im `main`-Bereich an, den alle PRs lesen. PR-Einträge sind für `main` und andere PRs unsichtbar, also baut der erste Push nach einem nativen Merge voll — ein nativer PR wird damit zweimal gebaut. Akzeptiert: Auf den Lauf auf `main` wartet niemand, und die Minuten sind gratis.
 - `schedule`, wöchentlich (meine Wahl: montags 04:00 UTC): Vollbuild, ignoriert die Marke, frischt sie auf.
-- `workflow_dispatch`: manueller Vollbuild wie `schedule`. Damit lässt sich der Vollbuild-Pfad direkt nach dem Merge prüfen, statt eine Woche zu warten.
+- `workflow_dispatch` (meine Wahl): manueller Vollbuild wie `schedule`. Damit lässt sich der Vollbuild-Pfad direkt nach dem Merge prüfen, statt eine Woche zu warten.
 - Concurrency: Ein Push auf `main` darf den laufenden Wochenbuild nicht abbrechen. Das PR-Verhalten (ein Lauf pro Ref, alter wird abgebrochen) bleibt.
 
 ### 5. Caches
 
-- Große Caches — Gradle, CocoaPods-Download-Cache, Bun auf den Ubuntu-Jobs — werden nur im `main`-Bereich gespeichert und auf PRs nur geladen (`actions/cache/restore` und `actions/cache/save` getrennt). Schlüssel und Fallback-Schlüssel wie bisher.
-- Der Bun-Cache im iOS-Job entfällt ganz.
+- Große Caches — Gradle, CocoaPods-Download-Cache, Bun auf den Ubuntu-Jobs — werden nur im `main`-Bereich gespeichert, und nur von einem Lauf, der tatsächlich gebaut hat; auf PRs werden sie nur geladen (`actions/cache/restore` und `actions/cache/save` getrennt). Schlüssel und Fallback-Schlüssel wie bisher. Bis zum ersten Lauf auf `main` starten PRs kalt — wie heute auch.
+- Der Bun-Cache im iOS-Job entfällt ganz (meine Wahl, nach den gemessenen Zeiten oben).
 - Ziel: Belegung deutlich unter 10 GB. Bestehende PR-Einträge verfallen von selbst nach 7 Tagen ohne Zugriff.
 
 ## Nachweis
 
 Jede Stufe als eigener Commit, gemessen über mindestens zwei Läufe auf einem früh geöffneten Draft-PR — nur `pull_request`-Läufe messen. Die Runner-Varianz liegt bei ~29 %; der Metro-Job dient als Kontrollgröße (ADR-016).
 
-| Stufe        | Beleg                                                                                                                                        |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| arm64        | keine `CompileC`/`SwiftCompile` für x86_64 im Log; iOS-Jobdauer                                                                              |
-| Prebuilds    | `[ReactNativeCore] … Building from source: false` im Log, die Expo-Warnung fehlt; iOS-Jobdauer                                               |
-| Schlüssel    | lokal: Fingerprint ändert sich bei geänderter `app.json` und bei geänderter nativer Paketversion, bleibt gleich bei geänderter `.ts`-Datei   |
-| Überspringen | erster Lauf baut voll und speichert die Marke; ein Folge-Push ohne native Änderung lässt beide Compile-Jobs mit Notiz in ≤ ~3 min grün enden |
-| Caches       | keine neuen Gradle-/Pods-/Bun-Einträge unter `refs/pull/…` aus diesem PR (`gh cache list`)                                                   |
+| Stufe        | Beleg                                                                                                                                                                                                                               |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| arm64        | keine `CompileC`/`SwiftCompile` für x86_64 im Log; iOS-Jobdauer                                                                                                                                                                     |
+| Prebuilds    | `[ReactNativeCore] … Building from source: false` im Log, die Expo-Warnung fehlt; iOS-Jobdauer                                                                                                                                      |
+| Schlüssel    | lokal: Fingerprint ändert sich bei geänderter `app.json` und bei geänderter nativer Paketversion, bleibt gleich bei geänderter `.ts`-Datei                                                                                          |
+| Überspringen | erster Lauf baut voll und speichert die Marke; ein Folge-Push ohne native Änderung lässt beide Compile-Jobs mit Notiz in ≤ ~3 min grün enden — das belegt zugleich, dass der Schlüssel auf einem frischen Runner reproduzierbar ist |
+| Caches       | keine neuen Gradle-/Pods-/Bun-Einträge unter `refs/pull/…` aus diesem PR (`gh cache list`)                                                                                                                                          |
 
 Nach dem Merge, braucht Sven: Der Push-Lauf auf `main` legt die Marken an; der nächste TS-PR überspringt; ein `workflow_dispatch` baut voll.
 
