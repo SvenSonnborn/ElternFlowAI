@@ -3,10 +3,12 @@ import { describe, expect, test } from "bun:test";
 import type { Ingredient } from "../types";
 
 import {
+  familyAllergyKind,
   isRecipeSafeForFamily,
   judgeRecipe,
   judgeWithAllergyState,
   matchedAllergens,
+  type AllergySource,
 } from "./judge";
 
 function ing(de: string): Ingredient {
@@ -126,35 +128,75 @@ describe("isRecipeSafeForFamily", () => {
   });
 });
 
+describe("familyAllergyKind", () => {
+  function src(o: Partial<AllergySource> = {}): AllergySource {
+    return { data: [], error: null, isFetching: false, ...o };
+  }
+  const idle = { data: undefined };
+  const fetching = { data: undefined, isFetching: true };
+
+  test("Fehler gewinnt, auch mit alten Daten", () => {
+    expect(familyAllergyKind([src({ error: new Error("x") }), src(), src()])).toBe("unknown");
+  });
+
+  test("Fehler gewinnt, auch wenn eine andere lädt", () => {
+    expect(familyAllergyKind([src({ error: new Error("x") }), src(fetching), src()])).toBe(
+      "unknown",
+    );
+  });
+
+  test("null zählt als Daten", () => {
+    expect(familyAllergyKind([src({ data: null }), src(), src()])).toBe("known");
+  });
+
+  test("Hintergrund-Refetch mit Daten bleibt bekannt", () => {
+    expect(familyAllergyKind([src({ isFetching: true }), src(), src()])).toBe("known");
+  });
+
+  test("Kette: Elternteil da, Kinder/Eltern laden", () => {
+    expect(
+      familyAllergyKind([src({ data: { family_id: "f" } }), src(fetching), src(fetching)]),
+    ).toBe("loading");
+  });
+
+  test("Elternteil lädt, Kinder/Eltern deaktiviert", () => {
+    expect(familyAllergyKind([src(fetching), src(idle), src(idle)])).toBe("loading");
+  });
+
+  test("Pausiert/deaktiviert ohne Daten", () => {
+    expect(familyAllergyKind([src(), src(idle), src()])).toBe("unknown");
+  });
+
+  test("Elternteil null, Rest deaktiviert", () => {
+    expect(familyAllergyKind([src({ data: null }), src(idle), src(idle)])).toBe("unknown");
+  });
+});
+
 describe("judgeWithAllergyState", () => {
-  test("urteilt normal, sobald die Allergien geladen sind", () => {
-    const loaded = { keys: ["eggs"] as const, isLoading: false, error: null };
+  test("known urteilt wie judgeRecipe", () => {
+    const known = { kind: "known", keys: ["eggs"] } as const;
 
-    expect(judgeWithAllergyState(CARBONARA, loaded).status).toBe("unsafe");
-    expect(judgeWithAllergyState(DECLARED_CLEAN, loaded).status).toBe("safe");
+    expect(judgeWithAllergyState(CARBONARA, known)).toEqual(judgeRecipe(CARBONARA, ["eggs"]));
+    expect(judgeWithAllergyState(CARBONARA, known).status).toBe("unsafe");
+    expect(judgeWithAllergyState(DECLARED_CLEAN, known).status).toBe("safe");
   });
 
-  test("sagt während des Ladens 'nicht geprüft' statt 'safe'", () => {
-    // Ein leeres `keys` heißt für `judgeRecipe` „diese Familie hat keine
-    // Allergien" — im Ladezustand wäre das eine Entwarnung, die niemand geben
-    // kann. Ohne diesen Zweig blitzte jedes Rezept erst unmarkiert auf.
-    const loading = { keys: [], isLoading: true, error: null };
-
-    expect(judgeWithAllergyState(CARBONARA, loading)).toEqual({ status: "unverified" });
-    expect(judgeWithAllergyState(DECLARED_CLEAN, loading)).toEqual({ status: "unverified" });
-  });
-
-  test("sagt auch bei einem Ladefehler 'nicht geprüft'", () => {
-    const failed = { keys: [], isLoading: false, error: new Error("offline") };
-
-    expect(judgeWithAllergyState(DECLARED_CLEAN, failed)).toEqual({ status: "unverified" });
-  });
-
-  test("behandelt das erfolgreiche null als 'kein Fehler'", () => {
-    // `useFamilyAllergies` faltet drei Query-Fehler mit `??` zusammen; im
-    // Erfolgsfall steht dort `null`, nicht `undefined`.
-    expect(judgeWithAllergyState(CARBONARA, { keys: [], isLoading: false, error: null })).toEqual({
+  test("known ohne Allergien ist ein ehrliches safe", () => {
+    expect(judgeWithAllergyState(CARBONARA, { kind: "known", keys: [] })).toEqual({
       status: "safe",
+    });
+  });
+
+  test("loading sagt 'nicht geprüft' statt 'safe'", () => {
+    expect(judgeWithAllergyState(CARBONARA, { kind: "loading" })).toEqual({ status: "unverified" });
+    expect(judgeWithAllergyState(DECLARED_CLEAN, { kind: "loading" })).toEqual({
+      status: "unverified",
+    });
+  });
+
+  test("unknown sagt 'nicht geprüft' statt 'safe'", () => {
+    expect(judgeWithAllergyState(DECLARED_CLEAN, { kind: "unknown" })).toEqual({
+      status: "unverified",
     });
   });
 });

@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { Alert, type AlertButton } from "react-native";
 
 import type { MealPlanEntryWithRecipe, RecipeRow } from "@/features/meals";
+import type { FamilyAllergyState } from "@/features/meals/allergens";
 
 import { useToastStore } from "@/app-sections/shared";
 import i18n from "@/features/i18n";
@@ -13,7 +14,7 @@ import { MealScheduleScreen } from "./MealScheduleScreen";
 
 const mockPlan = jest.fn();
 const mockReplace = jest.fn();
-const mockAllergies = { keys: [] as string[], isLoading: false, error: null };
+let mockAllergies: FamilyAllergyState = { kind: "known", keys: [] };
 let mockParams: Record<string, string> = {};
 
 // Nur die Schreib-Hooks und die Allergien werden ersetzt: `useMealPlanning`
@@ -89,7 +90,7 @@ beforeEach(() => {
   mockParams = { recipeId: "r-new" };
   mockPlan.mockResolvedValue(undefined);
   mockReplace.mockResolvedValue(undefined);
-  mockAllergies.isLoading = false;
+  mockAllergies = { kind: "known", keys: [] };
   useToastStore.getState().clear();
 });
 
@@ -187,7 +188,7 @@ describe("MealScheduleScreen", () => {
   });
 
   it("sperrt „Einplanen“, solange die Allergien laden", async () => {
-    mockAllergies.isLoading = true;
+    mockAllergies = { kind: "loading" };
     await renderScreen(<MealScheduleScreen />, { queryClient: client(false) });
     const submit = screen.getByRole("button", { name: i18n.t("meals.schedule.submit") });
     expect(submit).toBeDisabled();

@@ -16,35 +16,33 @@ const bareRecipe: JudgeableRecipe = { contains_allergens: null, ingredients: [] 
 
 describe("allergyCheck", () => {
   test("Laden hat Vorrang", () => {
-    expect(allergyCheck(milkRecipe, { keys: ["milk"], isLoading: true, error: null })).toEqual({
+    expect(allergyCheck(milkRecipe, { kind: "loading" })).toEqual({
       kind: "loading",
     });
   });
 
-  test("Fehler ergibt unknown", () => {
-    expect(allergyCheck(milkRecipe, { keys: [], isLoading: false, error: new Error("x") })).toEqual(
-      { kind: "unknown" },
-    );
+  test("unbekannte Allergien ergeben unknown", () => {
+    expect(allergyCheck(milkRecipe, { kind: "unknown" })).toEqual({ kind: "unknown" });
   });
 
   test("deklarierter Treffer ergibt unsafe mit eindeutigen Keys", () => {
-    const check = allergyCheck(milkRecipe, { keys: ["milk"], isLoading: false, error: null });
+    const check = allergyCheck(milkRecipe, { kind: "known", keys: ["milk"] });
     expect(check).toEqual({ kind: "hits", status: "unsafe", keys: ["milk"] });
   });
 
   test("Zutaten-Treffer ergibt caution", () => {
-    const check = allergyCheck(butterRecipe, { keys: ["milk"], isLoading: false, error: null });
+    const check = allergyCheck(butterRecipe, { kind: "known", keys: ["milk"] });
     expect(check).toMatchObject({ kind: "hits", status: "caution" });
   });
 
   test("unverified ergibt ok", () => {
-    expect(allergyCheck(bareRecipe, { keys: ["milk"], isLoading: false, error: null })).toEqual({
+    expect(allergyCheck(bareRecipe, { kind: "known", keys: ["milk"] })).toEqual({
       kind: "ok",
     });
   });
 
   test("safe ergibt ok", () => {
-    expect(allergyCheck(milkRecipe, { keys: [], isLoading: false, error: null })).toEqual({
+    expect(allergyCheck(milkRecipe, { kind: "known", keys: [] })).toEqual({
       kind: "ok",
     });
   });

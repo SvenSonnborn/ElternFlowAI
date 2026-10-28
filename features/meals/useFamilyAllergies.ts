@@ -2,13 +2,7 @@ import { useMemo } from "react";
 
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
 
-import { mergeAllergies, type AllergenKey } from "./allergens";
-
-interface UseFamilyAllergiesResult {
-  keys: AllergenKey[];
-  isLoading: boolean;
-  error: unknown;
-}
+import { familyAllergyKind, mergeAllergies, type FamilyAllergyState } from "./allergens";
 
 /**
  * Die Allergien der ganzen Familie — Kinder **und** Eltern.
@@ -21,8 +15,12 @@ interface UseFamilyAllergiesResult {
  * Liegt unter `features/meals/`, weil Meals der einzige Verbraucher ist; zieht
  * um, sobald ein zweiter dazukommt. Die eigentliche Zusammenführung steht in
  * `allergens/members.ts` — dort ist sie ohne React-Renderer testbar.
+ *
+ * Wann der Zustand `known`, `loading` oder `unknown` ist, regelt
+ * `familyAllergyKind`. Die Identität des Ergebnisses wechselt nur, wenn sich
+ * `kind` oder `keys` ändern; `useRecipeJudge` hängt seinen `useCallback` daran.
  */
-export function useFamilyAllergies(): UseFamilyAllergiesResult {
+export function useFamilyAllergies(): FamilyAllergyState {
   const parent = useCurrentParent();
   const familyId = parent.data?.family_id;
 
@@ -34,9 +32,7 @@ export function useFamilyAllergies(): UseFamilyAllergiesResult {
     [children.data, parents.data],
   );
 
-  return {
-    keys,
-    isLoading: parent.isLoading || children.isLoading || parents.isLoading,
-    error: parent.error ?? children.error ?? parents.error,
-  };
+  const kind = familyAllergyKind([parent, children, parents]);
+
+  return useMemo(() => (kind === "known" ? { kind, keys } : { kind }), [kind, keys]);
 }
