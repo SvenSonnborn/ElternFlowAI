@@ -1735,3 +1735,38 @@ Accepted. Supersediert in [ADR-013](#adr-013--renovate-als-gehostete-app-expo-ko
 
 - Bis zur Freigabe fehlt der Gate-Lauf über den vollständigen Diff. Der Kommentar des Sync-Workflows im PR weist darauf hin.
 - Der freigegebene Lauf startet auch `expo-sdk-sync.yml` erneut (`synchronize`). Er findet keinen Diff und pusht nicht; die Schleife, gegen die ADR-013 die Token-Eigenschaft anführte, verhindert jetzt die Idempotenz des Workflows.
+
+## ADR-048 — Native-Build: unveränderter nativer Stand wird übersprungen, iOS nur arm64, React Native vorkompiliert (2026-10-28)
+
+### Status
+
+Accepted. Ersetzt in [ADR-016](#adr-016--native-build-gate-auf-jedem-pr-auf-github-runnern-statt-eas-2026-08-14) Decision 1 in der Aussage, dass jeder PR beide Plattformen voll kompiliert, sowie die dortigen Cache-Regeln (jede Ref speichert). Ersetzt in [ADR-007](#adr-007--dependency-update-expo-sdk-54--57--non-expo-deps-2026-07-21) den Pin `RCT_USE_PREBUILT_RNCORE=0`. ADR-016 Decision 7 (kein ccache) und der Rest beider ADRs gelten weiter.
+
+### Context
+
+Der iOS-Job bestimmte die PR-Dauer und kompilierte React Native aus dem Quelltext, auch wenn ein PR nur TypeScript änderte. Die Laufzeit der macOS-Runner schwankt auf demselben Image um ein Mehrfaches; Zeitvergleiche taugen deshalb nicht als Begründung, die Entscheidungen stützen sich auf die Menge der Compile-Einheiten. Vor diesem Branch schrieb `main` nie einen Gradle-Cache, weil dort kein Workflow lief; nur PR-Refs schrieben, und andere PRs können sie nicht lesen. Jeder PR holte die Android-Abhängigkeiten kalt.
+
+### Decisions
+
+1. **iOS baut nur arm64.** Die generische Simulator-Destination baut arm64 und x86_64. Der Runner ist arm64, x86_64 prüft nichts zusätzlich, und arm64 ist die Architektur der Geräte.
+2. **React Native kommt vorkompiliert.** Der `RCT_USE_PREBUILT_RNCORE=0`-Pin aus `mise.toml` entfällt; Expos Default gilt. Der Pin war die Antwort auf ein veraltetes, versions-mismatchtes Binary aus CocoaPods ([ADR-007](#adr-007--dependency-update-expo-sdk-54--57--non-expo-deps-2026-07-21)). Die CI dieses Branches baut den Default grün, und `ios/Pods` wird weiterhin nicht gecacht, damit kein Fallback-Schlüssel Binaries einer anderen Version zurückholt. Lokal gilt nach dem Merge einmal `bunx expo prebuild --platform ios --clean`.
+3. **Große Caches speichert nur `main`.** Bun, Gradle und CocoaPods werden in PRs nur gelesen; gespeichert wird per `actions/cache/save` am Jobende. Ein PR-Cache ist für andere PRs unsichtbar und verdrängt bei 10 GB Repo-Limit die nützlichen von `main`. Dafür läuft `native-build.yml` nun auch auf `push` nach `main`; das behebt als Nebeneffekt den kalten Android-Abhängigkeitsabruf auf jedem PR. Die Concurrency-Gruppe trägt den Event-Namen, damit ein Push den Wochenbuild nicht abbricht; nur PRs brechen einander ab.
+4. **Gleicher nativer Stand, kein Compile.** Die Compile-Jobs berechnen vor dem Prebuild einen Schlüssel ([scripts/native-build-key.sh](../scripts/native-build-key.sh)) und suchen eine Marke (kleiner Cache-Eintrag) darunter. Gibt es sie, entfallen Prebuild und Compile; die Jobs laufen an und enden grün unter ihrem Namen. Die Marke schreibt ein Lauf, der gebaut hat und grün blieb, auf jedem Ereignis. `schedule` und `workflow_dispatch` bauen immer. Der `bundle`-Job überspringt nie, denn er prüft JS, nicht den nativen Stand.
+
+### Warum Überspringen sicher ist
+
+Der Schlüssel enthält alles, was den Compile bestimmt und aus dem Repo kommt: den Fingerprint von `@expo/fingerprint` (native Paketversionen, `app.json` samt Config-Plugins und referenzierten Dateien, Autolinking), `mise.toml`, den Workflow und das Skript selbst; bei iOS die Xcode-Version. Wer Workflow oder Toolchain ändert, baut voll. Das Skript bricht mit Exit ≠ 0 und ohne Ausgabe ab, wenn `ios/` oder `android/` schon existieren (der Fingerprint hashte sie mit) oder dem Fingerprint die Quellen `expoConfig` bzw. `expoAutolinkingConfig:<Plattform>` fehlen. Ein leerer oder konstanter Schlüssel ließe sonst jeden Lauf überspringen.
+
+- **Versionsfelder stehen nicht im Schlüssel.** Das Preset `balanced` lässt `expo.version`, `ios.buildNumber` und `android.versionCode` aus `app.json` weg; sie ändern keinen Compile. `--preset strict` entfiel, weil es absolute Autolinking-Pfade hasht und der Schlüssel dann pro Maschine und Runner-Pfad abwiche.
+- **`bun.lock` steht bewusst nicht darin.** Sonst baute jeder reine JS-Bump voll; native Pakete stecken über ihre Version schon im Fingerprint.
+
+### Bekannte Lücken
+
+Nicht im Schlüssel, daher vom Überspringen unbemerkt: das Ubuntu-Image des Android-Runners, bei iOS das macOS-Image abseits von Xcode (CocoaPods, Ruby) und die Pods vom CocoaPods-CDN, deren Versionen zwar die RN-Podspecs festlegen, deren ausgelieferter Inhalt aber driften kann. Diese Lücke deckt der Wochenbuild ab, der die Marke ignoriert.
+
+### Consequences
+
+- **Der Wochenbuild frischt keine Marke auf.** Cache-Schlüssel sind in GitHub unveränderlich, Speichern unter einem vorhandenen Schlüssel ist ein No-op. Der Wochenbuild legt eine verdrängte Marke neu an; die Spec spricht von „auffrischen", der Code tut das nicht.
+- **Ein übersprungener iOS-Job braucht trotzdem einen macOS-Runner.** Er muss unter seinem Required-Check-Namen berichten. Bei knappen Runnern kann er minutenlang warten, obwohl seine Arbeit Sekunden dauert. Das zu vermeiden bräuchte `needs:` oder ein Job-`if`, was die Required-Check-Regeln ausschließen.
+- **Der erste Lauf nach jeder Änderung am Schlüssel baut voll**, und die Marken aus `main` entstehen erst mit dem ersten Push dorthin.
+- **Das Ziel aus ADR-016, jede Änderung zu kompilieren, gilt nur noch für geänderten nativen Stand.** Für alles andere beweist die Marke eines früheren, identisch geschlüsselten Laufs dasselbe.

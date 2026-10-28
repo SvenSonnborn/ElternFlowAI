@@ -132,7 +132,7 @@ Web-bundle smoke check end-to-end:
 bunx expo export --platform web --output-dir /tmp/eltern-web
 ```
 
-**Toolchain:** Node, Java, Bun and the Supabase CLI are pinned in [mise.toml](mise.toml) — `mise install` once, mise activated in the shell. Two pins look optional and are not: **JDK 17** (React Native's reference JDK; the machine default JDK 26 failed the Gradle build up to SDK 57) and **`RCT_USE_PREBUILT_RNCORE=0`** (without it iOS can pull a mismatched prebuilt RN core). Why: [docs/development.md](docs/development.md#toolchain-mise).
+**Toolchain:** Node, Java, Bun and the Supabase CLI are pinned in [mise.toml](mise.toml) — `mise install` once, mise activated in the shell. One pin looks optional and is not: **JDK 17** (React Native's reference JDK; the machine default JDK 26 failed the Gradle build up to SDK 57). Why: [docs/development.md](docs/development.md#toolchain-mise).
 
 ## Tech stack (locked)
 
@@ -270,7 +270,7 @@ Das ist eine **Konvention, kein Gate**: CodeRabbits Docstring-Coverage-Prüfung 
 
 ## CI/CD
 
-Workflows in [.github/workflows/](.github/workflows/), alle PR-getriggert. Required Checks auf jedem PR: `ci.yml` (format → lint → typecheck → test → test:rn → Web-Export), `native-build.yml` (Metro-Bundles für iOS und Android, Android- und iOS-Compile), `db.yml` (lokale Supabase, Schema-Lint, `test:db`), `pr-labeler.yml` (Labels aus dem Branch-Präfix `feat/`, `fix/`, `chore/`, `docs/`, `refactor/`, `test/` …), `dependency-review.yml`. Bedingt: `renovate-validate.yml`, `expo-sdk-sync.yml`. Was jeder tut und warum: [docs/development.md](docs/development.md#cicd-github-actions).
+Workflows in [.github/workflows/](.github/workflows/), alle PR-getriggert; `native-build.yml` läuft zusätzlich auf `main` und wöchentlich. Required Checks auf jedem PR: `ci.yml` (format → lint → typecheck → test → test:rn → Web-Export), `native-build.yml` (Metro-Bundles für iOS und Android, Android- und iOS-Compile), `db.yml` (lokale Supabase, Schema-Lint, `test:db`), `pr-labeler.yml` (Labels aus dem Branch-Präfix `feat/`, `fix/`, `chore/`, `docs/`, `refactor/`, `test/` …), `dependency-review.yml`. Bedingt: `renovate-validate.yml`, `expo-sdk-sync.yml`. Was jeder tut und warum: [docs/development.md](docs/development.md#cicd-github-actions).
 
 Fallen, an denen lokal und CI auseinanderlaufen:
 

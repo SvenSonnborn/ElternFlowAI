@@ -964,13 +964,6 @@ Alle aus `TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-sco
   abdeckt und nur `expo-doctor` sieht: Paketversionen abseits der SDK-Vorgabe, doppelte/inkompatible
   Deps, ungültige `app.json`-Felder. Ein Bump kann grün kompilieren und trotzdem von der
   SDK-Vorgabe abweichen — siehe Block 0.2.
-- **`RCT_USE_PREBUILT_RNCORE` über `expo-build-properties`** — der Pin lebt heute ausschließlich in
-  Shell-Umgebungen (mise lokal, `jdx/mise-action` in CI) und **nirgends im eingecheckten Projekt**;
-  `ios/Podfile` Zeile 19 fällt ohne die Variable still auf `'1'` zurück. Das Plugin mit
-  `ios: { buildReactNativeFromSource: true }` in [app.json](../app.json) schriebe den Key nach
-  `Podfile.properties.json`, der Pin überlebte jeden Aufrufweg, und die Assertion im `ios`-Job würde
-  von einer Notwendigkeit zur Redundanz. Braucht einen eigenen Native-Build-Nachweis — den es seit
-  ADR-016 gibt.
 - ~~`platformAutomerge: true` testen~~ und ~~Custom-Manager-Regex gegenprüfen~~ — **entfallen**:
   Renovate merged nicht mehr selbst, und der Regex-Manager ist entfernt
   ([ADR-045](./decision-log.md)).
@@ -1001,7 +994,7 @@ Alle aus `TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-sco
   Braucht einen laufenden Metro-Prozess im Job und eine Abbruchbedingung, die nicht flaky ist.
 - **`eas build --local` als gemeinsame Build-Definition** — erst sinnvoll, wenn `eas.json` für die
   🔒 Release-Iteration existiert; sonst gibt es nichts zusammenzuführen. Zu prüfen ist vorher, ob
-  sich Caching in den lokalen EAS-Build durchreichen lässt.
+  sich die Caches und das Überspringen unveränderter nativer Stände ([ADR-048](./decision-log.md)) in den lokalen EAS-Build durchreichen lassen.
 - **„`AuthGate` folgt nicht Expos Auth-Muster"** ([Auth](./TODO.md#auth--onboarding)) ·
   [gateLayout.ts](../features/auth/gateLayout.ts) — Umbau auf `Stack.Protected` bzw. Guards in
   verschachtelten Layouts. Kein Fehler heute ([ADR-040](./decision-log.md)), aber eine Abhängigkeit
