@@ -17,7 +17,7 @@ import { confirmDestructive } from "./confirmDialog";
  * der Bestätigung arbeitet intern genauso.
  *
  * Plattformen: iOS fängt das Wegwischen über `preventNativeDismiss`, auf Web
- * kommt `beforeunload` hinzu; Android-Wischen siehe Sichtlauf.
+ * kommt `beforeunload` hinzu; Android-Wischen bleibt ohne Rückfrage (docs/TODO.md).
  */
 export function useDiscardGuard(dirty: boolean): () => void {
   const { t } = useTranslation();

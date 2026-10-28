@@ -1787,3 +1787,27 @@ Drei Fehler lieferten still falsche Daten, ohne Meldung und plausibel aussehend:
 - **Alte, schon verschobene Termine werden nicht repariert.** Man kann sie von gewollten nicht unterscheiden; der Fix verschiebt sie nur nicht weiter.
 - **Alte Deep-Links**, die zufällig die Nachbar-Occurrence einer Serie treffen, bleiben ein offener Punkt in `docs/TODO.md`.
 - **Der 0-Zeilen-Guard von `useToggleTaskDone` bleibt offen**, weil eine Meldung neue Copy bräuchte.
+
+## ADR-050 — Nebenbefunde: Begrüßung nach Tageszeit, Verwerfen-Rückfrage für Formular-Sheets, „Titel fehlt" erst nach Eingabe (2026-10-29)
+
+### Status
+
+Accepted.
+
+### Context
+
+Drei Dinge fielen im Betrieb auf: Das Dashboard begrüßte um jede Uhrzeit mit „Guten Morgen". Ein Formular-Sheet ließ sich mit einem Wisch schließen und verwarf dabei stumm alles, was jemand getippt hatte. Und das Neuer-Termin-Formular zeigte „Titel fehlt" schon im frisch geöffneten, leeren Zustand.
+
+### Decisions
+
+1. **Die Begrüßung folgt der Gerätezeit.** 05:00–10:59 `morning`, 11:00–17:59 `day`, 18:00–04:59 `evening`; die Nacht gehört zum Abend, weil es keine eigene Nacht-Begrüßung gibt. Die Grenzen sind eine Entscheidung von Claude, nicht aus dem Handoff-Bundle. `dash.greeting.evening` ist neu.
+2. **Formular-Sheets fragen vor dem Verwerfen nach.** `useDiscardGuard(dirty)` in `app-sections/shared/` sitzt auf `usePreventRemove` aus `expo-router` und fragt über `confirmDestructive`; die Sperre fängt das Wegwischen wie „Abbrechen" ab, weil beides die Route entfernt. Termin und Aufgabe, Anlegen und Bearbeiten, melden dem Hook nur „geändert". Als Änderung zählt nur, was der Nutzer tut: der automatisch gesetzte Standardtyp und die Hydration des Bearbeiten-Formulars nicht.
+3. **Wer nach dem Speichern oder Löschen selbst navigiert, ruft `allowLeave()` zuerst.** Der Aufruf hebt die Sperre im selben Handler vor dem Navigationsaufruf auf; das trägt, weil der Navigations-Reducer die Sperrliste bei jedem Render neu liest. Im Termin-Bearbeiten ist es die erste Zeile von `closeAfterSave`, nicht der Anfang von `onSave`: Bricht jemand die Scope-Auswahl ab, bleibt das Formular offen und geändert, und die Sperre muss stehen bleiben. In `TaskEditScreen` rufen alle programmatischen Schließwege es zuerst auf (Speichern, Schließen nach dem Konflikt-Dialog, Löschen); nur „Abbrechen" und „Zurück" im Nicht-gefunden-Zustand laufen durch die Rückfrage.
+4. **„Titel fehlt" erscheint erst, nachdem der Titel einmal geändert wurde,** beim Anlegen von Termin und Aufgabe (Vorbild `nameTouched` im Eltern-Profil). Speichern bleibt gesperrt, solange der Titel leer ist.
+5. **Die neue Copy steht nur in den Katalogen** (`form.discard.*`, `dash.greeting.evening`), nicht in `docs/COPY.md`, das dem Designer gehört. Den Nachtrag führt `docs/TODO.md`.
+
+### Consequences
+
+- **Ein Wechsel der Begrüßung zeigt sich erst beim nächsten Render.** Bleibt das Dashboard über 11:00 oder 18:00 hinweg unverändert offen, steht die alte Begrüßung bis dahin; ein Timer dafür wäre mehr Aufwand, als die Stelle wert ist.
+- **Auf Android lässt sich ein `formSheet` ohne Rückfrage wegwischen.** `preventNativeDismiss` in react-native-screens gilt nur auf iOS; die Zurück-Taste läuft über React Navigation und ist gesperrt. Die Lücke steht in `docs/TODO.md`.
+- **Jeder neue Weg, ein gesperrtes Sheet programmatisch zu schließen, muss `allowLeave()` zuerst aufrufen,** sonst fragt die App nach dem Speichern „Änderungen verwerfen?".
