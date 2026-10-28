@@ -50,7 +50,7 @@ export {
   useCreateInvitation,
   useRegenerateInvitation,
   useRevokeInvitation,
-} from "./onboardingMutations";
+} from "./familyMutations";
 export {
   selectStatus,
   useInitSession,

@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Share } from "react-native";
 
 import { mapAuthError, type AuthErrorKey } from "./errors";
-import { useCreateInvitation } from "./onboardingMutations";
+import { useCreateInvitation } from "./familyMutations";
 
 interface UseInvitePartner {
   /** Creates a fresh invitation and opens the native share sheet. Resolves
