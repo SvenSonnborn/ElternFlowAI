@@ -18,9 +18,9 @@
 #           lesson as the mise pin in native-build.yml.
 #
 # .github/workflows/native-build.yml consumes THIS FILE directly (jdx/mise-action)
-# rather than re-pinning in YAML — the native builds are where the java pin and
-# the RCT_USE_PREBUILT_RNCORE value below are load-bearing (ADR-016). Editing a
-# pin here therefore changes CI too. `ci.yml` still pins Bun via oven-sh/setup-bun.
+# rather than re-pinning in YAML — the native builds are where the java pin is
+# load-bearing (ADR-016). Editing a pin here therefore changes CI too. `ci.yml`
+# still pins Bun via oven-sh/setup-bun.
 [tools]
 java = "temurin-17"
 node = "24"
@@ -32,17 +32,3 @@ supabase = "2.121.0"
 # ${SUPABASE_ACCESS_TOKEN} for the Supabase MCP server (see .env.example). mise
 # silently skips the file when it doesn't exist, so a fresh clone still works.
 _.file = ".env.local"
-
-# Expo SDK 55 enables "prebuilt React Native core" (the React-Core-prebuilt pod /
-# React.xcframework) for iOS by default. On this project, CocoaPods resolved a
-# STALE, mismatched prebuilt binary — React-Core-prebuilt 0.81.5 against
-# React-Core 0.83.6 source — whose headers predate RCTDevMenuConfiguration, so the
-# iOS build fails with "expected a type" in Expo's EXReactRootViewFactory.h.
-# Forcing RN to build from source (the SDK-54 behaviour) sidesteps the prebuilt
-# binary entirely. The generated ios/Podfile (line 19) reads it as
-# `ENV['RCT_USE_PREBUILT_RNCORE'] ||= podfile_properties['ios.buildReactNativeFromSource'] == 'true' ? '0' : '1'`
-# — and this project sets no such key, so without this variable the value falls
-# back to '1'. That makes this line the ONLY thing holding the pin, which is why
-# native-build.yml asserts it explicitly instead of trusting it through.
-# Trade-off: slower iOS builds. Revisit once a later SDK's prebuilt RN is stable.
-RCT_USE_PREBUILT_RNCORE = "0"
