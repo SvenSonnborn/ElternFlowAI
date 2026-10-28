@@ -35,6 +35,14 @@
     "blue": "Blau",
     "ochre": "Ocker"
   },
+  "form": {
+    "discard": {
+      "title": "Änderungen verwerfen?",
+      "body": "Deine Änderungen gehen verloren.",
+      "confirm": "Verwerfen",
+      "cancel": "Weiter bearbeiten"
+    }
+  },
   "auth": {
     "signIn": "Anmelden",
     "signUp": "Konto erstellen",

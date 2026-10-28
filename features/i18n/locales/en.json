@@ -35,6 +35,14 @@
     "blue": "Blue",
     "ochre": "Ochre"
   },
+  "form": {
+    "discard": {
+      "title": "Discard changes?",
+      "body": "Your changes will be lost.",
+      "confirm": "Discard",
+      "cancel": "Keep editing"
+    }
+  },
   "auth": {
     "signIn": "Sign in",
     "signUp": "Create account",
