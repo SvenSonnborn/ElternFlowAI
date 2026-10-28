@@ -894,7 +894,7 @@ Drei Einträge, die `TODO.md` selbst als „eigener Docs-Pass" zusammenfasst:
 
 Beim Durchgang gleich diese Datei hier mit auf Stand halten.
 
-### 8.2 `onboardingMutations.ts` → `familyMutations.ts` — **S**
+### 8.2 `onboardingMutations.ts` → `familyMutations.ts` — **erledigt**
 
 ([Familie](./TODO.md#familie--child-profile-live-daten-v1)) Die Datei hält längst das gesamte
 Familien-CRUD; nur zwei ihrer Hooks kommen im Onboarding vor. Mechanisch, aber berührt jeden
