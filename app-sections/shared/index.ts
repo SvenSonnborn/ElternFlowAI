@@ -50,5 +50,6 @@ export {
 } from "./toastStore";
 export { tabSceneStyle } from "./tabSceneStyle";
 export { TypePicker, type TypePickerItem } from "./TypePicker";
+export { useDiscardGuard } from "./useDiscardGuard";
 export { useUndoableDelete, type UndoableDeleteArgs } from "./useUndoableDelete";
 export { VoiceAssistantFAB } from "./VoiceAssistantFAB";
