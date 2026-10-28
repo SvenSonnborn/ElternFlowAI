@@ -199,7 +199,8 @@
   "dash": {
     "greeting": {
       "morning": "Good morning, {{name}}",
-      "day": "Have a great day, {{name}}"
+      "day": "Have a great day, {{name}}",
+      "evening": "Good evening, {{name}}"
     },
     "subtitle": "{{family}} · {{date}}",
     "today": {
