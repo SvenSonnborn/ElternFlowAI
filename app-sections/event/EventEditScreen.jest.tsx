@@ -258,6 +258,19 @@ describe("EventEditScreen: Schließen nach dem Speichern", () => {
     expect(router.dismiss).not.toHaveBeenCalled();
   });
 
+  it("Einzeltermin, dem eine Wiederholung gegeben wird, schließt beide", async () => {
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(calendarKeys.one("e1"), versionA);
+    await renderScreen(<EventEditScreen />, { queryClient });
+    await fireEvent.press(screen.getByText(i18n.t("cal.recur.weekly")));
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.edit.save") }));
+    await waitFor(() => expect(mockUpdateEvent).toHaveBeenCalledTimes(1));
+
+    expect(mockPickScope).not.toHaveBeenCalled();
+    expect(router.dismiss).toHaveBeenCalledWith(2);
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
   it("darunter liegt das Detail eines anderen Termins", async () => {
     mockNavState = stackedOverDetail("e2");
     await save(seriesA, "forward");
