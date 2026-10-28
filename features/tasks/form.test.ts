@@ -5,6 +5,7 @@ import type { TaskWithType } from "./types";
 import {
   emptyTaskForm,
   hasTaskFormErrors,
+  taskFormChanged,
   taskToForm,
   toCreateVars,
   toTaskChanges,
@@ -160,5 +161,40 @@ describe("toTaskChanges", () => {
       due_time: task.due_time,
       description: task.description,
     });
+  });
+});
+
+describe("taskFormChanged", () => {
+  test("is false for equal values, even as different Date instances", () => {
+    const pristine = { ...validState(), dueTime: new Date(2026, 7, 11, 16, 30) };
+    const current = {
+      ...pristine,
+      dueDate: new Date(pristine.dueDate.getTime()),
+      dueTime: new Date(2026, 7, 11, 16, 30),
+    };
+    expect(taskFormChanged(current, pristine)).toBe(false);
+  });
+
+  test("is true when any single field differs", () => {
+    const pristine = validState();
+    const variants = [
+      { typeId: "type-2" },
+      { childId: "child-1" },
+      { title: "Anderer Titel" },
+      { subject: "Mathe" },
+      { dueDate: new Date(2026, 7, 12, 9, 0) },
+      { dueTime: new Date(2026, 7, 11, 16, 30) },
+      { notes: "Seite 42" },
+    ];
+    for (const change of variants) {
+      expect(taskFormChanged({ ...pristine, ...change }, pristine)).toBe(true);
+    }
+  });
+
+  test("treats dueTime null against a set time as a change, in both directions", () => {
+    const withTime = { ...validState(), dueTime: new Date(2026, 7, 11, 16, 30) };
+    const without = validState();
+    expect(taskFormChanged(withTime, without)).toBe(true);
+    expect(taskFormChanged(without, withTime)).toBe(true);
   });
 });

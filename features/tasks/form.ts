@@ -48,6 +48,33 @@ export function emptyTaskForm(now: Date): TaskFormState {
 }
 
 /**
+ * Weicht das Formular vom Ausgangsstand ab? Entscheidet, ob Wegwischen und
+ * „Abbrechen" nachfragen (`useDiscardGuard`).
+ *
+ * `dueTime` braucht den `null`-Fall: „keine Uhrzeit" ist ein gültiger Wert,
+ * und `null.getTime()` würfe. `null` gegen gesetzt zählt als Änderung, beide
+ * `null` nicht. Datumsfelder vergleicht `getTime()`, weil dieselbe Zeit als
+ * andere `Date`-Instanz kein Unterschied ist; Strings bleiben ungetrimmt, ein
+ * eingetipptes Leerzeichen ist eine Eingabe, die verloren ginge. Der
+ * Ausgangsstand ist Sache des Aufrufers.
+ */
+export function taskFormChanged(current: TaskFormState, pristine: TaskFormState): boolean {
+  const timeChanged =
+    current.dueTime === null || pristine.dueTime === null
+      ? current.dueTime !== pristine.dueTime
+      : current.dueTime.getTime() !== pristine.dueTime.getTime();
+  return (
+    current.typeId !== pristine.typeId ||
+    current.childId !== pristine.childId ||
+    current.title !== pristine.title ||
+    current.subject !== pristine.subject ||
+    current.dueDate.getTime() !== pristine.dueDate.getTime() ||
+    timeChanged ||
+    current.notes !== pristine.notes
+  );
+}
+
+/**
  * `due_time` is a bare Postgres `time` — no day, no zone. It is parsed against
  * the task's own due date so the resulting Date sits on the day the time
  * belongs to; only the clock part is ever read back out.
