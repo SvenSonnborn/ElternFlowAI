@@ -777,7 +777,7 @@ Sichtbar wurde das erst durch ADR-021 Decision 6: solange der untere Button „P
 - **Abgelaufene Einladungen werden nicht mehr aufgeräumt.** Der alte Create-Pfad löschte sie, weil der Index den Slot sonst blockiert hätte; ohne Index gibt es keinen Zwang mehr, und „alle unbenutzten löschen" wäre jetzt aktiv falsch. Die Zeilen sind unsichtbar (die Query filtert sie), sammeln sich aber an — als Follow-up für einen pg_cron-Job in `docs/TODO.md` notiert.
 - **Onboarding Step 3 legt jetzt bei jedem Tap eine Einladung an** statt die bestehende erneut zu teilen. Folgenlos, weil der Screen bei Erfolg sofort zu Step 4 navigiert und der Button währenddessen über `canSend` gesperrt ist.
 - **Der Familie-Tab kann eine echte Liste zeigen.** Der Screen rendert schon vorher über `.map()`, es war also nur die DB, die ihn auf einen Eintrag beschränkt hat.
-- **Der Index-Drop allein hätte kein Typen-Regenerat gebraucht** — ein Index ist in `database.types.ts` nicht abgebildet. Die RPC aus Decision 4 dagegen schon: `regenerate_invitation` steht dort unter `Functions` und wird in [onboardingMutations.ts](../features/auth/onboardingMutations.ts) typisiert aufgerufen.
+- **Der Index-Drop allein hätte kein Typen-Regenerat gebraucht** — ein Index ist in `database.types.ts` nicht abgebildet. Die RPC aus Decision 4 dagegen schon: `regenerate_invitation` steht dort unter `Functions` und wird in [familyMutations.ts](../features/auth/familyMutations.ts) typisiert aufgerufen.
 
 ## ADR-023 — Onboarding-Resume ist eine Karte auf dem Dashboard, kein Redirect (2026-08-28)
 
