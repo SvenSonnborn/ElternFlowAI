@@ -467,4 +467,48 @@ describe("Kalender-Mutationen: Overlay bis zur bestätigten Serverprojektion", (
     expect(fetchEventsInRange).not.toHaveBeenCalled();
     expect(useOptimisticEventsStore.getState().entries).toEqual([]);
   });
+
+  it("Abmelden während des Anlegens: Termin kommt nicht zurück", async () => {
+    const { queryClient, mutations } = await renderMonths([]);
+    const upsert = deferred<UpsertAnswer>();
+    mockUpsert.mockReturnValue(upsert.promise);
+    // Das Neuladen des nächsten Kontos hängt: Bis es antwortet, zeigt der
+    // Monat dessen älteren Datenstand, und genau dort gälte ein neu angelegter
+    // gespeicherter Eintrag.
+    const refetch = deferred<EventWithRelations[]>();
+    jest.mocked(fetchEventsInRange).mockReturnValue(refetch.promise);
+
+    const save = { done: false };
+    await act(async () => {
+      void mutations.create.mutateAsync(createVars()).then(() => {
+        save.done = true;
+      });
+      await tick();
+    });
+    expect(elternabende(OCTOBER)).toHaveLength(1);
+
+    // Dieselben zwei Schritte wie `useSignOut`, ohne auf die Mutation zu
+    // warten; danach lädt das nächste Konto denselben Range-Key.
+    await act(() => {
+      queryClient.clear();
+      useOptimisticEventsStore.getState().clear();
+      queryClient.setQueryData(rangeKey(OCTOBER), []);
+    });
+    expect(elternabende(OCTOBER)).toHaveLength(0);
+
+    await act(async () => {
+      upsert.resolve({ data: [{ id: SERVER_ID }], error: null });
+      await tick();
+    });
+
+    expect(save.done).toBe(true);
+    expect(fetchEventsInRange).toHaveBeenCalledTimes(1);
+    expect(elternabende(OCTOBER)).toHaveLength(0);
+    expect(useOptimisticEventsStore.getState().entries).toEqual([]);
+
+    await act(async () => {
+      refetch.resolve([]);
+      await tick();
+    });
+  });
 });
