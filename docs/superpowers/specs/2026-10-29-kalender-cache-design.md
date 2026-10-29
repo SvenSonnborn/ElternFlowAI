@@ -1,6 +1,6 @@
 # Kalender-Cache — Design
 
-**Status:** Entwurf (Brainstorming)
+**Status:** Approved (Brainstorming)
 **Date:** 2026-10-29
 **Branch:** `fix/kalender-cache`, Roadmap 8.3 „Kalender-Cache (Doppelanzeige und #111 zusammen)"
 **Issue:** [#111](https://github.com/SvenSonnborn/ElternFlowAI/issues/111), die offene Overlay-Hälfte. Die Server-Hälfte (Idempotenz über `vars.id`, `apply_event_change` mit Request-Id) ist seit ADR-044 erledigt.
