@@ -1,3 +1,5 @@
+import type { QueryCache, QueryClient } from "@tanstack/react-query";
+
 import { format } from "date-fns";
 import { create } from "zustand";
 
@@ -7,6 +9,7 @@ import type { EditScope, EventChanges, RecurrenceChanges } from "./recurrence";
 import type { CalendarOccurrence } from "./types";
 
 import { hidesOccurrence } from "./pendingDeletes";
+import { calendarKeys } from "./queries";
 import { mergeDateAndTimeOfDay, zonedDateKey } from "./timezone";
 
 /**
@@ -19,8 +22,8 @@ import { mergeDateAndTimeOfDay, zonedDateKey } from "./timezone";
  * [ADR-026](../../docs/decision-log.md) für das Löschen bereits verworfen.
  *
  * Was hier steht, ist deshalb bewusst eine **Näherung** (Decision 3 der Spec):
- * Sie muss gut aussehen, nicht exakt sein — der Refetch korrigiert sie
- * innerhalb einer Sekunde.
+ * Sie muss gut aussehen, nicht exakt sein — das erste Laden nach dem Speichern
+ * korrigiert sie, online innerhalb einer Sekunde.
  */
 
 /**
@@ -111,7 +114,7 @@ export function patchesOccurrence(
  * `recurrenceToRrule` durch), eine Interface-Änderung war also nicht nötig.
  *
  * **Einordnung, keine offene Grenze mehr:** Selbst ein falsches Ergebnis hier
- * träfe nur die **Anzeige** für die eine Sekunde bis zum Refetch — nie den
+ * träfe nur die **Anzeige** bis zum ersten Laden nach dem Speichern — nie den
  * gespeicherten Wert, den `anchoredChanges` unabhängig davon korrekt schreibt.
  */
 export function canApplyOptimistically(args: {
@@ -203,7 +206,8 @@ export interface OptimisticCreate {
   /**
    * Die Id, unter der der Server den Termin anlegt (`vars.id`). Angezeigt wird
    * weiter `row.id` (`optimistic-<n>`), damit der Termin nicht antippbar ist
-   * (`isOptimisticEventId`); zugeordnet wird über diese hier (Spec 3.2): Trägt
+   * (`isOptimisticEventId`); zugeordnet wird über diese hier (§3.2 der
+   * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)): Trägt
    * eine Ansicht schon die Serverzeile, gilt dort der Server, und ein späteres
    * Update oder Delete mit dieser `eventId` trifft auch die Overlay-Zeile.
    */
@@ -212,7 +216,9 @@ export interface OptimisticCreate {
 
 /**
  * Ein Update einer bereits expandierten Occurrence — der Eintrag beschreibt
- * eine Änderung, die der Store puffert, bis der Server antwortet.
+ * eine Änderung, die der Store hält, bis keine Ansicht mehr Daten von vor dem
+ * Speichern zeigt (§3.3 der
+ * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
  */
 export interface OptimisticUpdate {
   kind: "update";
@@ -225,12 +231,14 @@ export interface OptimisticUpdate {
 
 /**
  * Eine ausgeführte Löschung, die eine Ansicht mit Daten von vor dem Löschen
- * weiter ausblendet (Spec 3.4). Dasselbe Ziel wie im Undo-Fenster, darum
- * dieselbe Form und dasselbe `hidesOccurrence`.
+ * weiter ausblendet (§3.4 der
+ * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * Dasselbe Ziel wie im Undo-Fenster, darum dieselbe Form und dasselbe
+ * `hidesOccurrence`.
  *
- * Kommt nie über `add` in den Store: Eine Löschung hat keine Phase
- * „unterwegs", bis zum Erfolg des DELETE blendet sie der Pending-Delete-Store
- * aus.
+ * Kommt nie über `add` in den Store, sondern erst mit dem Erfolg über
+ * `confirm`: Eine Löschung hat keine Phase „unterwegs", bis zum Erfolg des
+ * DELETE blendet sie der Pending-Delete-Store aus.
  */
 export interface OptimisticDelete extends PendingEventDelete {
   kind: "delete";
@@ -240,7 +248,8 @@ export interface OptimisticDelete extends PendingEventDelete {
 export type OptimisticPayload = OptimisticCreate | OptimisticUpdate | OptimisticDelete;
 
 /**
- * Ein Eintrag aus dem Optimistic-Store, in einer von zwei Phasen (Spec 3.1).
+ * Ein Eintrag aus dem Optimistic-Store, in einer von zwei Phasen (§3.1 der
+ * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
  *
  * Die `id` wird vom Store verwaltet und kommt dort von außen nicht rein — daher
  * die Intersection-Struktur statt eines Feldes in den Basistypen. Sie wird
@@ -267,14 +276,15 @@ export interface EventsView {
 }
 
 /**
- * Ob ein Eintrag in dieser Ansicht gilt (Spec 3.2). Die Prüfungen laufen in
- * dieser Reihenfolge:
+ * Ob ein Eintrag in dieser Ansicht gilt (§3.2 der
+ * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * Die Prüfungen laufen in dieser Reihenfolge:
  *
  * 1. Ein Create, dessen Serverzeile (`serverId`) die Ansicht schon trägt, gilt
  *    nie, auch „unterwegs" nicht. Das deckt ein Laden ab, das den Termin
  *    bringt, aber vor dem Speichern ankam (etwa über das eigene
  *    Realtime-Echo), und hält die Overlay-Zeile neben der echten heraus.
- * 2. „Unterwegs" gilt er in jeder Ansicht (Spec 3.1).
+ * 2. „Unterwegs" gilt er in jeder Ansicht (§3.1).
  * 3. Ohne Serverdaten gilt er: Eine solche Ansicht ist „älter".
  * 4. Sonst nur, solange die Daten nicht neuer sind als das Speichern.
  *    Gleichstand zählt als „älter": Daten, die in derselben Millisekunde
@@ -283,7 +293,7 @@ export interface EventsView {
  * Für Update und Delete gibt es kein Gegenstück zu 1: Ihre Serverzeile gab es
  * schon vorher, ihr Vorhandensein sagt nichts darüber, ob die Änderung darin
  * steckt. Ab 4 gilt deshalb allein der Server, auch wenn danach jemand anderes
- * den Termin geändert oder gelöscht hat (Anti-Ziel der Spec).
+ * den Termin geändert oder gelöscht hat (Anti-Ziel in §2 der Kalender-Spec).
  */
 export function appliesToView(entry: OptimisticEvent, view: EventsView): boolean {
   if (entry.kind === "create" && view.rows?.some((row) => row.id === entry.serverId)) {
@@ -321,8 +331,8 @@ export function isOptimisticEventId(eventId: string): boolean {
 }
 
 /**
- * Wie lange ein optimistischer Eintrag höchstens stehen bleibt, wenn die
- * Mutation ihn nicht selbst abräumt.
+ * Wie lange ein Eintrag in der Phase „unterwegs" höchstens stehen bleibt, wenn
+ * die Mutation sich nicht meldet.
  *
  * Die Spec begründete den fehlenden Watchdog damit, der Eintrag lebe „genau so
  * lange wie die Mutation". Genau diese Annahme hat
@@ -330,13 +340,18 @@ export function isOptimisticEventId(eventId: string): boolean {
  * geprüft und verworfen (siehe `COMMIT_TIMEOUT_MS` in
  * [pendingDeletes.ts](../shared/pendingDeletes.ts)): [client.ts](../supabase/client.ts)
  * setzt dem `fetch` kein Timeout, hinter einem Captive Portal settelt eine
- * Anfrage weder, noch lehnt sie ab. Hier kommt erschwerend hinzu, dass
- * `onSettled` zusätzlich auf den Refetch wartet.
+ * Anfrage weder, noch lehnt sie ab.
  *
- * Ohne Obergrenze liefe `onSettled` nie, `remove(id)` liefe nie, und ein nie
- * gespeicherter Termin stünde für den Rest der Sitzung im Kalender **und** im
- * Dashboard — ohne Toast, ohne Log. Der Nutzer verließe sich auf einen Termin,
- * den es nicht gibt.
+ * Ohne Obergrenze käme weder Erfolg noch Fehler an, `remove(id)` liefe nie, und
+ * ein nie gespeicherter Termin stünde für den Rest der Sitzung im Kalender
+ * **und** im Dashboard — ohne Toast, ohne Log. Der Nutzer verließe sich auf
+ * einen Termin, den es nicht gibt.
+ *
+ * In der Phase „gespeichert" gibt es keinen Watchdog (§3.1 der
+ * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)):
+ * Dort zeigt der Eintrag, was gespeichert ist, auch offline über Stunden.
+ * Meldet der Server nach dem Ablauf doch noch Erfolg, legt `confirm` den
+ * Eintrag gespeichert wieder an.
  *
  * Dieselben 30 Sekunden wie beim Löschen, aus demselben Grund.
  */
@@ -345,39 +360,80 @@ export const OPTIMISTIC_TIMEOUT_MS = 30_000;
 interface OptimisticEventsState {
   entries: OptimisticEvent[];
   /**
-   * Legt einen Eintrag an und gibt seine Id zurück — `onMutate` reicht sie als
-   * Kontext weiter. `timeoutMs` liegt am Aufruf statt an einer festen Konstante,
-   * damit Tests den Watchdog kurz stellen können; wie `timeoutMs` am
-   * Pending-Delete-Eintrag.
+   * Legt einen Eintrag „unterwegs" an und gibt seine Id zurück — `onMutate`
+   * reicht sie als Kontext weiter. `timeoutMs` liegt am Aufruf statt an einer
+   * festen Konstante, damit Tests den Watchdog kurz stellen können; wie
+   * `timeoutMs` am Pending-Delete-Eintrag.
    */
   add: (payload: OptimisticCreate | OptimisticUpdate, timeoutMs?: number) => string;
+  /**
+   * Überführt einen Eintrag in die Phase „gespeichert" (§3.1 der
+   * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)):
+   * `savedAt` wird jetzt gesetzt, der Watchdog endet. Steht `id` noch im
+   * Store, bleibt der Eintrag an seiner Stelle. Sonst kommt er neu dazu: der
+   * späte Erfolg nach dem Watchdog und jedes `delete`, das nie „unterwegs" war.
+   *
+   * Danach hält ein Abo auf `cache` den Eintrag genau so lange, wie ihn eine
+   * Range-Query noch braucht (§3.3): geprüft sofort und bei jedem
+   * Cache-Ereignis. Inaktive Queries und solche ohne Daten zählen mit, bis
+   * TanStack sie nach `gcTime` verwirft. Ein Abo statt einer Prüfung beim
+   * Rendern, weil jede Ansicht nur ihre eigene Query kennt und der Store sonst
+   * über die Sitzung wüchse.
+   */
+  confirm: (payload: OptimisticPayload, cache: QueryCache, id?: string) => void;
+  /**
+   * Nimmt einen Eintrag heraus, samt Watchdog und Cache-Abo. Eine unbekannte Id
+   * ist kein Fehler.
+   */
   remove: (id: string) => void;
   /**
-   * Verwirft alle offenen Einträge samt ihrer Watchdogs. Für das Abmelden:
+   * Verwirft alle Einträge samt Watchdogs und Cache-Abos. Für das Abmelden:
    * `useSignOut` räumt bereits den Query-Cache und die Pending-Deletes ab; ohne
    * diesen dritten Store stünde der optimistische Termin des Vorgängers im
    * Kalender des nächsten Familienmitglieds, das sich auf demselben Gerät
-   * anmeldet — mit Titel, Ort und Kind-Zuordnung.
+   * anmeldet — mit Titel, Ort und Kind-Zuordnung. Ohne das Ende der Abos liefe
+   * die Prüfung jedes verworfenen Eintrags bei jedem Cache-Ereignis weiter.
    */
   clear: () => void;
 }
 
-// Timer gehören nicht in den Store — genau wie bei den Pending-Deletes: Sie
-// lösen kein Rendern aus, und ein `setTimeout`-Handle im State schlüge bei
-// jedem Abonnenten als Änderung durch.
+// Timer und Cache-Abos gehören nicht in den Store — genau wie bei den
+// Pending-Deletes: Sie lösen kein Rendern aus, und ein Handle im State schlüge
+// bei jedem Abonnenten als Änderung durch.
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
+const subscriptions = new Map<string, () => void>();
 
-function clearTimer(id: string): void {
+/** Beendet Watchdog und Cache-Abo eines Eintrags, soweit vorhanden. */
+function release(id: string): void {
   const handle = timers.get(id);
-  if (handle !== undefined) {
-    clearTimeout(handle);
-    timers.delete(id);
-  }
+  if (handle !== undefined) clearTimeout(handle);
+  timers.delete(id);
+  subscriptions.get(id)?.();
+  subscriptions.delete(id);
 }
 
-// Laufende Nummer statt Zufalls-Id: Der Eintrag lebt Sekundenbruchteile, eine
-// Kollision über einen App-Lauf hinweg gibt es nicht, und Tests bleiben lesbar.
+/**
+ * Ob noch eine Range-Query im Cache den Eintrag braucht (§3.3), aktiv oder
+ * nicht. Der Query-Cache ist untypisiert; unter `eventsRoot` liegen nur die
+ * Zeilen aus `fetchEventsInRange`.
+ */
+function neededByAnyView(entry: OptimisticEvent, cache: QueryCache): boolean {
+  return cache.findAll({ queryKey: calendarKeys.eventsRoot }).some((query) =>
+    appliesToView(entry, {
+      dataUpdatedAt: query.state.dataUpdatedAt,
+      rows: query.state.data as EventWithRelations[] | undefined,
+    }),
+  );
+}
+
+// Laufende Nummer statt Zufalls-Id: Eine Kollision über einen App-Lauf hinweg
+// gibt es nicht, und Tests bleiben lesbar.
 let sequence = 0;
+
+function nextId(): string {
+  sequence += 1;
+  return `optimistic-${sequence}`;
+}
 
 /**
  * Der Store der offenen optimistischen Einträge.
@@ -392,15 +448,19 @@ let sequence = 0;
  * Screens navigieren weg, bevor die Mutation settlet.
  *
  * Jeder Eintrag bekommt beim Anlegen einen **Watchdog** (siehe
- * `OPTIMISTIC_TIMEOUT_MS`), den `remove` im Normalfall wieder abräumt. Die
- * Mutation wird dabei ausdrücklich nicht abgebrochen.
+ * `OPTIMISTIC_TIMEOUT_MS`), den `confirm` oder `remove` im Normalfall wieder
+ * abräumt. Die Mutation wird dabei ausdrücklich nicht abgebrochen. Gespeichert
+ * verlässt ein Eintrag den Store über sein Cache-Abo (`confirm`).
+ *
+ * Die vom Store geführten Felder `id` und `savedAt` stehen beim Bauen eines
+ * Eintrags hinter dem Spread: Ein strukturell breiteres Objekt als Payload
+ * überschriebe sie sonst, und der Watchdog hinge an einer anderen Id.
  */
 export const useOptimisticEventsStore = create<OptimisticEventsState>((set) => ({
   entries: [],
   add: (payload, timeoutMs = OPTIMISTIC_TIMEOUT_MS) => {
-    sequence += 1;
-    const id = `optimistic-${sequence}`;
-    set((state) => ({ entries: [...state.entries, { id, savedAt: null, ...payload }] }));
+    const id = nextId();
+    set((state) => ({ entries: [...state.entries, { ...payload, id, savedAt: null }] }));
     timers.set(
       id,
       setTimeout(() => {
@@ -415,12 +475,29 @@ export const useOptimisticEventsStore = create<OptimisticEventsState>((set) => (
     );
     return id;
   },
+  confirm: (payload, cache, id) => {
+    const entryId = id ?? nextId();
+    release(entryId);
+    const entry: OptimisticEvent = { ...payload, id: entryId, savedAt: Date.now() };
+    set((state) => ({
+      entries: state.entries.some((existing) => existing.id === entryId)
+        ? state.entries.map((existing) => (existing.id === entryId ? entry : existing))
+        : [...state.entries, entry],
+    }));
+    const check = () => {
+      if (!neededByAnyView(entry, cache)) useOptimisticEventsStore.getState().remove(entryId);
+    };
+    // Erst abonnieren, dann prüfen: Räumt schon die erste Prüfung ab, beendet
+    // `remove` das Abo gleich mit, statt es hängen zu lassen.
+    subscriptions.set(entryId, cache.subscribe(check));
+    check();
+  },
   remove: (id) => {
-    clearTimer(id);
+    release(id);
     set((state) => ({ entries: state.entries.filter((entry) => entry.id !== id) }));
   },
   clear: () => {
-    for (const id of [...timers.keys()]) clearTimer(id);
+    for (const id of [...timers.keys(), ...subscriptions.keys()]) release(id);
     set({ entries: [] });
   },
 }));
@@ -431,8 +508,58 @@ export function useOptimisticEvents(): OptimisticEvent[] {
 }
 
 /**
- * Die Anzeige-Pipeline hinter `useFamilyEvents`, für genau eine Ansicht
- * (Spec 3.2):
+ * Was `onMutate` als Kontext weiterreicht. Neben der Id auch der Payload:
+ * Hat der Watchdog den Eintrag schon entfernt, legt `confirm` ihn daraus
+ * gespeichert neu an (§3.1 der
+ * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ */
+export interface OptimisticContext {
+  id: string;
+  payload: OptimisticCreate | OptimisticUpdate;
+}
+
+/**
+ * Der gemeinsame Erfolgsweg der Kalender-Mutationen (§3.1 bis §3.3 und §3.5
+ * der [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * Die Reihenfolge ist fest:
+ *
+ * 1. `confirm` setzt `savedAt`, **bevor** irgendetwas neu lädt. Erst damit
+ *    steht fest, welche Daten einer Ansicht „neuer" sind als das Speichern.
+ * 2. `cancelQueries` bricht jedes laufende Laden unter `eventsRoot` ab, auch
+ *    ein erstes Laden ohne Daten und das eines inaktiven Monats. Es begann vor
+ *    dem Speichern und kann den Stand davor tragen, zählte nach dem Landen
+ *    aber als „neuer" und wegen der Standard-`staleTime` 30 s lang als frisch.
+ *    `invalidateQueries` allein reicht nicht: Sein `cancelRefetch` greift nur
+ *    bei Queries mit Daten, und es lädt nur aktive neu.
+ * 3. `invalidateQueries` für `eventsRoot` und `oneRoot`, nicht `all`, wie der
+ *    Realtime-Pfad (ADR-030): `types` und `reminders` hängen an keiner
+ *    Termin-Änderung. In TanStack 5.105 bricht `Query.cancel` synchron ab
+ *    (`retryer.cancel` → `reject`, der Revert setzt `fetchStatus: "idle"`),
+ *    darum startet dieses Invalidieren ein neues Laden, statt das abgebrochene
+ *    Promise zurückzugeben.
+ *
+ * Nichts wird erwartet, die Rückgabe ist `void`: Über die Sichtbarkeit
+ * entscheidet die Overlay-Regel, und ein hängender Refetch hielte sonst die
+ * Mutation und mit ihr das Abmelden auf. Beide Promises lehnen nie ab.
+ *
+ * `saved` fehlt, wenn `onMutate` keinen Eintrag angelegt hat (Event-Typ nicht
+ * im Cache, `canApplyOptimistically` falsch); dann wird nur neu geladen.
+ */
+export function confirmEventSave(
+  qc: QueryClient,
+  saved: { payload: OptimisticPayload; id?: string } | undefined,
+): void {
+  if (saved) {
+    useOptimisticEventsStore.getState().confirm(saved.payload, qc.getQueryCache(), saved.id);
+  }
+  void qc.cancelQueries({ queryKey: calendarKeys.eventsRoot });
+  void qc.invalidateQueries({ queryKey: calendarKeys.eventsRoot });
+  void qc.invalidateQueries({ queryKey: calendarKeys.oneRoot });
+}
+
+/**
+ * Die Anzeige-Pipeline hinter `useFamilyEvents`, für genau eine Ansicht (§3.2
+ * der [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)):
  *
  * 1. Es zählen nur die Einträge, die in `view` gelten (`appliesToView`).
  * 2. Zu den Server-Occurrences kommen die der gültigen Creates.

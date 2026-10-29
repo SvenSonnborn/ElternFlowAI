@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { QueryClient, QueryObserver } from "@tanstack/react-query";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 
 import { lightTheme } from "@/design-system";
 
 import type { EventWithRelations } from "./expand";
-import type { EventsView, OptimisticEvent } from "./optimisticEvents";
+import type { EventsView, OptimisticEvent, OptimisticUpdate } from "./optimisticEvents";
 import type { PendingEventDelete } from "./pendingDeletes";
 import type { EventChanges, RecurrenceChanges } from "./recurrence";
 import type { CalendarOccurrence } from "./types";
@@ -13,12 +14,14 @@ import {
   appliesToView,
   applyOptimisticChanges,
   canApplyOptimistically,
+  confirmEventSave,
   isOptimisticEventId,
   patchesOccurrence,
   useOptimisticEventsStore,
   visibleOccurrences,
 } from "./optimisticEvents";
 import { withoutPendingDeletes } from "./pendingDeletes";
+import { calendarKeys } from "./queries";
 import { instantToFloating } from "./timezone";
 
 function occ(partial: Partial<CalendarOccurrence> = {}): CalendarOccurrence {
@@ -444,8 +447,8 @@ describe("visibleOccurrences mit dem echten expandEvents", () => {
 describe("Reihenfolge der beiden Overlays", () => {
   test("eine zugleich bearbeitete und gelöschte Occurrence ist weg (scope: all)", () => {
     // Ein Update kann eine bereits gefilterte Occurrence nicht zurückbringen,
-    // weil der Patch-Schritt von `visibleOccurrences` nur per `.map()` über die
-    // bestehende Liste arbeitet und nie Einträge hinzufügt. Daher ist die
+    // weil der Patch-Schritt von `visibleOccurrences` jede Occurrence höchstens
+    // durch ihre gepatchte Fassung ersetzt und nie Einträge hinzufügt. Daher ist die
     // Reihenfolge (Patch vor Delete oder umgekehrt) folgenlos — das Ergebnis
     // ist in beiden Fällen leer. Wir halten diesen Test trotzdem, weil die
     // Aussage („eine Löschung gewinnt gegen eine gleichzeitige Bearbeitung")
@@ -997,5 +1000,256 @@ describe("Watchdog", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+// ── Phase „gespeichert" (§3.1 und §3.3 in
+// docs/superpowers/specs/2026-10-29-kalender-cache-design.md) ──────────────
+// Ein echter `QueryClient` statt eines Stubs: Ob ein Eintrag den Store verlässt,
+// hängt an den Ereignissen des Query-Caches und an `cancelQueries`, und genau
+// deren Verhalten in TanStack 5.105 sollen diese Tests festhalten.
+const OCTOBER = calendarKeys.range("2026-09-24T00:00:00.000Z", "2026-11-08T00:00:00.000Z");
+const NOVEMBER = calendarKeys.range("2026-10-25T00:00:00.000Z", "2026-12-08T00:00:00.000Z");
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function updatePayload(): OptimisticUpdate {
+  return {
+    kind: "update",
+    eventId: "e9",
+    occurrenceKey: "2026-10-01",
+    scope: "this",
+    changes: changes({ title: "Elternabend neu" }),
+  };
+}
+
+/** Ein Promise, das der Test von außen auflöst — das Laden „unterwegs". */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+describe('Phase „gespeichert"', () => {
+  const store = () => useOptimisticEventsStore.getState();
+  let qc: QueryClient;
+
+  beforeEach(() => {
+    qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  });
+  // Erst der Store, dann der Cache: `clear()` beendet die Abos, bevor
+  // `qc.clear()` seine „removed"-Ereignisse verschickt.
+  afterEach(() => {
+    store().clear();
+    qc.clear();
+  });
+
+  test("Erfolg: gespeichert, Watchdog aus, Position bleibt", async () => {
+    // Offline länger als der Watchdog: Ein gespeicherter Eintrag zeigt, was
+    // gespeichert ist, und darf nicht nach 30 s verfallen.
+    const spy = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      qc.setQueryData(OCTOBER, [singleRow()], { updatedAt: Date.now() - 100 });
+      const id = store().add(updatePayload(), 10);
+      const other = store().add({ kind: "create", row: row(), serverId: "e-neu" });
+      store().confirm(updatePayload(), qc.getQueryCache(), id);
+      await sleep(20);
+      expect(store().entries.map((entry) => entry.id)).toEqual([id, other]);
+      expect(store().entries[0].savedAt).not.toBeNull();
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("später Erfolg nach dem Watchdog: der Eintrag kommt gespeichert zurück", async () => {
+    const spy = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      qc.setQueryData(OCTOBER, [singleRow()], { updatedAt: Date.now() - 100 });
+      const id = store().add(updatePayload(), 10);
+      await sleep(20);
+      expect(store().entries).toEqual([]);
+
+      store().confirm(updatePayload(), qc.getQueryCache(), id);
+      expect(store().entries).toHaveLength(1);
+      expect(store().entries[0].savedAt).not.toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("verlässt den Store erst, wenn keine Range-Query mehr alte Daten trägt", () => {
+    // Ein Delete, das ohne `id` direkt gespeichert in den Store kommt.
+    const before = Date.now() - 100;
+    qc.setQueryData(OCTOBER, [singleRow()], { updatedAt: before });
+    qc.setQueryData(NOVEMBER, [singleRow()], { updatedAt: before });
+    store().confirm(
+      { kind: "delete", eventId: "e9", occurrenceKey: "2026-10-01", scope: "this" },
+      qc.getQueryCache(),
+    );
+    const savedAt = store().entries[0]?.savedAt ?? Number.NaN;
+
+    qc.setQueryData(NOVEMBER, [singleRow()], { updatedAt: savedAt + 100 });
+    expect(store().entries).toHaveLength(1);
+
+    qc.setQueryData(OCTOBER, [singleRow()], { updatedAt: savedAt + 100 });
+    expect(store().entries).toEqual([]);
+  });
+
+  test("eine Range-Query ohne Daten hält ihn, bis sie verworfen wird", () => {
+    // Etwa ein erstes Laden, das scheiterte. `removeQueries` steht für `gcTime`.
+    qc.getQueryCache().build(qc, { queryKey: OCTOBER });
+    expect(
+      qc
+        .getQueryCache()
+        .findAll({ queryKey: calendarKeys.eventsRoot })
+        .map((query) => query.state.data),
+    ).toEqual([undefined]);
+
+    store().confirm(updatePayload(), qc.getQueryCache());
+    expect(store().entries).toHaveLength(1);
+
+    qc.removeQueries({ queryKey: OCTOBER });
+    expect(store().entries).toEqual([]);
+  });
+
+  test("eine inaktive Range-Query mit alten Daten hält ihn, bis sie verworfen wird", () => {
+    // Der Monat, in den der Nutzer nie zurückkehrt: kein Beobachter, also auch
+    // kein Neuladen über `invalidateQueries`.
+    qc.setQueryData(OCTOBER, [singleRow()], { updatedAt: Date.now() - 100 });
+    store().confirm(updatePayload(), qc.getQueryCache());
+    expect(store().entries).toHaveLength(1);
+
+    qc.removeQueries({ queryKey: OCTOBER });
+    expect(store().entries).toEqual([]);
+  });
+
+  test("Create: eine ältere Ansicht mit der echten Id gibt ihn frei", () => {
+    const before = Date.now() - 100;
+    qc.setQueryData(OCTOBER, [singleRow()], { updatedAt: before });
+    store().confirm(
+      { kind: "create", row: singleRow({ id: "optimistic-1" }), serverId: "e-neu" },
+      qc.getQueryCache(),
+    );
+    expect(store().entries).toHaveLength(1);
+
+    // Weiter älter als das Speichern, aber mit der Serverzeile — etwa vom
+    // eigenen Realtime-Echo angestoßen.
+    qc.setQueryData(OCTOBER, [singleRow(), singleRow({ id: "e-neu" })], { updatedAt: before });
+    expect(store().entries).toEqual([]);
+  });
+
+  test("keine Range-Query im Cache: sofort weg, ohne Abo", () => {
+    // Andere Kalender-Queries zählen nicht, nur die unter `eventsRoot`.
+    qc.setQueryData(calendarKeys.types, []);
+    qc.setQueryData(calendarKeys.one("e9"), singleRow());
+    store().confirm(updatePayload(), qc.getQueryCache());
+    expect(store().entries).toEqual([]);
+    expect(qc.getQueryCache().hasListeners()).toBe(false);
+  });
+
+  test("`remove` beendet das Abo", () => {
+    qc.setQueryData(OCTOBER, [singleRow()], { updatedAt: Date.now() - 100 });
+    store().confirm(updatePayload(), qc.getQueryCache());
+    store().remove(store().entries[0].id);
+    expect(qc.getQueryCache().hasListeners()).toBe(false);
+  });
+
+  test("`clear()` beendet die Abos: ein späteres Cache-Ereignis bringt nichts zurück", () => {
+    // Das Abmelden mit gespeicherten Einträgen.
+    qc.setQueryData(OCTOBER, [singleRow()], { updatedAt: Date.now() - 100 });
+    store().confirm(updatePayload(), qc.getQueryCache());
+    expect(store().entries).toHaveLength(1);
+
+    store().clear();
+    expect(qc.getQueryCache().hasListeners()).toBe(false);
+    expect(() => qc.setQueryData(NOVEMBER, [singleRow()])).not.toThrow();
+    expect(store().entries).toEqual([]);
+  });
+});
+
+describe("confirmEventSave", () => {
+  const store = () => useOptimisticEventsStore.getState();
+  let qc: QueryClient;
+
+  beforeEach(() => {
+    qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  });
+  afterEach(() => {
+    store().clear();
+    qc.clear();
+  });
+
+  test("ein vor dem Speichern begonnenes erstes Laden zählt nicht", async () => {
+    // Kaltstart oder frisch gewischter Monat: Das Laden begann vor dem
+    // Speichern und kann den Stand davor tragen. Ohne `cancelQueries` landete
+    // es danach, zählte als „neuer" und gäbe den Eintrag frei.
+    const first = deferred<EventWithRelations[]>();
+    const loading = qc
+      .fetchQuery({ queryKey: OCTOBER, queryFn: () => first.promise })
+      .catch(() => undefined);
+    const id = store().add(updatePayload());
+    confirmEventSave(qc, { payload: updatePayload(), id });
+    await sleep(5);
+    first.resolve([singleRow()]);
+    await loading;
+    expect(qc.getQueryState(OCTOBER)?.data).toBeUndefined();
+    expect(store().entries).toHaveLength(1);
+
+    // Ein Beobachter lädt den Monat neu, nach dem Speichern: Das gibt frei.
+    const observer = new QueryObserver(qc, {
+      queryKey: OCTOBER,
+      queryFn: () => Promise.resolve([singleRow()]),
+    });
+    const unsubscribe = observer.subscribe(() => {});
+    try {
+      await sleep(5);
+      expect(qc.getQueryState(OCTOBER)?.data).toHaveLength(1);
+      expect(store().entries).toEqual([]);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  test("ein vor dem Speichern begonnener Refetch schreibt nichts und zählt nicht", async () => {
+    const before = Date.now() - 100;
+    const oldRows = [singleRow()];
+    qc.setQueryData(OCTOBER, oldRows, { updatedAt: before });
+    const refetch = deferred<EventWithRelations[]>();
+    const loading = qc
+      .fetchQuery({ queryKey: OCTOBER, queryFn: () => refetch.promise })
+      .catch(() => undefined);
+    const id = store().add(updatePayload());
+    confirmEventSave(qc, { payload: updatePayload(), id });
+    await sleep(5);
+    refetch.resolve([singleRow({ title: "Stand vor dem Speichern" })]);
+    await loading;
+    expect(qc.getQueryState(OCTOBER)?.dataUpdatedAt).toBe(before);
+    expect(qc.getQueryState(OCTOBER)?.data).toBe(oldRows);
+    expect(store().entries).toHaveLength(1);
+  });
+
+  test("invalidiert `eventsRoot` und `oneRoot`, nicht `types` und `reminders`", () => {
+    qc.setQueryData(OCTOBER, [singleRow()]);
+    qc.setQueryData(calendarKeys.one("e9"), singleRow());
+    qc.setQueryData(calendarKeys.types, []);
+    qc.setQueryData(calendarKeys.reminders("e9"), []);
+    confirmEventSave(qc, { payload: updatePayload() });
+    expect(qc.getQueryState(OCTOBER)?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(calendarKeys.one("e9"))?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(calendarKeys.types)?.isInvalidated).toBe(false);
+    expect(qc.getQueryState(calendarKeys.reminders("e9"))?.isInvalidated).toBe(false);
+  });
+
+  test("ohne Eintrag lädt es nur neu und gibt nichts zurück", () => {
+    // Etwa ein Update ohne Overlay-Eintrag (`canApplyOptimistically` war falsch).
+    qc.setQueryData(OCTOBER, [singleRow()]);
+    store().add(updatePayload());
+    const entries = store().entries;
+    expect(confirmEventSave(qc, undefined)).toBeUndefined();
+    expect(store().entries).toBe(entries);
+    expect(qc.getQueryState(OCTOBER)?.isInvalidated).toBe(true);
   });
 });
