@@ -370,8 +370,14 @@ interface OptimisticEventsState {
    * Überführt einen Eintrag in die Phase „gespeichert" (§3.1 der
    * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)):
    * `savedAt` wird jetzt gesetzt, der Watchdog endet. Steht `id` noch im
-   * Store, bleibt der Eintrag an seiner Stelle. Sonst kommt er neu dazu: der
-   * späte Erfolg nach dem Watchdog und jedes `delete`, das nie „unterwegs" war.
+   * Store, bleibt der Eintrag an seiner Stelle. Sonst kommt er neu dazu, aber
+   * nur in zwei Fällen: der späte Erfolg, nachdem der **Watchdog** die `id`
+   * entfernt hat, und jedes `delete`, das ohne `id` nie „unterwegs" war. Hat
+   * dagegen `remove(id)` oder `clear()` den Eintrag verworfen, legt ein später
+   * Erfolg nichts an und abonniert nichts: Nach dem Abmelden stünde sonst der
+   * Termin des Vorgängers im Kalender des nächsten Kontos, denn `useSignOut`
+   * wartet nicht auf laufende Mutationen, und die Range-Keys tragen keine
+   * Familie.
    *
    * Danach hält ein Abo auf `cache` den Eintrag genau so lange, wie ihn eine
    * Range-Query noch braucht (§3.3): geprüft sofort und bei jedem
@@ -383,7 +389,7 @@ interface OptimisticEventsState {
   confirm: (payload: OptimisticPayload, cache: QueryCache, id?: string) => void;
   /**
    * Nimmt einen Eintrag heraus, samt Watchdog und Cache-Abo. Eine unbekannte Id
-   * ist kein Fehler.
+   * ist kein Fehler. Ein späteres `confirm` mit dieser Id legt nichts mehr an.
    */
   remove: (id: string) => void;
   /**
@@ -393,6 +399,8 @@ interface OptimisticEventsState {
    * Kalender des nächsten Familienmitglieds, das sich auf demselben Gerät
    * anmeldet — mit Titel, Ort und Kind-Zuordnung. Ohne das Ende der Abos liefe
    * die Prüfung jedes verworfenen Eintrags bei jedem Cache-Ereignis weiter.
+   * Ein später Erfolg einer Mutation von vor dem Leeren legt nichts neu an,
+   * auch nicht nach dem Watchdog (siehe `confirm`).
    */
   clear: () => void;
 }
@@ -402,6 +410,9 @@ interface OptimisticEventsState {
 // bei jedem Abonnenten als Änderung durch.
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 const subscriptions = new Map<string, () => void>();
+// Ids, die der Watchdog entfernt hat und deren Mutation noch Erfolg melden
+// darf. Nur sie legt `confirm` neu an; `remove` und `clear` streichen sie.
+const expired = new Set<string>();
 
 /** Beendet Watchdog und Cache-Abo eines Eintrags, soweit vorhanden. */
 function release(id: string): void {
@@ -456,7 +467,7 @@ function nextId(): string {
  * Eintrags hinter dem Spread: Ein strukturell breiteres Objekt als Payload
  * überschriebe sie sonst, und der Watchdog hinge an einer anderen Id.
  */
-export const useOptimisticEventsStore = create<OptimisticEventsState>((set) => ({
+export const useOptimisticEventsStore = create<OptimisticEventsState>((set, get) => ({
   entries: [],
   add: (payload, timeoutMs = OPTIMISTIC_TIMEOUT_MS) => {
     const id = nextId();
@@ -471,11 +482,20 @@ export const useOptimisticEventsStore = create<OptimisticEventsState>((set) => (
         // wie in `pendingDeletes.commit`, damit der Fall nicht spurlos bleibt.
         console.error("[optimisticEvents] Eintrag abgelaufen", { id, timeoutMs });
         useOptimisticEventsStore.getState().remove(id);
+        // Nach `remove`, das die Marke sonst gleich wieder striche.
+        expired.add(id);
       }, timeoutMs),
     );
     return id;
   },
   confirm: (payload, cache, id) => {
+    if (
+      id !== undefined &&
+      !expired.delete(id) &&
+      !get().entries.some((existing) => existing.id === id)
+    ) {
+      return;
+    }
     const entryId = id ?? nextId();
     release(entryId);
     const entry: OptimisticEvent = { ...payload, id: entryId, savedAt: Date.now() };
@@ -494,10 +514,12 @@ export const useOptimisticEventsStore = create<OptimisticEventsState>((set) => (
   },
   remove: (id) => {
     release(id);
+    expired.delete(id);
     set((state) => ({ entries: state.entries.filter((entry) => entry.id !== id) }));
   },
   clear: () => {
     for (const id of [...timers.keys(), ...subscriptions.keys()]) release(id);
+    expired.clear();
     set({ entries: [] });
   },
 }));
@@ -512,6 +534,7 @@ export function useOptimisticEvents(): OptimisticEvent[] {
  * Hat der Watchdog den Eintrag schon entfernt, legt `confirm` ihn daraus
  * gespeichert neu an (§3.1 der
  * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * Nach `remove` oder `clear` bleibt der Payload ungenutzt.
  */
 export interface OptimisticContext {
   id: string;

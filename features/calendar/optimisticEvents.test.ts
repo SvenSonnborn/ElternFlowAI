@@ -1080,6 +1080,64 @@ describe('Phase „gespeichert"', () => {
     }
   });
 
+  test("später Erfolg nach `clear()`: nichts kommt zurück, kein Abo", () => {
+    // Das Abmelden, während das Speichern unterwegs ist: `useSignOut` wartet
+    // nicht auf laufende Mutationen, und die Range-Keys tragen keine Familie.
+    // Käme der Eintrag zurück, stünde der Termin des Vorgängers im Kalender des
+    // nächsten Kontos.
+    qc.setQueryData(OCTOBER, [singleRow()], { updatedAt: Date.now() - 100 });
+    const id = store().add(updatePayload());
+    store().clear();
+
+    store().confirm(updatePayload(), qc.getQueryCache(), id);
+    expect(store().entries).toEqual([]);
+    expect(qc.getQueryCache().hasListeners()).toBe(false);
+  });
+
+  test("später Erfolg nach `remove(id)`: nichts kommt zurück, kein Abo", () => {
+    qc.setQueryData(OCTOBER, [singleRow()], { updatedAt: Date.now() - 100 });
+    const id = store().add(updatePayload());
+    store().remove(id);
+
+    store().confirm(updatePayload(), qc.getQueryCache(), id);
+    expect(store().entries).toEqual([]);
+    expect(qc.getQueryCache().hasListeners()).toBe(false);
+  });
+
+  test("später Erfolg nach Watchdog und `clear()`: nichts kommt zurück", async () => {
+    const spy = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      qc.setQueryData(OCTOBER, [singleRow()], { updatedAt: Date.now() - 100 });
+      const id = store().add(updatePayload(), 10);
+      await sleep(20);
+      store().clear();
+
+      store().confirm(updatePayload(), qc.getQueryCache(), id);
+      expect(store().entries).toEqual([]);
+      expect(qc.getQueryCache().hasListeners()).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("später Erfolg nach Watchdog und `remove(id)`: nichts kommt zurück", async () => {
+    // `remove` nach dem Watchdog ist `onError` einer Mutation, die doch noch
+    // gescheitert ist.
+    const spy = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      qc.setQueryData(OCTOBER, [singleRow()], { updatedAt: Date.now() - 100 });
+      const id = store().add(updatePayload(), 10);
+      await sleep(20);
+      store().remove(id);
+
+      store().confirm(updatePayload(), qc.getQueryCache(), id);
+      expect(store().entries).toEqual([]);
+      expect(qc.getQueryCache().hasListeners()).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   test("verlässt den Store erst, wenn keine Range-Query mehr alte Daten trägt", () => {
     // Ein Delete, das ohne `id` direkt gespeichert in den Store kommt.
     const before = Date.now() - 100;
