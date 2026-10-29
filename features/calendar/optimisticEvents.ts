@@ -6,7 +6,7 @@ import type { PendingEventDelete } from "./pendingDeletes";
 import type { EditScope, EventChanges, RecurrenceChanges } from "./recurrence";
 import type { CalendarOccurrence } from "./types";
 
-import { withoutPendingDeletes } from "./pendingDeletes";
+import { hidesOccurrence } from "./pendingDeletes";
 import { mergeDateAndTimeOfDay, zonedDateKey } from "./timezone";
 
 /**
@@ -200,6 +200,14 @@ export interface OptimisticCreate {
    * erscheint dadurch mit allen seinen Occurrences statt nur der ersten.
    */
   row: EventWithRelations;
+  /**
+   * Die Id, unter der der Server den Termin anlegt (`vars.id`). Angezeigt wird
+   * weiter `row.id` (`optimistic-<n>`), damit der Termin nicht antippbar ist
+   * (`isOptimisticEventId`); zugeordnet wird über diese hier (Spec 3.2): Trägt
+   * eine Ansicht schon die Serverzeile, gilt dort der Server, und ein späteres
+   * Update oder Delete mit dieser `eventId` trifft auch die Overlay-Zeile.
+   */
+  serverId: string;
 }
 
 /**
@@ -216,16 +224,75 @@ export interface OptimisticUpdate {
 }
 
 /**
- * Ein Eintrag aus dem Optimistic-Store — entweder ein neu angelegter Serientermin
- * (Create) oder eine Änderung an einer bestehenden Occurrence (Update).
+ * Eine ausgeführte Löschung, die eine Ansicht mit Daten von vor dem Löschen
+ * weiter ausblendet (Spec 3.4). Dasselbe Ziel wie im Undo-Fenster, darum
+ * dieselbe Form und dasselbe `hidesOccurrence`.
+ *
+ * Kommt nie über `add` in den Store: Eine Löschung hat keine Phase
+ * „unterwegs", bis zum Erfolg des DELETE blendet sie der Pending-Delete-Store
+ * aus.
+ */
+export interface OptimisticDelete extends PendingEventDelete {
+  kind: "delete";
+}
+
+/** Was ein Aufrufer über einen Eintrag sagt; `id` und `savedAt` führt der Store. */
+export type OptimisticPayload = OptimisticCreate | OptimisticUpdate | OptimisticDelete;
+
+/**
+ * Ein Eintrag aus dem Optimistic-Store, in einer von zwei Phasen (Spec 3.1).
  *
  * Die `id` wird vom Store verwaltet und kommt dort von außen nicht rein — daher
  * die Intersection-Struktur statt eines Feldes in den Basistypen. Sie wird
- * benötigt, um den Eintrag später aus dem Store zu entfernen (Callback in
- * `onSuccess`).
+ * benötigt, um den Eintrag später aus dem Store zu entfernen.
  */
-export type OptimisticEvent =
-  ({ id: string } & OptimisticCreate) | ({ id: string } & OptimisticUpdate);
+export type OptimisticEvent = OptimisticPayload & {
+  id: string;
+  /**
+   * `null` = „unterwegs": Die Mutation läuft, der Eintrag gilt in jeder
+   * Ansicht. Eine Zahl = „gespeichert" um diesen `Date.now()`; ab dann gilt er
+   * nur noch in Ansichten mit älteren Daten (`appliesToView`).
+   */
+  savedAt: number | null;
+};
+
+/**
+ * Der Datenstand einer Ansicht, also einer Range-Query: ihr `dataUpdatedAt`
+ * und ihre `data`. `rows: undefined` heißt „noch nie Daten" (neuer Monat,
+ * erstes Laden gescheitert).
+ */
+export interface EventsView {
+  dataUpdatedAt: number;
+  rows: readonly EventWithRelations[] | undefined;
+}
+
+/**
+ * Ob ein Eintrag in dieser Ansicht gilt (Spec 3.2). Die Prüfungen laufen in
+ * dieser Reihenfolge:
+ *
+ * 1. Ein Create, dessen Serverzeile (`serverId`) die Ansicht schon trägt, gilt
+ *    nie, auch „unterwegs" nicht. Das deckt ein Laden ab, das den Termin
+ *    bringt, aber vor dem Speichern ankam (etwa über das eigene
+ *    Realtime-Echo), und hält die Overlay-Zeile neben der echten heraus.
+ * 2. „Unterwegs" gilt er in jeder Ansicht (Spec 3.1).
+ * 3. Ohne Serverdaten gilt er: Eine solche Ansicht ist „älter".
+ * 4. Sonst nur, solange die Daten nicht neuer sind als das Speichern.
+ *    Gleichstand zählt als „älter": Daten, die in derselben Millisekunde
+ *    landen, stammen aus einem Laden, das vorher begann.
+ *
+ * Für Update und Delete gibt es kein Gegenstück zu 1: Ihre Serverzeile gab es
+ * schon vorher, ihr Vorhandensein sagt nichts darüber, ob die Änderung darin
+ * steckt. Ab 4 gilt deshalb allein der Server, auch wenn danach jemand anderes
+ * den Termin geändert oder gelöscht hat (Anti-Ziel der Spec).
+ */
+export function appliesToView(entry: OptimisticEvent, view: EventsView): boolean {
+  if (entry.kind === "create" && view.rows?.some((row) => row.id === entry.serverId)) {
+    return false;
+  }
+  if (entry.savedAt === null) return true;
+  if (view.rows === undefined) return true;
+  return view.dataUpdatedAt <= entry.savedAt;
+}
 
 /**
  * Präfix der **synthetischen Event-Id**, die ein optimistischer Create trägt.
@@ -333,7 +400,7 @@ export const useOptimisticEventsStore = create<OptimisticEventsState>((set) => (
   add: (payload, timeoutMs = OPTIMISTIC_TIMEOUT_MS) => {
     sequence += 1;
     const id = `optimistic-${sequence}`;
-    set((state) => ({ entries: [...state.entries, { id, ...payload }] }));
+    set((state) => ({ entries: [...state.entries, { id, savedAt: null, ...payload }] }));
     timers.set(
       id,
       setTimeout(() => {
@@ -364,7 +431,19 @@ export function useOptimisticEvents(): OptimisticEvent[] {
 }
 
 /**
- * Legt die optimistischen Änderungen auf den expandierten Occurrence-Strom.
+ * Die Anzeige-Pipeline hinter `useFamilyEvents`, für genau eine Ansicht
+ * (Spec 3.2):
+ *
+ * 1. Es zählen nur die Einträge, die in `view` gelten (`appliesToView`).
+ * 2. Zu den Server-Occurrences kommen die der gültigen Creates.
+ * 3. Weg ist, was eine offene Löschung im Undo-Fenster oder ein gültiges
+ *    Delete trifft (`hidesOccurrence`).
+ * 4. Gültige Updates patchen in Store-Reihenfolge.
+ *
+ * Als eigene Funktion, nicht inline im Hook — damit die Pipeline testbar ist.
+ * Stünde sie im Hook, könnte ein Test sie nur nachbauen, und ein nachgebauter
+ * Test bliebe grün, wenn jemand den Hook zurückdreht. Genau das ist bei der
+ * ersten Fassung passiert.
  *
  * `expand` wird **injiziert** statt importiert: `expandEvents` braucht
  * `rangeStart`, `rangeEnd` und `theme`, die alle im Hook liegen. So bleibt diese
@@ -372,80 +451,55 @@ export function useOptimisticEvents(): OptimisticEvent[] {
  * für neu angelegte Termine fällt dabei gratis ab — `expandEvents` wendet sie
  * ohnehin an.
  *
- * Gibt bei leerer Liste die Eingabe **unverändert** zurück. Das spart im
- * Normalfall einen Durchlauf und eine Allokation; für die Referenzstabilität des
- * Aufrufers tut es nichts, denn der Aufruf steht innerhalb desselben `useMemo`.
- */
-export function withOptimistic(
-  occurrences: CalendarOccurrence[],
-  entries: readonly OptimisticEvent[],
-  expand: (rows: EventWithRelations[]) => CalendarOccurrence[],
-): CalendarOccurrence[] {
-  if (entries.length === 0) return occurrences;
-
-  const updates = entries.filter(
-    (entry): entry is { id: string } & OptimisticUpdate => entry.kind === "update",
-  );
-  const patched =
-    updates.length === 0
-      ? occurrences
-      : occurrences.map((occurrence) => {
-          let next = occurrence;
-          for (const update of updates) {
-            if (patchesOccurrence(update, next)) {
-              next = applyOptimisticChanges(next, update.scope, update.changes);
-            }
-          }
-          return next;
-        });
-
-  const created = entries
-    .filter((entry): entry is { id: string } & OptimisticCreate => entry.kind === "create")
-    .map((entry) => entry.row);
-  if (created.length === 0) return patched;
-  return [...patched, ...expand(created)];
-}
-
-/**
- * Die Anzeige-Pipeline hinter `useFamilyEvents`: erst der Löschfilter, dann das
- * optimistische Overlay.
+ * **Overlay-Zeilen laufen durch Filter und Patch.** Zum Abgleich gilt für sie
+ * die `serverId` ihres Creates als `eventId`, angezeigt wird weiter
+ * `optimistic-<n>`. Ohne die Zuordnung brächte eine Ansicht mit alten Daten
+ * einen Termin zurück, den der Nutzer anderswo schon gelöscht oder geändert
+ * hat: in der Überlappung zweier Monate angelegt, vom November aus gelöscht,
+ * zurück auf den Oktober.
  *
- * Als eigene Funktion, nicht inline im Hook — damit die **Reihenfolge** testbar
- * ist. Stünde sie im Hook, könnte ein Test sie nur nachbauen, und ein
- * nachgebauter Test bliebe grün, wenn jemand den Hook zurückdreht. Genau das
- * ist bei der ersten Fassung passiert.
+ * **Erst filtern, dann patchen:** Eine Löschung gewinnt gegen ein
+ * gleichzeitiges Update (ADR-027 Decision 9). Seit `hidesOccurrence` und
+ * `patchesOccurrence` beide gegen `occurrenceKey` vergleichen, das
+ * `applyOptimisticChanges` nie neu berechnet, kommutieren die beiden Schritte;
+ * die Reihenfolge bleibt als Gürtel und Hosenträger.
  *
- * Warum die Reihenfolge so herum: Vor ADR-034 verglich `hidesOccurrence` gegen
- * das aufgelöste Anzeigedatum, und ein Update mit Scope `this`, das den Termin
- * verschiebt, schrieb genau dieses Feld (`occurrenceDate`) neu. Liefe der
- * Filter danach, vergliche er das neue Datum gegen das alte, das die offene
- * Löschung trägt — die Löschung griffe nicht mehr. Seit `hidesOccurrence` und
- * `patchesOccurrence` beide gegen `occurrenceKey` vergleichen — ein Wert, den
- * `applyOptimisticChanges` nie neu berechnet — kommutieren Filter und Patch für
- * diesen Fall inzwischen: Filtern-vor-Patchen und Patchen-vor-Filtern liefern
- * dasselbe Ergebnis. Ehrlich zu Ende gedacht (siehe „Was die Reihenfolge
- * kostet" unten): Auch der zweite denkbare Grund, die Reihenfolge festzuhalten
- * — ein optimistischer Create-Eintrag könnte den Filter umgehen —, trägt
- * nicht, weil dieser Fall strukturell unerreichbar ist. Die Reihenfolge ist
- * damit für keinen der beiden Overlay-Typen mehr folgenreich; sie bleibt
- * stehen als Gürtel und Hosenträger, nicht weil ein Test sie verlangt.
- *
- * **Was die Reihenfolge kostet:** Die Occurrences eines optimistischen
- * **Creates** umgehen den Löschfilter strukturell — sie entstehen erst hinter
- * ihm, `withOptimistic` hängt sie an. Folgenlos, weil eine synthetische
- * `optimistic-`-Id keine Löschung adressieren kann (siehe
- * `isOptimisticEventId`); der Fall ist damit unerreichbar, nicht bloß
- * unwahrscheinlich. Der ADR sagt das, die Funktion sagte es bisher nicht.
+ * Gilt kein Eintrag und ist keine Löschung offen, kommt `expanded`
+ * **unverändert** zurück. Das spart im Normalfall einen Durchlauf und eine
+ * Allokation; für die Referenzstabilität des Aufrufers tut es nichts, denn der
+ * Aufruf steht innerhalb seines `useMemo`.
  */
 export function visibleOccurrences(args: {
   expanded: CalendarOccurrence[];
+  view: EventsView;
   pending: readonly PendingEventDelete[];
   optimistic: readonly OptimisticEvent[];
   expand: (rows: EventWithRelations[]) => CalendarOccurrence[];
 }): CalendarOccurrence[] {
-  return withOptimistic(
-    withoutPendingDeletes(args.expanded, args.pending),
-    args.optimistic,
-    args.expand,
-  );
+  const active = args.optimistic.filter((entry) => appliesToView(entry, args.view));
+  if (active.length === 0 && args.pending.length === 0) return args.expanded;
+
+  // Jede Occurrence mit der Id, unter der der Server sie kennt.
+  const candidates = [
+    ...args.expanded.map((occurrence) => ({ occurrence, eventId: occurrence.eventId })),
+    ...active.flatMap((entry) =>
+      entry.kind === "create"
+        ? args.expand([entry.row]).map((occurrence) => ({ occurrence, eventId: entry.serverId }))
+        : [],
+    ),
+  ];
+  const hiding = [...args.pending, ...active.filter((entry) => entry.kind === "delete")];
+  const updates = active.filter((entry) => entry.kind === "update");
+
+  return candidates.flatMap(({ occurrence, eventId }) => {
+    const target = { eventId, occurrenceKey: occurrence.occurrenceKey };
+    if (hiding.some((entry) => hidesOccurrence(entry, target))) return [];
+    let next = occurrence;
+    for (const update of updates) {
+      if (patchesOccurrence(update, target)) {
+        next = applyOptimisticChanges(next, update.scope, update.changes);
+      }
+    }
+    return [next];
+  });
 }

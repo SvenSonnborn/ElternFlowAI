@@ -65,20 +65,24 @@ export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
     // eigenen Query-Cache-Eintrag (neue Range-Query, Kaltstart), wäre der
     // gerade angelegte Termin bis zum Fetch unsichtbar. `NO_OCCURRENCES` statt
     // `[]`, damit die Referenz stabil bleibt, solange weder Serverdaten noch
-    // ein optimistischer Eintrag vorliegen — `withoutPendingDeletes` und
-    // `withOptimistic` geben ihre Eingabe unverändert zurück, solange ihre
-    // jeweilige Liste leer ist.
+    // ein gültiger Eintrag vorliegen — `visibleOccurrences` gibt seine Eingabe
+    // unverändert zurück, solange in dieser Ansicht kein Eintrag gilt und keine
+    // Löschung offen ist.
     const expanded = query.data
       ? expandEvents(query.data, rangeStart, rangeEnd, theme)
       : NO_OCCURRENCES;
-    // Siehe `visibleOccurrences`: Reihenfolge Filter → Patch.
+    // `dataUpdatedAt` steht eigens in den Abhängigkeiten: Ein Refetch mit
+    // gleichen Daten behält dank Structural Sharing dieselbe `data`-Referenz,
+    // schiebt aber `dataUpdatedAt` vor — und das entscheidet, ob ein
+    // gespeicherter Eintrag in dieser Ansicht noch gilt (`appliesToView`).
     return visibleOccurrences({
       expanded,
+      view: { dataUpdatedAt: query.dataUpdatedAt, rows: query.data },
       pending,
       optimistic,
       expand: (rows) => expandEvents(rows, rangeStart, rangeEnd, theme),
     });
-  }, [query.data, rangeStart, rangeEnd, theme, optimistic, pending]);
+  }, [query.data, query.dataUpdatedAt, rangeStart, rangeEnd, theme, optimistic, pending]);
 
   const segments = useMemo(
     () => toDaySegments(data, rangeStart, rangeEnd),

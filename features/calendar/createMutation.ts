@@ -247,15 +247,12 @@ let sequence = 0;
  * spiegelt bewusst den `upsert` in `createEvent` direkt darüber: Weicht sie ab,
  * zeigt der Kalender etwas anderes an, als gleich gespeichert wird.
  *
- * **Warum nicht `vars.id`**, obwohl die echte Zeile genau diese Id bekommt.
- * `onSettled` invalidiert bei Erfolg zuerst und gibt die optimistische Zeile
- * erst danach frei, damit kein Frame den alten Stand zeigt. Zwischen dem
- * gelandeten Refetch und dem `remove` stehen echte und optimistische Zeile also
- * kurz nebeneinander — `withOptimistic` hängt Creates an, statt nach Id zu
- * entdoppeln. Mit derselben Id und demselben `start_at` trügen beide denselben
- * React-Key `${eventId}-${occurrenceKey}-${date}`. Und eine echte UUID verlöre
- * den Präfix `optimistic-`, an dem `isOptimisticEventId` die Zeile erkennt und
- * die Navigation zum noch nicht gespeicherten Termin sperrt.
+ * **Warum nicht `vars.id`**, obwohl die echte Zeile genau diese Id bekommt:
+ * Eine echte UUID verlöre den Präfix `optimistic-`, an dem
+ * `isOptimisticEventId` die Zeile erkennt und die Navigation zum noch nicht
+ * gespeicherten Termin sperrt. Die echte Id trägt der Eintrag daneben als
+ * `serverId`; darüber ordnen `appliesToView` und `visibleOccurrences` ihn der
+ * Serverzeile zu.
  */
 export function optimisticEventRow(vars: CreateEventVars, type: EventTypeRow): EventWithRelations {
   const rrule = recurrenceToRrule(vars.recurrence, new Date(vars.startAt), vars.timezone);
@@ -330,7 +327,7 @@ export function useCreateEvent() {
         });
         return undefined;
       }
-      return add({ kind: "create", row: optimisticEventRow(vars, type) });
+      return add({ kind: "create", row: optimisticEventRow(vars, type), serverId: vars.id });
     },
     onError: (_err, _vars, id) => {
       if (id) remove(id);
