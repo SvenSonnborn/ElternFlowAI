@@ -536,7 +536,9 @@ export interface OptimisticContext {
  *    Termin-Änderung. In TanStack 5.105 bricht `Query.cancel` synchron ab
  *    (`retryer.cancel` → `reject`, der Revert setzt `fetchStatus: "idle"`),
  *    darum startet dieses Invalidieren ein neues Laden, statt das abgebrochene
- *    Promise zurückzugeben.
+ *    Promise zurückzugeben. Vertauscht bräche `cancelQueries` genau das Laden
+ *    ab, das `invalidateQueries` gerade für die aktive Ansicht gestartet hat,
+ *    und sie bliebe bis zum nächsten Fokus oder Mount auf dem alten Stand.
  *
  * Nichts wird erwartet, die Rückgabe ist `void`: Über die Sichtbarkeit
  * entscheidet die Overlay-Regel, und ein hängender Refetch hielte sonst die

@@ -1231,6 +1231,68 @@ describe("confirmEventSave", () => {
     expect(store().entries).toHaveLength(1);
   });
 
+  // Diese beiden halten die Reihenfolge Abbrechen → Invalidieren fest: Vertauscht
+  // bräche `cancelQueries` das Laden ab, das `invalidateQueries` gerade für die
+  // aktive Ansicht gestartet hat, und der sichtbare Monat bliebe alt.
+  test("eine aktive Ansicht mit alten Daten lädt nach dem Speichern neu", async () => {
+    qc.setQueryData(OCTOBER, [singleRow()], { updatedAt: Date.now() - 100 });
+    let calls = 0;
+    const observer = new QueryObserver(qc, {
+      queryKey: OCTOBER,
+      queryFn: async () => {
+        calls += 1;
+        // Landet sicher nach `savedAt`, auch wenn alles in einer Millisekunde läuft.
+        await sleep(2);
+        return [singleRow({ title: "Stand nach dem Speichern" })];
+      },
+      // Kein eigenes Laden beim Abonnieren: Neu laden soll hier nur `confirmEventSave`.
+      refetchOnMount: false,
+    });
+    const unsubscribe = observer.subscribe(() => {});
+    try {
+      const id = store().add(updatePayload());
+      confirmEventSave(qc, { payload: updatePayload(), id });
+      const savedAt = store().entries[0]?.savedAt ?? Number.NaN;
+      await sleep(10);
+      expect(calls).toBe(1);
+      expect(qc.getQueryState(OCTOBER)?.dataUpdatedAt).toBeGreaterThan(savedAt);
+      expect(store().entries).toEqual([]);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  test("eine aktive Ansicht mitten im ersten Laden lädt nach dem Speichern neu", async () => {
+    const first = deferred<EventWithRelations[]>();
+    let calls = 0;
+    const observer = new QueryObserver(qc, {
+      queryKey: OCTOBER,
+      queryFn: async () => {
+        calls += 1;
+        if (calls === 1) return first.promise;
+        await sleep(2);
+        return [singleRow({ title: "Stand nach dem Speichern" })];
+      },
+    });
+    const unsubscribe = observer.subscribe(() => {});
+    try {
+      expect(qc.getQueryState(OCTOBER)?.fetchStatus).toBe("fetching");
+      const id = store().add(updatePayload());
+      confirmEventSave(qc, { payload: updatePayload(), id });
+      const savedAt = store().entries[0]?.savedAt ?? Number.NaN;
+      first.resolve([singleRow({ title: "Stand vor dem Speichern" })]);
+      await sleep(10);
+      expect(calls).toBe(2);
+      expect(qc.getQueryState(OCTOBER)?.dataUpdatedAt).toBeGreaterThan(savedAt);
+      expect(qc.getQueryData<EventWithRelations[]>(OCTOBER)?.[0]?.title).toBe(
+        "Stand nach dem Speichern",
+      );
+      expect(store().entries).toEqual([]);
+    } finally {
+      unsubscribe();
+    }
+  });
+
   test("invalidiert `eventsRoot` und `oneRoot`, nicht `types` und `reminders`", () => {
     qc.setQueryData(OCTOBER, [singleRow()]);
     qc.setQueryData(calendarKeys.one("e9"), singleRow());
