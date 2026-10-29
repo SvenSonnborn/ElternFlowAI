@@ -3,18 +3,20 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { lightTheme } from "@/design-system";
 
 import type { EventWithRelations } from "./expand";
+import type { EventsView, OptimisticEvent } from "./optimisticEvents";
+import type { PendingEventDelete } from "./pendingDeletes";
 import type { EventChanges, RecurrenceChanges } from "./recurrence";
 import type { CalendarOccurrence } from "./types";
 
 import { expandEvents } from "./expand";
 import {
+  appliesToView,
   applyOptimisticChanges,
   canApplyOptimistically,
   isOptimisticEventId,
   patchesOccurrence,
   useOptimisticEventsStore,
   visibleOccurrences,
-  withOptimistic,
 } from "./optimisticEvents";
 import { withoutPendingDeletes } from "./pendingDeletes";
 import { instantToFloating } from "./timezone";
@@ -294,16 +296,33 @@ function expandStub(rows: EventWithRelations[]): CalendarOccurrence[] {
   ]);
 }
 
-describe("withOptimistic", () => {
+// `visibleOccurrences` ohne Löschungen und mit Einträgen „unterwegs" — die
+// gelten in jeder Ansicht, der Datenstand spielt für die Tests darunter keine
+// Rolle.
+function overlay(
+  expanded: CalendarOccurrence[],
+  optimistic: readonly OptimisticEvent[],
+  expand: (rows: EventWithRelations[]) => CalendarOccurrence[] = expandStub,
+): CalendarOccurrence[] {
+  return visibleOccurrences({
+    expanded,
+    view: { dataUpdatedAt: 0, rows: undefined },
+    pending: [],
+    optimistic,
+    expand,
+  });
+}
+
+describe("visibleOccurrences", () => {
   test("gibt bei leerer Liste dieselbe Referenz zurück", () => {
     const input = [occ()];
-    expect(withOptimistic(input, [], expandStub)).toBe(input);
+    expect(overlay(input, [])).toBe(input);
   });
 
   test("patcht eine betroffene Occurrence und lässt die übrigen unberührt", () => {
     const a = occ({ occurrenceDate: "2026-09-10" });
     const b = occ({ eventId: "e2", occurrenceDate: "2026-09-10" });
-    const out = withOptimistic(
+    const out = overlay(
       [a, b],
       [
         {
@@ -313,16 +332,19 @@ describe("withOptimistic", () => {
           occurrenceKey: "2026-09-10",
           scope: "this",
           changes: changes({ title: "Geändert" }),
+          savedAt: null,
         },
       ],
-      expandStub,
     );
     expect(out[0].title).toBe("Geändert");
     expect(out[1]).toBe(b);
   });
 
   test("schickt eine Create-Zeile durch den Expander", () => {
-    const out = withOptimistic([], [{ id: "o1", kind: "create", row: row() }], expandStub);
+    const out = overlay(
+      [],
+      [{ id: "o1", kind: "create", row: row(), serverId: "e-neu", savedAt: null }],
+    );
     expect(out).toHaveLength(2);
     expect(out.map((o) => o.occurrenceDate)).toEqual(["2026-10-01", "2026-10-08"]);
   });
@@ -344,7 +366,7 @@ describe("withOptimistic", () => {
       isRecurring: false,
       rrule: { freq: null, interval: 1, byweekday: null, count: null, until: null },
     });
-    const out = withOptimistic(
+    const out = overlay(
       [single],
       [
         {
@@ -358,6 +380,7 @@ describe("withOptimistic", () => {
             start_at: new Date("2026-09-24T18:00:00").toISOString(),
             end_at: new Date("2026-09-24T19:30:00").toISOString(),
           }),
+          savedAt: null,
         },
         {
           id: "o2",
@@ -370,9 +393,9 @@ describe("withOptimistic", () => {
             start_at: new Date("2026-09-30T18:00:00").toISOString(),
             end_at: new Date("2026-09-30T19:30:00").toISOString(),
           }),
+          savedAt: null,
         },
       ],
-      expandStub,
     );
     // Wenn sequenziell: o1 verschiebt auf den 24.09. und setzt den Titel, o2
     // findet dieselbe Occurrence über `occurrenceKey` wieder (unabhängig davon,
@@ -386,7 +409,7 @@ describe("withOptimistic", () => {
   });
 });
 
-describe("withOptimistic mit dem echten expandEvents", () => {
+describe("visibleOccurrences mit dem echten expandEvents", () => {
   const theme = lightTheme;
 
   test("ein neu angelegter Serientermin erscheint mit allen Occurrences im Fenster", () => {
@@ -395,8 +418,10 @@ describe("withOptimistic mit dem echten expandEvents", () => {
     // gegen das dieses Feature antritt.
     const start = new Date("2026-09-25T00:00:00");
     const end = new Date("2026-10-31T00:00:00");
-    const out = withOptimistic([], [{ id: "o1", kind: "create", row: row() }], (rows) =>
-      expandEvents(rows, start, end, theme),
+    const out = overlay(
+      [],
+      [{ id: "o1", kind: "create", row: row(), serverId: "e-neu", savedAt: null }],
+      (rows) => expandEvents(rows, start, end, theme),
     );
     // rrule_count: 2 → zwei wöchentliche Termine ab dem 01.10.
     expect(out.map((o) => o.occurrenceDate)).toEqual(["2026-10-01", "2026-10-08"]);
@@ -407,8 +432,10 @@ describe("withOptimistic mit dem echten expandEvents", () => {
     // damit eine spätere Umstellung sie nicht verliert.
     const start = new Date("2026-11-01T00:00:00");
     const end = new Date("2026-11-30T00:00:00");
-    const out = withOptimistic([], [{ id: "o1", kind: "create", row: row() }], (rows) =>
-      expandEvents(rows, start, end, theme),
+    const out = overlay(
+      [],
+      [{ id: "o1", kind: "create", row: row(), serverId: "e-neu", savedAt: null }],
+      (rows) => expandEvents(rows, start, end, theme),
     );
     expect(out).toHaveLength(0);
   });
@@ -417,7 +444,7 @@ describe("withOptimistic mit dem echten expandEvents", () => {
 describe("Reihenfolge der beiden Overlays", () => {
   test("eine zugleich bearbeitete und gelöschte Occurrence ist weg (scope: all)", () => {
     // Ein Update kann eine bereits gefilterte Occurrence nicht zurückbringen,
-    // weil der Patch-Zweig von `withOptimistic` nur per `.map()` über die
+    // weil der Patch-Schritt von `visibleOccurrences` nur per `.map()` über die
     // bestehende Liste arbeitet und nie Einträge hinzufügt. Daher ist die
     // Reihenfolge (Patch vor Delete oder umgekehrt) folgenlos — das Ergebnis
     // ist in beiden Fällen leer. Wir halten diesen Test trotzdem, weil die
@@ -426,7 +453,7 @@ describe("Reihenfolge der beiden Overlays", () => {
     //
     // ABER: Bei `scope: "this"` auf einem Einzeltermin, der sich verschiebt,
     // wird dieses Testen kritisch — siehe Test unten.
-    const patched = withOptimistic(
+    const patched = overlay(
       [occ()],
       [
         {
@@ -436,9 +463,9 @@ describe("Reihenfolge der beiden Overlays", () => {
           occurrenceKey: "2026-09-10",
           scope: "all",
           changes: changes({ title: "Geändert" }),
+          savedAt: null,
         },
       ],
-      expandStub,
     );
     expect(patched).toHaveLength(1);
     const out = withoutPendingDeletes(patched, [
@@ -458,9 +485,9 @@ describe("Reihenfolge der beiden Overlays", () => {
     // vergleichen — ein Wert, den `applyOptimisticChanges` nie neu berechnet —
     // kommutieren Filter und Patch für diesen Fall: beide Reihenfolgen kommen
     // zum selben Ergebnis. `visibleOccurrences` filtert trotzdem weiterhin vor
-    // dem Patchen (ein optimistischer **Create**-Eintrag umgeht den Filter
-    // strukturell, siehe der Test oben) — dieser Test hält beide Reihenfolgen
-    // als Regression fest, nicht nur die, die die Pipeline tatsächlich fährt.
+    // dem Patchen (eine Löschung gewinnt gegen ein gleichzeitiges Update,
+    // ADR-027 Decision 9) — dieser Test hält beide Reihenfolgen als Regression
+    // fest, nicht nur die, die die Pipeline tatsächlich fährt.
 
     const single = occ({
       isRecurring: false,
@@ -478,12 +505,14 @@ describe("Reihenfolge der beiden Overlays", () => {
           start_at: new Date("2026-09-20T18:00:00").toISOString(),
           end_at: new Date("2026-09-20T19:30:00").toISOString(),
         }),
+        savedAt: null,
       },
     ];
 
     // Tatsächliche Pipeline (Filter vor Patch) — über `visibleOccurrences`.
     const result = visibleOccurrences({
       expanded: [single],
+      view: { dataUpdatedAt: 0, rows: undefined },
       pending,
       optimistic,
       expand: expandStub,
@@ -492,16 +521,252 @@ describe("Reihenfolge der beiden Overlays", () => {
 
     // Umgekehrte Reihenfolge (Patch vor Filter) — kommt seit ADR-034 zum
     // selben Ergebnis, weil `occurrenceKey` den Patch unverändert übersteht.
-    const patchedFirst = withOptimistic([single], optimistic, expandStub);
+    const patchedFirst = overlay([single], optimistic);
     // Belegt die Step-3-Invariante direkt an dieser Stelle: der Patch hat das
     // Anzeigedatum verschoben, aber `occurrenceKey` unangetastet gelassen —
     // ohne das wäre der Filter-Aufruf direkt darunter kein Beleg für
-    // Kommutativität, sondern liefe blind ins Leere, falls `withOptimistic`
+    // Kommutativität, sondern liefe blind ins Leere, falls der Patch-Schritt
     // aus irgendeinem Grund gar nichts mehr patchte.
     expect(patchedFirst[0].occurrenceDate).toBe("2026-09-20");
     expect(patchedFirst[0].occurrenceKey).toBe("2026-09-10");
     const patchedThenFiltered = withoutPendingDeletes(patchedFirst, pending);
     expect(patchedThenFiltered).toHaveLength(0);
+  });
+});
+
+// ── Regel pro Ansicht (Spec 3.2) ───────────────────────────────────────────
+// Gespeicherte Einträge tragen `savedAt: 1000`; eine Ansicht ist „älter" mit
+// `dataUpdatedAt: 500`, „neuer" mit `2000`.
+const SAVED_AT = 1000;
+const OLDER = 500;
+const NEWER = 2000;
+
+// Ein Einzeltermin am 01.10., zonenexplizit gebaut: Sein `occurrenceKey`
+// (Zone des Termins) bleibt unter jeder Runner-Zone `2026-10-01`, die
+// Einträge unten treffen ihn dadurch verlässlich.
+function singleRow(partial: Partial<EventWithRelations> = {}): EventWithRelations {
+  return row({
+    start_at: "2026-10-01T17:00:00.000Z", // 19:00 Europe/Berlin
+    end_at: "2026-10-01T18:30:00.000Z", // 20:30 Europe/Berlin
+    rrule_freq: null,
+    rrule_count: null,
+    ...partial,
+  });
+}
+
+// Destrukturierte Defaults statt `??`: `savedAt: null` („unterwegs") muss
+// durchkommen und darf nicht auf `SAVED_AT` fallen.
+function createEntry({
+  savedAt = SAVED_AT,
+  row: overlayRow = singleRow({ id: "optimistic-1" }),
+}: { savedAt?: number | null; row?: EventWithRelations } = {}): OptimisticEvent {
+  return { id: "o1", kind: "create", row: overlayRow, serverId: "e-neu", savedAt };
+}
+
+function updateEntry({
+  eventId = "e9",
+  savedAt = SAVED_AT,
+}: { eventId?: string; savedAt?: number | null } = {}): OptimisticEvent {
+  return {
+    id: "o2",
+    kind: "update",
+    eventId,
+    occurrenceKey: "2026-10-01",
+    scope: "this",
+    changes: changes({
+      title: "Elternabend neu",
+      start_at: "2026-10-01T17:00:00.000Z",
+      end_at: "2026-10-01T18:30:00.000Z",
+      location: null,
+      description: null,
+    }),
+    savedAt,
+  };
+}
+
+function deleteEntry({
+  eventId = "e9",
+  savedAt = SAVED_AT,
+}: { eventId?: string; savedAt?: number | null } = {}): OptimisticEvent {
+  return { id: "o3", kind: "delete", eventId, occurrenceKey: "2026-10-01", scope: "this", savedAt };
+}
+
+// Die Range-Fenster von Oktober und November, wie `useFamilyEvents` sie
+// aufspannt (Monat ± 7 Tage). Der 30.10. liegt in beiden.
+const expandOctober = (rows: EventWithRelations[]) =>
+  expandEvents(
+    rows,
+    new Date("2026-09-24T00:00:00.000Z"),
+    new Date("2026-11-08T00:00:00.000Z"),
+    lightTheme,
+  );
+const expandNovember = (rows: EventWithRelations[]) =>
+  expandEvents(
+    rows,
+    new Date("2026-10-25T00:00:00.000Z"),
+    new Date("2026-12-08T00:00:00.000Z"),
+    lightTheme,
+  );
+
+// Baut nur die Eingabe einer Ansicht — `expanded` aus ihren eigenen Zeilen,
+// wie der Hook es tut. Die Pipeline darunter ist die echte.
+function show(
+  view: EventsView,
+  optimistic: readonly OptimisticEvent[],
+  pending: readonly PendingEventDelete[] = [],
+  expand: (rows: EventWithRelations[]) => CalendarOccurrence[] = expandOctober,
+): CalendarOccurrence[] {
+  return visibleOccurrences({
+    expanded: view.rows ? expand([...view.rows]) : [],
+    view,
+    pending,
+    optimistic,
+    expand,
+  });
+}
+
+const titles = (occurrences: CalendarOccurrence[]) => occurrences.map((o) => o.title);
+
+describe("appliesToView", () => {
+  // Alle drei Arten: Bis auf die Zuordnung über die echte Id hängt die Regel
+  // nicht an der Art des Eintrags.
+  const allKinds = (savedAt: number | null) => [
+    createEntry({ savedAt }),
+    updateEntry({ savedAt }),
+    deleteEntry({ savedAt }),
+  ];
+  // Serverdaten, die den neuen Termin (`e-neu`) noch nicht kennen.
+  const rows = [singleRow()];
+
+  test("unterwegs gilt ein Eintrag in jeder Ansicht", () => {
+    for (const entry of allKinds(null)) {
+      expect(appliesToView(entry, { dataUpdatedAt: OLDER, rows })).toBe(true);
+      expect(appliesToView(entry, { dataUpdatedAt: NEWER, rows })).toBe(true);
+      expect(appliesToView(entry, { dataUpdatedAt: 0, rows: undefined })).toBe(true);
+    }
+  });
+
+  test("gespeichert gilt er in einer Ansicht ohne Serverdaten", () => {
+    for (const entry of allKinds(SAVED_AT)) {
+      expect(appliesToView(entry, { dataUpdatedAt: 0, rows: undefined })).toBe(true);
+    }
+  });
+
+  test("gespeichert gilt er, bis die Ansicht Daten von nach dem Speichern hat", () => {
+    for (const entry of allKinds(SAVED_AT)) {
+      expect(appliesToView(entry, { dataUpdatedAt: 999, rows })).toBe(true);
+      // Gleichstand zählt als älter: Daten aus derselben Millisekunde stammen
+      // aus einem Laden, das vor dem Speichern begann.
+      expect(appliesToView(entry, { dataUpdatedAt: 1000, rows })).toBe(true);
+      expect(appliesToView(entry, { dataUpdatedAt: 1001, rows })).toBe(false);
+    }
+  });
+
+  test("ein Create weicht der Serverzeile mit seiner echten Id, in jeder Phase", () => {
+    // Deckt ein Laden ab, das den Termin schon trägt, aber vor dem Speichern
+    // ankam — etwa vom eigenen Realtime-Echo angestoßen.
+    const withServerRow = { dataUpdatedAt: OLDER, rows: [singleRow(), singleRow({ id: "e-neu" })] };
+    expect(appliesToView(createEntry({ savedAt: null }), withServerRow)).toBe(false);
+    expect(appliesToView(createEntry({ savedAt: SAVED_AT }), withServerRow)).toBe(false);
+  });
+});
+
+describe("visibleOccurrences · Regel pro Ansicht", () => {
+  test("gespeicherter Create: die ältere Ansicht zeigt die Overlay-Zeile, die neuere die Serverzeile", () => {
+    const older = show({ dataUpdatedAt: OLDER, rows: [] }, [createEntry()]);
+    expect(older).toHaveLength(1);
+    expect(older[0].eventId).toMatch(/^optimistic-/);
+
+    const newer = show({ dataUpdatedAt: NEWER, rows: [singleRow({ id: "e-neu" })] }, [
+      createEntry(),
+    ]);
+    expect(newer).toHaveLength(1);
+    expect(newer[0].eventId).toBe("e-neu");
+  });
+
+  test("gespeichertes Update: die ältere Ansicht zeigt die Änderung, die neuere den Server", () => {
+    // Die neuere Ansicht trägt bewusst den alten Titel, etwa weil jemand ihn
+    // danach zurückgeändert hat: Dort überstimmt der Eintrag nichts mehr.
+    expect(titles(show({ dataUpdatedAt: OLDER, rows: [singleRow()] }, [updateEntry()]))).toEqual([
+      "Elternabend neu",
+    ]);
+    expect(titles(show({ dataUpdatedAt: NEWER, rows: [singleRow()] }, [updateEntry()]))).toEqual([
+      "Elternabend",
+    ]);
+  });
+
+  test("gespeichertes Delete: die ältere Ansicht blendet aus, in der neueren gewinnt der Server", () => {
+    expect(show({ dataUpdatedAt: OLDER, rows: [singleRow()] }, [deleteEntry()])).toEqual([]);
+    expect(titles(show({ dataUpdatedAt: NEWER, rows: [singleRow()] }, [deleteEntry()]))).toEqual([
+      "Elternabend",
+    ]);
+  });
+
+  test("ein Delete mit der echten Id blendet die Overlay-Zeile eines gespeicherten Creates aus", () => {
+    // Spec 3.2: in der Überlappung angelegt, vom November aus gelöscht, zurück
+    // auf den Oktober, dessen Daten noch von vor dem Anlegen stammen.
+    const out = show({ dataUpdatedAt: OLDER, rows: [] }, [
+      createEntry(),
+      deleteEntry({ eventId: "e-neu" }),
+    ]);
+    expect(out).toEqual([]);
+  });
+
+  test("ein Update mit der echten Id patcht die Overlay-Zeile, ihre angezeigte Id bleibt", () => {
+    const out = show({ dataUpdatedAt: OLDER, rows: [] }, [
+      createEntry(),
+      updateEntry({ eventId: "e-neu" }),
+    ]);
+    expect(titles(out)).toEqual(["Elternabend neu"]);
+    expect(out[0].eventId).toMatch(/^optimistic-/);
+  });
+
+  test("eine Löschung im Undo-Fenster trifft die Overlay-Zeile über die echte Id", () => {
+    const out = show(
+      { dataUpdatedAt: OLDER, rows: [] },
+      [createEntry()],
+      [{ eventId: "e-neu", occurrenceKey: "2026-10-01", scope: "this" }],
+    );
+    expect(out).toEqual([]);
+  });
+
+  test("Delete und Update auf dieselbe Occurrence: erst filtern, dann patchen, sie bleibt weg", () => {
+    // Das Update steht im Store vor dem Delete — die Löschung gewinnt trotzdem.
+    const out = show({ dataUpdatedAt: OLDER, rows: [singleRow()] }, [updateEntry(), deleteEntry()]);
+    expect(out).toEqual([]);
+  });
+
+  test("ein Eintrag, zwei Ansichten mit verschiedenem Datenstand: jede zeigt den Termin genau einmal", () => {
+    // Die Doppelanzeige aus Spec 1.2: Der Termin am 30.10. liegt in den Ranges
+    // beider Monate. Der Kalender auf November hat nach dem Speichern neu
+    // geladen und trägt die Serverzeile, das Dashboard auf Oktober wartet noch.
+    const at = { start_at: "2026-10-30T17:00:00.000Z", end_at: "2026-10-30T18:30:00.000Z" };
+    const entry = createEntry({ row: singleRow({ id: "optimistic-1", ...at }) });
+
+    const october = show({ dataUpdatedAt: OLDER, rows: [] }, [entry], [], expandOctober);
+    const november = show(
+      { dataUpdatedAt: NEWER, rows: [singleRow({ id: "e-neu", ...at })] },
+      [entry],
+      [],
+      expandNovember,
+    );
+    expect(october).toHaveLength(1);
+    expect(november).toHaveLength(1);
+  });
+
+  test("gilt kein Eintrag und ist keine Löschung offen, kommt dieselbe Referenz zurück", () => {
+    // „Kein Eintrag" heißt hier: keiner, der in **dieser** Ansicht gilt. Der
+    // Fall ganz ohne Einträge steht oben unter `visibleOccurrences`.
+    const view = { dataUpdatedAt: NEWER, rows: [singleRow()] };
+    const expanded = expandOctober([singleRow()]);
+    const out = visibleOccurrences({
+      expanded,
+      view,
+      pending: [],
+      optimistic: [updateEntry(), deleteEntry()],
+      expand: expandOctober,
+    });
+    expect(out).toBe(expanded);
   });
 });
 
@@ -520,7 +785,7 @@ describe("useOptimisticEventsStore", () => {
       changes: changes(),
     });
     expect(store().entries).toHaveLength(1);
-    expect(store().entries[0]).toMatchObject({ id, kind: "update", eventId: "e1" });
+    expect(store().entries[0]).toMatchObject({ id, kind: "update", eventId: "e1", savedAt: null });
     store().remove(id);
     expect(store().entries).toHaveLength(0);
   });
@@ -713,7 +978,7 @@ describe("Watchdog", () => {
     const spy = spyOn(console, "error").mockImplementation(() => {});
     try {
       const store = useOptimisticEventsStore.getState();
-      store.add({ kind: "create", row: row() }, 5);
+      store.add({ kind: "create", row: row(), serverId: "e-neu" }, 5);
       store.add(
         {
           kind: "update",
