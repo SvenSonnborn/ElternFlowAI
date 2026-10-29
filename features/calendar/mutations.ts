@@ -11,8 +11,14 @@ import {
   type ApplyEventChange,
   type EventChangeStep,
 } from "./eventChange";
-import { canApplyOptimistically, useOptimisticEventsStore } from "./optimisticEvents";
-import { calendarKeys, fetchEventById } from "./queries";
+import {
+  canApplyOptimistically,
+  confirmEventSave,
+  useOptimisticEventsStore,
+  type OptimisticContext,
+  type OptimisticUpdate,
+} from "./optimisticEvents";
+import { fetchEventById } from "./queries";
 import {
   applyDeleteScope,
   applyEditScope,
@@ -199,6 +205,20 @@ async function applySteps(
   }
 }
 
+/**
+ * Löscht einen Termin. Ein Overlay-Eintrag (`kind: "delete"`) entsteht erst
+ * bei Erfolg und gleich in der Phase „gespeichert"; bis dahin blendet im
+ * Undo-Ablauf der Pending-Delete-Store den Termin aus. `onSuccess` läuft,
+ * bevor `mutateAsync` auflöst und der Pending-Delete-Store freigibt — so liegt
+ * kein Frame ohne Ausblendung dazwischen, auch wenn das Neuladen danach
+ * scheitert (§3.4 der
+ * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ *
+ * Auf das Neuladen wartet niemand (§3.5): `useSignOut` → `flush()` braucht nur
+ * das abgeschlossene DELETE, und ein hängendes Laden hielte das Abmelden sonst
+ * bis zum Watchdog des Pending-Delete-Stores auf. Kein `onError`: Vor dem
+ * Erfolg gibt es keinen Eintrag, den ein Fehler entfernen müsste.
+ */
 export function useDeleteEvent() {
   const qc = useQueryClient();
   return useMutation({
@@ -208,11 +228,15 @@ export function useDeleteEvent() {
         applyChange: createSupabaseApplyEventChange(supabase),
       });
     },
-    onSuccess: () => {
-      // Zurückgegeben statt `void`: der Pending-Delete-Store gibt das Item erst
-      // frei, wenn `mutateAsync` durch ist. Ohne das Warten blitzte es für einen
-      // Frame zurück, bevor der Refetch es erneut entfernt.
-      return qc.invalidateQueries({ queryKey: calendarKeys.all });
+    onSuccess: (_data, vars) => {
+      confirmEventSave(qc, {
+        payload: {
+          kind: "delete",
+          eventId: vars.eventId,
+          occurrenceKey: vars.occurrenceKey,
+          scope: vars.scope,
+        },
+      });
     },
   });
 }
@@ -221,11 +245,11 @@ export function useDeleteEvent() {
  * Bearbeitet einen Termin und zeigt die Änderungen sofort im Kalender, statt auf
  * die Server-Antwort zu warten. `onMutate` schreibt einen Overlay-Eintrag
  * (`kind: "update"`) in den Store, der die geänderten Felder anwendet — es sei
- * denn, `canApplyOptimistically` verneint (siehe dort). `onSettled` invalidiert
- * die Kalender-Queries **nur bei Erfolg** und gibt den Store-Eintrag erst danach
- * frei: andersherum blitzte der optimistische Stand für einen Frame durch, bevor
- * der Refetch ihn ersetzt — dieselbe Lehre, die `useDeleteEvent` in ADR-026
- * gezogen hat. Warum der Fehlerfall nicht invalidiert, steht am `if` selbst.
+ * denn, `canApplyOptimistically` verneint (siehe dort). Bei Erfolg bestätigt
+ * `confirmEventSave` den Eintrag und stößt das Neuladen nur an: Der Eintrag
+ * gilt weiter in jeder Ansicht, deren Daten älter sind als das Speichern, und
+ * scheitert das Neuladen, bleibt die Änderung sichtbar (§3.1 und §3.5 der
+ * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
  *
  * **Zwei Grenzen, dieselbe Konsequenz.** `all`/`forward` **mit geändertem
  * Datum** bekommt gar keinen Eintrag, weil das Overlay dort die Nicht-Änderung
@@ -251,36 +275,31 @@ export function useUpdateEvent() {
         applyChange: createSupabaseApplyEventChange(supabase),
       });
     },
-    onMutate: (vars) => {
+    onMutate: (vars): OptimisticContext | undefined => {
       // Lieber gar nichts zeigen als die Nicht-Änderung dessen, was der Nutzer
       // gerade geändert hat — siehe `canApplyOptimistically`.
       if (!canApplyOptimistically(vars)) return undefined;
-      return add({
+      const payload: OptimisticUpdate = {
         kind: "update",
         eventId: vars.eventId,
         occurrenceKey: vars.occurrenceKey,
         scope: vars.scope,
         changes: vars.changes,
-      });
+      };
+      return { id: add(payload), payload };
     },
-    onError: (_err, _vars, id) => {
-      if (id) remove(id);
+    onSuccess: (_data, _vars, context) => {
+      confirmEventSave(qc, context);
     },
-    onSettled: async (_data, error, _vars, id) => {
-      // **Nur bei Erfolg invalidieren.** Bei einem Fehler ist serverseitig nichts
-      // passiert, der Refetch brächte dieselben Daten zurück — und er kostet mehr
-      // als nichts: TanStack ruft `onError` → `await onSettled` → **dann erst**
-      // lehnt `mutateAsync` ab. Der Rollback (`remove`) läuft also sofort, der
-      // Fehler-Toast wartete aber hinter einem Refetch, der bei toter Verbindung
-      // mit `retry: 1` und Backoff ins Leere läuft. Im Funkloch sähe der Nutzer
-      // seine Änderung kommen und wieder gehen, ohne ein Wort dazu. Das `if` ist
-      // deshalb kein Sonderfall, den man „vereinfachen" darf.
-      if (!error) {
-        // Erst invalidieren, **dann** freigeben — sonst blitzt der alte Stand
-        // für einen Frame durch.
-        await qc.invalidateQueries({ queryKey: calendarKeys.all });
-      }
-      if (id) remove(id);
+    onError: (_err, _vars, context) => {
+      // **Kein Neuladen nach einem Fehler.** Serverseitig ist nichts passiert,
+      // das Neuladen brächte dieselben Daten zurück. Und wer hier darauf
+      // wartete, hielte den Fehler-Toast auf: TanStack wartet `onError` und
+      // `onSettled` ab, **dann erst** lehnt `mutateAsync` ab — bei toter
+      // Verbindung hinter einem Laden, das mit `retry: 1` und Backoff ins
+      // Leere läuft. Im Funkloch sähe der Nutzer seine Änderung kommen und wieder
+      // gehen, ohne ein Wort dazu.
+      if (context) remove(context.id);
     },
   });
 }
