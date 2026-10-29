@@ -23,6 +23,8 @@ export type EventFormValues = {
  * eingetipptes Leerzeichen ist eine Eingabe, die verloren ginge. Der
  * Ausgangsstand ist Sache des Aufrufers — beim Anlegen zählt der automatisch
  * gesetzte Termin-Typ nicht als Änderung, beim Bearbeiten nicht die Hydration.
+ * Der Zähler zählt nur bei aktiver Wiederholung, weil das Feld sonst
+ * ausgeblendet ist und das Speichern ihn ignoriert.
  */
 export function eventFormChanged(current: EventFormValues, pristine: EventFormValues): boolean {
   return (
@@ -35,6 +37,6 @@ export function eventFormChanged(current: EventFormValues, pristine: EventFormVa
     current.typeId !== pristine.typeId ||
     current.memberId !== pristine.memberId ||
     current.recurrence !== pristine.recurrence ||
-    current.countText !== pristine.countText
+    (current.recurrence !== "none" && current.countText !== pristine.countText)
   );
 }
