@@ -26,8 +26,9 @@ export const UNDO_WINDOW_MS = 5000;
  * freigibt.
  *
  * Es gibt sonst **keine** Obergrenze: [client.ts](../supabase/client.ts) setzt
- * dem `fetch` kein Timeout, und `useDeleteEvent.onSuccess` gibt zusätzlich
- * sein `invalidateQueries` zurück — gewartet wird also auch auf den Refetch.
+ * dem `fetch` kein Timeout. Bei Aufgaben und Mahlzeiten wartet `run` auch auf
+ * das Neuladen danach, bei Terminen nur auf das DELETE (§3.5 der
+ * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
  * Hinter einem Captive Portal steht die Verbindung, die Antwort kommt nie, und
  * `fetch` resolved weder noch rejected: ohne Watchdog bliebe der Eintrag für
  * den Rest der Sitzung stehen und hielte das Item aus jeder Liste heraus.

@@ -8,7 +8,13 @@ import { supabase } from "@/features/supabase";
 
 import type { EventWithRelations } from "./expand";
 
-import { OPTIMISTIC_EVENT_ID_PREFIX, useOptimisticEventsStore } from "./optimisticEvents";
+import {
+  confirmEventSave,
+  OPTIMISTIC_EVENT_ID_PREFIX,
+  useOptimisticEventsStore,
+  type OptimisticContext,
+  type OptimisticCreate,
+} from "./optimisticEvents";
 import { calendarKeys } from "./queries";
 import { instantToFloating } from "./timezone";
 
@@ -286,14 +292,18 @@ export function optimisticEventRow(vars: CreateEventVars, type: EventTypeRow): E
 
 /**
  * Legt einen Termin an und zeigt ihn sofort im Kalender, statt auf die
- * Server-Antwort zu warten. `onMutate` schreibt bei Erfolg eine synthetische
- * Master-Zeile (`optimisticEventRow`) in den Overlay-Store — vorausgesetzt der
- * Typ des Termins steht bereits im Cache, sonst bleibt der Termin unsichtbar
- * bis zum Refetch (siehe Kommentar dort). `onSettled` invalidiert die
- * Kalender-Queries **nur bei Erfolg** und gibt den Store-Eintrag erst danach
- * frei: andersherum blitzte der optimistische Stand für einen Frame durch, bevor
- * der Refetch ihn ersetzt — dieselbe Lehre, die `useDeleteEvent` in ADR-026
- * gezogen hat. Warum der Fehlerfall nicht invalidiert, steht am `if` selbst.
+ * Server-Antwort zu warten. `onMutate` schreibt eine synthetische Master-Zeile
+ * (`optimisticEventRow`) in den Overlay-Store — vorausgesetzt der Typ des
+ * Termins steht bereits im Cache, sonst erscheint der Termin erst mit dem
+ * Neuladen (siehe Kommentar dort).
+ *
+ * Bei Erfolg bestätigt `confirmEventSave` den Eintrag und stößt das Neuladen
+ * nur an. Der Eintrag bleibt in jeder Ansicht, deren Daten älter sind als das
+ * Speichern, und scheitert das Neuladen, bleibt der Termin trotzdem sichtbar
+ * (§3.1 und §3.5 der
+ * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * Die Serverzeile ordnet `appliesToView` über `serverId` zu, also über
+ * `vars.id`: Trägt eine Ansicht sie schon, gilt dort der Server.
  */
 export function useCreateEvent() {
   const qc = useQueryClient();
@@ -304,7 +314,7 @@ export function useCreateEvent() {
     // Nicht `mutationFn: createEvent`: TanStack ruft mit einem zweiten Argument
     // (dem Mutations-Kontext), und `createEvent` nähme es als Supabase-Client.
     mutationFn: (vars: CreateEventVars) => createEvent(vars),
-    onMutate: (vars) => {
+    onMutate: (vars): OptimisticContext | undefined => {
       // Der Typ kommt aus dem Cache statt aus `useEventTypes()`: `onMutate`
       // braucht kein Abonnement, nur den aktuellen Stand — und ein Import aus
       // `./hooks` zöge über `useTheme` das nativewind-Runtime herein, das sich
@@ -327,28 +337,25 @@ export function useCreateEvent() {
         });
         return undefined;
       }
-      return add({ kind: "create", row: optimisticEventRow(vars, type), serverId: vars.id });
+      const payload: OptimisticCreate = {
+        kind: "create",
+        row: optimisticEventRow(vars, type),
+        serverId: vars.id,
+      };
+      return { id: add(payload), payload };
     },
-    onError: (_err, _vars, id) => {
-      if (id) remove(id);
+    onSuccess: (_data, _vars, context) => {
+      confirmEventSave(qc, context);
     },
-    onSettled: async (_data, error, _vars, id) => {
-      // **Nur bei Erfolg invalidieren.** Bei einem Fehler ist serverseitig
-      // nichts passiert, der Refetch brächte dieselben Daten zurück — und er
-      // kostet mehr als nichts: TanStack ruft `onError` → `await onSettled` →
-      // **dann erst** lehnt `mutateAsync` ab. Der Rollback (`remove`) läuft also
-      // sofort, der Fehler-Toast wartete aber hinter einem Refetch, der bei
-      // toter Verbindung mit `retry: 1` und Backoff ins Leere läuft. Im
-      // Funkloch sähe der Nutzer seinen Termin kommen und wieder gehen, ohne
-      // ein Wort dazu. Das `if` ist deshalb kein Sonderfall, den man
-      // „vereinfachen" darf.
-      if (!error) {
-        // Erst invalidieren, **dann** freigeben. Andersherum blitzt der alte
-        // Stand für einen Frame durch, bevor der Refetch landet — dieselbe
-        // Lehre, die `useDeleteEvent` in ADR-026 gezogen hat.
-        await qc.invalidateQueries({ queryKey: calendarKeys.all });
-      }
-      if (id) remove(id);
+    onError: (_err, _vars, context) => {
+      // **Kein Neuladen nach einem Fehler.** Serverseitig ist nichts passiert,
+      // das Neuladen brächte dieselben Daten zurück. Und wer hier darauf
+      // wartete, hielte den Fehler-Toast auf: TanStack wartet `onError` und
+      // `onSettled` ab, **dann erst** lehnt `mutateAsync` ab — bei toter
+      // Verbindung hinter einem Laden, das mit `retry: 1` und Backoff ins
+      // Leere läuft. Im Funkloch sähe der Nutzer seinen Termin kommen und wieder
+      // gehen, ohne ein Wort dazu.
+      if (context) remove(context.id);
     },
   });
 }
