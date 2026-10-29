@@ -38,7 +38,6 @@ describe("eventFormChanged", () => {
     ["typeId", { typeId: "type-2" }],
     ["memberId", { memberId: null }],
     ["recurrence", { recurrence: "weekly" }],
-    ["countText", { countText: "3" }],
   ];
 
   test.each(differing)("abweichendes Feld %s ist eine Änderung", (_field, override) => {
@@ -47,5 +46,23 @@ describe("eventFormChanged", () => {
 
   test("ein Leerzeichen im Titel zählt, Strings sind ungetrimmt", () => {
     expect(eventFormChanged(values({ title: "Zahnarzt " }), values())).toBe(true);
+  });
+
+  test("abweichender Zähler bei aktiver Wiederholung ist eine Änderung", () => {
+    expect(
+      eventFormChanged(
+        values({ recurrence: "weekly", countText: "3" }),
+        values({ recurrence: "weekly", countText: "" }),
+      ),
+    ).toBe(true);
+  });
+
+  test("verborgener Zähler ohne Wiederholung ist keine Änderung", () => {
+    expect(
+      eventFormChanged(
+        values({ recurrence: "none", countText: "3" }),
+        values({ recurrence: "none", countText: "" }),
+      ),
+    ).toBe(false);
   });
 });
