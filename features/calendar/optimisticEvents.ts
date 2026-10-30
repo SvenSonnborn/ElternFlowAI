@@ -206,7 +206,8 @@ export interface OptimisticCreate {
   /**
    * Die Id, unter der der Server den Termin anlegt (`vars.id`). Angezeigt wird
    * weiter `row.id` (`optimistic-<n>`), damit der Termin nicht antippbar ist
-   * (`isOptimisticEventId`); zugeordnet wird über diese hier ([ADR-051](../../docs/decision-log.md) Decision 2): Trägt
+   * (`isOptimisticEventId`); zugeordnet wird über diese hier
+   * ([ADR-051](../../docs/decision-log.md) Decision 2): Trägt
    * eine Ansicht schon die Serverzeile, gilt dort der Server, und ein späteres
    * Update oder Delete mit dieser `eventId` trifft auch die Overlay-Zeile.
    */
@@ -245,7 +246,8 @@ export interface OptimisticDelete extends PendingEventDelete {
 export type OptimisticPayload = OptimisticCreate | OptimisticUpdate | OptimisticDelete;
 
 /**
- * Ein Eintrag aus dem Optimistic-Store, in einer von zwei Phasen ([ADR-051](../../docs/decision-log.md) Decision 1).
+ * Ein Eintrag aus dem Optimistic-Store, in einer von zwei Phasen
+ * ([ADR-051](../../docs/decision-log.md) Decision 1).
  *
  * Die `id` wird vom Store verwaltet und kommt dort von außen nicht rein — daher
  * die Intersection-Struktur statt eines Feldes in den Basistypen. Sie wird
@@ -342,7 +344,8 @@ export function isOptimisticEventId(eventId: string): boolean {
  * **und** im Dashboard — ohne Toast, ohne Log. Der Nutzer verließe sich auf
  * einen Termin, den es nicht gibt.
  *
- * In der Phase „gespeichert" gibt es keinen Watchdog ([ADR-051](../../docs/decision-log.md) Decision 1):
+ * In der Phase „gespeichert" gibt es keinen Watchdog
+ * ([ADR-051](../../docs/decision-log.md) Decision 1):
  * Dort zeigt der Eintrag, was gespeichert ist, auch offline über Stunden.
  * Meldet der Server nach dem Ablauf doch noch Erfolg, legt `confirm` den
  * Eintrag gespeichert wieder an.
@@ -361,7 +364,8 @@ interface OptimisticEventsState {
    */
   add: (payload: OptimisticCreate | OptimisticUpdate, timeoutMs?: number) => string;
   /**
-   * Überführt einen Eintrag in die Phase „gespeichert" ([ADR-051](../../docs/decision-log.md) Decision 1):
+   * Überführt einen Eintrag in die Phase „gespeichert"
+   * ([ADR-051](../../docs/decision-log.md) Decision 1):
    * `savedAt` wird jetzt gesetzt, der Watchdog endet. Steht `id` noch im
    * Store, bleibt der Eintrag an seiner Stelle. Sonst kommt er neu dazu, aber
    * nur in zwei Fällen: der späte Erfolg, nachdem der **Watchdog** die `id`
@@ -453,7 +457,8 @@ function nextId(): string {
  *
  * Jeder Eintrag, den `add` anlegt, bekommt einen **Watchdog** (siehe
  * `OPTIMISTIC_TIMEOUT_MS`), den `confirm` oder `remove` im Normalfall wieder
- * abräumt; ein `delete` entsteht über `confirm` und ist sofort „gespeichert“. Die Mutation wird dabei ausdrücklich nicht abgebrochen. Gespeichert
+ * abräumt; ein `delete` entsteht über `confirm` und ist sofort „gespeichert“.
+ * Die Mutation wird dabei ausdrücklich nicht abgebrochen. Gespeichert
  * verlässt ein Eintrag den Store über sein Cache-Abo (`confirm`).
  *
  * Die vom Store geführten Felder `id` und `savedAt` stehen beim Bauen eines
@@ -525,7 +530,7 @@ export function useOptimisticEvents(): OptimisticEvent[] {
 /**
  * Was `onMutate` als Kontext weiterreicht. Neben der Id auch der Payload:
  * Hat der Watchdog den Eintrag schon entfernt, legt `confirm` ihn daraus
- * gespeichert neu an ([ADR-051](../../docs/decision-log.md) Decision 1).
+ * gespeichert neu an ([ADR-051](../../docs/decision-log.md) Decision 6).
  * Nach `remove` oder `clear` bleibt der Payload ungenutzt.
  */
 export interface OptimisticContext {

@@ -27,7 +27,8 @@ export const UNDO_WINDOW_MS = 5000;
  *
  * Es gibt sonst **keine** Obergrenze: [client.ts](../supabase/client.ts) setzt
  * dem `fetch` kein Timeout. Bei Aufgaben und Mahlzeiten wartet `run` auch auf
- * das Neuladen danach, bei Terminen nur auf das DELETE ([ADR-051](../../docs/decision-log.md), Consequences: „Keine Kalender-Mutation wartet mehr auf ihren Refetch“).
+ * das Neuladen danach, bei Terminen nur auf das DELETE ([ADR-051](../../docs/decision-log.md),
+ * Consequences: „Keine Kalender-Mutation wartet mehr auf ihren Refetch“).
  * Hinter einem Captive Portal steht die Verbindung, die Antwort kommt nie, und
  * `fetch` resolved weder noch rejected: ohne Watchdog bliebe der Eintrag für
  * den Rest der Sitzung stehen und hielte das Item aus jeder Liste heraus.
