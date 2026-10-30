@@ -357,6 +357,13 @@ export const OPTIMISTIC_TIMEOUT_MS = 30_000;
 interface OptimisticEventsState {
   entries: OptimisticEvent[];
   /**
+   * Zählt die `clear()`-Aufrufe, `remove` zählt nicht. Ein Löschen hat vor dem
+   * Erfolg keinen Eintrag, an dem `clear` sich zeigen könnte; es merkt sich die
+   * Generation und legt nach einem `clear` nichts mehr an
+   * ([ADR-051](../../docs/decision-log.md) Decision 6).
+   */
+  generation: number;
+  /**
    * Legt einen Eintrag „unterwegs" an und gibt seine Id zurück — `onMutate`
    * reicht sie als Kontext weiter. `timeoutMs` liegt am Aufruf statt an einer
    * festen Konstante, damit Tests den Watchdog kurz stellen können; wie
@@ -467,6 +474,7 @@ function nextId(): string {
  */
 export const useOptimisticEventsStore = create<OptimisticEventsState>((set, get) => ({
   entries: [],
+  generation: 0,
   add: (payload, timeoutMs = OPTIMISTIC_TIMEOUT_MS) => {
     const id = nextId();
     set((state) => ({ entries: [...state.entries, { ...payload, id, savedAt: null }] }));
@@ -518,7 +526,7 @@ export const useOptimisticEventsStore = create<OptimisticEventsState>((set, get)
   clear: () => {
     for (const id of [...timers.keys(), ...subscriptions.keys()]) release(id);
     expired.clear();
-    set({ entries: [] });
+    set((state) => ({ entries: [], generation: state.generation + 1 }));
   },
 }));
 

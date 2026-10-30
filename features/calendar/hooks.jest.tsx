@@ -513,6 +513,47 @@ describe("Kalender-Mutationen: Overlay bis zur bestätigten Serverprojektion", (
       await tick();
     });
   });
+
+  it("Abmelden während des Löschens: kein Eintrag kommt zurück", async () => {
+    const event = single();
+    const { queryClient, mutations } = await renderMonths([event]);
+    jest.mocked(fetchEventById).mockResolvedValue(event);
+    const applied = deferred<Awaited<ReturnType<ApplyEventChange>>>();
+    mockApplyChange.mockReturnValue(applied.promise);
+    const refetch = deferred<EventWithRelations[]>();
+    jest.mocked(fetchEventsInRange).mockReturnValue(refetch.promise);
+
+    const remove = { done: false };
+    await act(async () => {
+      void mutations.remove.mutateAsync(deleteVars(event)).then(() => {
+        remove.done = true;
+      });
+      await tick();
+    });
+    expect(mockApplyChange).toHaveBeenCalledTimes(1);
+
+    // Dieselben zwei Schritte wie `useSignOut`, ohne auf die Mutation zu
+    // warten; danach lädt das nächste Konto denselben Range-Key.
+    await act(() => {
+      queryClient.clear();
+      useOptimisticEventsStore.getState().clear();
+      queryClient.setQueryData(rangeKey(OCTOBER), []);
+    });
+
+    await act(async () => {
+      applied.resolve("applied");
+      await tick();
+    });
+
+    expect(remove.done).toBe(true);
+    expect(fetchEventsInRange).not.toHaveBeenCalled();
+    expect(useOptimisticEventsStore.getState().entries).toEqual([]);
+
+    await act(async () => {
+      refetch.resolve([]);
+      await tick();
+    });
+  });
 });
 
 /**
