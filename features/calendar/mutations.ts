@@ -217,6 +217,9 @@ async function applySteps(
  * `flush()` braucht nur das abgeschlossene DELETE, und ein hängendes Laden hielte das
  * Abmelden sonst bis zum Watchdog des Pending-Delete-Stores auf. Kein `onError`: Vor dem
  * Erfolg gibt es keinen Eintrag, den ein Fehler entfernen müsste.
+ *
+ * `onMutate` merkt sich die Generation des Stores: Ohne Eintrag zeigte sich ein `clear()`
+ * (Abmelden) sonst nicht, und ein später Erfolg legte im Cache des nächsten Kontos einen an.
  */
 export function useDeleteEvent() {
   const qc = useQueryClient();
@@ -227,7 +230,10 @@ export function useDeleteEvent() {
         applyChange: createSupabaseApplyEventChange(supabase),
       });
     },
-    onSuccess: (_data, vars) => {
+    onMutate: () => ({ generation: useOptimisticEventsStore.getState().generation }),
+    onSuccess: (_data, vars, context) => {
+      // Der Cache gehört schon dem nächsten Konto: nichts anlegen, nichts neu laden.
+      if (context.generation !== useOptimisticEventsStore.getState().generation) return;
       confirmEventSave(qc, {
         payload: {
           kind: "delete",
