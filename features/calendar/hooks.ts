@@ -25,8 +25,16 @@ interface UseFamilyEventsResult {
   data: CalendarOccurrence[];
   /** One entry per covered calendar day, clipped to the same window as `data`. */
   segments: DaySegment[];
-  isLoading: boolean;
-  error: unknown;
+  /**
+   * Ob die Query für diese Range je Serverdaten hatte (`query.data !== undefined`).
+   * Das ist bewusst mehr als „nicht lädt, kein Fehler“: React Query behält die
+   * letzten Daten, wenn ein Neuladen scheitert, und `error` ist dann gesetzt —
+   * wer daran die Anzeige knüpft (Dashboard, vorher `isLoading`/`error`), blendet
+   * einen belegten Stand aus. Ohne Daten kann auch ein Overlay-Eintrag in
+   * `data` stehen; `hasData` bleibt dann `false`, denn über den Tag sagt er
+   * nichts.
+   */
+  hasData: boolean;
 }
 
 /**
@@ -37,9 +45,11 @@ interface UseFamilyEventsResult {
  * Query ihn nachgeladen hat. Das ist Absicht (Decision 1 der Spec): die Zeile
  * bleibt im Cache, wird nur ausgeblendet, solange die Undo-Aktion möglich ist.
  *
- * Die Menge enthält zusätzlich **optimistische Änderungen**, die der Server noch
- * nicht bestätigt hat — inklusive Termine, deren Zeilen es serverseitig noch gar
- * nicht gibt.
+ * Die Menge enthält zusätzlich **optimistische Änderungen** — inklusive Termine,
+ * deren Zeilen es serverseitig noch gar nicht gibt. Ein Eintrag bleibt auch nach
+ * der Bestätigung durch den Server stehen, bis die Daten **dieser Ansicht**
+ * neuer sind als das Speichern (siehe `visibleOccurrences`); scheitert das
+ * Neuladen, bleibt die gespeicherte Änderung sichtbar.
  */
 export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
   const { theme } = useTheme();
@@ -58,31 +68,37 @@ export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
   const pending = usePendingEventDeletes();
   const optimistic = useOptimisticEvents();
 
-  const data = useMemo(() => {
-    // Fehlende Serverdaten sind eine leere Expansion, kein Abbruch: Ein früher
-    // `return NO_OCCURRENCES` überspränge auch das optimistische Overlay —
-    // legt der Nutzer einen Termin an und wischt sofort in einen Monat ohne
-    // eigenen Query-Cache-Eintrag (neue Range-Query, Kaltstart), wäre der
-    // gerade angelegte Termin bis zum Fetch unsichtbar. `NO_OCCURRENCES` statt
-    // `[]`, damit die Referenz stabil bleibt, solange weder Serverdaten noch
-    // ein gültiger Eintrag vorliegen — `visibleOccurrences` gibt seine Eingabe
-    // unverändert zurück, solange in dieser Ansicht kein Eintrag gilt und keine
-    // Löschung offen ist.
-    const expanded = query.data
-      ? expandEvents(query.data, rangeStart, rangeEnd, theme)
-      : NO_OCCURRENCES;
+  // Nur die Serverdaten expandieren, damit ein Refetch mit gleichen Daten
+  // (gleiche `data`-Referenz dank Structural Sharing) nicht neu rechnet.
+  // Fehlende Serverdaten sind eine leere Expansion, kein Abbruch: Ein früher
+  // `return NO_OCCURRENCES` überspränge auch das optimistische Overlay —
+  // legt der Nutzer einen Termin an und wischt sofort in einen Monat ohne
+  // eigenen Query-Cache-Eintrag (neue Range-Query, Kaltstart), wäre der
+  // gerade angelegte Termin bis zum Fetch unsichtbar. `NO_OCCURRENCES` statt
+  // `[]`, damit die Referenz stabil bleibt, solange weder Serverdaten noch
+  // ein gültiger Eintrag vorliegen — `visibleOccurrences` gibt seine Eingabe
+  // unverändert zurück, solange in dieser Ansicht kein Eintrag gilt und keine
+  // Löschung offen ist.
+  const expanded = useMemo(
+    () => (query.data ? expandEvents(query.data, rangeStart, rangeEnd, theme) : NO_OCCURRENCES),
+    [query.data, rangeStart, rangeEnd, theme],
+  );
+
+  const data = useMemo(
     // `dataUpdatedAt` steht eigens in den Abhängigkeiten: Ein Refetch mit
     // gleichen Daten behält dank Structural Sharing dieselbe `data`-Referenz,
     // schiebt aber `dataUpdatedAt` vor — und das entscheidet, ob ein
     // gespeicherter Eintrag in dieser Ansicht noch gilt (`appliesToView`).
-    return visibleOccurrences({
-      expanded,
-      view: { dataUpdatedAt: query.dataUpdatedAt, rows: query.data },
-      pending,
-      optimistic,
-      expand: (rows) => expandEvents(rows, rangeStart, rangeEnd, theme),
-    });
-  }, [query.data, query.dataUpdatedAt, rangeStart, rangeEnd, theme, optimistic, pending]);
+    () =>
+      visibleOccurrences({
+        expanded,
+        view: { dataUpdatedAt: query.dataUpdatedAt, rows: query.data },
+        pending,
+        optimistic,
+        expand: (rows) => expandEvents(rows, rangeStart, rangeEnd, theme),
+      }),
+    [expanded, query.dataUpdatedAt, query.data, rangeStart, rangeEnd, theme, optimistic, pending],
+  );
 
   const segments = useMemo(
     () => toDaySegments(data, rangeStart, rangeEnd),
@@ -92,8 +108,7 @@ export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
   return {
     data,
     segments,
-    isLoading: query.isLoading,
-    error: query.error,
+    hasData: query.data !== undefined,
   };
 }
 

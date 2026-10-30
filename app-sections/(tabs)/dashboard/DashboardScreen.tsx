@@ -61,7 +61,9 @@ import { buildTomorrowPrep } from "./tomorrowPrep";
  * - **Schweigen statt Behaupten.** Solange eine Query lädt oder gescheitert
  *   ist, rendert die betroffene Sektion gar nichts — „alles ruhig" ist eine
  *   Aussage über den Tag, und die lässt sich ohne Daten nicht belegen
- *   (ADR-018, ADR-019). Dieselbe Zurückhaltung trägt die Fortsetzen-Karte
+ *   (ADR-018, ADR-019). Für die Heute-Liste gilt das nur ohne Serverdaten
+ *   (`hasData`): Scheitert ein Neuladen, zeigt sie den letzten Stand weiter —
+ *   ein belegter Stand ist keine Behauptung ins Blaue. Dieselbe Zurückhaltung trägt die Fortsetzen-Karte
  *   (ADR-023), nur über den Zustand des Accounts statt über den Tag.
  */
 export function DashboardScreen() {
@@ -74,7 +76,7 @@ export function DashboardScreen() {
   const todayKey = format(today, "yyyy-MM-dd");
   // Passing today's date means the range key matches the calendar tab's on
   // mount — both tabs read the same cached month instead of fetching twice.
-  const { segments, isLoading, error } = useFamilyEvents(today);
+  const { segments, hasData } = useFamilyEvents(today);
   const todaySegments = useMemo(() => segmentsForDay(segments, todayKey), [segments, todayKey]);
 
   // Der Slot der aktuellen Uhrzeit — `useTodaysMeal` rechnet ihn selbst weiter,
@@ -154,7 +156,7 @@ export function DashboardScreen() {
   // Aus dem Objekt gelöst, damit TypeScript die Null-Prüfung bis in den
   // `onPress`-Closure trägt.
   const { overflowTarget } = prep;
-  const prepPending = isLoading || !!error || tasks.isLoading || !!tasks.error;
+  const prepPending = !hasData || tasks.isLoading || !!tasks.error;
 
   return (
     <Screen scroll>
@@ -218,11 +220,12 @@ export function DashboardScreen() {
         onPressAction={() => router.push("/kalender")}
       />
       {/*
-       * Nothing while the query is in flight or has failed: "alles ruhig" is a
-       * statement about the day, and claiming it before the events are in — or
-       * after they failed to arrive — would be a claim we cannot back.
+       * Nothing until the events have arrived once: "alles ruhig" is a
+       * statement about the day, and claiming it before any answer is in would
+       * be a claim we cannot back. After that the list stays — a failed refetch
+       * keeps the last known state instead of blanking the day.
        */}
-      {isLoading || error ? null : todaySegments.length === 0 ? (
+      {!hasData ? null : todaySegments.length === 0 ? (
         <Card className="items-center py-6">
           <Text variant="caption" tone="inkSecondary">
             {t("dash.today.empty")}
