@@ -240,7 +240,7 @@ function MonthProbe({
   month: Date;
   onMutations?: (mutations: Mutations) => void;
 }) {
-  const { data } = useFamilyEvents(month);
+  const { data, hasData } = useFamilyEvents(month);
   const create = useCreateEvent();
   const update = useUpdateEvent();
   const remove = useDeleteEvent();
@@ -248,11 +248,14 @@ function MonthProbe({
     onMutations?.({ create, update, remove });
   });
   return (
-    <View testID={`monat-${month.getMonth() + 1}`}>
-      {data.map((occurrence) => (
-        <Text key={`${occurrence.eventId}|${occurrence.occurrenceKey}`}>{occurrence.title}</Text>
-      ))}
-    </View>
+    <>
+      <Text testID={`hasdata-${month.getMonth() + 1}`}>{String(hasData)}</Text>
+      <View testID={`monat-${month.getMonth() + 1}`}>
+        {data.map((occurrence) => (
+          <Text key={`${occurrence.eventId}|${occurrence.occurrenceKey}`}>{occurrence.title}</Text>
+        ))}
+      </View>
+    </>
   );
 }
 
@@ -510,5 +513,39 @@ describe("Kalender-Mutationen: Overlay bis zur bestätigten Serverprojektion", (
       refetch.resolve([]);
       await tick();
     });
+  });
+});
+
+/**
+ * `hasData` trennt „der Server hat nie geantwortet“ von „das Neuladen ist
+ * gescheitert“ (§3.6 der
+ * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ */
+describe("useFamilyEvents: hasData", () => {
+  beforeEach(() => {
+    jest.mocked(fetchEventsInRange).mockReset();
+  });
+
+  it("hasData bleibt nach gescheitertem Refetch", async () => {
+    const errors = jest.spyOn(console, "error").mockImplementation(() => {});
+    const { queryClient } = await renderMonths([single()]);
+    jest.mocked(fetchEventsInRange).mockRejectedValue(offline);
+
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: rangeKey(OCTOBER) });
+    });
+    await waitFor(() => expect(queryClient.getQueryState(rangeKey(OCTOBER))?.status).toBe("error"));
+
+    expect(fetchEventsInRange).toHaveBeenCalledTimes(1);
+    expect(errors.mock.calls).toEqual([["Query fehlgeschlagen:", offline]]);
+    expect(screen.getByTestId("hasdata-10").props.children).toBe("true");
+    expect(elternabende(OCTOBER)).toHaveLength(1);
+  });
+
+  it("hasData ohne Daten: false", async () => {
+    jest.mocked(fetchEventsInRange).mockReturnValue(new Promise(() => {}));
+    await renderScreen(<MonthProbe month={OCTOBER} />);
+
+    expect(screen.getByTestId("hasdata-10").props.children).toBe("false");
   });
 });
