@@ -121,15 +121,16 @@ Einschätzung („ein Großteil davon können wir jetzt schon umsetzen") trifft 
 Der große Rest teilt sich in Anbieter-Blockaden (Sprachassistent, gustar.io, Notifications, Stripe)
 und Designer-Punkte, die zwar nicht _von uns_ erledigt werden, aber in den Blöcken mitlaufen.
 
-### Die nächsten Branches (Stand 2026-10-28)
+### Die nächsten Branches (Stand 2026-10-30)
 
-1. `fix/stille-fehler` ([ADR-049](./decision-log.md))
-2. 8.3 Kalender-Cache (Doppelanzeige und [#111](https://github.com/SvenSonnborn/ElternFlowAI/issues/111) zusammen)
-3. Realtime (Test und `setAuth`-Retry)
-4. DB-Aufräumen (pg_cron für Einladungen, `anon`-Rechte, Einladungs-Kurzschluss)
-5. Entscheidung [4.1](#41-inlinerem-entscheiden--offen-entscheidung-bei-dir) `inlineRem`
-6. a11y nativ (`hitSlop` zur Box, `aria-*`, Field-Label, `AuthGate`, Serifenschrift im Web)
-7. Block 9 (`expo-doctor`, `ci.yml`-Cache nur lesen)
+Erledigt sind `fix/stille-fehler` ([ADR-049](./decision-log.md)) und der Kalender-Cache aus
+[8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-051](./decision-log.md)).
+
+1. Realtime (Test und `setAuth`-Retry)
+2. DB-Aufräumen (pg_cron für Einladungen, `anon`-Rechte, Einladungs-Kurzschluss)
+3. Entscheidung [4.1](#41-inlinerem-entscheiden--offen-entscheidung-bei-dir) `inlineRem`
+4. a11y nativ (`hitSlop` zur Box, `aria-*`, Field-Label, `AuthGate`, Serifenschrift im Web)
+5. Block 9 (`expo-doctor`, `ci.yml`-Cache nur lesen)
 
 ### Schlusssteine — was am meisten entsperrt
 
@@ -837,8 +838,10 @@ Hero-CTA plant statt zu navigieren · ein ADR hält die Optimistik-Entscheidung 
 > verschwunden; `createSupabaseEventOps` gibt es nicht mehr. Aufgaben löschen über `delete_task`,
 > das „keine Familie" von „schon weg" unterscheidet. Dazu kamen eine lokale Supabase als
 > Testumgebung, Datenbank-Tests in der CI (`db.yml`) und ein Sicherheitsdurchgang. Die Overlay-
-> Hälfte von #111 bleibt offen, ebenso Änderungen an _anderen_ Occurrences beim Regelwechsel
-> (Spec §5.5, im 🎨-Eintrag zum Konfliktdialog).
+> Hälfte von #111 kam später mit dem Kalender-Cache aus
+> [8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-051](./decision-log.md)). Offen
+> bleiben Änderungen an _anderen_ Occurrences beim Regelwechsel (Spec §5.5, im 🎨-Eintrag zum
+> Konfliktdialog).
 
 Die teuerste verbleibende Korrektheitsbaustelle — und die einzige, die **eine** Lösung für zwei
 Einträge ist. `TODO.md` beschreibt die RPC bei beiden als den sauberen Fix.
@@ -912,16 +915,10 @@ Importpfad und den Barrel — deshalb eine eigene, sonst leere Änderung, damit 
 
 ### 8.3 Kleine Korrekturen mit je eigenem Grund — **S–M**
 
-- **„Die Mutations-`onSettled`-Blöcke invalidieren weiterhin `calendarKeys.all`"**
-  ([Realtime](./TODO.md#realtime-siehe-adr-030)) — der Realtime-Pfad nutzt seit ADR-030 die engeren
-  Präfixe `eventsRoot`/`oneRoot`; die Mutationen ziehen `types` und `reminders` bei jedem Schreiben
-  mit. Einzeiler pro Block — der aber drei Overlay-Interaktionen berührt (ADR-026, ADR-027) und
-  seinen eigenen Testlauf verdient.
-- **„Doppelte Anzeige, solange zwei Range-Queries aktiv sind"**
-  ([Calendar Optimistic UI](./TODO.md#calendar-optimistic-ui-siehe-adr-027)) — Kalender auf Oktober,
-  Dashboard auf September: der neue Termin erscheint **zweimal**, bis auch die zweite Query durch
-  ist. Selbstheilend, aber „die auffälligste denkbare Fehlanzeige für ein Feature, das gerade
-  Vertrauen in die Sofortanzeige aufbauen soll".
+- ~~„Die Mutations-`onSettled`-Blöcke invalidieren weiterhin `calendarKeys.all`"~~ und
+  ~~„Doppelte Anzeige, solange zwei Range-Queries aktiv sind"~~ — **erledigt** mit dem
+  Kalender-Cache, zusammen mit der Overlay-Hälfte von
+  [#111](https://github.com/SvenSonnborn/ElternFlowAI/issues/111) ([ADR-051](./decision-log.md)).
 - **„Kein Kompositions-Test für die Kalender-Filterkette"** ([Undo-Delete](./TODO.md#undo-delete-siehe-adr-026))
   — ursprünglich zwei Einträge, einer davon erledigt: Die Divergenz zwischen Filter und Server (der
   Filter verglich das aufgelöste Anzeigedatum, der Server rechnete auf Regel-Daten) ist mit
