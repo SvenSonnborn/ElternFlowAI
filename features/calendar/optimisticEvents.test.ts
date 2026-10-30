@@ -537,7 +537,7 @@ describe("Reihenfolge der beiden Overlays", () => {
   });
 });
 
-// ── Regel pro Ansicht (Spec 3.2) ───────────────────────────────────────────
+// ── Regel pro Ansicht (ADR-051 Decision 2) ───────────────────────────────────────────
 // Gespeicherte Einträge tragen `savedAt: 1000`; eine Ansicht ist „älter" mit
 // `dataUpdatedAt: 500`, „neuer" mit `2000`.
 const SAVED_AT = 1000;
@@ -706,7 +706,7 @@ describe("visibleOccurrences · Regel pro Ansicht", () => {
   });
 
   test("ein Delete mit der echten Id blendet die Overlay-Zeile eines gespeicherten Creates aus", () => {
-    // Spec 3.2: in der Überlappung angelegt, vom November aus gelöscht, zurück
+    // ADR-051 Decision 2: in der Überlappung angelegt, vom November aus gelöscht, zurück
     // auf den Oktober, dessen Daten noch von vor dem Anlegen stammen.
     const out = show({ dataUpdatedAt: OLDER, rows: [] }, [
       createEntry(),
@@ -740,7 +740,7 @@ describe("visibleOccurrences · Regel pro Ansicht", () => {
   });
 
   test("ein Eintrag, zwei Ansichten mit verschiedenem Datenstand: jede zeigt den Termin genau einmal", () => {
-    // Die Doppelanzeige aus Spec 1.2: Der Termin am 30.10. liegt in den Ranges
+    // Die Doppelanzeige aus ADR-051 (Context): Der Termin am 30.10. liegt in den Ranges
     // beider Monate. Der Kalender auf November hat nach dem Speichern neu
     // geladen und trägt die Serverzeile, das Dashboard auf Oktober wartet noch.
     const at = { start_at: "2026-10-30T17:00:00.000Z", end_at: "2026-10-30T18:30:00.000Z" };
@@ -1003,8 +1003,7 @@ describe("Watchdog", () => {
   });
 });
 
-// ── Phase „gespeichert" (§3.1 und §3.3 in
-// docs/superpowers/specs/2026-10-29-kalender-cache-design.md) ──────────────
+// ── Phase „gespeichert" (ADR-051 Decision 1 und 3) ──────────────
 // Ein echter `QueryClient` statt eines Stubs: Ob ein Eintrag den Store verlässt,
 // hängt an den Ereignissen des Query-Caches und an `cancelQueries`, und genau
 // deren Verhalten in TanStack 5.105 sollen diese Tests festhalten.

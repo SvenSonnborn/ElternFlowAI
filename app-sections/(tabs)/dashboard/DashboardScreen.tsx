@@ -63,8 +63,10 @@ import { buildTomorrowPrep } from "./tomorrowPrep";
  *   Aussage über den Tag, und die lässt sich ohne Daten nicht belegen
  *   (ADR-018, ADR-019). Für die Heute-Liste gilt das nur ohne Serverdaten
  *   (`hasData`): Scheitert ein Neuladen, zeigt sie den letzten Stand weiter —
- *   ein belegter Stand ist keine Behauptung ins Blaue. Dieselbe Zurückhaltung trägt die Fortsetzen-Karte
- *   (ADR-023), nur über den Zustand des Accounts statt über den Tag.
+ *   ein belegter Stand ist keine Behauptung ins Blaue. Dasselbe gilt für die
+ *   Termin-Hälfte der Prep-Karte (`prepPending`). Dieselbe Zurückhaltung trägt
+ *   die Fortsetzen-Karte (ADR-023), nur über den Zustand des Accounts statt
+ *   über den Tag.
  */
 export function DashboardScreen() {
   const { t, i18n } = useTranslation();

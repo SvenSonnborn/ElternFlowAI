@@ -211,10 +211,9 @@ async function applySteps(
  * Undo-Ablauf der Pending-Delete-Store den Termin aus. `onSuccess` läuft,
  * bevor `mutateAsync` auflöst und der Pending-Delete-Store freigibt — so liegt
  * kein Frame ohne Ausblendung dazwischen, auch wenn das Neuladen danach
- * scheitert (§3.4 der
- * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * scheitert ([ADR-051](../../docs/decision-log.md) Decision 5).
  *
- * Auf das Neuladen wartet niemand (§3.5): `useSignOut` → `flush()` braucht nur
+ * Auf das Neuladen wartet niemand (ADR-051, Consequences zum Warten): `useSignOut` → `flush()` braucht nur
  * das abgeschlossene DELETE, und ein hängendes Laden hielte das Abmelden sonst
  * bis zum Watchdog des Pending-Delete-Stores auf. Kein `onError`: Vor dem
  * Erfolg gibt es keinen Eintrag, den ein Fehler entfernen müsste.
@@ -248,8 +247,7 @@ export function useDeleteEvent() {
  * denn, `canApplyOptimistically` verneint (siehe dort). Bei Erfolg bestätigt
  * `confirmEventSave` den Eintrag und stößt das Neuladen nur an: Der Eintrag
  * gilt weiter in jeder Ansicht, deren Daten älter sind als das Speichern, und
- * scheitert das Neuladen, bleibt die Änderung sichtbar (§3.1 und §3.5 der
- * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * scheitert das Neuladen, bleibt die Änderung sichtbar ([ADR-051](../../docs/decision-log.md) Decision 1 und 4).
  *
  * **Zwei Grenzen, dieselbe Konsequenz.** `all`/`forward` **mit geändertem
  * Datum** bekommt gar keinen Eintrag, weil das Overlay dort die Nicht-Änderung
