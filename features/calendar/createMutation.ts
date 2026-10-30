@@ -300,8 +300,7 @@ export function optimisticEventRow(vars: CreateEventVars, type: EventTypeRow): E
  * Bei Erfolg bestätigt `confirmEventSave` den Eintrag und stößt das Neuladen
  * nur an. Der Eintrag bleibt in jeder Ansicht, deren Daten älter sind als das
  * Speichern, und scheitert das Neuladen, bleibt der Termin trotzdem sichtbar
- * (§3.1 und §3.5 der
- * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * ([ADR-051](../../docs/decision-log.md) Decision 1 und 4).
  * Die Serverzeile ordnet `appliesToView` über `serverId` zu, also über
  * `vars.id`: Trägt eine Ansicht sie schon, gilt dort der Server.
  */

@@ -21,7 +21,7 @@ import { mergeDateAndTimeOfDay, zonedDateKey } from "./timezone";
  * inklusive der Serien-Aufspaltung bei `forward` —, und genau das hat
  * [ADR-026](../../docs/decision-log.md) für das Löschen bereits verworfen.
  *
- * Was hier steht, ist deshalb bewusst eine **Näherung** (Decision 3 der Spec):
+ * Was hier steht, ist deshalb bewusst eine **Näherung** (Decision 3 von ADR-027):
  * Sie muss gut aussehen, nicht exakt sein — das erste Laden nach dem Speichern
  * korrigiert sie, online innerhalb einer Sekunde.
  */
@@ -206,8 +206,7 @@ export interface OptimisticCreate {
   /**
    * Die Id, unter der der Server den Termin anlegt (`vars.id`). Angezeigt wird
    * weiter `row.id` (`optimistic-<n>`), damit der Termin nicht antippbar ist
-   * (`isOptimisticEventId`); zugeordnet wird über diese hier (§3.2 der
-   * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)): Trägt
+   * (`isOptimisticEventId`); zugeordnet wird über diese hier ([ADR-051](../../docs/decision-log.md) Decision 2): Trägt
    * eine Ansicht schon die Serverzeile, gilt dort der Server, und ein späteres
    * Update oder Delete mit dieser `eventId` trifft auch die Overlay-Zeile.
    */
@@ -217,8 +216,7 @@ export interface OptimisticCreate {
 /**
  * Ein Update einer bereits expandierten Occurrence — der Eintrag beschreibt
  * eine Änderung, die der Store hält, bis keine Ansicht mehr Daten von vor dem
- * Speichern zeigt (§3.3 der
- * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * Speichern zeigt ([ADR-051](../../docs/decision-log.md) Decision 3).
  */
 export interface OptimisticUpdate {
   kind: "update";
@@ -231,8 +229,7 @@ export interface OptimisticUpdate {
 
 /**
  * Eine ausgeführte Löschung, die eine Ansicht mit Daten von vor dem Löschen
- * weiter ausblendet (§3.4 der
- * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * weiter ausblendet ([ADR-051](../../docs/decision-log.md) Decision 5).
  * Dasselbe Ziel wie im Undo-Fenster, darum dieselbe Form und dasselbe
  * `hidesOccurrence`.
  *
@@ -248,8 +245,7 @@ export interface OptimisticDelete extends PendingEventDelete {
 export type OptimisticPayload = OptimisticCreate | OptimisticUpdate | OptimisticDelete;
 
 /**
- * Ein Eintrag aus dem Optimistic-Store, in einer von zwei Phasen (§3.1 der
- * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * Ein Eintrag aus dem Optimistic-Store, in einer von zwei Phasen ([ADR-051](../../docs/decision-log.md) Decision 1).
  *
  * Die `id` wird vom Store verwaltet und kommt dort von außen nicht rein — daher
  * die Intersection-Struktur statt eines Feldes in den Basistypen. Sie wird
@@ -276,15 +272,14 @@ export interface EventsView {
 }
 
 /**
- * Ob ein Eintrag in dieser Ansicht gilt (§3.2 der
- * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * Ob ein Eintrag in dieser Ansicht gilt ([ADR-051](../../docs/decision-log.md) Decision 2).
  * Die Prüfungen laufen in dieser Reihenfolge:
  *
  * 1. Ein Create, dessen Serverzeile (`serverId`) die Ansicht schon trägt, gilt
  *    nie, auch „unterwegs" nicht. Das deckt ein Laden ab, das den Termin
  *    bringt, aber vor dem Speichern ankam (etwa über das eigene
  *    Realtime-Echo), und hält die Overlay-Zeile neben der echten heraus.
- * 2. „Unterwegs" gilt er in jeder Ansicht (§3.1).
+ * 2. „Unterwegs" gilt er in jeder Ansicht (ADR-051 Decision 1).
  * 3. Ohne Serverdaten gilt er: Eine solche Ansicht ist „älter".
  * 4. Sonst nur, solange die Daten nicht neuer sind als das Speichern.
  *    Gleichstand zählt als „älter": Daten, die in derselben Millisekunde
@@ -293,7 +288,7 @@ export interface EventsView {
  * Für Update und Delete gibt es kein Gegenstück zu 1: Ihre Serverzeile gab es
  * schon vorher, ihr Vorhandensein sagt nichts darüber, ob die Änderung darin
  * steckt. Ab 4 gilt deshalb allein der Server, auch wenn danach jemand anderes
- * den Termin geändert oder gelöscht hat (Anti-Ziel in §2 der Kalender-Spec).
+ * den Termin geändert oder gelöscht hat (ADR-051 Decision 2).
  */
 export function appliesToView(entry: OptimisticEvent, view: EventsView): boolean {
   if (entry.kind === "create" && view.rows?.some((row) => row.id === entry.serverId)) {
@@ -334,7 +329,7 @@ export function isOptimisticEventId(eventId: string): boolean {
  * Wie lange ein Eintrag in der Phase „unterwegs" höchstens stehen bleibt, wenn
  * die Mutation sich nicht meldet.
  *
- * Die Spec begründete den fehlenden Watchdog damit, der Eintrag lebe „genau so
+ * Die Spec zu ADR-027 begründete den fehlenden Watchdog damit, der Eintrag lebe „genau so
  * lange wie die Mutation". Genau diese Annahme hat
  * [ADR-026](../../docs/decision-log.md) für den Pending-Delete-Store bereits
  * geprüft und verworfen (siehe `COMMIT_TIMEOUT_MS` in
@@ -342,13 +337,12 @@ export function isOptimisticEventId(eventId: string): boolean {
  * setzt dem `fetch` kein Timeout, hinter einem Captive Portal settelt eine
  * Anfrage weder, noch lehnt sie ab.
  *
- * Ohne Obergrenze käme weder Erfolg noch Fehler an, `remove(id)` liefe nie, und
+ * Kommt weder Erfolg noch Fehler an, liefe `remove(id)` ohne Obergrenze nie, und
  * ein nie gespeicherter Termin stünde für den Rest der Sitzung im Kalender
  * **und** im Dashboard — ohne Toast, ohne Log. Der Nutzer verließe sich auf
  * einen Termin, den es nicht gibt.
  *
- * In der Phase „gespeichert" gibt es keinen Watchdog (§3.1 der
- * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)):
+ * In der Phase „gespeichert" gibt es keinen Watchdog ([ADR-051](../../docs/decision-log.md) Decision 1):
  * Dort zeigt der Eintrag, was gespeichert ist, auch offline über Stunden.
  * Meldet der Server nach dem Ablauf doch noch Erfolg, legt `confirm` den
  * Eintrag gespeichert wieder an.
@@ -367,8 +361,7 @@ interface OptimisticEventsState {
    */
   add: (payload: OptimisticCreate | OptimisticUpdate, timeoutMs?: number) => string;
   /**
-   * Überführt einen Eintrag in die Phase „gespeichert" (§3.1 der
-   * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)):
+   * Überführt einen Eintrag in die Phase „gespeichert" ([ADR-051](../../docs/decision-log.md) Decision 1):
    * `savedAt` wird jetzt gesetzt, der Watchdog endet. Steht `id` noch im
    * Store, bleibt der Eintrag an seiner Stelle. Sonst kommt er neu dazu, aber
    * nur in zwei Fällen: der späte Erfolg, nachdem der **Watchdog** die `id`
@@ -380,7 +373,7 @@ interface OptimisticEventsState {
    * Familie.
    *
    * Danach hält ein Abo auf `cache` den Eintrag genau so lange, wie ihn eine
-   * Range-Query noch braucht (§3.3): geprüft sofort und bei jedem
+   * Range-Query noch braucht (ADR-051 Decision 3): geprüft sofort und bei jedem
    * Cache-Ereignis. Inaktive Queries und solche ohne Daten zählen mit, bis
    * TanStack sie nach `gcTime` verwirft. Ein Abo statt einer Prüfung beim
    * Rendern, weil jede Ansicht nur ihre eigene Query kennt und der Store sonst
@@ -424,7 +417,7 @@ function release(id: string): void {
 }
 
 /**
- * Ob noch eine Range-Query im Cache den Eintrag braucht (§3.3), aktiv oder
+ * Ob noch eine Range-Query im Cache den Eintrag braucht (ADR-051 Decision 3), aktiv oder
  * nicht. Der Query-Cache ist untypisiert; unter `eventsRoot` liegen nur die
  * Zeilen aus `fetchEventsInRange`.
  */
@@ -458,9 +451,9 @@ function nextId(): string {
  * Eintrag muss den Unmount des Sheets überleben, das ihn angelegt hat — die
  * Screens navigieren weg, bevor die Mutation settlet.
  *
- * Jeder Eintrag bekommt beim Anlegen einen **Watchdog** (siehe
+ * Jeder Eintrag, den `add` anlegt, bekommt einen **Watchdog** (siehe
  * `OPTIMISTIC_TIMEOUT_MS`), den `confirm` oder `remove` im Normalfall wieder
- * abräumt. Die Mutation wird dabei ausdrücklich nicht abgebrochen. Gespeichert
+ * abräumt; ein `delete` entsteht über `confirm` und ist sofort „gespeichert“. Die Mutation wird dabei ausdrücklich nicht abgebrochen. Gespeichert
  * verlässt ein Eintrag den Store über sein Cache-Abo (`confirm`).
  *
  * Die vom Store geführten Felder `id` und `savedAt` stehen beim Bauen eines
@@ -532,8 +525,7 @@ export function useOptimisticEvents(): OptimisticEvent[] {
 /**
  * Was `onMutate` als Kontext weiterreicht. Neben der Id auch der Payload:
  * Hat der Watchdog den Eintrag schon entfernt, legt `confirm` ihn daraus
- * gespeichert neu an (§3.1 der
- * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * gespeichert neu an ([ADR-051](../../docs/decision-log.md) Decision 1).
  * Nach `remove` oder `clear` bleibt der Payload ungenutzt.
  */
 export interface OptimisticContext {
@@ -542,8 +534,8 @@ export interface OptimisticContext {
 }
 
 /**
- * Der gemeinsame Erfolgsweg der Kalender-Mutationen (§3.1 bis §3.3 und §3.5
- * der [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * Der gemeinsame Erfolgsweg der Kalender-Mutationen (ADR-051 Decision 4, im Zusammenspiel mit den
+ * Decisions 1 bis 3; [ADR-051](../../docs/decision-log.md)).
  * Die Reihenfolge ist fest:
  *
  * 1. `confirm` setzt `savedAt`, **bevor** irgendetwas neu lädt. Erst damit
@@ -583,8 +575,8 @@ export function confirmEventSave(
 }
 
 /**
- * Die Anzeige-Pipeline hinter `useFamilyEvents`, für genau eine Ansicht (§3.2
- * der [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)):
+ * Die Anzeige-Pipeline hinter `useFamilyEvents`, für genau eine Ansicht (ADR-051
+ * Decision 2, [ADR-051](../../docs/decision-log.md)):
  *
  * 1. Es zählen nur die Einträge, die in `view` gelten (`appliesToView`).
  * 2. Zu den Server-Occurrences kommen die der gültigen Creates.

@@ -296,8 +296,7 @@ function elternabende(month: Date) {
 
 /**
  * Die drei Mutationen bestätigen ihren Overlay-Eintrag, statt auf das Neuladen
- * zu warten (§3.1, §3.4 und §3.5 der
- * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * zu warten ([ADR-051](../../docs/decision-log.md) Decision 1, 5 und 4).
  * Scheitert das Neuladen, bleibt die gespeicherte Änderung sichtbar.
  */
 describe("Kalender-Mutationen: Overlay bis zur bestätigten Serverprojektion", () => {
@@ -429,7 +428,7 @@ describe("Kalender-Mutationen: Overlay bis zur bestätigten Serverprojektion", (
     expect(elternabende(OCTOBER)).toHaveLength(1);
     expect(elternabende(NOVEMBER)).toHaveLength(1);
     // Oktober hat noch nicht geantwortet, das Speichern ist trotzdem durch:
-    // Keine Mutation wartet auf das Neuladen (§3.5).
+    // Keine Mutation wartet auf das Neuladen (ADR-051, Consequences zum Warten).
     expect(save.done).toBe(true);
 
     await act(async () => {
@@ -518,8 +517,7 @@ describe("Kalender-Mutationen: Overlay bis zur bestätigten Serverprojektion", (
 
 /**
  * `hasData` trennt „der Server hat nie geantwortet“ von „das Neuladen ist
- * gescheitert“ (§3.6 der
- * [Kalender-Spec](../../docs/superpowers/specs/2026-10-29-kalender-cache-design.md)).
+ * gescheitert“ ([ADR-051](../../docs/decision-log.md) Decision 7).
  */
 describe("useFamilyEvents: hasData", () => {
   beforeEach(() => {
