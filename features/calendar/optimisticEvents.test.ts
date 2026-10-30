@@ -537,7 +537,7 @@ describe("Reihenfolge der beiden Overlays", () => {
   });
 });
 
-// ── Regel pro Ansicht (ADR-051 Decision 2) ───────────────────────────────────────────
+// ── Regel pro Ansicht (ADR-051 Decision 2) ─────────────────
 // Gespeicherte Einträge tragen `savedAt: 1000`; eine Ansicht ist „älter" mit
 // `dataUpdatedAt: 500`, „neuer" mit `2000`.
 const SAVED_AT = 1000;
@@ -1003,7 +1003,7 @@ describe("Watchdog", () => {
   });
 });
 
-// ── Phase „gespeichert" (ADR-051 Decision 1 und 3) ──────────────
+// ── Phase „gespeichert" (ADR-051 Decision 1 und 3) ─────────────
 // Ein echter `QueryClient` statt eines Stubs: Ob ein Eintrag den Store verlässt,
 // hängt an den Ereignissen des Query-Caches und an `cancelQueries`, und genau
 // deren Verhalten in TanStack 5.105 sollen diese Tests festhalten.
