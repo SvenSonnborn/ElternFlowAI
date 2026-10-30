@@ -39,7 +39,13 @@ jest.mock("@/features/tasks", () => ({
 
 jest.mock("@/features/shared", () => ({
   ...jest.requireActual<typeof import("@/features/shared")>("@/features/shared"),
-  useToday: () => new Date(2026, 9, 30, 9, 0),
+  // Aus dem Instant des Fixtures `event` abgeleitet, damit "heute" in jeder Zone
+  // auf dessen lokalem Tag liegt.
+  useToday: () => {
+    const d = new Date("2026-10-30T18:00:00.000Z");
+    d.setHours(9, 0, 0, 0);
+    return d;
+  },
 }));
 
 jest.mock("expo-router", () => ({
