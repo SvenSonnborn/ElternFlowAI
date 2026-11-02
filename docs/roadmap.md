@@ -121,16 +121,16 @@ Einschätzung („ein Großteil davon können wir jetzt schon umsetzen") trifft 
 Der große Rest teilt sich in Anbieter-Blockaden (Sprachassistent, gustar.io, Notifications, Stripe)
 und Designer-Punkte, die zwar nicht _von uns_ erledigt werden, aber in den Blöcken mitlaufen.
 
-### Die nächsten Branches (Stand 2026-10-30)
+### Die nächsten Branches (Stand 2026-11-02)
 
-Erledigt sind `fix/stille-fehler` ([ADR-049](./decision-log.md)) und der Kalender-Cache aus
-[8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-051](./decision-log.md)).
+Erledigt sind `fix/stille-fehler` ([ADR-049](./decision-log.md)), der Kalender-Cache aus
+[8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-051](./decision-log.md)) und der Test
+für `useFamilyRealtime`, ohne `setAuth`-Retry ([ADR-052](./decision-log.md)).
 
-1. Realtime (Test und `setAuth`-Retry)
-2. DB-Aufräumen (pg_cron für Einladungen, `anon`-Rechte, Einladungs-Kurzschluss)
-3. Entscheidung [4.1](#41-inlinerem-entscheiden--offen-entscheidung-bei-dir) `inlineRem`
-4. a11y nativ (`hitSlop` zur Box, `aria-*`, Field-Label, `AuthGate`, Serifenschrift im Web)
-5. Block 9 (`expo-doctor`, `ci.yml`-Cache nur lesen)
+1. DB-Aufräumen (pg_cron für Einladungen, `anon`-Rechte, Einladungs-Kurzschluss)
+2. Entscheidung [4.1](#41-inlinerem-entscheiden--offen-entscheidung-bei-dir) `inlineRem`
+3. a11y nativ (`hitSlop` zur Box, `aria-*`, Field-Label, `AuthGate`, Serifenschrift im Web)
+4. Block 9 (`expo-doctor`, `ci.yml`-Cache nur lesen)
 
 ### Schlusssteine — was am meisten entsperrt
 
@@ -702,8 +702,8 @@ Siebtel und braucht einen nativen Sichtlauf über alle Screens — eigener PR.
 > `jest-expo` für `*.jest.tsx`/`*.jest.ts`, alles andere bleibt unter `bun`. Die
 > Hydrations-Invariante ist in `EventEditScreen` (Speichern) und `TaskEditScreen` (Speichern und
 > Löschen) per Regressionstest gesichert. `features/calendar/hooks.ts` lädt unter `jest`. Die
-> Tests für `useFamilyRealtime` und `useEvent` stehen weiter in [TODO.md](./TODO.md), der Pfad
-> dafür steht jetzt.
+> Tests für `useEvent` und `useFamilyRealtime` kamen später ([ADR-049](./decision-log.md),
+> [ADR-052](./decision-log.md)).
 
 Ab hier wird Infrastruktur gebaut. Vier Einträge warten explizit auf **einen** fehlenden Pfad: es
 gibt im Repo keine Möglichkeit, React-Komponenten im Test zu rendern.
@@ -719,7 +719,7 @@ gibt im Repo keine Möglichkeit, React-Komponenten im Test zu rendern.
   `Appearance`-Mock, dann ein tieferer CommonJS-Wrapper-Fehler). Jede Datei in `features/calendar`,
   die aus `./hooks` importiert, ist damit für Tests unerreichbar — der Grund, warum
   `useCreateEvent` den Event-Typ aus dem Query-Cache liest statt `useEventTypes()` zu rufen.
-- **„`useFamilyRealtime` ist ungetestet"** ([Realtime](./TODO.md#realtime-siehe-adr-030))
+- **„`useFamilyRealtime` ist ungetestet"** ([Realtime](./TODO.md#realtime-siehe-adr-030)) ✅
 - **„Für die Hydrations-Invariante gibt es keinen Regressionstest"**
   ([Conflict-Detection](./TODO.md#conflict-detection-siehe-adr-031)) — **der wichtigste der vier.**
   „`baseVersion` ist die Version, aus der der Formular-State entstand" trägt das ganze
@@ -1109,7 +1109,6 @@ fällig wird — sie jetzt zu erledigen hieße, ohne den zweiten Datenpunkt zu r
 | **„`useCreateTask` ist nicht optimistisch"** ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1))                                               | ein Screen die Latenz beim Anlegen spürbar macht                                                                                                                                                          |
 | **„Ein verlorenes Broadcast ist stumm"** ([Realtime](./TODO.md#realtime-siehe-adr-030))                                                           | es serverseitige Beobachtbarkeit gibt (Alert auf die `WARNING`-Logzeile) oder einen Client-Heartbeat                                                                                                      |
 | **„Ein geplanter Eintrag ohne sichtbares Rezept"** (2×: [Essen](./TODO.md#essen--meal-planner-daten-layer-v1) + [Dashboard](./TODO.md#dashboard)) | 🎨 ein Copy-Key existiert — praktisch unerreichbar, solange nur globale und eigene Rezepte verplant werden                                                                                                |
-| **„Kein zweiter Versuch nach abgelehntem `setAuth()`"** ([Realtime](./TODO.md#realtime-siehe-adr-030))                                            | — **umsetzbar**, aber mit eigenem Testbedarf (wie oft, wie lange, was bei Unmount mittendrin). Kandidat für Block 8, sobald Block 5 einen Testpfad hat.                                                   |
 
 ---
 
