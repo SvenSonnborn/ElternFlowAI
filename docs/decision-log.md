@@ -1841,3 +1841,23 @@ Die Kalender-Mutationen räumten ihren Overlay-Eintrag ab, sobald `invalidateQue
 - **Springt die Uhr zwischen Speichern und Neuladen zurück,** wirken die neuen Daten älter als das Speichern, und der Eintrag gilt weiter, bis ein Laden nach dem Speicherzeitpunkt landet oder die Query verworfen ist. Hingenommen: Der Fall ist selten, und `dataUpdatedAt` ist selbst `Date.now()`, eine monotone Uhr ließe sich damit nicht vergleichen.
 - **Anlegen und Bearbeiten laden nach einem `clear` weiter neu.** Ein später Erfolg legt keinen Eintrag an (Decision 6), bricht aber ein laufendes Laden der Termine ab und stößt es neu an. Hat das nächste Konto den Kalender schon geöffnet, lädt es seine eigenen Daten einmal mehr. Hingenommen: Falsche Daten entstehen dabei nicht.
 - **Änderungen ohne Overlay-Eintrag bleiben, wie sie sind** (Regeländerung, `all`/`forward` mit geändertem Datum, siehe `canApplyOptimistically`): Scheitert das Neuladen, zeigt der Kalender den alten Stand bis zum nächsten gelungenen Laden.
+
+## ADR-052 — Realtime: `useFamilyRealtime` unter Test, kein Retry nach `setAuth()` (2026-11-02)
+
+### Status
+
+Accepted. Löst zwei Consequences von ADR-030 ab: „`useFamilyRealtime` selbst bleibt ungetestet" und „Nach einem abgelehnten `setAuth()` versucht es niemand erneut".
+
+### Context
+
+ADR-030 ließ den Hook ohne Test, weil es keinen Render-Pfad gab; den gibt es seit ADR-042. Die zweite Consequence nahm an, `client.realtime.setAuth()` lehne ohne Token oder ohne Netz ab, und `docs/TODO.md` schlug dafür einen begrenzten Retry mit Backoff im Fehlerzweig vor. Beobachtet wurde eine solche Ablehnung nie; die Annahme stammte aus einem Review.
+
+### Decisions
+
+1. **Kein Retry nach `setAuth()`.** In realtime-js fängt `_performAuth` einen Fehler des `accessToken`-Callbacks ab und nimmt den zuletzt bekannten Token. supabase-js übergibt als Callback `_getAccessToken`, das ohne Sitzung den anon-Key liefert. `setAuth()` lehnt damit in keinem der angenommenen Fälle ab, und ein Retry hätte nichts zu wiederholen. Der Fehlerzweig in `useFamilyRealtime` bleibt als Absicherung gegen eine unerwartete Ablehnung von `subscribeToFamilyChanges`: Er meldet `error`, und nach der Frist erscheint der Offline-Hinweis.
+2. **Der Test spielt den Kanal, die Regeln darunter laufen echt.** `useFamilyRealtime.jest.tsx` ersetzt `subscribeToFamilyChanges` durch einen Fake, über den der Test Status und Änderungen meldet und den Aufbau abschließt oder scheitern lässt. `coalesce`, `reconnect` und `dispatch` bleiben echt, die Zeit läuft über Jests Fake-Timer. Geprüft wird das Zusammenspiel im Hook: Sammelfenster, Frist des Offline-Hinweises (auch wenn derselbe Status erneut kommt und wenn ein neuer Kanal mit dem letzten Status des alten beginnt), Nachladen nach dem Wiederverbinden, die `cancelled`-Guards aus ADR-030 Decision 9, das Zurücksetzen beim Abmelden und der Fehlerzweig.
+
+### Consequences
+
+- **Was in `subscribeToFamilyChanges` passiert, sieht der Hook-Test nicht.** Die Reihenfolge `setAuth()` vor `channel()` und das Entsorgen von Altkanälen prüft weiter `subscribe.test.ts`; das Zusammenspiel mit einem echten Server nur ein Sichtlauf.
+- **Ändert supabase-js das Verhalten von `setAuth()`, kehrt die alte Lücke zurück.** Eine Ablehnung landet dann im Fehlerzweig, und der Kanal bleibt bis zum nächsten Wechsel von `familyId` tot. Ein Retry wäre dann neu zu bewerten.

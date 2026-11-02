@@ -144,11 +144,12 @@ export function useFamilyRealtime(): void {
         unsubscribe = cleanup;
       },
       (error: unknown) => {
-        // `setAuth` kann ablehnen (kein Token, kein Netz) — noch bevor
-        // `onStatus` auch nur einmal gerufen wurde. Das ist kein Kanal-Zustand,
-        // den der Server meldet: Ohne diesen Zweig bliebe der Status auf
-        // seinem vorherigen Wert stehen (typisch `idle`) und niemand erführe
-        // vom gescheiterten Aufbau.
+        // Eine Absicherung, kein erwarteter Weg: `setAuth()` lehnt weder ohne
+        // Sitzung noch ohne Netz ab, es fängt Fehler beim Holen des Tokens
+        // selbst ab und nimmt den zuletzt bekannten (ADR-052). Lehnt der
+        // Aufbau trotzdem ab, dann bevor `onStatus` je gerufen wurde: Ohne
+        // diesen Zweig bliebe der Status auf seinem vorherigen Wert stehen
+        // (typisch `idle`) und niemand erführe vom gescheiterten Aufbau.
         console.error("[useFamilyRealtime] Kanal konnte nicht aufgebaut werden", { error });
         if (!cancelled) handleStatus("error");
       },
