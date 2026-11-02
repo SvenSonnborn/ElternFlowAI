@@ -176,6 +176,7 @@ describe("useFamilyRealtime", () => {
       await rerender({});
       expect(channels[0]?.cleanup).toHaveBeenCalledTimes(1);
       expect(channels[1]?.args.familyId).toBe("f2");
+      await connect(channels[1]);
 
       // `removeChannel` liefert `CLOSED` erst nach dem Leave-Ack aus, also
       // nach dem Cleanup des Effekts.
