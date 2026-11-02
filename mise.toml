@@ -13,9 +13,9 @@
 # bun — same version as `bun-version:` in the workflows and `constraints.bun` in
 #       .github/renovate.json5, so local == CI == the Bun that writes Renovate's
 #       lockfile updates. Renovate bumps all of them in one PR ("bun toolchain").
-# supabase 2.121.0 — CLI for the local stack in Docker (supabase/config.toml). Before
-#           bumping, check that the supabase/cli GitHub release exists — the same
-#           lesson as the mise pin in native-build.yml.
+# supabase — CLI for the local stack in Docker (supabase/config.toml). Before
+#            bumping, check that the supabase/cli GitHub release exists — the
+#            same lesson as the mise pin in native-build.yml.
 #
 # .github/workflows/native-build.yml consumes THIS FILE directly (jdx/mise-action)
 # rather than re-pinning in YAML — the native builds are where the java pin is

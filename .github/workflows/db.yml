@@ -50,14 +50,17 @@ jobs:
 
       # Versionsdrift der CLI sieht sonst wie ein Projektfehler aus (andere
       # Migrationsreihenfolge, andere Lint-Ausgabe). Hart prüfen statt vermuten,
-      # im Stil der Pin-Checks in native-build.yml.
+      # im Stil der Pin-Checks in native-build.yml. Den Soll-Wert liest
+      # `mise current` aus mise.toml: Eine Kopie der Zahl hier hob Renovate
+      # nicht mit, und jeder Bump der CLI scheiterte an diesem Schritt.
       - name: Assert supabase CLI pin from mise.toml
         run: |
           set -e
+          expected="$(mise current supabase)"
           version="$(supabase --version)"
-          echo "supabase --version: ${version}"
-          if [ "${version}" != "2.121.0" ]; then
-            echo "::error::Expected supabase CLI 2.121.0 (mise.toml pin), got '${version}'."
+          echo "supabase --version: ${version} (mise.toml: ${expected})"
+          if [ "${version}" != "${expected}" ]; then
+            echo "::error::Expected supabase CLI ${expected} (mise.toml pin), got '${version}'."
             exit 1
           fi
 
