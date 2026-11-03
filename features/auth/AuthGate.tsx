@@ -4,17 +4,10 @@ import { Platform, StyleSheet, View, type ViewProps } from "react-native";
 
 import { useTheme } from "@/design-system/ThemeProvider";
 
-import { decideRoute, type RouteGroup } from "./decideRoute";
+import { decideRoute, segmentToGroup } from "./decideRoute";
 import { gateLayout } from "./gateLayout";
 import { useSession } from "./session";
 import { useCurrentParent } from "./useCurrentParent";
-
-function segmentToGroup(segment: string | undefined): RouteGroup {
-  if (segment === "(auth)") return "auth";
-  if (segment === "(onboarding)") return "onboarding";
-  if (segment === "(tabs)") return "tabs";
-  return "other";
-}
 
 function SplashFallback() {
   const { theme } = useTheme();

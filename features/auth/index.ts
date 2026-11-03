@@ -27,9 +27,9 @@ export {
   initDeepLinkHandler,
   parseDeepLink,
   getPendingInviteToken,
-  clearPendingInviteToken,
   type ParsedDeepLink,
 } from "./deepLinkHandler";
+export { clearPendingInviteToken } from "./pendingInvite";
 export { mapAuthError, type AuthErrorKey } from "./errors";
 export { inviteExpiry, type InviteExpiry } from "./inviteStatus";
 export { useSignUp, useSignIn, useSignOut, useResetPassword, useUpdatePassword } from "./mutations";
