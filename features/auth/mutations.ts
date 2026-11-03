@@ -68,17 +68,23 @@ export function useSignIn() {
  * `qc.clear()` in `onSettled` räumt aus demselben Grund den Query-Cache; der
  * Pending-Store ist der zweite Modul-Store, den ein Abmelden erreichen muss,
  * der Optimistic-Store aus [ADR-027](../../docs/decision-log.md) der dritte.
+ *
+ * Ohne Argument meldet `signOut` das Konto auf allen Geräten ab (Supabase-Default
+ * `global`). `"local"` braucht der Kontowechsel über einen Einladungslink: Sein
+ * Dialog verspricht „auf diesem Gerät", und auf einem fremden Gerät soll der
+ * Besitzer auf seinen eigenen angemeldet bleiben.
  */
 export function useSignOut() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
+    // `void`, damit `mutate()` ohne Argument weiter typisiert.
+    mutationFn: async (scope: "global" | "local" | void) => {
       // Warten, nicht nur anstoßen: `signOut` entfernt die lokale Session, und
       // ein DELETE, das seinen Token erst danach auflöst, liefe unangemeldet und
       // schlüge unter RLS lautlos fehl — `error: null` bei null getroffenen Zeilen.
       // Der Watchdog in `commit` begrenzt, wie lange das Abmelden dafür wartet.
       await usePendingDeleteStore.getState().flush();
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut({ scope: scope ?? "global" });
       if (error) throw error;
     },
     onSettled: () => {

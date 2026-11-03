@@ -7,7 +7,7 @@ import { renderScreen } from "@/testing/renderScreen";
 import { InviteLinkHost } from "./InviteLinkHost";
 
 const mockConfirm = jest.fn<Promise<boolean>, [unknown]>();
-const mockSignOut = jest.fn<Promise<void>, []>();
+const mockSignOut = jest.fn<Promise<void>, [unknown]>();
 let mockStatus: "authenticated" | "unauthenticated" = "authenticated";
 let mockSegments: string[] = ["(tabs)"];
 
@@ -72,6 +72,9 @@ describe("InviteLinkHost", () => {
       cancel: "Abbrechen",
     });
     expect(mockSignOut).toHaveBeenCalledTimes(1);
+    // Nur dieses Gerät, wie der Dialog sagt — auf einem fremden Gerät bleibt der
+    // Besitzer auf seinen eigenen angemeldet.
+    expect(mockSignOut).toHaveBeenCalledWith("local");
     expect(usePendingInviteStore.getState().token).toBe("T");
     expect(router.push).not.toHaveBeenCalled();
   });
