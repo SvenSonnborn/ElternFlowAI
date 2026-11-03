@@ -22,7 +22,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(44);
+select plan(47);
 
 -- ── Helfer ──────────────────────────────────────────────────────────────────
 
@@ -210,6 +210,24 @@ select is(
   '{}'::text[],
   'Inventar: anon darf keine Funktion in public ausführen'
 );
+
+-- Probetabelle (Rollback räumt sie weg): die Inventare darunter decken sie mit ab
+create table public.acl_probe (id int);
+
+select is_empty($$
+  select c.relname::text from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relkind in ('r', 'p', 'v', 'm', 'f')
+     and (has_table_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+          or has_any_column_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')) $$,
+  'Inventar: anon hat auf keiner Tabelle in public ein Recht');
+select is_empty($$
+  select c.relname::text from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relkind in ('r', 'p', 'v', 'm', 'f')
+     and has_table_privilege('authenticated', c.oid, 'TRUNCATE,REFERENCES,TRIGGER,MAINTAIN') $$,
+  'Inventar: authenticated hat nirgends TRUNCATE, REFERENCES, TRIGGER oder MAINTAIN');
+select table_privs_are('public', 'acl_probe', 'authenticated',
+  array['DELETE', 'INSERT', 'SELECT', 'UPDATE'],
+  'neue Tabelle: authenticated bekommt genau select/insert/update/delete (Default-Privileges)');
 
 -- ── 3. Verhalten der definer-Funktionen ─────────────────────────────────────
 
