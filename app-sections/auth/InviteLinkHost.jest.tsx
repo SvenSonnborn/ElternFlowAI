@@ -126,4 +126,20 @@ describe("InviteLinkHost", () => {
     expect(router.push).toHaveBeenCalledWith("/(auth)/register");
     expect(mockConfirm).not.toHaveBeenCalled();
   });
+
+  it("ein Link auf der offenen Registrierung legt keine zweite darüber", async () => {
+    mockStatus = "unauthenticated";
+    mockSegments = ["(auth)", "register"];
+    stash("T2");
+
+    const { rerender } = await renderScreen(<InviteLinkHost />);
+    expect(router.push).not.toHaveBeenCalled();
+
+    // Zurück zum Login: Der Link gilt als bedient, die Registrierung kommt
+    // nicht noch einmal hoch.
+    mockSegments = ["(auth)", "login"];
+    await rerender(<InviteLinkHost />);
+    expect(router.push).not.toHaveBeenCalled();
+    expect(usePendingInviteStore.getState().token).toBe("T2");
+  });
 });
