@@ -50,6 +50,7 @@ export function InviteLinkHost(): null {
     token,
     done,
   });
+  const onRegister = segments[0] === "(auth)" && segments[1] === "register";
 
   useEffect(() => {
     if (!action || !token) return;
@@ -58,8 +59,10 @@ export function InviteLinkHost(): null {
     markInviteLinkDone({ token, action });
     if (action === "openRegister") {
       // Der Login bleibt darunter im Stapel — `router.back()` in
-      // `RegisterScreen` führt dorthin zurück.
-      router.push("/(auth)/register");
+      // `RegisterScreen` führt dorthin zurück. Ist die Registrierung schon
+      // offen (ein Link, während sie offen ist), bleibt es dabei: Ein zweiter
+      // `push` legte sie doppelt in den Stapel, und Zurück führte nicht zum Login.
+      if (!onRegister) router.push("/(auth)/register");
       return;
     }
     confirmDestructive({
@@ -70,7 +73,7 @@ export function InviteLinkHost(): null {
     })
       .then((ok) => (ok ? signOut("local") : clearPendingInviteToken()))
       .catch((e: unknown) => console.warn("[InviteLinkHost] invite link handling failed", e));
-  }, [action, token, t, signOut]);
+  }, [action, token, onRegister, t, signOut]);
 
   return null;
 }
