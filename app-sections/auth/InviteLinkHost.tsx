@@ -74,7 +74,7 @@ export function InviteLinkHost(): null {
       confirm: t("auth.invite.otherAccountConfirm"),
       cancel: t("action.cancel"),
     })
-      .then((ok) => (ok ? signOut("local") : clearPendingInviteToken()))
+      .then((ok) => (ok ? signOut("local") : clearPendingInviteToken(token)))
       .catch((e: unknown) => console.warn("[InviteLinkHost] invite link handling failed", e));
   }, [action, token, onRegister, t, signOut]);
 

@@ -65,10 +65,21 @@ describe("pendingInvite", () => {
       done: { token: "T", action: "openRegister" },
     });
     const remove = spyOn(AsyncStorage, "removeItem");
-    await clearPendingInviteToken();
+    await clearPendingInviteToken("T");
     const s = usePendingInviteStore.getState();
     expect(s.token).toBeNull();
     expect(s.done).toBeNull();
     expect(remove).toHaveBeenCalledWith("auth.pendingInvite");
+  });
+
+  test("clear lässt einen neueren Token stehen", async () => {
+    const done = { token: "T2", action: "askSwitchAccount" } as const;
+    usePendingInviteStore.setState({ token: "T2", hydrated: true, done });
+    const remove = spyOn(AsyncStorage, "removeItem");
+    await clearPendingInviteToken("T1");
+    const s = usePendingInviteStore.getState();
+    expect(s.token).toBe("T2");
+    expect(s.done).toEqual(done);
+    expect(remove).not.toHaveBeenCalled();
   });
 });

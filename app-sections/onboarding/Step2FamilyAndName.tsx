@@ -65,7 +65,7 @@ export function Step2FamilyAndName() {
       // selben Tick und React bündelt beide. Entscheidend ist, das Verwerfen
       // nicht vor dem `push` abzuwarten: Sonst schaltete das Formular vor dem
       // Wechsel kurz auf „Familie gründen" um.
-      if (isInvitePath) void clearPendingInviteToken();
+      if (isInvitePath) void clearPendingInviteToken(inviteToken);
     } catch (err) {
       // If the user already belongs to a family (23505), the AuthGate would
       // route to /(tabs) on its next render anyway — make it explicit.

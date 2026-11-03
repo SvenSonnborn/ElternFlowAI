@@ -1,4 +1,4 @@
-import { waitFor } from "@testing-library/react-native";
+import { act, waitFor } from "@testing-library/react-native";
 import { router } from "expo-router";
 
 import { usePendingInviteStore } from "@/features/auth";
@@ -112,6 +112,29 @@ describe("InviteLinkHost", () => {
 
     expect(mockConfirm).toHaveBeenCalledTimes(1);
     expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it("Abbrechen eines älteren Dialogs verwirft keinen neueren Link", async () => {
+    mockStatus = "authenticated";
+    mockSegments = ["(tabs)"];
+    let cancelFirst: (ok: boolean) => void = () => {};
+    mockConfirm
+      .mockImplementationOnce(() => new Promise<boolean>((resolve) => (cancelFirst = resolve)))
+      .mockImplementationOnce(() => new Promise<boolean>(() => {}));
+    stash("T1");
+
+    await renderScreen(<InviteLinkHost />);
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalledTimes(1));
+    // Ein zweiter Link, während der erste Dialog noch offen ist.
+    await act(() => {
+      stash("T2");
+    });
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalledTimes(2));
+
+    await act(() => {
+      cancelFirst(false);
+    });
+    expect(usePendingInviteStore.getState().token).toBe("T2");
   });
 
   it("abgemeldet im Login öffnet die Registrierung einmal", async () => {
