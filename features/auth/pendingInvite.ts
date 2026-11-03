@@ -70,8 +70,13 @@ export function markInviteLinkDone(done: InviteLinkDone): void {
   usePendingInviteStore.setState({ done });
 }
 
-/** Verwirft den Token (Store und AsyncStorage), z. B. nach gelungenem Beitritt. */
-export async function clearPendingInviteToken(): Promise<void> {
+/**
+ * Verwirft genau diesen Token (Store und AsyncStorage), z. B. nach gelungenem
+ * Beitritt. Ist inzwischen ein anderer gemerkt — ein zweiter Link, während der
+ * Dialog zum ersten offen war oder der Beitritt lief —, bleibt der stehen.
+ */
+export async function clearPendingInviteToken(token: string): Promise<void> {
+  if (usePendingInviteStore.getState().token !== token) return;
   usePendingInviteStore.setState({ token: null, done: null });
   try {
     await AsyncStorage.removeItem(PENDING_INVITE_KEY);
