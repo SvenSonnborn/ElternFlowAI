@@ -137,6 +137,34 @@ describe("InviteLinkHost", () => {
     expect(usePendingInviteStore.getState().token).toBe("T2");
   });
 
+  it("Bestätigen eines überholten Dialogs meldet nicht ab", async () => {
+    mockStatus = "authenticated";
+    mockSegments = ["(tabs)"];
+    let answerFirst: (ok: boolean) => void = () => {};
+    let answerSecond: (ok: boolean) => void = () => {};
+    mockConfirm
+      .mockImplementationOnce(() => new Promise<boolean>((resolve) => (answerFirst = resolve)))
+      .mockImplementationOnce(() => new Promise<boolean>((resolve) => (answerSecond = resolve)));
+    stash("T1");
+
+    await renderScreen(<InviteLinkHost />);
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalledTimes(1));
+    await act(() => {
+      stash("T2");
+    });
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalledTimes(2));
+
+    // iOS lässt beide Dialoge stehen: erst den neueren abbrechen, dann den älteren bestätigen.
+    await act(() => {
+      answerSecond(false);
+    });
+    expect(usePendingInviteStore.getState().token).toBeNull();
+    await act(() => {
+      answerFirst(true);
+    });
+    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
   it("abgemeldet im Login öffnet die Registrierung einmal", async () => {
     mockStatus = "unauthenticated";
     mockSegments = ["(auth)"];
