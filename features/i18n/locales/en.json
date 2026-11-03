@@ -104,6 +104,11 @@
       "notAuthenticated": "Please sign in again.",
       "network": "Connection failed. Please try again later.",
       "generic": "Something went wrong. Please try again later."
+    },
+    "invite": {
+      "otherAccountTitle": "This account already belongs to a family.",
+      "otherAccountBody": "An account belongs to exactly one family. This invitation needs another account with its own email address – this account will be signed out on this device for that.",
+      "otherAccountConfirm": "Continue with another account"
     }
   },
   "onb": {

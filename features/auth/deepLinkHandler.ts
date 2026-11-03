@@ -1,10 +1,9 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
 
 import { supabase } from "@/features/supabase";
 
-import { PENDING_INVITE_KEY } from "./pendingInvite";
+import { hydratePendingInvite, stashPendingInvite } from "./pendingInvite";
 
 export type ParsedDeepLink =
   | { kind: "auth-confirm"; tokenHash: string; otpType: "email" }
@@ -55,14 +54,6 @@ export function parseDeepLink(rawUrl: string): ParsedDeepLink | null {
   return null;
 }
 
-export async function getPendingInviteToken(): Promise<string | null> {
-  try {
-    return await AsyncStorage.getItem(PENDING_INVITE_KEY);
-  } catch {
-    return null;
-  }
-}
-
 /**
  * `redirectSystemPath` für `app/+native-intent.tsx`: Einladungslinks (voll als
  * `elternflow://invite/<token>` oder als Pfad `/invite/<token>`) gehen auf
@@ -80,8 +71,15 @@ export function redirectInviteSystemPath(options: { path: string; initial: boole
   return path;
 }
 
-/** Called from app/_layout.tsx. Returns a cleanup function. */
+/**
+ * Called from app/_layout.tsx. Returns a cleanup function.
+ *
+ * Liest zuerst den gemerkten Einladungstoken aus AsyncStorage in den Store —
+ * hier, weil das einmal pro App-Start passiert; Onboarding-Schritt 2 wartet auf
+ * genau dieses `hydrated`.
+ */
 export function initDeepLinkHandler(): () => void {
+  void hydratePendingInvite();
   const handle = async (rawUrl: string | null) => {
     try {
       if (!rawUrl) return;
@@ -108,18 +106,10 @@ export function initDeepLinkHandler(): () => void {
       }
 
       if (parsed.kind === "invite") {
-        // Stash so onboarding can pick it up after sign-in.
-        try {
-          await AsyncStorage.setItem(PENDING_INVITE_KEY, parsed.token);
-        } catch (e) {
-          console.warn("[deepLinkHandler] failed to stash invite", e);
-        }
-        const { data } = await supabase.auth.getSession();
-        if (!data.session) {
-          router.replace("/(auth)/login");
-          return;
-        }
-        router.replace("/(onboarding)/2");
+        // Nur merken, nicht navigieren: Auf `/` schreibt `app/+native-intent.tsx`
+        // den Link um, den Rest erledigen `AuthGate` (ohne Familie → Schritt 2)
+        // und `InviteLinkHost` (Registrierung oder Rückfrage).
+        await stashPendingInvite(parsed.token);
         return;
       }
     } catch (e) {

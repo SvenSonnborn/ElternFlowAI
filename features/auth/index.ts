@@ -19,17 +19,23 @@ export {
 } from "./familyQueries";
 export {
   decideRoute,
+  segmentToGroup,
   type RouteDecisionInput,
   type RouteGroup,
   type RoutePath,
 } from "./decideRoute";
 export {
-  initDeepLinkHandler,
-  parseDeepLink,
-  getPendingInviteToken,
-  type ParsedDeepLink,
-} from "./deepLinkHandler";
-export { clearPendingInviteToken } from "./pendingInvite";
+  decideInviteLink,
+  type InviteLinkAction,
+  type InviteLinkDone,
+  type InviteLinkInput,
+} from "./decideInviteLink";
+export { initDeepLinkHandler, parseDeepLink, type ParsedDeepLink } from "./deepLinkHandler";
+export {
+  clearPendingInviteToken,
+  markInviteLinkDone,
+  usePendingInviteStore,
+} from "./pendingInvite";
 export { mapAuthError, type AuthErrorKey } from "./errors";
 export { inviteExpiry, type InviteExpiry } from "./inviteStatus";
 export { useSignUp, useSignIn, useSignOut, useResetPassword, useUpdatePassword } from "./mutations";

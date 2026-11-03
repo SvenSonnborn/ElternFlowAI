@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, View } from "react-native";
 
@@ -10,10 +10,10 @@ import {
   AVATAR_COLORS,
   clearPendingInviteToken,
   deriveShort,
-  getPendingInviteToken,
   mapAuthError,
   useAcceptInvitation,
   useCreateFamily,
+  usePendingInviteStore,
 } from "@/features/auth";
 
 import { OnboardingShell } from "./OnboardingShell";
@@ -27,15 +27,8 @@ export function Step2FamilyAndName() {
   const [familyName, setFamilyName] = useState("");
   const [parentName, setParentName] = useState("");
   const [color, setColor] = useState<string>(AVATAR_COLORS[0]);
-  const [inviteToken, setInviteToken] = useState<string | null>(null);
-  const [inviteChecked, setInviteChecked] = useState(false);
-
-  useEffect(() => {
-    void getPendingInviteToken().then((token) => {
-      setInviteToken(token);
-      setInviteChecked(true);
-    });
-  }, []);
+  const inviteToken = usePendingInviteStore((s) => s.token);
+  const inviteChecked = usePendingInviteStore((s) => s.hydrated);
 
   const isInvitePath = inviteToken !== null;
   const familyOk = isInvitePath || familyName.trim().length >= 2;
@@ -59,7 +52,6 @@ export function Step2FamilyAndName() {
           short,
           color,
         });
-        await clearPendingInviteToken();
       } else {
         await createFamily.mutateAsync({
           familyName: familyName.trim(),
@@ -69,6 +61,10 @@ export function Step2FamilyAndName() {
         });
       }
       router.push("/(onboarding)/3");
+      // Erst wechseln, dann verwerfen: Der Token kommt reaktiv aus dem Store,
+      // vorher verworfen schaltete das Formular vor dem Wechsel kurz auf
+      // „Familie gründen" um.
+      if (isInvitePath) void clearPendingInviteToken();
     } catch (err) {
       // If the user already belongs to a family (23505), the AuthGate would
       // route to /(tabs) on its next render anyway — make it explicit.
