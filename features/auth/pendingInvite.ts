@@ -12,8 +12,7 @@ import { create } from "zustand";
 
 import type { InviteLinkDone } from "./decideInviteLink";
 
-/** AsyncStorage-Schlüssel; auch `deepLinkHandler` schreibt darunter. */
-export const PENDING_INVITE_KEY = "auth.pendingInvite";
+const PENDING_INVITE_KEY = "auth.pendingInvite";
 
 interface PendingInviteState {
   token: string | null;
@@ -21,6 +20,11 @@ interface PendingInviteState {
   done: InviteLinkDone | null;
 }
 
+/**
+ * `token: null` heißt erst dann „kein Token", wenn `hydrated` steht — davor ist
+ * AsyncStorage nur noch nicht gelesen. Wer daraus einen Weg ableitet (Schritt 2:
+ * Einladung oder neue Familie), wartet auf `hydrated`.
+ */
 export const usePendingInviteStore = create<PendingInviteState>(() => ({
   token: null,
   hydrated: false,

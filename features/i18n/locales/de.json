@@ -104,6 +104,11 @@
       "notAuthenticated": "Bitte erneut anmelden.",
       "network": "Verbindung fehlgeschlagen. Bitte später erneut versuchen.",
       "generic": "Etwas ist schiefgelaufen. Bitte später erneut versuchen."
+    },
+    "invite": {
+      "otherAccountTitle": "Dieses Konto gehört bereits zu einer Familie.",
+      "otherAccountBody": "Ein Konto gehört zu genau einer Familie. Für diese Einladung brauchst du ein weiteres Konto mit eigener E-Mail-Adresse – dieses Konto wird dafür auf diesem Gerät abgemeldet.",
+      "otherAccountConfirm": "Mit anderem Konto fortfahren"
     }
   },
   "onb": {

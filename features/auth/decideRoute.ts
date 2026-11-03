@@ -2,6 +2,10 @@ import type { SessionStatus } from "./session";
 
 export type RouteGroup = "auth" | "onboarding" | "tabs" | "other";
 
+/**
+ * Ordnet das erste Routensegment einer der drei Gruppen zu. Jedes andere
+ * Segment (`settings`, `event` …), auch `undefined`, wird `"other"`.
+ */
 export function segmentToGroup(segment: string | undefined): RouteGroup {
   if (segment === "(auth)") return "auth";
   if (segment === "(onboarding)") return "onboarding";
