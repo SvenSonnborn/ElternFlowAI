@@ -223,7 +223,8 @@ select is_empty($$
 select is_empty($$
   select c.relname::text from pg_class c join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public' and c.relkind in ('r', 'p', 'v', 'm', 'f')
-     and has_table_privilege('authenticated', c.oid, 'TRUNCATE,REFERENCES,TRIGGER,MAINTAIN') $$,
+     and (has_table_privilege('authenticated', c.oid, 'TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+          or has_any_column_privilege('authenticated', c.oid, 'REFERENCES')) $$,
   'Inventar: authenticated hat nirgends TRUNCATE, REFERENCES, TRIGGER oder MAINTAIN');
 select table_privs_are('public', 'acl_probe', 'authenticated',
   array['DELETE', 'INSERT', 'SELECT', 'UPDATE'],
