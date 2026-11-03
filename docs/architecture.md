@@ -37,10 +37,14 @@ Root-Navigator nicht mehr aus — ein anstehender Redirect steht neben dem `Stac
 Warten liegt als Deckfläche darüber; ein ersetzter Root-Navigator löste beim
 Login-Übergang eine Render-Schleife aus (ADR-040, Regel in `features/auth/gateLayout.ts`).
 
-Neben dem `Stack`, innerhalb von `ToastProvider`, hängen zwei Wirte für Dialoge, die nicht
+Neben dem `Stack`, innerhalb von `ToastProvider`, hängen drei Wirte für Dialoge, die nicht
 im Screen leben können: `<ConflictDialogHost />` (der Konflikt kommt erst an, wenn das
-Bearbeiten-Sheet schon zu ist, ADR-031) und `<ScopeSheetHost />` (die Scope-Auswahl auf Web und
-Android, ADR-039). Beide lesen einen Store, den die Screens befüllen.
+Bearbeiten-Sheet schon zu ist, ADR-031), `<InviteLinkHost />` (was ein gemerkter
+Einladungstoken für die aktuelle Sitzung bedeutet, ADR-053) und `<ScopeSheetHost />` (die
+Scope-Auswahl auf Web und Android, ADR-039). Alle drei lesen einen Store, den andere befüllen.
+
+Das Root-Layout mountet beim Kaltstart zweimal. `initDeepLinkHandler()` läuft in einem Effekt des
+Layouts und liest die Start-URL deshalb nur einmal pro JS-Laufzeit (ADR-053).
 
 `features/i18n` is initialized as a side effect on module import.
 
@@ -73,6 +77,10 @@ is the visual spec it follows, not a value read at runtime.
 - `app/(tabs)/<name>.tsx` — re-exports the corresponding screen from
   `app-sections/(tabs)/<name>/<Name>Screen.tsx`
 - `app/+not-found.tsx` — 404 fallback
+- `app/+native-intent.tsx` — schreibt einen Einladungslink beim Kaltstart auf `/` um und lässt
+  die App bei laufender App, wo sie ist. Den Token merkt `initDeepLinkHandler`, wohin er führt,
+  entscheidet `InviteLinkHost`: ohne Sitzung in die Registrierung, mit Familie in einen Dialog
+  „Mit anderem Konto fortfahren", ohne Familie über `decideRoute` zum Beitritt (ADR-053).
 
 ## State management
 
@@ -91,6 +99,12 @@ Schritten mit Einladung über das Share-Sheet ([ADR-005](./decision-log.md)); we
 Nutzer sieht, entscheidet `features/auth/AuthGate`. Für alles, was die Datenbank berührt, gibt es
 eine lokale Supabase im Docker als Testumgebung — gleich in Schema und Konfiguration, nie in Daten
 ([supabase/SETUP.md](../supabase/SETUP.md) §7, [ADR-044](./decision-log.md)).
+
+`anon` hat auf keiner Tabelle in `public` ein Recht, eine Abfrage ohne Sitzung endet mit `42501`;
+`authenticated` hat höchstens `select`, `insert`, `update` und `delete`, oft enger. Für neue
+Tabellen, die `postgres` anlegt, gilt dasselbe über die Default-ACLs. Ein pg_cron-Job
+(`purge-expired-invitations`) löscht nachts abgelaufene, unbenutzte Einladungen über
+`private.purge_expired_invitations()` ([ADR-053](./decision-log.md)).
 
 ## Kalender
 

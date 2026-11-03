@@ -6,7 +6,7 @@ folder named here — see `CLAUDE.md` for the "do not silently diverge" rule.
 
 ```
 app/                     Expo Router routes — THIN re-export files; `_layout.tsx` holds navigator + providers, `+not-found.tsx` is its own screen
-├─ _layout.tsx           Root stack + i18n-Init (Import) + providers (QueryClient · ThemeProvider · SafeArea · GestureHandler · ToastProvider) + <ConflictDialogHost /> + <ScopeSheetHost /> + useFlushPendingDeletes() + useFamilyRealtime()
+├─ _layout.tsx           Root stack + i18n-Init (Import) + providers (QueryClient · ThemeProvider · SafeArea · GestureHandler · ToastProvider) + <ConflictDialogHost /> + <InviteLinkHost /> + <ScopeSheetHost /> + initDeepLinkHandler() + useFlushPendingDeletes() + useFamilyRealtime()
 ├─ (auth)/               Stack-_layout.tsx + login · register · check-email · reset-password · new-password
 ├─ (onboarding)/         Stack-_layout.tsx + [step].tsx → OnboardingStepScreen
 ├─ (tabs)/_layout.tsx    Bottom tab navigator (5 tabs) + Voice FAB overlay
@@ -27,11 +27,13 @@ app/                     Expo Router routes — THIN re-export files; `_layout.t
 ├─ debug/realtime.tsx     → RealtimeDebugScreen (nur `__DEV__` verlinkt)
 ├─ meal/pick.tsx          → MealPickScreen (Rezept für einen festen Tag/Slot wählen)
 ├─ meal/schedule.tsx      → MealScheduleScreen (Tag/Slot für ein festes Rezept wählen)
-└─ +not-found.tsx        NotFoundScreen, eigene Komponente statt Re-Export
+├─ +not-found.tsx        NotFoundScreen, eigene Komponente statt Re-Export
+└─ +native-intent.tsx    Einladungslink beim Kaltstart → `/` (`redirectInviteSystemPath`, ADR-053)
 
 app-sections/            Real screen implementations
 ├─ (tabs)/<name>/<Name>Screen.tsx
 ├─ auth/                 Login · Registrieren · Passwort zurücksetzen · E-Mail bestätigen (ADR-005)
+│                        · InviteLinkHost (Registrierung oder Kontowechsel für einen gemerkten Einladungstoken, ADR-053)
 ├─ child-profile/        ChildProfileScreen
 ├─ debug/                Dev-Werkzeuge (Realtime-Debug) — Einstieg nur unter `__DEV__`
 ├─ event/                Termin anlegen/ansehen/bearbeiten · Scope-Auswahl (`pickScope` →
@@ -65,6 +67,8 @@ design-system/           Handoff bundle + theming runtime
 features/                Cross-cutting feature logic
 ├─ i18n/                 react-i18next init + de.json + en.json
 ├─ auth/                 Session-Store · AuthGate · DeepLinkHandler · Familien-Queries und -Mutations
+│                        · pendingInvite (gemerkter Einladungstoken) · decideInviteLink (was er bedeutet, ADR-053)
+│                        · decideRoute (Route nach Sitzung und Familie, samt `segmentToGroup`)
 ├─ calendar/             Queries · Mutations · RRULE-Expansion · Reminder · Pending-Deletes · Optimistic-Overlay
 │                        · rrule.ts (Vertrag: `occurrencesBetween`/`allOccurrences`, wertet in Wandzeit aus, ADR-033)
 │                        · timezone.ts (Instant↔Wandzeit-Umrechnung, `zonedDayBounds`) · deviceTimeZone.ts (Geräte-Zone für neue Termine)
