@@ -1,13 +1,17 @@
 -- Abgelaufene, unbenutzte Einladungen nachts abräumen.
 -- Spec: docs/superpowers/specs/2026-11-03-db-aufraeumen-design.md (§3.1)
 
--- pg_cron wie in der Supabase-Doku („Cron → Install"): Erweiterung anlegen, dem Besitzer der
--- Jobs (postgres) den Zugriff auf das Schema `cron` geben.
+-- Die Rechte von postgres auf das Schema `cron` vergibt Supabases Event-Trigger
+-- grant_pg_cron_access bei jedem `create extension`, auch wenn die Erweiterung schon da ist.
+-- Die zwei `grant … to postgres` aus der Supabase-Doku („Cron → Install") fehlen bewusst: Sie
+-- legten Einträge mit postgres als Grantor an, und am nächsten Lauf scheiterte das `revoke` des
+-- Triggers an ihnen („dependent privileges exist") — die Migration wäre nicht wiederholbar.
 create extension if not exists pg_cron with schema pg_catalog;
-grant usage on schema cron to postgres;
-grant all privileges on all tables in schema cron to postgres;
 
-create function private.purge_expired_invitations()
+-- security invoker genügt nur, weil der Job als postgres läuft und postgres RLS umgeht
+-- (BYPASSRLS): family_invitations erzwingt RLS, ihre Policies gelten nur für authenticated.
+-- Unter einer Rolle ohne BYPASSRLS löschte der Job still nichts.
+create or replace function private.purge_expired_invitations()
 returns void
 language sql
 security invoker

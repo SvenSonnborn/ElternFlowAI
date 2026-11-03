@@ -36,9 +36,9 @@ export type GateLayout =
  * an, mounteten ohne Sitzung die geschützten Screens und fragten anonym `events`,
  * `tasks` und `meal_plan_entries` ab. Ohne Sitzung gilt das auch *nach* dem
  * Mount — beim Abmelden bliebe sonst `(tabs)` unter `/login` gemountet: Das
- * Dashboard lädt nach `qc.clear()` ohne Sitzung nach, legt leere RLS-Antworten
- * als frisch in den Cache, und der Root-Stack wüchse mit jedem Zyklus um ein
- * `(tabs)`. Das Ersetzen setzt den Stack zurück; die Schleife tritt nur beim
+ * Dashboard lädt nach `qc.clear()` ohne Sitzung nach und läuft in `42501`
+ * (`anon` hat keine Tabellenrechte, ADR-053), und der Root-Stack wüchse mit
+ * jedem Zyklus um ein `(tabs)`. Das Ersetzen setzt den Stack zurück; die Schleife tritt nur beim
  * Umleiten *in* die App auf.
  *
  * „Warten" heißt `loading` oder (`authenticated` und Parent lädt) — dieselbe
