@@ -121,16 +121,17 @@ Einschätzung („ein Großteil davon können wir jetzt schon umsetzen") trifft 
 Der große Rest teilt sich in Anbieter-Blockaden (Sprachassistent, gustar.io, Notifications, Stripe)
 und Designer-Punkte, die zwar nicht _von uns_ erledigt werden, aber in den Blöcken mitlaufen.
 
-### Die nächsten Branches (Stand 2026-11-02)
+### Die nächsten Branches (Stand 2026-11-03)
 
 Erledigt sind `fix/stille-fehler` ([ADR-049](./decision-log.md)), der Kalender-Cache aus
-[8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-051](./decision-log.md)) und der Test
-für `useFamilyRealtime`, ohne `setAuth`-Retry ([ADR-052](./decision-log.md)).
+[8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-051](./decision-log.md)), der Test
+für `useFamilyRealtime`, ohne `setAuth`-Retry ([ADR-052](./decision-log.md)), und das DB-Aufräumen
+mit pg_cron für Einladungen, `anon`-Rechten und Einladungslink nach Kontostand
+([ADR-053](./decision-log.md)).
 
-1. DB-Aufräumen (pg_cron für Einladungen, `anon`-Rechte, Einladungs-Kurzschluss)
-2. Entscheidung [4.1](#41-inlinerem-entscheiden--offen-entscheidung-bei-dir) `inlineRem`
-3. a11y nativ (`hitSlop` zur Box, `aria-*`, Field-Label, `AuthGate`, Serifenschrift im Web)
-4. Block 9 (`expo-doctor`, `ci.yml`-Cache nur lesen)
+1. Entscheidung [4.1](#41-inlinerem-entscheiden--offen-entscheidung-bei-dir) `inlineRem`
+2. a11y nativ (`hitSlop` zur Box, `aria-*`, Field-Label, `AuthGate`, Serifenschrift im Web)
+3. Block 9 (`expo-doctor`, `ci.yml`-Cache nur lesen)
 
 ### Schlusssteine — was am meisten entsperrt
 
@@ -939,13 +940,10 @@ Importpfad und den Barrel — deshalb eine eigene, sonst leere Änderung, damit 
   `useFamilyEvents(startAt)`, also dem Monat um den Starttag ±7 Tage; eine längere Terminspanne wird
   nur im geladenen Ausschnitt geprüft. Sauber ist ein am Formular-Range ausgerichtetes Query-Fenster
   — eine Änderung an der Query-Ebene.
-- **„Invite-Link von bereits-Mitglied geöffnet"** ([Auth](./TODO.md#auth--onboarding)) ·
-  [deepLinkHandler.ts](../features/auth/deepLinkHandler.ts) — heute landet der Nutzer im
-  Namensformular und bekommt erst beim Absenden `23505`. Früh kurzschließen und freundlich melden.
+- **„Invite-Link von bereits-Mitglied geöffnet"** ([Auth](./TODO.md#auth--onboarding)) ✅ —
+  erledigt mit [ADR-053](./decision-log.md).
 - **„Abgelaufene Einladungen werden nie aufgeräumt"** ([Familie](./TODO.md#familie--child-profile-live-daten-v1))
-  — pg_cron-Job auf `family_invitations` mit `used_at is null and expires_at < now()`. `TODO.md`
-  schlägt vor, ihn „sinnvollerweise zusammen mit dem Reminder-Worker" zu bauen — der ist 🔒
-  notifications-blockiert, dieser Job aber **nicht**. Er steht für sich und kostet eine Migration.
+  ✅ — erledigt mit [ADR-053](./decision-log.md).
 
 - **„Weitere Tippflächen hängen an `hitSlop`"** und **„`accessibilityState` kommt auf Web nicht im
   DOM an"** ([Weitere](./TODO.md#weitere-out-of-scope-items)) — Reste aus Block 4. Beide sind ein

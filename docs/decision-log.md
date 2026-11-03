@@ -1861,3 +1861,31 @@ ADR-030 ließ den Hook ohne Test, weil es keinen Render-Pfad gab; den gibt es se
 
 - **Was in `subscribeToFamilyChanges` passiert, sieht der Hook-Test nicht.** Die Reihenfolge `setAuth()` vor `channel()` und das Entsorgen von Altkanälen prüft weiter `subscribe.test.ts`; das Zusammenspiel mit einem echten Server nur ein Sichtlauf.
 - **Ändert supabase-js das Verhalten von `setAuth()`, kehrt die alte Lücke zurück.** Eine Ablehnung landet dann im Fehlerzweig, und der Kanal bleibt bis zum nächsten Wechsel von `familyId` tot. Ein Retry wäre dann neu zu bewerten.
+
+## ADR-053 — DB-Aufräumen: pg_cron für abgelaufene Einladungen, gezielte Entzüge der Tabellenrechte, Einladungslink nach Kontostand (2026-11-03)
+
+### Status
+
+Accepted.
+
+### Context
+
+Drei Reste aus Block 7 und 8. Abgelaufene, unbenutzte Einladungen blieben für immer in `family_invitations`. Auf den Tabellen in `public` hielt `anon` weiter die Supabase-Defaults und `authenticated` zusätzlich `truncate`, `references`, `trigger` und `maintain`; geschützt hat allein RLS. Und ein Einladungslink führte jede Sitzung nach Onboarding-Schritt 2: Ein Konto mit Familie sah das Namensformular und erst beim Absenden `23505`, ein abgemeldeter Eingeladener landete im Login statt in der Registrierung. Ein Konto gehört zu genau einer Familie; wer in eine zweite eingeladen wird (Patchwork) oder den Link auf dem Gerät eines anderen Familienmitglieds öffnet, braucht ein zweites Konto.
+
+### Decisions
+
+1. **Ein pg_cron-Job räumt auf, kein Client.** `private.purge_expired_invitations()` löscht einmal am Tag, nachts in UTC, was `used_at is null and expires_at < now()` erfüllt; benutzte Einladungen bleiben. Eine Funktion statt Inline-SQL im Job, damit der pgTAP-Test genau das ausführt, was der Job ausführt; `execute` hat nur ihr Besitzer. Mit dem Reminder-Worker, wie `docs/TODO.md` es vorschlug, wird er nicht gebaut: Der wartet auf Expo Notifications, dieser Job auf nichts.
+2. **Gezielte Entzüge statt `revoke all` und neuem `grant`.** `anon` verliert jedes Tabellenrecht in `public`, `authenticated` nur `truncate`, `references`, `trigger` und `maintain`. Ein `revoke all` mit anschließendem `grant select, insert, update, delete` gäbe `authenticated` das volle Tabellenrecht `insert` auf `family_invitations` zurück, das die Migration `calendar_transaction_rpc` auf `insert (family_id)` verengt hat — Token und Ablauf wären wieder vom Client setzbar. Dieselben Entzüge gelten über `alter default privileges for role postgres` für künftige Tabellen.
+3. **Ein Eingeladener ohne Sitzung landet in der Registrierung, der Login liegt darunter.** Wer einen Einladungslink bekommt, hat meist noch kein Konto; wer eins hat, kommt mit einem Schritt zurück zum Login.
+4. **Ein Konto mit Familie bekommt einen Dialog, keinen Hinweis-Toast.** Es gibt eine Entscheidung zu treffen. „Mit anderem Konto fortfahren" behält den Token, meldet ab und führt zur Registrierung; „Abbrechen" verwirft den Token. Abgemeldet wird nur über diesen Button.
+5. **Der Kontowechsel meldet nur dieses Gerät ab.** `useSignOut` nimmt den Supabase-Scope, der Kontowechsel übergibt `local`. Der Default `global` beendete alle Sitzungen des Kontos — auf einem fremden Gerät also auch die des Besitzers auf seinen eigenen Geräten. Das Abmelden in den Einstellungen bleibt global.
+6. **Genau ein Host handelt, und nach dem Abmelden navigiert er nicht.** `InviteLinkHost` unter `AuthGate` setzt um, was die reine Funktion `decideInviteLink` aus Sitzung, Parent-Zeile, Routengruppe und gemerktem Token ableitet. Im Onboarding fragt er nicht, denn nach einem erfolgreichen Beitritt steht die Parent-Zeile, bevor der Token geräumt ist. Pro Token fragt er höchstens einmal; das „erledigt" liegt im Store `pendingInvite`, nicht in der Instanz. Nach dem Abmelden führt der Redirect von `AuthGate` zum Login, und der dort neu gemountete Host öffnet die Registrierung. Ein eigenes Navigieren liefe gegen den Redirect (ADR-040).
+7. **Der Link-Handler merkt nur den Token; `+native-intent.tsx` schreibt allein den Kaltstart um.** `redirectSystemPath` macht aus einem Einladungslink beim Kaltstart `/`, damit Expo Router nicht auf `+not-found` fällt. Bei laufender App gibt es `null` zurück, Expo Router navigiert dann nicht, und der Nutzer bleibt, wo er ist — auch mitten im Onboarding.
+8. **Die Start-URL wird einmal pro JS-Laufzeit gelesen.** Das Root-Layout mountet beim Kaltstart zweimal, und `Linking.getInitialURL()` liefert jedem Mount denselben Link. Der zweite Mount merkte den Token neu, setzte damit „erledigt" zurück und öffnete die Registrierung ein zweites Mal; ein Auth-Link löste `verifyOtp` doppelt aus. Ein Modul-Flag in `deepLinkHandler.ts` verbraucht die Start-URL einmal. Den Token stattdessen idempotent zu merken, verböte „Link erneut öffnen, Dialog erneut".
+
+### Consequences
+
+- **Ohne Sitzung antwortet Postgres mit `42501` statt mit einer leeren Liste.** Heute ohne Wirkung, weil `AuthGate` die geschützten Screens ohne Sitzung abhängt; was ein künftiger Pfad ohne Sitzung sähe, beschreibt der TODO-Eintrag „Die Familien-Queries haben keinen Sitzungs-Guard".
+- **Die Default-ACLs decken nur Tabellen, die `postgres` anlegt.** Legt eine andere Rolle Tabellen in `public` an, gelten für sie wieder deren Defaults; der Live-Rollout liest `pg_default_acl` auf weitere Besitzer.
+- **Funktionsrechte bleiben, wie sie sind.** `execute` liegt per Default bei `PUBLIC`; das Inventar in `security.test.sql` meldet jedes `execute` für `anon`.
+- **Ein abgebrochener Kontowechsel lässt den Token liegen.** Das nächste Konto ohne Familie auf diesem Gerät landet auf dem Einladungspfad, ein Familienkonto sieht den Dialog wieder. Hingenommen: Der Token läuft nach sieben Tagen ab, und ein Aufräumen beim Verlassen des Login-Stapels wäre mehr Verdrahtung, als der Fall wert ist.
