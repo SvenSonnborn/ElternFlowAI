@@ -4,12 +4,12 @@ import { router } from "expo-router";
 
 import { supabase } from "@/features/supabase";
 
+import { PENDING_INVITE_KEY } from "./pendingInvite";
+
 export type ParsedDeepLink =
   | { kind: "auth-confirm"; tokenHash: string; otpType: "email" }
   | { kind: "auth-recovery"; tokenHash: string; otpType: "recovery" }
   | { kind: "invite"; token: string };
-
-const PENDING_INVITE_KEY = "auth.pendingInvite";
 
 function tryParseUrl(input: string): URL | null {
   if (!input) return null;
@@ -63,12 +63,21 @@ export async function getPendingInviteToken(): Promise<string | null> {
   }
 }
 
-export async function clearPendingInviteToken(): Promise<void> {
+/**
+ * `redirectSystemPath` für `app/+native-intent.tsx`: Einladungslinks (voll als
+ * `elternflow://invite/<token>` oder als Pfad `/invite/<token>`) gehen auf
+ * `/`, weil Expo Router `/invite/<token>` sonst auf `+not-found` routet; den
+ * Token merkt `initDeepLinkHandler`. Alles andere bleibt unverändert. Wirft nie.
+ */
+export function redirectInviteSystemPath(options: { path: string; initial: boolean }): string {
+  const { path } = options;
   try {
-    await AsyncStorage.removeItem(PENDING_INVITE_KEY);
+    if (parseDeepLink(path)?.kind === "invite") return "/";
+    if (/^\/invite\/[^/?#]+/.test(path)) return "/";
   } catch {
-    /* ignore — best-effort */
+    /* fällt auf den Pfad zurück */
   }
+  return path;
 }
 
 /** Called from app/_layout.tsx. Returns a cleanup function. */
