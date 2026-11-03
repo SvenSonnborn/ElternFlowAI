@@ -74,7 +74,13 @@ export function InviteLinkHost(): null {
       confirm: t("auth.invite.otherAccountConfirm"),
       cancel: t("action.cancel"),
     })
-      .then((ok) => (ok ? signOut("local") : clearPendingInviteToken(token)))
+      .then((ok) => {
+        // Ein neuerer Link hat diesen Dialog überholt (iOS lässt beide stehen):
+        // Seine Antwort zählt nicht mehr. Bestätigen meldete sonst für einen
+        // Token ab, der schon ersetzt oder verworfen ist.
+        if (usePendingInviteStore.getState().token !== token) return;
+        return ok ? signOut("local") : clearPendingInviteToken(token);
+      })
       .catch((e: unknown) => console.warn("[InviteLinkHost] invite link handling failed", e));
   }, [action, token, onRegister, t, signOut]);
 
