@@ -50,12 +50,19 @@ describe("parseDeepLink", () => {
 
 describe("redirectInviteSystemPath", () => {
   const uuid = "0b9a4a52-5f0e-4c8e-9a43-2d1f6a7c9e10";
-  for (const initial of [true, false]) {
-    test(`Einladungslinks gehen auf / (initial=${initial})`, () => {
-      expect(redirectInviteSystemPath({ path: `elternflow://invite/${uuid}`, initial })).toBe("/");
-      expect(redirectInviteSystemPath({ path: `/invite/${uuid}`, initial })).toBe("/");
-    });
+  test("Einladungslinks gehen beim Kaltstart auf /", () => {
+    const initial = true;
+    expect(redirectInviteSystemPath({ path: `elternflow://invite/${uuid}`, initial })).toBe("/");
+    expect(redirectInviteSystemPath({ path: `/invite/${uuid}`, initial })).toBe("/");
+  });
 
+  test("Einladungslinks bei laufender App lassen den Screen stehen", () => {
+    const initial = false;
+    expect(redirectInviteSystemPath({ path: `elternflow://invite/${uuid}`, initial })).toBeNull();
+    expect(redirectInviteSystemPath({ path: `/invite/${uuid}`, initial })).toBeNull();
+  });
+
+  for (const initial of [true, false]) {
     test(`alles andere bleibt unverändert (initial=${initial})`, () => {
       for (const path of [
         "elternflow://auth/confirm?token_hash=x&type=email",
