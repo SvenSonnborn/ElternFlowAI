@@ -59,7 +59,8 @@ export function InviteLinkHost(): null {
     if (!action || !token) return;
     // Zuerst festhalten, vor allem Asynchronen: Der nächste Render sieht `done`
     // und fragt nicht ein zweites Mal.
-    markInviteLinkDone({ token, action });
+    const ticket = { token, action };
+    markInviteLinkDone(ticket);
     if (action === "openRegister") {
       // Der Login bleibt darunter im Stapel — `router.back()` in
       // `RegisterScreen` führt dorthin zurück. Ist die Registrierung schon
@@ -75,10 +76,12 @@ export function InviteLinkHost(): null {
       cancel: t("action.cancel"),
     })
       .then((ok) => {
-        // Ein neuerer Link hat diesen Dialog überholt (iOS lässt beide stehen):
-        // Seine Antwort zählt nicht mehr. Bestätigen meldete sonst für einen
-        // Token ab, der schon ersetzt oder verworfen ist.
-        if (usePendingInviteStore.getState().token !== token) return;
+        // Ein neuerer Link hat diesen Dialog überholt (iOS lässt beide stehen),
+        // auch einer mit demselben Token: Seine Antwort zählt nicht mehr, sonst
+        // meldete sie ab oder verwürfe den Token des neueren. Verglichen wird die
+        // Identität von `done`, nicht der Token — jeder neue Link setzt es
+        // zurück, jeder neue Dialog legt es neu an.
+        if (usePendingInviteStore.getState().done !== ticket) return;
         return ok ? signOut("local") : clearPendingInviteToken(token);
       })
       .catch((e: unknown) => console.warn("[InviteLinkHost] invite link handling failed", e));

@@ -165,6 +165,33 @@ describe("InviteLinkHost", () => {
     expect(mockSignOut).not.toHaveBeenCalled();
   });
 
+  it("derselbe Link erneut: der ältere Dialog verwirft nach dem Bestätigen nichts", async () => {
+    mockStatus = "authenticated";
+    mockSegments = ["(tabs)"];
+    let answerFirst: (ok: boolean) => void = () => {};
+    let answerSecond: (ok: boolean) => void = () => {};
+    mockConfirm
+      .mockImplementationOnce(() => new Promise<boolean>((resolve) => (answerFirst = resolve)))
+      .mockImplementationOnce(() => new Promise<boolean>((resolve) => (answerSecond = resolve)));
+    stash("T");
+
+    await renderScreen(<InviteLinkHost />);
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalledTimes(1));
+    await act(() => {
+      stash("T");
+    });
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalledTimes(2));
+
+    await act(() => {
+      answerSecond(true);
+    });
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    await act(() => {
+      answerFirst(false);
+    });
+    expect(usePendingInviteStore.getState().token).toBe("T");
+  });
+
   it("abgemeldet im Login öffnet die Registrierung einmal", async () => {
     mockStatus = "unauthenticated";
     mockSegments = ["(auth)"];
