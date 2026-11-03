@@ -76,6 +76,28 @@ describe("InviteLinkHost", () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
+  it("nach dem Abmelden öffnet die Registrierung genau einmal", async () => {
+    mockStatus = "authenticated";
+    mockSegments = ["(tabs)"];
+    mockConfirm.mockResolvedValue(true);
+    stash("T");
+
+    const { rerender } = await renderScreen(<InviteLinkHost />);
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
+    expect(router.push).not.toHaveBeenCalled();
+
+    // Die Sitzung ist weg, `AuthGate` hat auf den Login gewechselt.
+    mockStatus = "unauthenticated";
+    mockSegments = ["(auth)"];
+    await rerender(<InviteLinkHost />);
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledWith("/(auth)/register");
+
+    await rerender(<InviteLinkHost />);
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+  });
+
   it("Abbrechen verwirft den Token", async () => {
     mockStatus = "authenticated";
     mockSegments = ["(tabs)"];

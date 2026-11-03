@@ -60,9 +60,10 @@ export function parseDeepLink(rawUrl: string): ParsedDeepLink | null {
  * Kaltstart auf `/`, weil Expo Router `/invite/<token>` sonst auf `+not-found`
  * routet. Bei laufender App (`initial: false`) kommt `null` zurück — Expo
  * Router navigiert dann gar nicht, und der Nutzer bleibt, wo er ist; `/` holte
- * ihn etwa aus den Onboarding-Schritten 3–5. Den Token merkt in beiden Fällen
- * der `url`-Listener von `initDeepLinkHandler`, entschieden wird auf dem
- * aktuellen Screen von `InviteLinkHost` bzw. von Schritt 2 über den Store.
+ * ihn etwa aus den Onboarding-Schritten 3–5. Den Token merkt `initDeepLinkHandler`
+ * selbst: beim Kaltstart über `Linking.getInitialURL()`, bei laufender App über
+ * den `url`-Listener. Entschieden wird auf dem aktuellen Screen von
+ * `InviteLinkHost` bzw. von Schritt 2 über den Store.
  * Alles andere bleibt unverändert. Wirft nie.
  */
 export function redirectInviteSystemPath(options: {
@@ -115,9 +116,10 @@ export function initDeepLinkHandler(): () => void {
       }
 
       if (parsed.kind === "invite") {
-        // Nur merken, nicht navigieren: Auf `/` schreibt `app/+native-intent.tsx`
-        // den Link um, den Rest erledigen `AuthGate` (ohne Familie → Schritt 2)
-        // und `InviteLinkHost` (Registrierung oder Rückfrage).
+        // Nur merken, nicht navigieren: Beim Kaltstart schreibt
+        // `app/+native-intent.tsx` den Link auf `/` um, bei laufender App
+        // bleibt der Screen stehen. Den Rest erledigen `AuthGate` (ohne
+        // Familie → Schritt 2) und `InviteLinkHost` (Registrierung oder Rückfrage).
         await stashPendingInvite(parsed.token);
         return;
       }
