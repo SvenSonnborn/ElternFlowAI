@@ -50,7 +50,10 @@ export function InviteLinkHost(): null {
     token,
     done,
   });
-  const onRegister = segments[0] === "(auth)" && segments[1] === "register";
+  // `.at(1)` statt `[1]`: Ohne die generierten Routentypen (CI erzeugt
+  // `.expo/types` nicht) ist `useSegments()` nur `[string]`, Index 1 kompiliert
+  // dort nicht.
+  const onRegister = segments[0] === "(auth)" && segments.at(1) === "register";
 
   useEffect(() => {
     if (!action || !token) return;
