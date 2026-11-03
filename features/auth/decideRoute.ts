@@ -3,8 +3,10 @@ import type { SessionStatus } from "./session";
 export type RouteGroup = "auth" | "onboarding" | "tabs" | "other";
 
 /**
- * Ordnet das erste Routensegment einer der drei Gruppen zu. Jedes andere
- * Segment (`settings`, `event` …), auch `undefined`, wird `"other"`.
+ * Die eine Zuordnung, die `AuthGate` und `InviteLinkHost` teilen, damit beide
+ * dieselbe Gruppe sehen. `"other"` sind Root-Routen wie `settings`, `event/*`
+ * und `task/*`: `decideRoute` lässt dort einen Familiennutzer stehen und
+ * leitet alle anderen um; `decideInviteLink` fragt dort wie in den Tabs.
  */
 export function segmentToGroup(segment: string | undefined): RouteGroup {
   if (segment === "(auth)") return "auth";

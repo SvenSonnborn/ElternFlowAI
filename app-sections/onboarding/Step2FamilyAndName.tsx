@@ -61,9 +61,10 @@ export function Step2FamilyAndName() {
         });
       }
       router.push("/(onboarding)/3");
-      // Erst wechseln, dann verwerfen: Der Token kommt reaktiv aus dem Store,
-      // vorher verworfen schaltete das Formular vor dem Wechsel kurz auf
-      // „Familie gründen" um.
+      // Der Token kommt reaktiv aus dem Store; `push` und Verwerfen laufen im
+      // selben Tick und React bündelt beide. Entscheidend ist, das Verwerfen
+      // nicht vor dem `push` abzuwarten: Sonst schaltete das Formular vor dem
+      // Wechsel kurz auf „Familie gründen" um.
       if (isInvitePath) void clearPendingInviteToken();
     } catch (err) {
       // If the user already belongs to a family (23505), the AuthGate would
