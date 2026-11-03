@@ -81,12 +81,21 @@ export function redirectInviteSystemPath(options: {
   return path;
 }
 
+/** Ob die Start-URL dieser JS-Laufzeit schon behandelt ist (s. `initDeepLinkHandler`). */
+let initialUrlHandled = false;
+
 /**
  * Called from app/_layout.tsx. Returns a cleanup function.
  *
- * Liest zuerst den gemerkten Einladungstoken aus AsyncStorage in den Store —
- * hier, weil das einmal pro App-Start passiert; Onboarding-Schritt 2 wartet auf
- * genau dieses `hydrated`.
+ * Liest zuerst den gemerkten Einladungstoken aus AsyncStorage in den Store;
+ * Onboarding-Schritt 2 wartet auf genau dieses `hydrated`.
+ *
+ * Das Root-Layout wird beim Kaltstart zweimal gemountet (beobachtet im
+ * iOS-Debug-Build), und `getInitialURL` liefert jedem Mount denselben Link.
+ * Deshalb wird die Start-URL nur beim ersten Aufruf behandelt: Ein zweites
+ * Merken setzte `done` zurück und öffnete die Registrierung ein zweites Mal,
+ * ein zweites `verifyOtp` schlüge am verbrauchten Token fehl. Der `url`-Listener
+ * gilt dagegen pro Mount.
  */
 export function initDeepLinkHandler(): () => void {
   void hydratePendingInvite();
@@ -131,9 +140,12 @@ export function initDeepLinkHandler(): () => void {
     }
   };
 
-  Linking.getInitialURL()
-    .then(handle)
-    .catch((e: unknown) => console.warn("[deepLinkHandler] getInitialURL failed", e));
+  if (!initialUrlHandled) {
+    initialUrlHandled = true;
+    Linking.getInitialURL()
+      .then(handle)
+      .catch((e: unknown) => console.warn("[deepLinkHandler] getInitialURL failed", e));
+  }
   const sub = Linking.addEventListener("url", ({ url }) => void handle(url));
   return () => sub.remove();
 }

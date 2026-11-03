@@ -1,6 +1,13 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
+import * as Linking from "expo-linking";
 
-import { parseDeepLink, redirectInviteSystemPath, type ParsedDeepLink } from "./deepLinkHandler";
+import {
+  initDeepLinkHandler,
+  parseDeepLink,
+  redirectInviteSystemPath,
+  type ParsedDeepLink,
+} from "./deepLinkHandler";
+import { markInviteLinkDone, usePendingInviteStore } from "./pendingInvite";
 
 describe("parseDeepLink", () => {
   test("confirm URL with token_hash and type=email", () => {
@@ -73,4 +80,29 @@ describe("redirectInviteSystemPath", () => {
       }
     });
   }
+});
+
+describe("initDeepLinkHandler", () => {
+  test("behandelt die Start-URL nur beim ersten Mount", async () => {
+    // Das Root-Layout wird beim Kaltstart zweimal gemountet; jeder Mount ruft
+    // `initDeepLinkHandler`, `getInitialURL` liefert jedes Mal denselben Link.
+    const token = "3f2b8c1e-0000-4000-8000-000000000001";
+    const initial = spyOn(Linking, "getInitialURL").mockResolvedValue(
+      `elternflow://invite/${token}`,
+    );
+    usePendingInviteStore.setState({ token: null, hydrated: false, done: null });
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
+
+    initDeepLinkHandler()();
+    await settle();
+    expect(usePendingInviteStore.getState().token).toBe(token);
+    // Der Host hat die Registrierung geöffnet.
+    markInviteLinkDone({ token, action: "openRegister" });
+
+    initDeepLinkHandler()();
+    await settle();
+    // Ein zweites Merken setzte `done` zurück, der Host pushte erneut.
+    expect(usePendingInviteStore.getState().done).toEqual({ token, action: "openRegister" });
+    initial.mockRestore();
+  });
 });
