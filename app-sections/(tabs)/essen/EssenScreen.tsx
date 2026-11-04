@@ -72,7 +72,10 @@ export function EssenScreen() {
       />
       <WeekNav weekStart={weekStart} isCurrentWeek={isCurrentWeek} onChange={changeWeek} />
 
-      <Pressable className="mt-3 overflow-hidden rounded-2xl active:opacity-90">
+      <Pressable
+        accessibilityRole="button"
+        className="mt-3 overflow-hidden rounded-2xl active:opacity-90"
+      >
         <LinearGradient
           colors={[palette.mint[500], palette.mint[700]]}
           start={{ x: 0, y: 0 }}
