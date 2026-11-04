@@ -5,9 +5,16 @@ import { useTranslation } from "react-i18next";
 import { Pressable, View } from "react-native";
 
 import { DateTimePickerSheet, Field, Icon } from "@/app-sections/shared";
+import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
-import { AVATAR_COLORS, mapAuthError, useCreateChild, useCurrentParent } from "@/features/auth";
+import {
+  AVATAR_COLOR_NAMES,
+  AVATAR_COLORS,
+  mapAuthError,
+  useCreateChild,
+  useCurrentParent,
+} from "@/features/auth";
 import { ALLERGY_KEYS, type AllergyKey } from "@/features/children";
 
 import { OnboardingShell } from "./OnboardingShell";
@@ -130,24 +137,36 @@ export function Step4FirstChild() {
           </View>
           <View
             accessibilityRole="radiogroup"
-            style={{ flexDirection: "row", gap: 8, marginTop: 12 }}
+            // 44er-Boxen Kante an Kante; die Reihe bricht im 44er-Raster um.
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              justifyContent: "center",
+              marginTop: 4,
+            }}
           >
             {AVATAR_COLORS.map((c) => (
               <Pressable
                 key={c}
                 onPress={() => setColor(c)}
-                hitSlop={8}
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 14,
-                  backgroundColor: c,
-                  borderWidth: 2,
-                  borderColor: color === c ? theme.ink : "transparent",
-                }}
                 accessibilityRole="radio"
+                accessibilityLabel={t(AVATAR_COLOR_NAMES[c])}
+                accessibilityHint={t("child.colorOption")}
                 aria-checked={color === c}
-              />
+                className="items-center justify-center"
+                style={{ width: touchTarget.min, height: touchTarget.min }}
+              >
+                <View
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    backgroundColor: c,
+                    borderWidth: 2,
+                    borderColor: color === c ? theme.ink : "transparent",
+                  }}
+                />
+              </Pressable>
             ))}
           </View>
         </View>

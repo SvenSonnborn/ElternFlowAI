@@ -135,7 +135,7 @@ export function ParentProfileScreen() {
             />
             {isSelf ? (
               // Each swatch sits centred in its own 44x44 box, and the boxes tile
-              // edge to edge. The earlier `hitSlop={8}` on a 28px swatch also
+              // edge to edge. The earlier `hitSlop` of 8 on a 28px swatch also
               // measured 44, but the slop of neighbouring swatches met inside the
               // 8px gap: a tap just right of one swatch landed on the next.
               <View accessibilityRole="radiogroup" className="mt-3 flex-row">
