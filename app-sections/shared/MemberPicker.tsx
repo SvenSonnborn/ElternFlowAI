@@ -95,8 +95,9 @@ export function MemberPicker({
           // Die Pille ist per Design 36 px hoch, die Tippfläche darum 44;
           // `hitSlop` leistet das nicht, weil React Native es an den Grenzen
           // des Elternteils beschneidet und react-native-web es gar nicht kennt.
-          // Das Maß ist eine Zahl statt `h-11`: NativeWind rechnet rem nativ mit
-          // 14, `h-11` wären dort 38,5 pt.
+          // Das Maß ist eine Zahl statt `h-11`: eine Quelle für die 44; eine
+          // rem-Klasse hängt an einer Metro-Einstellung, die niemand neben dem
+          // Pressable sieht.
           className="justify-center active:opacity-70"
           style={{ height: touchTarget.min, minWidth: touchTarget.min }}
         >

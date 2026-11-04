@@ -264,7 +264,8 @@ export function ChildProfileScreen() {
                 abut without gaps. `hitSlop` on the 28 px swatch would reach 44
                 too, but the overhang of neighbouring swatches would meet in the
                 gap, and web ignores it entirely. The size is a number, not
-                `h-11 w-11`: NativeWind resolves rem to 14 on native. */}
+                `h-11 w-11`: one source for the 44; a rem class hangs on a Metro
+                setting nobody sees next to the Pressable. */}
             <View className="mt-3 flex-row">
               {AVATAR_COLORS.map((c) => (
                 <Pressable
