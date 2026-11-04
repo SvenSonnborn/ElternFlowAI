@@ -38,6 +38,12 @@ export interface FieldProps {
   textContentType?: TextInputProps["textContentType"];
 }
 
+/**
+ * Beschriftetes Eingabefeld. Das Label steht als `accessibilityLabel` am
+ * `TextInput` (bzw. am `Pressable` der `onPress`-Variante); der sichtbare
+ * Label-`Text` ist `aria-hidden`, sonst sagen VoiceOver und TalkBack ihn
+ * zusätzlich zum Feldnamen an, also doppelt.
+ */
 export function Field({
   label,
   iconName,
@@ -65,6 +71,7 @@ export function Field({
     <>
       {iconName ? <Icon name={iconName} size={18} color={theme.inkTertiary} /> : null}
       <TextInput
+        accessibilityLabel={label}
         value={value}
         {...(onChangeText ? { onChangeText } : {})}
         placeholder={placeholder}
@@ -99,6 +106,7 @@ export function Field({
   return (
     <View>
       <Text
+        aria-hidden
         variant="caption"
         tone="inkSecondary"
         style={{ textTransform: "uppercase", fontWeight: "700", letterSpacing: 1.2 }}
