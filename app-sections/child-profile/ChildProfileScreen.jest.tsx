@@ -64,4 +64,9 @@ describe("ChildProfileScreen: Tippflächen im Inhalt", () => {
     await fireEvent.press(plus);
     expect(screen.getByRole("button", { name: "Pizza" })).toBeTruthy();
   });
+
+  it("das Tag-Feld füllt die Zeilenhöhe, damit die ganze Zeile antippbar ist", async () => {
+    await renderScreen(<ChildProfileScreen />);
+    expect(screen.getByLabelText(i18n.t("child.likes"))).toHaveStyle({ alignSelf: "stretch" });
+  });
 });

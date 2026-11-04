@@ -101,11 +101,17 @@ interface IconProps {
   strokeWidth?: number;
 }
 
+/**
+ * Icon-Fonts rendern eine Glyphe aus dem Private-Use-Bereich als Text. Ohne
+ * `aria-hidden` landet sie in der Bezeichnung jeder Zeile, die ihre Texte
+ * zusammenfasst („\uf17c, Sprache, Deutsch"), und steht frei als leeres
+ * Fokusziel. Die Bedeutung trägt immer der Text oder das Label daneben.
+ */
 export function Icon({ name, size = 18, color = "currentColor", strokeWidth: _ }: IconProps) {
   const feather = featherMap[name];
-  if (feather) return <Feather name={feather} size={size} color={color} />;
+  if (feather) return <Feather aria-hidden name={feather} size={size} color={color} />;
   const mci = mciMap[name];
-  if (mci) return <MaterialCommunityIcons name={mci} size={size} color={color} />;
+  if (mci) return <MaterialCommunityIcons aria-hidden name={mci} size={size} color={color} />;
   return null;
 }
 
