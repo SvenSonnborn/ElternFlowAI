@@ -65,7 +65,7 @@ function TagEditor({
 
   return (
     <View>
-      <Text variant="caption" tone="inkSecondary" className="mb-2" style={LABEL_STYLE}>
+      <Text aria-hidden variant="caption" tone="inkSecondary" className="mb-2" style={LABEL_STYLE}>
         {label}
       </Text>
       {tags.length > 0 ? (
@@ -96,6 +96,7 @@ function TagEditor({
         style={{ borderColor: theme.line }}
       >
         <TextInput
+          accessibilityLabel={label}
           value={draft}
           onChangeText={setDraft}
           placeholder={placeholder}

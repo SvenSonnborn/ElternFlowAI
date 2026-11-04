@@ -48,8 +48,7 @@ type CreateVars = { id: string };
 /** Rendert den Screen, tippt einen Titel und drückt Speichern. */
 async function fillAndSave() {
   await renderScreen(<EventCreateScreen />);
-  // Das Titelfeld ist das erste (noch leere) Eingabefeld des Formulars.
-  await fireEvent.changeText(screen.getAllByDisplayValue("")[0], "Zahnarzt");
+  await fireEvent.changeText(screen.getByLabelText(i18n.t("cal.edit.fieldTitle")), "Zahnarzt");
   await fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.create.save") }));
 }
 
