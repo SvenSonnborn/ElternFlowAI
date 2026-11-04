@@ -1,4 +1,4 @@
-import { screen, touchTarget } from "@/design-system";
+import { DS, screen, touchTarget } from "@/design-system";
 
 const PADDING_TOP = 8;
 // React Navigation setzt oben eine Haarlinie als Rand; sie zählt in die Höhe.
@@ -18,4 +18,14 @@ export function tabBarSize(bottomInset: number): { height: number; paddingTop: n
     height: Math.max(screen.tabBarHeight, PADDING_TOP + touchTarget.min + BORDER_TOP + bottomInset),
     paddingTop: PADDING_TOP,
   };
+}
+
+/**
+ * Abstand des Mic-FAB vom unteren Bildschirmrand. Der FAB behält seinen
+ * Design-Abstand über der Tab-Leiste; wächst die Leiste um den Systemrand
+ * (siehe `tabBarSize`), wandert er um dasselbe Stück nach oben, sonst
+ * überlappen sich die Boxen. Ohne Rand (Web) bleibt es bei `bottomInset`.
+ */
+export function fabBottom(bottomInset: number): number {
+  return DS.components.micFab.bottomInset + tabBarSize(bottomInset).height - screen.tabBarHeight;
 }

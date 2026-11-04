@@ -28,6 +28,16 @@ describe("Field: das Label ist der Name des Eingabefelds", () => {
     expect(screen.getByRole("button", { name: "Datum, 4. Nov. 2026" })).toBeTruthy();
   });
 
+  it("die onPress-Variante hat genau ein Element mit dem Label, das innere Feld ist ausgeblendet", async () => {
+    await renderScreen(<Field label="Datum" value="4. Nov. 2026" onPress={() => {}} />);
+    const named = screen.getAllByLabelText(/^Datum/);
+    expect(named).toHaveLength(1);
+    expect(named[0]).toBe(screen.getByRole("button", { name: /^Datum/ }));
+    const hidden = screen.getByDisplayValue("4. Nov. 2026", { includeHiddenElements: true });
+    expect(screen.queryByDisplayValue("4. Nov. 2026")).toBeNull();
+    expect(hidden.props.focusable).toBe(false);
+  });
+
   it("das einzeilige Eingabefeld füllt die Zeilenhöhe, damit die ganze Zeile antippbar ist", async () => {
     await renderScreen(<Field label="Titel" value="" onChangeText={() => {}} />);
     expect(screen.getByLabelText("Titel")).toHaveStyle({ alignSelf: "stretch" });

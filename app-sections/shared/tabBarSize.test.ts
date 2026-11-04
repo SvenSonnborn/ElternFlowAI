@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { tabBarSize } from "./tabBarSize";
+import { fabBottom, tabBarSize } from "./tabBarSize";
 
 /**
  * Höhe, die einem Tab nach Polster oben, Systemrand unten und der Haarlinie
@@ -26,5 +26,15 @@ describe("tabBarSize", () => {
 
   test("ein kleiner Rand lässt die 72 stehen", () => {
     expect(tabBarSize(10).height).toBe(72);
+  });
+});
+
+describe("fabBottom", () => {
+  test("ohne Systemrand (Web) bleibt der FAB bei 100", () => {
+    expect(fabBottom(0)).toBe(100);
+  });
+
+  test("mit Drei-Tasten-Leiste (Rand 48) liegt der FAB über der Leiste", () => {
+    expect(fabBottom(48)).toBeGreaterThanOrEqual(tabBarSize(48).height);
   });
 });

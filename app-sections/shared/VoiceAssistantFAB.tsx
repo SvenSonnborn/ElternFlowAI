@@ -1,19 +1,23 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal, Pressable, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DS } from "@/design-system";
 import { Button, Card, Text } from "@/design-system/ui";
 
 import { Icon } from "./Icon";
+import { fabBottom } from "./tabBarSize";
 
 export function VoiceAssistantFAB() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const size = DS.components.micFab.size;
   const right = DS.components.micFab.rightInset;
-  const bottom = DS.components.micFab.bottomInset;
+  // Folgt der um den Systemrand gewachsenen Tab-Leiste, sonst überlappt der FAB sie.
+  const bottom = fabBottom(insets.bottom);
 
   return (
     <>

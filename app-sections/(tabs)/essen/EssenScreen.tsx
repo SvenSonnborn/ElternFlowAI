@@ -72,7 +72,9 @@ export function EssenScreen() {
       />
       <WeekNav weekStart={weekStart} isCurrentWeek={isCurrentWeek} onChange={changeWeek} />
 
+      {/* Noch ohne Funktion: `disabled` sagt „nicht verfügbar" an und nimmt den Knopf aus der Tab-Reihenfolge. */}
       <Pressable
+        disabled
         accessibilityRole="button"
         className="mt-3 overflow-hidden rounded-2xl active:opacity-90"
       >
@@ -122,7 +124,8 @@ export function EssenScreen() {
         />
       )}
 
-      <Pressable className="mt-4 active:opacity-90">
+      {/* Noch ohne Funktion (Einkaufsliste): aus der Tab-Reihenfolge nehmen. */}
+      <Pressable disabled className="mt-4 active:opacity-90">
         <LinearGradient
           colors={[theme.accentSoft, theme.card]}
           start={{ x: 0, y: 0 }}
