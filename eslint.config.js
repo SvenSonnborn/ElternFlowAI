@@ -108,6 +108,11 @@ module.exports = [
           message:
             "accessibilityState kommt auf Web nicht im DOM an — aria-checked/aria-selected/aria-expanded bzw. die disabled-Prop nehmen (ADR-054).",
         },
+        {
+          selector: "JSXAttribute[name.name='hitSlop']",
+          message:
+            "hitSlop wirkt auf Web nicht und wird nativ am Elternteil beschnitten — Pressable mit touchTarget.min als Box (ADR-041).",
+        },
       ],
     },
   },
