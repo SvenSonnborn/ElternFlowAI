@@ -43,7 +43,8 @@ export interface FieldProps {
  * `TextInput` (bzw. am `Pressable` der `onPress`-Variante); der sichtbare
  * Label-`Text` ist `aria-hidden`, sonst sagen VoiceOver und TalkBack ihn
  * zusätzlich zum Feldnamen an, also doppelt. Weil das Label den Inhalt der
- * Zeile überdeckt, nimmt die `onPress`-Variante den Wert in ihren Namen auf.
+ * Zeile überdeckt, nimmt die `onPress`-Variante den Wert in ihren Namen auf;
+ * dort ist das innere Feld ausgeblendet, der Knopf allein trägt Name und Wert.
  */
 export function Field({
   label,
@@ -72,7 +73,9 @@ export function Field({
     <>
       {iconName ? <Icon name={iconName} size={18} color={theme.inkTertiary} /> : null}
       <TextInput
-        accessibilityLabel={label}
+        // In der onPress-Variante trägt der Knopf Name und Wert; das innere Feld
+        // ist ausgeblendet und kein Tab-Stopp (Web: sonst ein toter <input>).
+        {...(onPress ? { "aria-hidden": true, focusable: false } : { accessibilityLabel: label })}
         value={value}
         {...(onChangeText ? { onChangeText } : {})}
         placeholder={placeholder}

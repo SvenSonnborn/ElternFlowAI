@@ -137,6 +137,7 @@ export function Step4FirstChild() {
           </View>
           <View
             accessibilityRole="radiogroup"
+            accessibilityLabel={t("child.colorOption")}
             // 44er-Boxen Kante an Kante; die Reihe bricht im 44er-Raster um.
             style={{
               flexDirection: "row",
@@ -219,8 +220,8 @@ export function Step4FirstChild() {
                   key={a}
                   onPress={() => toggleAllergy(a)}
                   style={{
-                    minHeight: 44,
-                    minWidth: 44,
+                    minHeight: touchTarget.min,
+                    minWidth: touchTarget.min,
                     paddingHorizontal: 14,
                     paddingVertical: 8,
                     borderRadius: 999,

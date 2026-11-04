@@ -292,7 +292,11 @@ export function ChildProfileScreen() {
                 gap, and web ignores it entirely. The size is a number, not
                 `h-11 w-11`: one source for the 44; a rem class hangs on a Metro
                 setting nobody sees next to the Pressable. */}
-            <View accessibilityRole="radiogroup" className="mt-3 flex-row">
+            <View
+              accessibilityRole="radiogroup"
+              accessibilityLabel={t("child.colorOption")}
+              className="mt-3 flex-row"
+            >
               {AVATAR_COLORS.map((c) => (
                 <Pressable
                   key={c}

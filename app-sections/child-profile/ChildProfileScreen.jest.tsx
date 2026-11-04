@@ -55,6 +55,14 @@ describe("ChildProfileScreen: Tippflächen im Inhalt", () => {
     );
   });
 
+  it("die Farbgruppe hat einen Namen", async () => {
+    await renderScreen(<ChildProfileScreen />);
+    // Die Gruppe ist nicht `accessible` (sonst verschluckte sie die Farben), also
+    // findet `getByRole` sie nicht; Label und Rolle prüfen wir am Element.
+    const group = screen.getByLabelText(i18n.t("child.colorOption"), { exact: true });
+    expect(group.props.accessibilityRole).toBe("radiogroup");
+  });
+
   it("das Plus im Tag-Feld ist eine 44er-Box und fügt hinzu", async () => {
     await renderScreen(<ChildProfileScreen />);
     const input = screen.getByLabelText(i18n.t("child.likes"));
