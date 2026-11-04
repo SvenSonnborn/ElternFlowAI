@@ -2,8 +2,15 @@ import { Tabs, useRoute } from "expo-router";
 import { useNavigationState } from "expo-router/react-navigation";
 import { useTranslation } from "react-i18next";
 import { Platform, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Icon, type IconName, tabSceneStyle, VoiceAssistantFAB } from "@/app-sections/shared";
+import {
+  Icon,
+  type IconName,
+  tabBarSize,
+  tabSceneStyle,
+  VoiceAssistantFAB,
+} from "@/app-sections/shared";
 import { fontFamily } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 
@@ -15,6 +22,7 @@ function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
 export default function TabsLayout() {
   const { t } = useTranslation();
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   // Der Zustand des Tab-Navigators steckt im Root-Stack unter dieser Route.
   // Gelesen wird er hier per Hook statt über `navigation.getState()` im
   // Options-Callback: expo-router 58 frischt die Quelle von `getState()` erst
@@ -35,8 +43,7 @@ export default function TabsLayout() {
           tabBarStyle: {
             backgroundColor: theme.card,
             borderTopColor: theme.line,
-            paddingTop: 8,
-            height: 72,
+            ...tabBarSize(insets.bottom),
           },
           tabBarLabelStyle: { fontFamily: fontFamily.sans, fontSize: 11, fontWeight: "500" },
           sceneStyle: tabSceneStyle({ os: Platform.OS, routeKey: route.key, focusedRouteKey }),
