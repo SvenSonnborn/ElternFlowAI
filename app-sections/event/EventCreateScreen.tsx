@@ -19,6 +19,7 @@ import {
   type SelectedMember,
   type TypePickerItem,
 } from "@/app-sections/shared";
+import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { useCurrentParent, useFamilyChildren, useFamilyParents } from "@/features/auth";
@@ -304,8 +305,10 @@ export function EventCreateScreen() {
             accessibilityRole="button"
             accessibilityLabel={t("action.cancel")}
             onPress={goBackOrToKalender}
-            className="px-2 py-1 active:opacity-70"
-            hitSlop={12}
+            className="items-center justify-center px-2 py-1 active:opacity-70"
+            // 44er-Box um den Text; -9 oben und unten lässt sie nur 26 hoch
+            // zählen (Text 18 + py-1), so wächst der Kopf nicht.
+            style={{ minWidth: touchTarget.min, minHeight: touchTarget.min, marginVertical: -9 }}
           >
             <Text variant="bodyEmph" tone="inkSecondary">
               {t("action.cancel")}

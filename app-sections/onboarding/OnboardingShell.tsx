@@ -5,6 +5,7 @@ import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Icon } from "@/app-sections/shared";
+import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Text } from "@/design-system/ui";
 
@@ -36,14 +37,24 @@ export function OnboardingShell({
           alignItems: "center",
           justifyContent: "space-between",
           paddingHorizontal: 16,
-          paddingVertical: 12,
+          // 3 + 44er-Box + 3: die Kopfzeile bleibt so hoch wie mit dem
+          // 26 pt hohen Pfeil und 12 oben und unten.
+          paddingVertical: 3,
         }}
       >
         <Pressable
           onPress={() => router.back()}
-          hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel={t("onb.actions.back")}
+          // Pfeil bündig links in der 44er-Box. -20 lässt die Box nur 24 breit
+          // zählen, so bleiben die Punkte dort, wo sie neben dem Pfeil standen.
+          style={{
+            width: touchTarget.min,
+            height: touchTarget.min,
+            justifyContent: "center",
+            alignItems: "flex-start",
+            marginRight: -20,
+          }}
         >
           <Icon name="chevron-left" size={24} color={theme.ink} />
         </Pressable>
@@ -64,7 +75,16 @@ export function OnboardingShell({
           })}
         </View>
         {showSkip ? (
-          <Pressable onPress={onSkip} hitSlop={10}>
+          <Pressable
+            onPress={onSkip}
+            accessibilityRole="button"
+            style={{
+              minWidth: touchTarget.min,
+              minHeight: touchTarget.min,
+              justifyContent: "center",
+              alignItems: "flex-end",
+            }}
+          >
             <Text variant="caption" tone="inkSecondary">
               {t("onb.actions.skip")}
             </Text>

@@ -230,12 +230,16 @@ export function ChildProfileScreen() {
         leading={
           <Pressable
             onPress={() => router.back()}
-            hitSlop={4}
             accessibilityRole="button"
             accessibilityLabel={t("action.back")}
-            className="h-9 w-9 items-center justify-center rounded-xl border border-line bg-card active:opacity-70"
+            className="justify-center active:opacity-70"
+            // 44er-Box, die 36er-Optik bündig links. Der Überschuss rechts
+            // reicht in die Lücke zum Titel; -8 hält den Titel an seinem Platz.
+            style={{ width: touchTarget.min, height: touchTarget.min, marginRight: -8 }}
           >
-            <Icon name="chevron-left" size={16} color={theme.inkSecondary} />
+            <View className="h-9 w-9 items-center justify-center rounded-xl border border-line bg-card">
+              <Icon name="chevron-left" size={16} color={theme.inkSecondary} />
+            </View>
           </Pressable>
         }
         hideSettings
