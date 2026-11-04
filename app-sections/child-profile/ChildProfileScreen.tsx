@@ -266,18 +266,18 @@ export function ChildProfileScreen() {
                 gap, and web ignores it entirely. The size is a number, not
                 `h-11 w-11`: one source for the 44; a rem class hangs on a Metro
                 setting nobody sees next to the Pressable. */}
-            <View className="mt-3 flex-row">
+            <View accessibilityRole="radiogroup" className="mt-3 flex-row">
               {AVATAR_COLORS.map((c) => (
                 <Pressable
                   key={c}
                   onPress={() => setColor(c)}
-                  accessibilityRole="button"
+                  accessibilityRole="radio"
                   // Label says which control this is, hint says what tapping
                   // does. All six sharing "Farbe wählen" as the label left a
                   // screen reader with six identical buttons.
                   accessibilityLabel={t(AVATAR_COLOR_NAMES[c])}
                   accessibilityHint={t("child.colorOption")}
-                  accessibilityState={{ selected: color === c }}
+                  aria-checked={color === c}
                   className="items-center justify-center"
                   style={{ width: touchTarget.min, height: touchTarget.min }}
                 >
@@ -356,23 +356,34 @@ export function ChildProfileScreen() {
                 <Icon name="alert-triangle" size={14} color={theme.warning} />
               </View>
               <View className="flex-row flex-wrap gap-1.5">
-                {Array.from(allergies).map((a) => (
-                  <Pressable key={a} onPress={() => toggleAllergy(a)} className="active:opacity-70">
-                    <Pill
-                      label={
-                        ALLERGY_KEYS.includes(a as (typeof ALLERGY_KEYS)[number])
-                          ? t(`onb.s4.allergies.${a}`)
-                          : a
-                      }
-                      tone="warn"
-                      leading={<Icon name="check" size={11} color={theme.accentStrong} />}
-                    />
-                  </Pressable>
-                ))}
+                {Array.from(allergies).map((a) => {
+                  const allergyLabel = ALLERGY_KEYS.includes(a as (typeof ALLERGY_KEYS)[number])
+                    ? t(`onb.s4.allergies.${a}`)
+                    : a;
+                  return (
+                    <Pressable
+                      key={a}
+                      onPress={() => toggleAllergy(a)}
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={allergyLabel}
+                      aria-checked={true}
+                      className="active:opacity-70"
+                    >
+                      <Pill
+                        label={allergyLabel}
+                        tone="warn"
+                        leading={<Icon name="check" size={11} color={theme.accentStrong} />}
+                      />
+                    </Pressable>
+                  );
+                })}
                 {allergySuggestions.map((key) => (
                   <Pressable
                     key={key}
                     onPress={() => toggleAllergy(key)}
+                    accessibilityRole="checkbox"
+                    accessibilityLabel={t(`onb.s4.allergies.${key}`)}
+                    aria-checked={false}
                     className="active:opacity-70"
                   >
                     <Pill label={t(`onb.s4.allergies.${key}`)} tone="ink" />

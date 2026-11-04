@@ -124,15 +124,19 @@ export function MealScheduleScreen() {
           >
             {t("meals.schedule.slotLabel")}
           </Text>
-          <View className="mt-1.5 flex-row flex-wrap gap-2">
+          <View
+            accessibilityRole="radiogroup"
+            accessibilityLabel={t("meals.schedule.slotLabel")}
+            className="mt-1.5 flex-row flex-wrap gap-2"
+          >
             {SLOTS.map((key) => {
               const selected = key === slot;
               return (
                 <Pressable
                   key={key}
-                  accessibilityRole="button"
+                  accessibilityRole="radio"
                   accessibilityLabel={t(`meals.tabs.${key}`)}
-                  accessibilityState={{ selected }}
+                  aria-checked={selected}
                   onPress={() => setSlot(key)}
                   style={{ minWidth: touchTarget.min, minHeight: touchTarget.min }}
                   className="items-center justify-center active:opacity-80"

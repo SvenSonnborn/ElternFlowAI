@@ -109,7 +109,7 @@ export function RegisterScreen() {
           onPress={() => setTermsAccepted((v) => !v)}
           style={{ flexDirection: "row", gap: 12, alignItems: "flex-start", marginTop: 20 }}
           accessibilityRole="checkbox"
-          accessibilityState={{ checked: termsAccepted }}
+          aria-checked={termsAccepted}
         >
           <View
             style={{

@@ -144,13 +144,11 @@ describe("WeekPlanGrid — Zeilen-Menü", () => {
     await fireEvent.press(screen.getByRole("tab", { name: "Abendessen" }));
     expect(screen.queryByText("Anderes Rezept wählen")).toBeNull();
     const toggle = screen.getByLabelText("Aktionen für Mittwoch");
-    expect(toggle.props.accessibilityState).toMatchObject({ expanded: false });
+    expect(toggle).toBeCollapsed();
     await fireEvent.press(toggle);
     expect(screen.getByText("Anderes Rezept wählen")).toBeTruthy();
     expect(screen.getByText("Löschen")).toBeTruthy();
-    expect(screen.getByLabelText("Aktionen für Mittwoch").props.accessibilityState).toMatchObject({
-      expanded: true,
-    });
+    expect(screen.getByLabelText("Aktionen für Mittwoch")).toBeExpanded();
   });
 
   it("Anderes Rezept wählen pusht die Auswahl mit Ersetzen-Ziel", async () => {
@@ -257,9 +255,7 @@ describe("EssenScreen — Blättern", () => {
       answer([]);
       await Promise.resolve();
     });
-    expect(screen.getByRole("tab", { name: "Snack" }).props.accessibilityState).toMatchObject({
-      selected: true,
-    });
+    expect(screen.getByRole("tab", { name: "Snack" })).toBeSelected();
   });
 
   it("schließt ein offenes Menü beim Blättern, auch beim Zurückblättern", async () => {

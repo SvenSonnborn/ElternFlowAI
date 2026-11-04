@@ -198,7 +198,7 @@ describe("MealScheduleScreen", () => {
 
   it("markiert den vorbelegten Slot als gewählt", async () => {
     await renderScreen(<MealScheduleScreen />, { queryClient: client(false) });
-    const chosen = screen.getByRole("button", { name: i18n.t(`meals.tabs.${slot}`) });
-    expect(chosen.props.accessibilityState).toMatchObject({ selected: true });
+    const chosen = screen.getByRole("radio", { name: i18n.t(`meals.tabs.${slot}`) });
+    expect(chosen).toBeChecked();
   });
 });

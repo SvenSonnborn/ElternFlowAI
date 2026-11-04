@@ -48,7 +48,6 @@ export function PrepRow({
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      accessibilityState={disabled ? { disabled: true } : undefined}
       accessibilityLabel={accessibilityLabel}
       // `min-h-11` statt hitSlop: die Zeilen stehen dicht übereinander, ein
       // hitSlop ragte in den Nachbarn. Kachel (28) + Meta-Zeile bleiben

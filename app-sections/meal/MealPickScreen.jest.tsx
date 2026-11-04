@@ -90,6 +90,15 @@ describe("MealPickScreen", () => {
     expect(mockPlanRecipe).not.toHaveBeenCalled();
   });
 
+  it("Während ein Pick läuft, sind die Rezeptzeilen deaktiviert", async () => {
+    mockPlanning.busy = true;
+    await renderScreen(<MealPickScreen />, { queryClient: seededClient() });
+    const row = screen.getByRole("button", { name: /Nudeln mit Tomatensoße/ });
+    expect(row).toBeDisabled();
+    await fireEvent.press(row);
+    expect(mockPlanRecipe).not.toHaveBeenCalled();
+  });
+
   it("gibt das Ersetzen-Ziel mit, wenn die Route es trägt", async () => {
     mockParams = { date: "2026-10-28", slot: "dinner", entryId: "e1", seenRecipeId: "r0" };
     await renderScreen(<MealPickScreen />, { queryClient: seededClient() });

@@ -183,11 +183,10 @@ export function KalenderScreen() {
                 disabled={isOptimistic}
                 accessibilityRole="button"
                 // Kein visuelles Ausgrauen (Decision 6 der Optimistic-UI-Spec:
-                // die Occurrence soll echt aussehen) — nur assistive Technik
-                // soll die Zeile für die kurze Zeit bis zum Refetch als
-                // deaktiviert ankündigen, statt einen bedienbaren Knopf zu
-                // versprechen, der nichts tut.
-                accessibilityState={isOptimistic ? { disabled: true } : undefined}
+                // die Occurrence soll echt aussehen) — die `disabled`-Prop
+                // oben lässt assistive Technik die Zeile für die kurze Zeit
+                // bis zum Refetch als deaktiviert ankündigen, statt einen
+                // bedienbaren Knopf zu versprechen, der nichts tut.
                 accessibilityLabel={
                   isSpan
                     ? t("cal.a11y.eventSpan", {

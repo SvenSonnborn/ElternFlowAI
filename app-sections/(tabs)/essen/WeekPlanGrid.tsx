@@ -144,7 +144,7 @@ export function WeekPlanGrid({
             <Pressable
               key={tab}
               accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
+              aria-selected={active}
               onPress={() => selectSlot(tab)}
               // 44 statt der 34 px aus dem Handoff-Layout: dort war die Leiste
               // Dekoration, hier ist sie bedienbar — damit greift die
@@ -350,7 +350,7 @@ function DayRow({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("meals.a11y.rowMenu", { day: dayName })}
-            accessibilityState={{ expanded: menuOpen }}
+            aria-expanded={menuOpen}
             onPress={onToggleMenu}
             className="items-center justify-center active:opacity-70"
             style={{ width: touchTarget.min, height: touchTarget.min, marginRight: 4 }}

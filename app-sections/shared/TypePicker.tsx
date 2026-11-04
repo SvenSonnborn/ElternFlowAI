@@ -32,15 +32,19 @@ export function TypePicker({ label, items, selectedId, onSelect, error }: TypePi
       >
         {label}
       </Text>
-      <View className="mt-0.5 flex-row flex-wrap gap-x-2">
+      <View
+        accessibilityRole="radiogroup"
+        accessibilityLabel={label}
+        className="mt-0.5 flex-row flex-wrap gap-x-2"
+      >
         {items.map((item) => {
           const isSelected = item.id === selectedId;
           return (
             <Pressable
               key={item.id}
-              accessibilityRole="button"
+              accessibilityRole="radio"
               accessibilityLabel={item.label}
-              accessibilityState={{ selected: isSelected }}
+              aria-checked={isSelected}
               onPress={() => onSelect(item.id)}
               // The pill is 36 px tall by design, so the tap area is 44 around
               // it. hitSlop can't do that: React Native clips it at the parent's

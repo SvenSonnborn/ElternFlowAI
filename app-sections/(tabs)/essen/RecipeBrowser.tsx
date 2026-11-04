@@ -135,7 +135,7 @@ function RecipeRowItem({
       accessible
       accessibilityRole="button"
       accessibilityLabel={a11yLabel}
-      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={
         disabled
           ? undefined

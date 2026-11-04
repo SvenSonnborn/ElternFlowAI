@@ -173,7 +173,7 @@ function RecipeContent({ recipe }: { recipe: RecipeRow }) {
               <Pressable
                 key={key}
                 accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
+                aria-selected={active}
                 onPress={() => setTab(key)}
                 className="items-center justify-end pb-2 active:opacity-70"
                 // 44×44 ist die Untergrenze aus CLAUDE.md. Die Höhe braucht das

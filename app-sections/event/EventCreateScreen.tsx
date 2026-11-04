@@ -361,7 +361,7 @@ export function EventCreateScreen() {
 
         <Pressable
           accessibilityRole="switch"
-          accessibilityState={{ checked: allDay }}
+          aria-checked={allDay}
           accessibilityLabel={t("cal.create.fieldAllDay")}
           onPress={() => setAllDay(!allDay)}
           className="flex-row items-center justify-between rounded-xl border px-3.5 active:opacity-70"
