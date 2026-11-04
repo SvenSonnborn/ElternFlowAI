@@ -443,7 +443,9 @@ describe("EventEditScreen: Ganztägig, gelesen aus einer anderen Zone", () => {
 
     // Ende auf den lokalen Tag des Starts: Die Uhrzeit des Endes bleibt, das Ende liegt
     // eine Minute vor dem Start — lokal derselbe Tag, in Auckland der 27. vor dem 28.
-    await fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.edit.fieldEndDate") }));
+    // Der Name trägt hinter dem Label den Wert, der von der Zone des Testlaufs abhängt.
+    const endDateLabel = i18n.t("cal.edit.fieldEndDate").replace(/[()]/g, "\\$&");
+    await fireEvent.press(screen.getByRole("button", { name: new RegExp(`^${endDateLabel},`) }));
     await act(() => {
       mockPickerProps?.onPick(new Date(allDayAuckland.start_at));
     });
