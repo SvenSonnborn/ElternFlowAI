@@ -49,6 +49,7 @@ export {
   type ToastPosition,
   type ToastVariant,
 } from "./toastStore";
+export { tabBarSize } from "./tabBarSize";
 export { tabSceneStyle } from "./tabSceneStyle";
 export { TypePicker, type TypePickerItem } from "./TypePicker";
 export { useDiscardGuard } from "./useDiscardGuard";
