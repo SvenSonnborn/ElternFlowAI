@@ -136,7 +136,11 @@ export function Step2FamilyAndName() {
           >
             {t("onb.s2.color.label")}
           </Text>
-          <View style={{ flexDirection: "row", gap: 12, marginTop: 8 }}>
+          <View
+            accessibilityRole="radiogroup"
+            accessibilityLabel={t("onb.s2.color.label")}
+            style={{ flexDirection: "row", gap: 12, marginTop: 8 }}
+          >
             {AVATAR_COLORS.map((c) => (
               <Pressable
                 key={c}
@@ -150,8 +154,8 @@ export function Step2FamilyAndName() {
                   borderWidth: 3,
                   borderColor: color === c ? theme.ink : "transparent",
                 }}
-                accessibilityRole="button"
-                accessibilityState={{ selected: color === c }}
+                accessibilityRole="radio"
+                aria-checked={color === c}
               />
             ))}
           </View>

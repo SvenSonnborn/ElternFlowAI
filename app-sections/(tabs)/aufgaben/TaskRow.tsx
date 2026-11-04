@@ -61,7 +61,7 @@ export function TaskRow({ task, child, urgency }: TaskRowProps) {
         onPress={handleToggle}
         disabled={toggle.isPending}
         accessibilityRole="checkbox"
-        accessibilityState={{ checked: task.is_done, disabled: toggle.isPending }}
+        aria-checked={task.is_done}
         accessibilityLabel={task.title}
         // `invalidateTasks` returns its promise, so `isPending` only clears
         // once the refetched rows are in — the row stays locked until the

@@ -39,7 +39,7 @@ export function RecurrenceRadio({ label, value, onChange }: RecurrenceRadioProps
               key={opt}
               accessibilityRole="radio"
               accessibilityLabel={t(`cal.recur.${opt}`)}
-              accessibilityState={{ selected: isSelected, checked: isSelected }}
+              aria-checked={isSelected}
               onPress={() => onChange(opt)}
               className="h-12 flex-row items-center gap-3 px-3.5 active:opacity-70"
               style={{

@@ -128,7 +128,10 @@ export function Step4FirstChild() {
               {initial}
             </Text>
           </View>
-          <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+          <View
+            accessibilityRole="radiogroup"
+            style={{ flexDirection: "row", gap: 8, marginTop: 12 }}
+          >
             {AVATAR_COLORS.map((c) => (
               <Pressable
                 key={c}
@@ -142,8 +145,8 @@ export function Step4FirstChild() {
                   borderWidth: 2,
                   borderColor: color === c ? theme.ink : "transparent",
                 }}
-                accessibilityRole="button"
-                accessibilityState={{ selected: color === c }}
+                accessibilityRole="radio"
+                aria-checked={color === c}
               />
             ))}
           </View>
@@ -210,8 +213,8 @@ export function Step4FirstChild() {
                     justifyContent: "center",
                     gap: 6,
                   }}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
+                  accessibilityRole="checkbox"
+                  aria-checked={selected}
                 >
                   {selected ? <Icon name="check" size={14} color={theme.primaryStrong} /> : null}
                   <Text variant="caption" tone={selected ? "primaryStrong" : "inkSecondary"}>

@@ -48,7 +48,6 @@ export function EventRow({
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      accessibilityState={disabled ? { disabled: true } : undefined}
       accessibilityLabel={accessibilityLabel}
       className={`flex-row items-center gap-3 px-4 py-3.5 ${isFirst ? "" : "border-t border-line"} active:opacity-70`}
     >

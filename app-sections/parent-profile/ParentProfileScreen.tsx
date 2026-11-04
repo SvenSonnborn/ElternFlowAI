@@ -134,18 +134,18 @@ export function ParentProfileScreen() {
               // edge to edge. The earlier `hitSlop={8}` on a 28px swatch also
               // measured 44, but the slop of neighbouring swatches met inside the
               // 8px gap: a tap just right of one swatch landed on the next.
-              <View className="mt-3 flex-row">
+              <View accessibilityRole="radiogroup" className="mt-3 flex-row">
                 {AVATAR_COLORS.map((c) => (
                   <Pressable
                     key={c}
                     onPress={() => setColor(c)}
-                    accessibilityRole="button"
+                    accessibilityRole="radio"
                     // Label says which control this is, hint says what tapping
                     // does. All six sharing "Farbe wählen" as the label left a
                     // screen reader with six identical buttons.
                     accessibilityLabel={t(AVATAR_COLOR_NAMES[c])}
                     accessibilityHint={t("parent.colorOption")}
-                    accessibilityState={{ selected: color === c }}
+                    aria-checked={color === c}
                     className="items-center justify-center"
                     style={{ width: touchTarget.min, height: touchTarget.min }}
                   >

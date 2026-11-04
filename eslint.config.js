@@ -99,6 +99,20 @@ module.exports = [
   },
 
   {
+    files: ["**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "JSXAttribute[name.name='accessibilityState']",
+          message:
+            "accessibilityState kommt auf Web nicht im DOM an — aria-checked/aria-selected/aria-expanded bzw. die disabled-Prop nehmen (ADR-054).",
+        },
+      ],
+    },
+  },
+
+  {
     files: ["__tests__/**", "**/*.{test,spec}.{ts,tsx,js,jsx}", "**/*.jest.{ts,tsx}", "testing/**"],
     rules: {
       "i18next/no-literal-string": "off",

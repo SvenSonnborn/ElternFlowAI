@@ -52,7 +52,7 @@ export function FilterChipRow<T extends string>({
             key={option.id}
             accessibilityRole="radio"
             accessibilityLabel={option.label}
-            accessibilityState={{ checked: active }}
+            aria-checked={active}
             onPress={() => onSelect(option.id)}
             // Die Pille ist per Design 36 px hoch, die Tippfläche darum 44;
             // `hitSlop` leistet das nicht, weil React Native es an den Grenzen

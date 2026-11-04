@@ -53,15 +53,19 @@ export function MemberPicker({
       >
         {label}
       </Text>
-      <View className="mt-1.5 flex-row flex-wrap items-center gap-3">
+      <View
+        accessibilityRole="radiogroup"
+        accessibilityLabel={label}
+        className="mt-1.5 flex-row flex-wrap items-center gap-3"
+      >
         {options.map((member) => {
           const active = isSelected(member, selected);
           return (
             <Pressable
               key={`${member.kind}-${member.id}`}
-              accessibilityRole="button"
+              accessibilityRole="radio"
               accessibilityLabel={member.name}
-              accessibilityState={{ selected: active }}
+              aria-checked={active}
               onPress={() => onSelect({ kind: member.kind, id: member.id })}
               className="items-center active:opacity-70"
               style={{ minWidth: touchTarget.min }}
@@ -88,9 +92,9 @@ export function MemberPicker({
           );
         })}
         <Pressable
-          accessibilityRole="button"
+          accessibilityRole="radio"
           accessibilityLabel={noMemberLabel}
-          accessibilityState={{ selected: selected === null }}
+          aria-checked={selected === null}
           onPress={() => onSelect(null)}
           // Die Pille ist per Design 36 px hoch, die Tippfläche darum 44;
           // `hitSlop` leistet das nicht, weil React Native es an den Grenzen

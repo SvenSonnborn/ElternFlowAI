@@ -59,9 +59,8 @@ function Row({
   return (
     <Pressable
       onPress={press}
-      disabled={disabled}
+      disabled={soon || disabled}
       accessibilityRole={press ? "button" : undefined}
-      accessibilityState={soon || disabled ? { disabled: true } : undefined}
       className={`flex-row items-center gap-3 py-3 ${isLast ? "" : "border-b border-line"} ${press ? "active:opacity-70" : ""} ${disabled ? "opacity-50" : ""}`}
     >
       <View className={`h-8 w-8 items-center justify-center rounded-xl ${containerBg}`}>
