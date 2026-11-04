@@ -1,6 +1,6 @@
 # a11y nativ — Design
 
-**Status:** Entwurf (Brainstorming), Freigabe offen
+**Status:** Entwurf (Brainstorming), Builder-Check eingearbeitet, Freigabe offen
 **Date:** 2026-11-04
 **Branch:** `fix/a11y-nativ`, Punkte 1 und 2 der „nächsten Branches" in [roadmap.md](../../roadmap.md#die-nächsten-branches-stand-2026-11-03) (4.1 `inlineRem` und a11y nativ)
 **Decision-Log:** ein ADR (054) am Branch-Ende
@@ -42,7 +42,7 @@ Sven hat am 2026-11-03 Vorher/Nachher-Screenshots mit `inlineRem: 16` im iPhone-
 1. Eine Änderung an Handoff-Dateien (`design-system/typography.ts` u. a.). Inter kommt über `Text` und die Umgehungsstellen in die App, nicht über die Token-Datei.
 2. Ein sichtbarer Schriftwechsel beim Laden im Web, oder ein leerer Bildschirm, der hängen bleibt, wenn die Schrift nicht lädt.
 3. Ein Root-`<Stack>`, der nach dem ersten Mount bedingt ersetzt oder neu gemountet wird — weder durch das Laden der Schrift noch durch den neuen Container in `AuthGate` ([ADR-040](../../decision-log.md)).
-4. Eine Tippfläche, die wieder über `hitSlop` wächst, oder eine Box, deren 44 aus einer rem-Klasse statt aus `touchTarget.min` kommt.
+4. Eine Tippfläche, die wieder über `hitSlop` wächst, oder eine in diesem Branch gebaute Box, deren 44 aus einer rem-Klasse statt aus `touchTarget.min` kommt. Vorhandene `h-11`/`min-h-11` (etwa `Button` md, `PrepRow`) sind nach §3.1 nativ 44 und bleiben.
 5. Eine sichtbare Größe, die sich ändert: Das Zahnrad bleibt 36, die Farbfelder bleiben 28. „Keep the drawn size, grow the touchable box" ([patterns/toast.md](../../../patterns/toast.md)). Benachbarte Boxen überlappen nicht.
 6. Schriftdateien im Repo. Sie kommen aus dem npm-Paket.
 
@@ -70,6 +70,8 @@ Commit-Reihenfolge: `inlineRem` → Inter → a11y-Punkte → gemeinsamer Sichtl
 
 **Web — geladen zur Laufzeit** mit `useFonts` in der Array-Form von SDK 58: `[{ fontFamily: "Inter", fontDefinitions: [{ path: require(…), weight: 400 }, …] }]`, alle Schnitte in einem Aufruf, nur auf Web. Der Web-Export läuft mit `web.output: "static"`; ob `expo-font` die `@font-face`-Regeln damit schon ins HTML schreibt, prüft der Builder. Anforderung in jedem Fall (Anti-Ziel 2 und 3): kein sichtbarer Schriftwechsel; falls die App dafür warten muss, dann vor dem ersten Mount des Root-`<Stack>`, nie danach; schlägt das Laden fehl, rendert die App mit der Ausweichschrift weiter.
 
+Die Array-Form steht in `expo-font` 58.0.11 (`FontMap` nimmt `FontFamilyDefinition[]`; `weight` unterscheidet laut Typ-Doku die Schnitte einer Familie). Die erste Aufgabe des Inter-Teils prüft im Web-Export, dass `fontFamily: "Inter"` mit `fontWeight` 400 bis 800 die fünf Schnitte trifft, bevor irgendeine Stelle umgestellt wird. Trägt die Array-Form nicht, ist ein `@font-face`-Block in `global.css` mit Pfaden ins npm-Paket der Rückfall (meine Entscheidung); Anti-Ziel 6 gilt weiter, es wird keine Datei ins Repo kopiert.
+
 **Wo Inter gesetzt wird:**
 
 - [Text.tsx](../../../design-system/ui/Text.tsx): `fontFamily: fontFamily.sans` (aus `@/design-system`) als erster Eintrag im Style-Array, damit das Preset (`hero` setzt `fontFamily.display`) und der Aufrufer überschreiben können. Kein anderes Modul importiert `Text` aus `react-native`.
@@ -84,6 +86,8 @@ Folge: Jeder Text der App wechselt von SF/Roboto zu Inter. Inter läuft breiter 
 **Form:** ein `Pressable` mit `touchTarget.min` als `minWidth`/`minHeight` (oder fester Breite und Höhe) im `style`, die Optik in einer inneren `View` mit der gezeichneten Größe — Vorbild [FilterChipRow.tsx](../../../app-sections/shared/FilterChipRow.tsx). Jedes `hitSlop` fällt weg.
 
 **Lage:** Die sichtbare Größe bleibt (Anti-Ziel 5). Die sichtbare Lage darf sich um die halbe Differenz verschieben (4 pt bei einem 36er-Element), wo ein Ausgleich über negative Ränder mehr Code kostet, als er bringt; an Bildschirmkanten und in Kopfzeilen bleibt die Kante bündig (meine Entscheidung). Den Ausschlag gibt der Sichtlauf.
+
+**Wenn der Platz nicht reicht:** Boxen überlappen nie; stattdessen wächst der sichtbare Abstand zwischen den gezeichneten Elementen. So ist es im Bestand schon gelöst: die Farbfelder im Eltern-Profil (44er-Boxen nebeneinander, der 28er-Kreis innen) und die Chip-Zeilen in `FilterChipRow` (umbrochene Zeilen im 44er-Raster). Farbfelder in Onboarding-Schritt 4, Tag-Felder und Allergie-Chips folgen dem.
 
 **Inventar durch Messen, nicht durch Grep.** Nach §3.1 sind Web und nativ gleich groß; deshalb misst ein Wegwerf-Skript (nicht eingecheckt, meine Entscheidung) per Playwright gegen den Prod-Export auf lokaler Supabase jedes Element mit interaktiver Rolle (`button`, `link`, `checkbox`, `radio`, `switch`, `tab`) und meldet alles unter 44 in einer Richtung — über alle Tabs, Sheets, Auth- und Onboarding-Screens. Nativ genügen Stichproben mit `axe describe-ui`. Der Ausgangsbestand aus dem Grep:
 
@@ -103,7 +107,7 @@ Folge: Jeder Text der App wechselt von SF/Roboto zu Inter. Inter läuft breiter 
 
 Die Allergie-Chips bekommen ihre Rolle nach Semantik: Mehrfachauswahl → `checkbox` mit `aria-checked`.
 
-**Gegen Rückfall:** eine ESLint-Regel (`no-restricted-syntax`) verbietet das JSX-Attribut `hitSlop`, wie die Regel gegen `Alert.alert` ([ADR-039](../../decision-log.md)) (meine Entscheidung).
+**Gegen Rückfall:** eine ESLint-Regel (`no-restricted-syntax`) verbietet das JSX-Attribut `hitSlop`, wie die Regel gegen `Alert.alert` ([ADR-039](../../decision-log.md)) (meine Entscheidung). Sie greift nur auf JSX-Attribute, in App- und Testcode gleichermaßen; als Objekt-Schlüssel (etwa in Navigator-Optionen) steht `hitSlop` heute nirgends, das deckt sie bewusst nicht ab.
 
 ### 3.4 Auswahlzustand für Web-Screenreader
 
@@ -120,6 +124,7 @@ Deshalb **ersetzt** `aria-*` das `accessibilityState` an allen 22 Stellen in 19 
 - [Field.tsx](../../../app-sections/shared/Field.tsx): Das `TextInput` bekommt `accessibilityLabel={label}`; react-native-web macht daraus `aria-label`.
 - Das sichtbare Label bekommt `aria-hidden`, damit es nicht ein zweites Mal angesagt wird (Ziel 5; meine Entscheidung). React Native übersetzt `aria-hidden` nativ in `accessibilityElementsHidden` und `importantForAccessibility="no-hide-descendants"`.
 - Das Tag-`TextInput` im Kinderprofil bekommt sein Label genauso. Weitere `TextInput` gibt es nicht.
+- Der `error`-Text eines `Field` bleibt sichtbares Geschwister und wird wie heute angesagt; ihn mit dem Feld zu verknüpfen gehört nicht in diesen Branch (meine Entscheidung). Der Test prüft nur das Label.
 
 ### 3.6 Deckfläche von `AuthGate` nativ
 
