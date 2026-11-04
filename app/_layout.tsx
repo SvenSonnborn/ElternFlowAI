@@ -11,6 +11,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { InviteLinkHost } from "@/app-sections/auth/InviteLinkHost";
 import { ScopeSheetHost } from "@/app-sections/event/ScopeSheetHost";
 import { ConflictDialogHost, ToastProvider } from "@/app-sections/shared";
+import { useAppFonts } from "@/design-system/fonts";
 import { ThemeProvider, useTheme } from "@/design-system/ThemeProvider";
 import { AuthGate, initDeepLinkHandler, useInitSession } from "@/features/auth";
 import { useFamilyRealtime } from "@/features/realtime";
@@ -167,6 +168,7 @@ function ThemedStack() {
 }
 
 export default function RootLayout() {
+  useAppFonts();
   const queryClient = useMemo(
     () =>
       new QueryClient({
