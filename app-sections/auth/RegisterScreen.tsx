@@ -5,6 +5,7 @@ import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Field, Icon } from "@/app-sections/shared";
+import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { mapAuthError, passwordStrength, useSignUp } from "@/features/auth";
@@ -42,8 +43,13 @@ export function RegisterScreen() {
       <ScrollView contentContainerStyle={{ padding: 24 }} keyboardShouldPersistTaps="handled">
         <Pressable
           onPress={() => router.back()}
-          style={{ marginBottom: 16 }}
-          hitSlop={10}
+          // Box 44 groß, Icon links bündig; die Lücke zum Titel ist in der Box.
+          style={{
+            alignSelf: "flex-start",
+            minWidth: touchTarget.min,
+            minHeight: touchTarget.min,
+            justifyContent: "center",
+          }}
           accessibilityRole="button"
           accessibilityLabel={t("action.back")}
         >
@@ -107,7 +113,13 @@ export function RegisterScreen() {
 
         <Pressable
           onPress={() => setTermsAccepted((v) => !v)}
-          style={{ flexDirection: "row", gap: 12, alignItems: "flex-start", marginTop: 20 }}
+          style={{
+            flexDirection: "row",
+            gap: 12,
+            alignItems: "center",
+            marginTop: 20,
+            minHeight: touchTarget.min,
+          }}
           accessibilityRole="checkbox"
           aria-checked={termsAccepted}
         >
@@ -121,7 +133,6 @@ export function RegisterScreen() {
               backgroundColor: termsAccepted ? theme.primary : "transparent",
               alignItems: "center",
               justifyContent: "center",
-              marginTop: 2,
             }}
           >
             {termsAccepted ? <Icon name="check" size={14} color={theme.onMint} /> : null}

@@ -5,6 +5,7 @@ import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Icon } from "@/app-sections/shared";
+import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { supabase } from "@/features/supabase";
@@ -75,8 +76,13 @@ export function CheckEmailScreen() {
 
         <Pressable
           onPress={() => router.back()}
-          style={{ marginTop: 16, alignSelf: "center" }}
-          hitSlop={10}
+          accessibilityRole="button"
+          style={{
+            marginTop: 16,
+            alignSelf: "center",
+            minHeight: touchTarget.min,
+            justifyContent: "center",
+          }}
         >
           <Text variant="caption" tone="inkSecondary">
             {t("auth.checkEmail.wrongEmail")}
