@@ -2,7 +2,7 @@
 
 **Status:** Approved (Brainstorming)
 **Date:** 2026-11-04
-**Branch:** `fix/a11y-nativ`, Punkte 1 und 2 der „nächsten Branches" in [roadmap.md](../../roadmap.md#die-nächsten-branches-stand-2026-11-03) (4.1 `inlineRem` und a11y nativ)
+**Branch:** `fix/a11y-nativ`, Punkte 1 und 2 der „nächsten Branches" in [roadmap.md](../../roadmap.md) (4.1 `inlineRem` und a11y nativ)
 **Decision-Log:** ein ADR (054) am Branch-Ende
 
 ## 1. Worum es geht
