@@ -22,4 +22,16 @@ describe("Field: das Label ist der Name des Eingabefelds", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Datum" }));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
+
+  it("die onPress-Variante sagt den gewählten Wert an", async () => {
+    await renderScreen(<Field label="Datum" value="4. Nov. 2026" onPress={() => {}} />);
+    expect(screen.getByRole("button", { name: "Datum" })).toHaveAccessibilityValue({
+      text: "4. Nov. 2026",
+    });
+  });
+
+  it("das einzeilige Eingabefeld füllt die Zeilenhöhe, damit die ganze Zeile antippbar ist", async () => {
+    await renderScreen(<Field label="Titel" value="" onChangeText={() => {}} />);
+    expect(screen.getByLabelText("Titel")).toHaveStyle({ alignSelf: "stretch" });
+  });
 });

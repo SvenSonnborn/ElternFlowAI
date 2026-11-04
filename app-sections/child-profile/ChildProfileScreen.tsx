@@ -114,8 +114,16 @@ function TagEditor({
           placeholderTextColor={theme.inkTertiary}
           onSubmitEditing={commit}
           returnKeyType="done"
-          className="flex-1 text-base"
-          style={{ fontFamily: fontFamily.sans, fontSize: 14, color: theme.ink }}
+          // Wie in `Field`: Das Feld füllt die h-12-Zeile, damit sie ganz
+          // antippbar ist, und lässt `text-base` weg, dessen Zeilenhöhe 24 den
+          // Text auf iOS im gestreckten Feld nach unten schöbe.
+          className="flex-1"
+          style={{
+            fontFamily: fontFamily.sans,
+            fontSize: 14,
+            color: theme.ink,
+            alignSelf: "stretch",
+          }}
         />
         <Pressable
           onPress={commit}

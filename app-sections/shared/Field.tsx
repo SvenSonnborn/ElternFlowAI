@@ -42,7 +42,8 @@ export interface FieldProps {
  * Beschriftetes Eingabefeld. Das Label steht als `accessibilityLabel` am
  * `TextInput` (bzw. am `Pressable` der `onPress`-Variante); der sichtbare
  * Label-`Text` ist `aria-hidden`, sonst sagen VoiceOver und TalkBack ihn
- * zusätzlich zum Feldnamen an, also doppelt.
+ * zusätzlich zum Feldnamen an, also doppelt. Weil das Label den Inhalt der
+ * Zeile überdeckt, trägt die `onPress`-Variante den Wert als `aria-valuetext`.
  */
 export function Field({
   label,
@@ -91,13 +92,18 @@ export function Field({
         autoCorrect={autoCorrect}
         autoComplete={autoComplete}
         textContentType={textContentType}
-        className="flex-1 text-base"
+        // Einzeilig ohne `text-base`: dessen Zeilenhöhe 24 setzt die Glyphen auf
+        // iOS an den Fuß der Zeile, im gestreckten Feld rutscht der Text tiefer.
+        className={multiline ? "flex-1 text-base" : "flex-1"}
         style={{
           fontFamily: fontFamily.sans,
           fontSize: 14,
           color: editable ? theme.ink : theme.inkSecondary,
           textAlignVertical: multiline ? "top" : "center",
           minHeight: multiline ? 60 : undefined,
+          // Einzeilig füllt das Feld die h-12-Zeile; sonst ist es nur so hoch
+          // wie seine Schrift, und ein Tipp auf den Rand fokussiert nichts.
+          alignSelf: multiline ? undefined : "stretch",
         }}
       />
     </>
@@ -117,6 +123,9 @@ export function Field({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={label}
+          // Das Label überdeckt den Text der Zeile; ohne Wert hörte man nur
+          // „Von (Datum)", nie das gewählte Datum.
+          aria-valuetext={value}
           onPress={onPress}
           className={rowClassName}
           style={rowStyle}
