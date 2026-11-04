@@ -50,6 +50,7 @@ app-sections/            Real screen implementations
    (DateTimePickerSheet · TypePicker · MemberPicker · Field · confirmDialog
    · Toast · useUndoableDelete · AllergenBadge · recipeA11y · mealPlaceholder · SyncNotice
    · conflictStore · ConflictDialog · ConflictDialogHost · newRequestId (Kennung pro Absicht, ADR-044)
+   · DecorativeSwitch (Schalter als Anzeige in einer Schalter-Zeile, ADR-054)
    — von mehr als einem Tab benutzt)
 
 design-system/           Handoff bundle + theming runtime

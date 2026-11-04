@@ -205,7 +205,11 @@ Path alias `@/*` → repo root (see [tsconfig.json](tsconfig.json)).
 
 **Formular-Sheets melden „geändert" an `useDiscardGuard`** ([ADR-050](docs/decision-log.md)). Jeder programmatische Schließweg nach Speichern oder Löschen ruft `allowLeave()` zuerst auf, sonst fragt die App nach dem Speichern „Änderungen verwerfen?".
 
-**Tippflächen über die Box, nicht über `hitSlop` — und das Maß als Zahl.** Ein Bedienelement, das kleiner als 44×44 aussehen soll, bekommt ein `Pressable` mit `touchTarget.min` aus `@/design-system` im `style` und trägt seine Optik in einer inneren `View` — Vorbild: [FilterChipRow.tsx](app-sections/shared/FilterChipRow.tsx). `hitSlop` wirkt auf Web gar nicht, und React Native beschneidet es an den Grenzen des Elternteils. `h-11` ist kein Ersatz für die Zahl: NativeWind rechnet `rem` auf iOS und Android mit 14, die Klasse ergibt dort 38,5 pt ([ADR-041](docs/decision-log.md)).
+**Tippflächen über die Box, nicht über `hitSlop` — und das Maß als Zahl.** Ein Bedienelement, das kleiner als 44×44 aussehen soll, bekommt ein `Pressable` mit `touchTarget.min` aus `@/design-system` im `style` und trägt seine Optik in einer inneren `View` — Vorbild: [FilterChipRow.tsx](app-sections/shared/FilterChipRow.tsx). `hitSlop` wirkt auf Web gar nicht, React Native beschneidet es an den Grenzen des Elternteils, und eine ESLint-Regel verbietet es. `h-11` ist kein Ersatz für die Zahl: `touchTarget.min` ist die eine Quelle für 44, eine rem-Klasse hängt an `inlineRem` in `metro.config.js`, das neben dem `Pressable` niemand sieht ([ADR-041](docs/decision-log.md), [ADR-054](docs/decision-log.md)).
+
+**Zustände für Screenreader über `aria-*`, nicht über `accessibilityState`** — react-native-web reicht `accessibilityState` nicht ans DOM durch; `aria-checked`/`aria-selected`/`aria-expanded` wirken auf allen Plattformen, „deaktiviert" geht über die `disabled`-Prop des `Pressable`. Eine ESLint-Regel hält das ([ADR-054](docs/decision-log.md)).
+
+**Wer an `Text` vorbei rendert, setzt `fontFamily.sans` aus `@/design-system` selbst** (`TextInput`, Web-`<input>`, Navigator- und Bibliotheks-Styles), sonst steht die Stelle nicht in Inter ([ADR-054](docs/decision-log.md)).
 
 **Important name collision:** `design-system/components.ts` (SPEC file with lowercase `button`/`card`/`pill` exports) shadows the React components folder if anyone reintroduces `design-system/components/`. That's why the React components live in `design-system/ui/`. Don't rename it back.
 

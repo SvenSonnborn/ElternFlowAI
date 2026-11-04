@@ -121,17 +121,16 @@ Einschätzung („ein Großteil davon können wir jetzt schon umsetzen") trifft 
 Der große Rest teilt sich in Anbieter-Blockaden (Sprachassistent, gustar.io, Notifications, Stripe)
 und Designer-Punkte, die zwar nicht _von uns_ erledigt werden, aber in den Blöcken mitlaufen.
 
-### Die nächsten Branches (Stand 2026-11-03)
+### Die nächsten Branches (Stand 2026-11-04)
 
 Erledigt sind `fix/stille-fehler` ([ADR-049](./decision-log.md)), der Kalender-Cache aus
 [8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-051](./decision-log.md)), der Test
-für `useFamilyRealtime`, ohne `setAuth`-Retry ([ADR-052](./decision-log.md)), und das DB-Aufräumen
+für `useFamilyRealtime`, ohne `setAuth`-Retry ([ADR-052](./decision-log.md)), das DB-Aufräumen
 mit pg_cron für Einladungen, `anon`-Rechten und Einladungslink nach Kontostand
-([ADR-053](./decision-log.md)).
+([ADR-053](./decision-log.md)) und a11y nativ samt [4.1](#41-inlinerem-entscheiden--erledigt)
+`inlineRem` und Inter ([ADR-054](./decision-log.md)).
 
-1. Entscheidung [4.1](#41-inlinerem-entscheiden--offen-entscheidung-bei-dir) `inlineRem`
-2. a11y nativ (`hitSlop` zur Box, `aria-*`, Field-Label, `AuthGate`, Serifenschrift im Web)
-3. Block 9 (`expo-doctor`, `ci.yml`-Cache nur lesen)
+1. Block 9 (`expo-doctor`, `ci.yml`-Cache nur lesen)
 
 ### Schlusssteine — was am meisten entsperrt
 
@@ -640,10 +639,10 @@ Geburtstagsfelder öffnen im Web einen Picker · die Konsole ist beim Login-Übe
 > auf Web gar nicht —, und `FilterChipRow` zog mit. Der Fokus-Punkt kam samt der Deckfläche von
 > `AuthGate`, beides nur auf Web. **Nicht geprüft: iOS und Android.**
 >
-> **Offen geblieben ist die Wurzel, [4.1](#41-inlinerem-entscheiden--offen-entscheidung-bei-dir).**
-> Vier kleinere Reste stehen in [TODO.md](./TODO.md): native Screenreader unter der Deckfläche,
-> das Kürzel in den Avataren und die zwei Verweise in
-> [8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm).
+> **Offen geblieben war die Wurzel, [4.1](#41-inlinerem-entscheiden--erledigt)** — seit 2026-11-04
+> erledigt, ebenso die nativen Screenreader unter der Deckfläche und die zwei Verweise in
+> [8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-054](./decision-log.md)). Das
+> Kürzel in den Avataren steht weiter in [TODO.md](./TODO.md).
 
 `CLAUDE.md` Non-negotiable 4 lautet „Touch targets ≥ 44×44". Zwei ausgelieferte Screens verletzen
 das, ein dritter Punkt macht einen Filter unsichtbar. Alle zusammen kosten eine
@@ -682,16 +681,11 @@ Sichtprüfungsrunde statt einer je Punkt — genau der Grund, aus dem sie einzel
 **Definition of done Block 4:** Alle fünf Änderungen in **einem** PR, danach eine Sichtprüfung über
 Termin-Formular, Aufgaben-Formular, Kinderprofil, Dashboard und Einstellungen — light und dark.
 
-### 4.1 `inlineRem` entscheiden — **offen, Entscheidung bei dir**
+### 4.1 `inlineRem` entscheiden — **erledigt**
 
-`TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-scope-items) → **„NativeWind rechnet
-`rem` nativ mit 14"**
-
-Gefunden in der Schluss-Review von Block 4: `h-11` sind auf iOS und Android 38,5 pt. Die in diesem
-Block angefassten Tippflächen tragen ihr Maß deshalb als Zahl; `Button` und die übrigen
-`*-11`-Flächen der App liegen nativ weiter unter 44. `inlineRem: 16` in
-[metro.config.js](../metro.config.js) ist eine Zeile, skaliert aber jedes rem-Maß der App um ein
-Siebtel und braucht einen nativen Sichtlauf über alle Screens — eigener PR.
+Entschieden für 16, nach Svens Vorher/Nachher-Vergleich im iOS-Simulator; umgesetzt im Branch
+„a11y nativ" mit nativem Sichtlauf ([ADR-054](./decision-log.md)). `h-11` ist damit auch auf iOS
+und Android 44; die Regel „Maß als Zahl" bleibt.
 
 ---
 
@@ -946,8 +940,8 @@ Importpfad und den Barrel — deshalb eine eigene, sonst leere Änderung, damit 
   ✅ — erledigt mit [ADR-053](./decision-log.md).
 
 - **„Weitere Tippflächen hängen an `hitSlop`"** und **„`accessibilityState` kommt auf Web nicht im
-  DOM an"** ([Weitere](./TODO.md#weitere-out-of-scope-items)) — Reste aus Block 4. Beide sind ein
-  Durchgang über viele Stellen und brauchen eine Sichtprüfung, sinnvollerweise mit nativem Lauf.
+  DOM an"** ([Weitere](./TODO.md#weitere-out-of-scope-items)) ✅ — erledigt mit
+  [ADR-054](./decision-log.md).
 
 **Definition of done Block 8:** `architecture.md` und die Struktur-Datei beschreiben das Repo von
 heute · `familyMutations.ts` heißt so · der Kompositions-Test läuft.
