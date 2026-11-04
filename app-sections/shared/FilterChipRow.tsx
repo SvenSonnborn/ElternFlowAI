@@ -1,8 +1,10 @@
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 
 import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Text } from "@/design-system/ui";
+
+import { SelectionPressable } from "./SelectionPressable";
 
 export interface FilterChipOption<T extends string> {
   id: T;
@@ -48,7 +50,7 @@ export function FilterChipRow<T extends string>({
       {options.map((option) => {
         const active = option.id === selectedId;
         return (
-          <Pressable
+          <SelectionPressable
             key={option.id}
             accessibilityRole="radio"
             accessibilityLabel={option.label}
@@ -88,7 +90,7 @@ export function FilterChipRow<T extends string>({
                 {option.label}
               </Text>
             </View>
-          </Pressable>
+          </SelectionPressable>
         );
       })}
     </View>

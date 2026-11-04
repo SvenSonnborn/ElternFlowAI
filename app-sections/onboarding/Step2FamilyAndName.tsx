@@ -1,9 +1,9 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 
-import { Field } from "@/app-sections/shared";
+import { Field, SelectionPressable } from "@/app-sections/shared";
 import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
@@ -145,7 +145,7 @@ export function Step2FamilyAndName() {
             style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 4 }}
           >
             {AVATAR_COLORS.map((c) => (
-              <Pressable
+              <SelectionPressable
                 key={c}
                 onPress={() => setColor(c)}
                 accessibilityRole="radio"
@@ -165,7 +165,7 @@ export function Step2FamilyAndName() {
                     borderColor: color === c ? theme.ink : "transparent",
                   }}
                 />
-              </Pressable>
+              </SelectionPressable>
             ))}
           </View>
         </View>

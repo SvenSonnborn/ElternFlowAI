@@ -1,8 +1,9 @@
 import { useTranslation } from "react-i18next";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 
 import type { RecurrenceOption } from "@/features/calendar";
 
+import { SelectionPressable } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Text } from "@/design-system/ui";
 
@@ -35,7 +36,7 @@ export function RecurrenceRadio({ label, value, onChange }: RecurrenceRadioProps
           const isSelected = opt === value;
           const isLast = idx === OPTIONS.length - 1;
           return (
-            <Pressable
+            <SelectionPressable
               key={opt}
               accessibilityRole="radio"
               accessibilityLabel={t(`cal.recur.${opt}`)}
@@ -70,7 +71,7 @@ export function RecurrenceRadio({ label, value, onChange }: RecurrenceRadioProps
               <Text variant="body" tone={isSelected ? "ink" : "inkSecondary"}>
                 {t(`cal.recur.${opt}`)}
               </Text>
-            </Pressable>
+            </SelectionPressable>
           );
         })}
       </View>

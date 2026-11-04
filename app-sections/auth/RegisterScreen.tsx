@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Field, Icon } from "@/app-sections/shared";
+import { Field, Icon, SelectionPressable } from "@/app-sections/shared";
 import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
@@ -111,7 +111,7 @@ export function RegisterScreen() {
           </View>
         </View>
 
-        <Pressable
+        <SelectionPressable
           onPress={() => setTermsAccepted((v) => !v)}
           style={{
             flexDirection: "row",
@@ -140,7 +140,7 @@ export function RegisterScreen() {
           <Text variant="body" tone="inkSecondary" style={{ flex: 1 }}>
             {t("auth.register.terms")}
           </Text>
-        </Pressable>
+        </SelectionPressable>
 
         <Button
           label={t("auth.register.submit")}

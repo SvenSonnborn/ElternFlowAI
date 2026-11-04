@@ -11,6 +11,7 @@ import {
   DecorativeSwitch,
   Icon,
   newRequestId,
+  SelectionPressable,
   showAlert,
   useToast,
   useUndoableDelete,
@@ -51,7 +52,7 @@ function ReminderRow({
   return (
     // Die Zeile ist der Schalter (eine Bedienstelle, Name aus dem Text); der
     // RN-Schalter darin ist nur Anzeige.
-    <Pressable
+    <SelectionPressable
       accessibilityRole="switch"
       accessibilityLabel={label}
       aria-checked={value}
@@ -76,7 +77,7 @@ function ReminderRow({
         thumbColor={theme.card}
         style={disabled ? { opacity: 0.5 } : undefined}
       />
-    </Pressable>
+    </SelectionPressable>
   );
 }
 

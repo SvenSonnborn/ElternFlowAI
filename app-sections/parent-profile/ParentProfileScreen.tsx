@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, View } from "react-native";
 
-import { ChildAvatar, Field, Icon, TopBar } from "@/app-sections/shared";
+import { ChildAvatar, Field, Icon, SelectionPressable, TopBar } from "@/app-sections/shared";
 import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
@@ -144,7 +144,7 @@ export function ParentProfileScreen() {
                 className="mt-3 flex-row"
               >
                 {AVATAR_COLORS.map((c) => (
-                  <Pressable
+                  <SelectionPressable
                     key={c}
                     onPress={() => setColor(c)}
                     accessibilityRole="radio"
@@ -167,7 +167,7 @@ export function ParentProfileScreen() {
                         borderColor: color === c ? theme.ink : "transparent",
                       }}
                     />
-                  </Pressable>
+                  </SelectionPressable>
                 ))}
               </View>
             ) : null}

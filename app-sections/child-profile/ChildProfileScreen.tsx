@@ -11,6 +11,7 @@ import {
   Field,
   Icon,
   Pill,
+  SelectionPressable,
   showAlert,
   TopBar,
 } from "@/app-sections/shared";
@@ -298,7 +299,7 @@ export function ChildProfileScreen() {
               className="mt-3 flex-row"
             >
               {AVATAR_COLORS.map((c) => (
-                <Pressable
+                <SelectionPressable
                   key={c}
                   onPress={() => setColor(c)}
                   accessibilityRole="radio"
@@ -321,7 +322,7 @@ export function ChildProfileScreen() {
                       borderColor: color === c ? theme.ink : "transparent",
                     }}
                   />
-                </Pressable>
+                </SelectionPressable>
               ))}
             </View>
           </View>
@@ -391,7 +392,7 @@ export function ChildProfileScreen() {
                     ? t(`onb.s4.allergies.${a}`)
                     : a;
                   return (
-                    <Pressable
+                    <SelectionPressable
                       key={a}
                       onPress={() => toggleAllergy(a)}
                       accessibilityRole="checkbox"
@@ -405,11 +406,11 @@ export function ChildProfileScreen() {
                         tone="warn"
                         leading={<Icon name="check" size={11} color={theme.accentStrong} />}
                       />
-                    </Pressable>
+                    </SelectionPressable>
                   );
                 })}
                 {allergySuggestions.map((key) => (
-                  <Pressable
+                  <SelectionPressable
                     key={key}
                     onPress={() => toggleAllergy(key)}
                     accessibilityRole="checkbox"
@@ -419,7 +420,7 @@ export function ChildProfileScreen() {
                     style={TAP_BOX}
                   >
                     <Pill label={t(`onb.s4.allergies.${key}`)} tone="ink" />
-                  </Pressable>
+                  </SelectionPressable>
                 ))}
               </View>
             </View>
