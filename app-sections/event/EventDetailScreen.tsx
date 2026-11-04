@@ -68,10 +68,13 @@ function ReminderRow({
         </View>
         <Text variant="listTitle">{label}</Text>
       </View>
+      {/* Gesperrt (lädt, Fehler, speichert) gedimmt wie ein gesperrter `Button`;
+          `DecorativeSwitch` nimmt kein `disabled`, das den Schalter dimmte. */}
       <DecorativeSwitch
         value={value}
         trackColor={{ false: theme.line, true: theme.primary }}
         thumbColor={theme.card}
+        style={disabled ? { opacity: 0.5 } : undefined}
       />
     </Pressable>
   );
