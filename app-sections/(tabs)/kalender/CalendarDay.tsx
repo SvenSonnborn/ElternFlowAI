@@ -5,6 +5,7 @@ import { Pressable, View } from "react-native";
 
 import type { SpanBar } from "@/features/calendar";
 
+import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Text } from "@/design-system/ui";
 
@@ -47,9 +48,11 @@ export function CalendarDay({ date, state, marking, onPress }: CalendarDayProps)
       onPress={() => onPress?.(date)}
       accessibilityRole="button"
       accessibilityLabel={date?.dateString}
-      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
       className="items-center justify-start"
-      style={{ width: 44, height: 52, paddingVertical: 4 }}
+      // Die Zelle ist selbst die Tippfläche: 44 breit, aber nie breiter als
+      // ihre Spalte. Bei 320 pt passen sieben 44er nicht in die Karte; dort
+      // gilt „Boxen überlappen nie" vor der 44 (docs/TODO.md).
+      style={{ width: touchTarget.min, maxWidth: "100%", height: 52, paddingVertical: 4 }}
     >
       <View
         className="h-9 w-9 items-center justify-center rounded-pill"

@@ -124,6 +124,7 @@ export function FamilieScreen() {
               <Pressable
                 key={p.id}
                 onPress={() => router.push(`/parent/${p.id}`)}
+                accessibilityRole="button"
                 className="active:opacity-80"
               >
                 <Card className="flex-row items-center gap-3">
@@ -168,6 +169,7 @@ export function FamilieScreen() {
                 <Pressable
                   key={child.id}
                   onPress={() => router.push(`/child/${child.id}`)}
+                  accessibilityRole="button"
                   className="active:opacity-80"
                 >
                   <Card className="flex-row items-center gap-3">
