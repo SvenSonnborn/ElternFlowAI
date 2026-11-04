@@ -92,7 +92,8 @@ The tab bar (Dashboard · Kalender · Essen · Aufgaben · Familie) takes its la
 i18n keys and its colors from the semantic theme tokens via `useTheme()`; `DS.components.tabBar`
 is the visual spec it follows, not a value read at runtime. Its height comes from `tabBarSize`:
 the design's 72, taller on devices with a bottom system inset so that every tab stays 44 high
-(ADR-054).
+(ADR-054). The Voice FAB moves up by the same amount (`fabBottom`), keeping its design gap above the
+bar.
 
 ## Routing
 
