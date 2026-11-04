@@ -17,8 +17,8 @@ function SplashFallback() {
 /**
  * Dieselbe Fläche wie `SplashFallback`, aber als Deckschicht über den Kindern
  * statt an ihrer Stelle. Eine `View` fängt Taps ab — niemand tippt während des
- * Übergangs auf den alten Screen dahinter. Auf Web kommt die Sperre für
- * Tastatur und Screenreader von `GateFrame`.
+ * Übergangs auf den alten Screen dahinter. Die Sperre für Tastatur und
+ * Screenreader kommt von `GateFrame`.
  */
 function GateCover() {
   const { theme } = useTheme();
@@ -26,23 +26,29 @@ function GateCover() {
 }
 
 /**
- * Auf Web macht `inert` den Screen unter der Deckfläche für Tastatur und
- * Screenreader unerreichbar — die `View` in `GateCover` fängt nur Taps ab.
- * Nur Web: nativ bräuchte derselbe Container eine eigene Sichtprüfung (siehe
- * TODO). Der Container steht dauerhaft da und schaltet nur `inert`: ein erst
- * während der Deckfläche eingefügter Container würde den Navigator neu mounten
- * (ADR-040). React Natives `ViewProps` kennt `inert` nicht, react-native-web
- * reicht das Attribut aber durch — daher die Assertion. Das tut es erst ab
- * 0.21.2, deshalb die Untergrenze in `package.json`. Nebenwirkung: Auf Web
- * bildet der Container einen eigenen Stapelkontext, die Toasts aus
- * `ToastProvider` liegen dadurch während der Deckfläche unter ihr statt darüber;
- * heute löst während des Login-Übergangs kein Ablauf einen Toast aus.
+ * Sperrt den Screen unter der Deckfläche für Tastatur und Screenreader — die
+ * `View` in `GateCover` fängt nur Taps ab. Nativ setzt der Container dafür
+ * `aria-hidden` (RN bildet es auf `accessibilityElementsHidden` und
+ * `importantForAccessibility="no-hide-descendants"` ab); auf Web schaltet er
+ * `inert`. Auf Web fehlt `aria-hidden` mit Absicht: Liegt der Fokus noch im
+ * versteckten Teil, warnt der Browser, und `inert` deckt Tastatur und
+ * Screenreader bereits ab.
+ *
+ * Der Container steht auf allen Plattformen dauerhaft da und schaltet nur
+ * diese Attribute: ein erst während der Deckfläche eingefügter oder
+ * ausgetauschter Container würde den Navigator neu mounten (ADR-040). React
+ * Natives `ViewProps` kennt `inert` nicht, react-native-web reicht das Attribut
+ * aber durch — daher die Assertion. Das tut es erst ab 0.21.2, deshalb die
+ * Untergrenze in `package.json`. Nebenwirkung: Auf Web bildet der Container
+ * einen eigenen Stapelkontext, die Toasts aus `ToastProvider` liegen dadurch
+ * während der Deckfläche unter ihr statt darüber; heute löst während des
+ * Login-Übergangs kein Ablauf einen Toast aus.
  */
-function GateFrame({ covered, children }: { covered: boolean; children: ReactNode }) {
-  if (Platform.OS !== "web") return <>{children}</>;
-  const inert = { inert: covered } as unknown as ViewProps;
+export function GateFrame({ covered, children }: { covered: boolean; children: ReactNode }) {
+  const web = Platform.OS === "web";
+  const inert = (web ? { inert: covered } : {}) as unknown as ViewProps;
   return (
-    <View style={{ flex: 1 }} {...inert}>
+    <View style={{ flex: 1 }} {...(web ? {} : { "aria-hidden": covered })} {...inert}>
       {children}
     </View>
   );
