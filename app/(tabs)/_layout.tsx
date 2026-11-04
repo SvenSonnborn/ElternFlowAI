@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Platform, View } from "react-native";
 
 import { Icon, type IconName, tabSceneStyle, VoiceAssistantFAB } from "@/app-sections/shared";
+import { fontFamily } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 
 function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
@@ -37,7 +38,7 @@ export default function TabsLayout() {
             paddingTop: 8,
             height: 72,
           },
-          tabBarLabelStyle: { fontSize: 11, fontWeight: "500" },
+          tabBarLabelStyle: { fontFamily: fontFamily.sans, fontSize: 11, fontWeight: "500" },
           sceneStyle: tabSceneStyle({ os: Platform.OS, routeKey: route.key, focusedRouteKey }),
         })}
       >

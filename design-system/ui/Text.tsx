@@ -1,6 +1,6 @@
 import { Text as RNText, type TextProps as RNTextProps } from "react-native";
 
-import { textStyles, type TextStyleKey } from "../typography";
+import { fontFamily, textStyles, type TextStyleKey } from "../typography";
 
 type Tone =
   | "ink"
@@ -50,7 +50,13 @@ export function Text({ variant = "body", tone = "ink", className, style, ...rest
   return (
     <RNText
       className={`${toneClass[tone]} ${className ?? ""}`.trim()}
-      style={[presetStyle, upper ? { textTransform: "uppercase" as const } : null, style]}
+      style={[
+        // Basis zuerst, damit Preset (`hero` setzt `fontFamily.display`) und Aufrufer überschreiben.
+        { fontFamily: fontFamily.sans },
+        presetStyle,
+        upper ? { textTransform: "uppercase" as const } : null,
+        style,
+      ]}
       {...rest}
     />
   );

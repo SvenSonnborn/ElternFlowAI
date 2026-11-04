@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal, Pressable, View } from "react-native";
 
+import { fontFamily } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button } from "@/design-system/ui";
 
@@ -94,7 +95,7 @@ function PickerSheetBody({
                 if (result.pick) onPick(result.pick);
               }}
               style={{
-                fontFamily: "Inter",
+                fontFamily: fontFamily.sans,
                 fontSize: 16,
                 padding: 12,
                 width: "100%",

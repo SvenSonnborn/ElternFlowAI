@@ -1,5 +1,6 @@
 import { Pressable, TextInput, View, type TextInputProps } from "react-native";
 
+import { fontFamily } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Text } from "@/design-system/ui";
 
@@ -85,7 +86,7 @@ export function Field({
         textContentType={textContentType}
         className="flex-1 text-base"
         style={{
-          fontFamily: "Inter",
+          fontFamily: fontFamily.sans,
           fontSize: 14,
           color: editable ? theme.ink : theme.inkSecondary,
           textAlignVertical: multiline ? "top" : "center",

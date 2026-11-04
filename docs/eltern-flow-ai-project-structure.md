@@ -59,6 +59,7 @@ design-system/           Handoff bundle + theming runtime
 ├─ themes.ts             lightTheme · darkTheme · themes (HANDOFF)
 ├─ components.ts         Variant SPECS for Button/Card/Pill/Field/FAB/… (HANDOFF — NOT React components)
 ├─ index.ts              DS barrel (HANDOFF)
+├─ fonts.ts · fonts.web.ts  useAppFonts — nativ No-op (Inter eingebettet über app.json), Web lädt Inter per useFonts
 ├─ themeStore.ts         Zustand store for active theme
 ├─ ThemeProvider.tsx     Injects CSS vars + NativeWind vars from active theme
 └─ ui/                   ← React component implementations (Claude-owned)
