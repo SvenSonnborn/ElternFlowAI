@@ -5,6 +5,7 @@ import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Field } from "@/app-sections/shared";
+import { touchTarget } from "@/design-system";
 import { Button, Text } from "@/design-system/ui";
 import { mapAuthError, useSignIn } from "@/features/auth";
 
@@ -83,9 +84,9 @@ export function LoginScreen() {
           />
         </View>
 
-        <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 12 }}>
+        <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
           <Link href={"/(auth)/reset-password"} asChild>
-            <Pressable hitSlop={10}>
+            <Pressable style={{ minHeight: touchTarget.min, justifyContent: "center" }}>
               <Text variant="caption" tone="primaryStrong">
                 {t("auth.forgot")}
               </Text>
@@ -136,8 +137,15 @@ export function LoginScreen() {
 
         <Pressable
           onPress={() => router.push("/(auth)/register")}
-          style={{ flexDirection: "row", justifyContent: "center", marginTop: 24, gap: 4 }}
-          hitSlop={10}
+          accessibilityRole="button"
+          style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            alignItems: "center",
+            marginTop: 24,
+            gap: 4,
+            minHeight: touchTarget.min,
+          }}
         >
           <Text variant="body" tone="inkSecondary">
             {t("auth.newHere")}

@@ -90,8 +90,13 @@ export function ResetPasswordScreen() {
         ) : null}
         <Pressable
           onPress={() => router.replace("/(auth)/login")}
-          style={{ marginTop: 24, alignSelf: "center" }}
-          hitSlop={10}
+          accessibilityRole="button"
+          style={{
+            marginTop: 24,
+            alignSelf: "center",
+            minHeight: touchTarget.min,
+            justifyContent: "center",
+          }}
         >
           <Text variant="caption" tone="primaryStrong">
             {t("auth.reset.backToLogin")}
