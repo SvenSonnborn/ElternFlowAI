@@ -101,8 +101,9 @@ reviews:
         Settings-Sheet und Onboarding versteckt. (5) Zustände für
         Screenreader über aria-checked/aria-selected/aria-expanded, nicht über
         accessibilityState (kommt auf Web nicht im DOM an, per ESLint
-        verboten); „deaktiviert" über die disabled-Prop des Pressable
-        (ADR-054). (6) Ein TextInput, <input> oder Style, der an Text vorbei
+        verboten); „deaktiviert" über die disabled-Prop des Pressable.
+        Rolle radio/checkbox/switch über SelectionPressable, sonst wählt die
+        Leertaste auf Web nichts (ADR-054). (6) Ein TextInput, <input> oder Style, der an Text vorbei
         rendert, setzt fontFamily.sans selbst — sonst steht er nicht in Inter
         (ADR-054).
 
