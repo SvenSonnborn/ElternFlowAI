@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react-native";
+import { fireEvent, screen, within } from "@testing-library/react-native";
 
 import type { EventWithRelations } from "@/features/calendar/expand";
 
@@ -10,6 +10,7 @@ import { EventDetailScreen } from "./EventDetailScreen";
 
 const mockToggle = jest.fn();
 const mockShowAlert = jest.fn();
+let mockRemindersError = false;
 
 jest.mock("@/app-sections/shared", () => ({
   ...jest.requireActual<typeof import("@/app-sections/shared")>("@/app-sections/shared"),
@@ -21,7 +22,12 @@ jest.mock("@/app-sections/shared", () => ({
 
 jest.mock("@/features/calendar", () => ({
   ...jest.requireActual<typeof import("@/features/calendar")>("@/features/calendar"),
-  useEventReminders: () => ({ data: [], isPending: false, isError: false, refetch: jest.fn() }),
+  useEventReminders: () => ({
+    data: [],
+    isPending: false,
+    isError: mockRemindersError,
+    refetch: jest.fn(),
+  }),
   useToggleReminder: () => ({ mutate: mockToggle, isPending: false }),
 }));
 
@@ -89,6 +95,26 @@ describe("EventDetailScreen: Erinnerungs-Fehler", () => {
     expect(mockShowAlert).toHaveBeenCalledWith({
       title: i18n.t("cal.detail.reminderError"),
       body: i18n.t("cal.error.notAuthenticated"),
+    });
+  });
+});
+
+describe("EventDetailScreen: gesperrte Erinnerung", () => {
+  afterEach(() => {
+    mockRemindersError = false;
+  });
+
+  it("dimmt den Schalter, solange die Zeile gesperrt ist", async () => {
+    mockRemindersError = true;
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(calendarKeys.one("e1"), event);
+    await renderScreen(<EventDetailScreen />, { queryClient });
+
+    const row = screen.getByRole("switch", { name: i18n.t("cal.detail.reminder24h") });
+    expect(row).toBeDisabled();
+    // Ohne Dimmen sähe die gesperrte Zeile bedienbar aus, und ein Tipp täte nichts.
+    expect(within(row).getByRole("switch", { includeHiddenElements: true })).toHaveStyle({
+      opacity: 0.5,
     });
   });
 });
