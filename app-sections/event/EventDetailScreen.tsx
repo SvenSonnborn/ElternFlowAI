@@ -2,12 +2,13 @@ import { format, parseISO } from "date-fns";
 import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, Switch, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   ChildAvatar,
   confirmDestructive,
+  DecorativeSwitch,
   Icon,
   newRequestId,
   showAlert,
@@ -48,7 +49,16 @@ function ReminderRow({
 }) {
   const { theme } = useTheme();
   return (
-    <View className="flex-row items-center justify-between border-b border-line py-3.5">
+    // Die Zeile ist der Schalter (eine Bedienstelle, Name aus dem Text); der
+    // RN-Schalter darin ist nur Anzeige.
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      aria-checked={value}
+      disabled={disabled}
+      onPress={() => onValueChange(!value)}
+      className="flex-row items-center justify-between border-b border-line py-3.5 active:opacity-70"
+    >
       <View className="flex-row items-center gap-2.5">
         <View
           className="h-8 w-8 items-center justify-center rounded-xl"
@@ -58,14 +68,12 @@ function ReminderRow({
         </View>
         <Text variant="listTitle">{label}</Text>
       </View>
-      <Switch
+      <DecorativeSwitch
         value={value}
-        disabled={disabled}
-        onValueChange={onValueChange}
         trackColor={{ false: theme.line, true: theme.primary }}
         thumbColor={theme.card}
       />
-    </View>
+    </Pressable>
   );
 }
 
@@ -401,7 +409,7 @@ export function EventDetailScreen() {
                 accessibilityLabel={t("action.retry")}
                 onPress={() => void reminders.refetch()}
                 className="flex-row items-center justify-between py-3 active:opacity-70"
-                hitSlop={8}
+                style={{ minHeight: touchTarget.min }}
               >
                 <Text variant="caption" tone="danger" className="flex-1">
                   {t("cal.detail.reminderError")}

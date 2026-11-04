@@ -35,6 +35,9 @@ const LABEL_STYLE = {
   letterSpacing: 1.2,
 };
 
+/** Tippfläche einer Pille oder eines Symbols: 44er-Box, die Optik sitzt darin (ADR-041). */
+const TAP_BOX = { minWidth: touchTarget.min, minHeight: touchTarget.min };
+
 function TagEditor({
   label,
   tags,
@@ -69,9 +72,17 @@ function TagEditor({
         {label}
       </Text>
       {tags.length > 0 ? (
-        <View className="mb-2 flex-row flex-wrap gap-1.5">
+        // Zeilen liegen im 44er-Raster (Box je Pille), darum nur horizontaler gap.
+        <View className="mb-2 flex-row flex-wrap gap-x-1.5">
           {tags.map((tag) => (
-            <Pressable key={tag} onPress={() => onRemove(tag)} className="active:opacity-70">
+            <Pressable
+              key={tag}
+              onPress={() => onRemove(tag)}
+              accessibilityRole="button"
+              accessibilityLabel={tag}
+              className="items-center justify-center active:opacity-70"
+              style={TAP_BOX}
+            >
               <Pill
                 label={tag}
                 tone={tone === "success" ? "success" : "ink"}
@@ -108,10 +119,12 @@ function TagEditor({
         />
         <Pressable
           onPress={commit}
-          hitSlop={13}
           accessibilityRole="button"
           accessibilityLabel={placeholder}
-          className="active:opacity-70"
+          className="items-center justify-center active:opacity-70"
+          // Das Plus bleibt 18 groß und an seinem Platz: die Box ragt über den
+          // Innenrand der Zeile (px-3.5 = 14, Box-Rand 13 neben dem Icon).
+          style={{ ...TAP_BOX, marginRight: -13 }}
         >
           <Icon name="plus" size={18} color={theme.primary} />
         </Pressable>
@@ -360,7 +373,7 @@ export function ChildProfileScreen() {
                 </Text>
                 <Icon name="alert-triangle" size={14} color={theme.warning} />
               </View>
-              <View className="flex-row flex-wrap gap-1.5">
+              <View className="flex-row flex-wrap gap-x-1.5">
                 {Array.from(allergies).map((a) => {
                   const allergyLabel = ALLERGY_KEYS.includes(a as (typeof ALLERGY_KEYS)[number])
                     ? t(`onb.s4.allergies.${a}`)
@@ -372,7 +385,8 @@ export function ChildProfileScreen() {
                       accessibilityRole="checkbox"
                       accessibilityLabel={allergyLabel}
                       aria-checked={true}
-                      className="active:opacity-70"
+                      className="items-center justify-center active:opacity-70"
+                      style={TAP_BOX}
                     >
                       <Pill
                         label={allergyLabel}
@@ -389,7 +403,8 @@ export function ChildProfileScreen() {
                     accessibilityRole="checkbox"
                     accessibilityLabel={t(`onb.s4.allergies.${key}`)}
                     aria-checked={false}
-                    className="active:opacity-70"
+                    className="items-center justify-center active:opacity-70"
+                    style={TAP_BOX}
                   >
                     <Pill label={t(`onb.s4.allergies.${key}`)} tone="ink" />
                   </Pressable>

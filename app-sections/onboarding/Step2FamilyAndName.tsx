@@ -4,9 +4,11 @@ import { useTranslation } from "react-i18next";
 import { Pressable, View } from "react-native";
 
 import { Field } from "@/app-sections/shared";
+import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import {
+  AVATAR_COLOR_NAMES,
   AVATAR_COLORS,
   clearPendingInviteToken,
   deriveShort,
@@ -139,24 +141,31 @@ export function Step2FamilyAndName() {
           <View
             accessibilityRole="radiogroup"
             accessibilityLabel={t("onb.s2.color.label")}
-            style={{ flexDirection: "row", gap: 12, marginTop: 8 }}
+            // 44er-Boxen Kante an Kante; die Reihe bricht im 44er-Raster um.
+            style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 4 }}
           >
             {AVATAR_COLORS.map((c) => (
               <Pressable
                 key={c}
                 onPress={() => setColor(c)}
-                hitSlop={4}
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: c,
-                  borderWidth: 3,
-                  borderColor: color === c ? theme.ink : "transparent",
-                }}
                 accessibilityRole="radio"
+                accessibilityLabel={t(AVATAR_COLOR_NAMES[c])}
+                accessibilityHint={t("parent.colorOption")}
                 aria-checked={color === c}
-              />
+                className="items-center justify-center"
+                style={{ width: touchTarget.min, height: touchTarget.min }}
+              >
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: c,
+                    borderWidth: 3,
+                    borderColor: color === c ? theme.ink : "transparent",
+                  }}
+                />
+              </Pressable>
             ))}
           </View>
         </View>
