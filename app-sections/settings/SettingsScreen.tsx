@@ -7,6 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import type { IconName } from "@/app-sections/shared/Icon";
 
 import { ChildAvatar, confirmDestructive, Icon, showAlert } from "@/app-sections/shared";
+import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { useThemeStore } from "@/design-system/themeStore";
 import { Card, Text } from "@/design-system/ui";
@@ -163,8 +164,10 @@ export function SettingsScreen() {
             accessibilityRole="button"
             accessibilityLabel={t("action.done")}
             onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
-            className="px-2 py-1 active:opacity-70"
-            hitSlop={12}
+            className="items-center justify-center px-2 py-1 active:opacity-70"
+            // 44er-Box um den Text; -9 oben und unten lässt sie nur 26 hoch
+            // zählen (Text 18 + py-1), so wächst der Kopf nicht.
+            style={{ minWidth: touchTarget.min, minHeight: touchTarget.min, marginVertical: -9 }}
           >
             <Text variant="bodyEmph" tone="primaryStrong">
               {t("action.done")}

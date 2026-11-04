@@ -5,6 +5,7 @@ import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Field, Icon } from "@/app-sections/shared";
+import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
 import { useResetPassword } from "@/features/auth";
@@ -31,7 +32,21 @@ export function ResetPasswordScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={{ padding: 24 }} keyboardShouldPersistTaps="handled">
-        <Pressable onPress={() => router.back()} style={{ marginBottom: 16 }} hitSlop={10}>
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel={t("action.back")}
+          // 44er-Box um den Pfeil, bündig links. Die Ränder (-9 oben, 7 statt
+          // 16 unten) lassen Pfeil und Titel dort, wo sie ohne Box standen.
+          style={{
+            width: touchTarget.min,
+            height: touchTarget.min,
+            justifyContent: "center",
+            alignItems: "flex-start",
+            marginTop: -9,
+            marginBottom: 7,
+          }}
+        >
           <Icon name="chevron-left" size={24} color={theme.ink} />
         </Pressable>
         <Text variant="h2" tone="ink">
