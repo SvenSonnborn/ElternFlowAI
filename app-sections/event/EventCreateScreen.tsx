@@ -3,7 +3,7 @@ import { de as deLocale, enUS as enLocale } from "date-fns/locale";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, Switch, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
@@ -11,6 +11,7 @@ import {
   Field,
   Icon,
   MemberPicker,
+  DecorativeSwitch,
   newRequestId,
   TypePicker,
   useDiscardGuard,
@@ -380,9 +381,8 @@ export function EventCreateScreen() {
               {t("cal.create.fieldAllDay")}
             </Text>
           </View>
-          <Switch
+          <DecorativeSwitch
             value={allDay}
-            onValueChange={setAllDay}
             trackColor={{ false: theme.line, true: theme.primary }}
             ios_backgroundColor={theme.line}
             style={{ alignSelf: "center" }}

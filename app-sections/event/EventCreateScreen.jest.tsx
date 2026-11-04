@@ -139,3 +139,19 @@ describe("EventCreateScreen: Rückfrage vor dem Verwerfen", () => {
     );
   });
 });
+
+describe("EventCreateScreen: Ganztägig ist eine Bedienstelle", () => {
+  it("die Zeile ist der einzige Schalter und schaltet um", async () => {
+    await renderScreen(<EventCreateScreen />);
+    const name = i18n.t("cal.create.fieldAllDay");
+
+    // Der RN-Schalter in der Zeile ist verborgen und zählt nicht mit.
+    expect(screen.getAllByRole("switch")).toHaveLength(1);
+    const row = screen.getByRole("switch", { name });
+    expect(row).not.toBeChecked();
+
+    await fireEvent.press(row);
+
+    expect(screen.getByRole("switch", { name })).toBeChecked();
+  });
+});

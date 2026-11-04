@@ -80,8 +80,11 @@ describe("EventDetailScreen: Erinnerungs-Fehler", () => {
     queryClient.setQueryData(calendarKeys.one("e1"), event);
     await renderScreen(<EventDetailScreen />, { queryClient });
 
-    // Die Zeile „24 Stunden vorher" steht vor „1 Stunde vorher".
-    await fireEvent(screen.getAllByRole("switch")[0], "valueChange", true);
+    // Die Zeile ist der Schalter; der RN-Schalter darin ist verborgen.
+    const row = screen.getByRole("switch", { name: i18n.t("cal.detail.reminder24h") });
+    expect(row).not.toBeChecked();
+    expect(screen.getAllByRole("switch")).toHaveLength(2);
+    await fireEvent.press(row);
 
     expect(mockShowAlert).toHaveBeenCalledWith({
       title: i18n.t("cal.detail.reminderError"),

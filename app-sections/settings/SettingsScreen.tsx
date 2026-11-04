@@ -1,12 +1,18 @@
 import Constants from "expo-constants";
 import { router, Stack } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Linking, Platform, Pressable, ScrollView, Switch, View } from "react-native";
+import { Linking, Platform, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { IconName } from "@/app-sections/shared/Icon";
 
-import { ChildAvatar, confirmDestructive, Icon, showAlert } from "@/app-sections/shared";
+import {
+  ChildAvatar,
+  confirmDestructive,
+  DecorativeSwitch,
+  Icon,
+  showAlert,
+} from "@/app-sections/shared";
 import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { useThemeStore } from "@/design-system/themeStore";
@@ -34,6 +40,8 @@ interface RowProps {
   disabled?: boolean;
   onPress?: () => void;
   trailing?: React.ReactNode;
+  /** Macht die Zeile zum Schalter (Rolle `switch`); der Schalter in `trailing` ist nur Anzeige. */
+  switchChecked?: boolean;
 }
 
 function Row({
@@ -48,6 +56,7 @@ function Row({
   disabled,
   onPress,
   trailing,
+  switchChecked,
 }: RowProps) {
   const { t } = useTranslation();
   const { theme } = useTheme();
@@ -61,7 +70,9 @@ function Row({
     <Pressable
       onPress={press}
       disabled={soon || disabled}
-      accessibilityRole={press ? "button" : undefined}
+      accessibilityRole={switchChecked !== undefined ? "switch" : press ? "button" : undefined}
+      accessibilityLabel={switchChecked !== undefined ? label : undefined}
+      aria-checked={switchChecked}
       className={`flex-row items-center gap-3 py-3 ${isLast ? "" : "border-b border-line"} ${press ? "active:opacity-70" : ""} ${disabled ? "opacity-50" : ""}`}
     >
       <View className={`h-8 w-8 items-center justify-center rounded-xl ${containerBg}`}>
@@ -206,10 +217,11 @@ export function SettingsScreen() {
           <Row
             icon="moon"
             label={t("set.darkMode")}
+            onPress={toggleTheme}
+            switchChecked={isDark}
             trailing={
-              <Switch
+              <DecorativeSwitch
                 value={isDark}
-                onValueChange={toggleTheme}
                 trackColor={{ false: theme.line, true: theme.primary }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor={theme.line}

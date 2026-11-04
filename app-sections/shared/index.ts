@@ -17,6 +17,7 @@ export {
   type ConflictRow,
   type ShowConflictOptions,
 } from "./conflictStore";
+export { DecorativeSwitch } from "./DecorativeSwitch";
 export { DateTimePickerSheet } from "./DateTimePickerSheet";
 export type { DateTimePickerMode, DateTimePickerSheetProps } from "./DateTimePickerSheet.types";
 export { EventRow, type EventRowProps } from "./EventRow";
