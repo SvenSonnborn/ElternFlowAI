@@ -93,11 +93,18 @@ reviews:
         UI-Strings in JSX. (2) Touch-Targets ≥ 44×44 (Mic-FAB 60, Voice-Overlay-
         Mic 84) — zu kleine interaktive Flächen melden. Die 44 müssen als Zahl
         (Token touchTarget.min) aus der Box des Pressable kommen. Nicht aus
-        hitSlop: das wirkt auf Web nicht und wird nativ am Elternteil
-        beschnitten. Nicht aus rem-Klassen wie h-11: NativeWind rechnet rem
-        nativ mit 14, das ergibt 38,5 pt (ADR-041). (3) Anrede immer Du, nie
-        Sie. (4) Voice-FAB muss auf Dashboard/Kalender/Essen/Aufgaben/Familie
-        erreichbar bleiben; nur in Settings-Sheet und Onboarding versteckt.
+        hitSlop: das wirkt auf Web nicht, wird nativ am Elternteil beschnitten
+        und ist per ESLint verboten. Nicht aus rem-Klassen wie h-11: die hängen
+        an inlineRem in metro.config.js statt am einen Token (ADR-041,
+        ADR-054). (3) Anrede immer Du, nie Sie. (4) Voice-FAB muss auf
+        Dashboard/Kalender/Essen/Aufgaben/Familie erreichbar bleiben; nur in
+        Settings-Sheet und Onboarding versteckt. (5) Zustände für
+        Screenreader über aria-checked/aria-selected/aria-expanded, nicht über
+        accessibilityState (kommt auf Web nicht im DOM an, per ESLint
+        verboten); „deaktiviert" über die disabled-Prop des Pressable
+        (ADR-054). (6) Ein TextInput, <input> oder Style, der an Text vorbei
+        rendert, setzt fontFamily.sans selbst — sonst steht er nicht in Inter
+        (ADR-054).
 
     # --- i18n-Kataloge ---
     - path: "features/i18n/locales/de.json"

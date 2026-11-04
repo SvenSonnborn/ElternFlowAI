@@ -65,9 +65,34 @@ full semantic role set: `bg`, `bgRaised`, `card`, `cardSubtle`, `overlay`, `ink`
 through NativeWind's `vars()` on a wrapper `View`. Tailwind classes (`bg-bg`, `text-ink`,
 `bg-primary-soft`, `border-line`) read those variables, so a theme switch is automatic.
 
+**Maße.** `metro.config.js` setzt `inlineRem: 16`; ohne die Option rechnet NativeWind nativ mit
+14, das Web ohnehin mit 16. Eine rem-Klasse ist damit auf iOS, Android und Web gleich groß. Radien
+(px in `tailwind.config.js`) und Schriftgrößen (px-Tokens über `Text`) hängen nicht daran
+(ADR-054).
+
+**Schrift.** Inter in fünf Schnitten (400–800) aus dem npm-Paket `@expo-google-fonts/inter`, je
+Plattform anders hergeholt:
+
+- iOS und Android: zur Build-Zeit eingebettet über den Config-Plugin von `expo-font` in `app.json`.
+  Wirkt erst nach Prebuild und neuem nativen Build; `useAppFonts()` aus `design-system/fonts.ts` ist
+  dort ein No-op.
+- Web: `useAppFonts()` aus `design-system/fonts.web.ts`, aufgerufen in `RootLayout`, lädt alle
+  Schnitte in einem `useFonts`-Aufruf. Der statische Export schreibt `@font-face` und `preload` ins
+  HTML; niemand wartet auf das Ergebnis, ein Fehlschlag lässt die Ausweichschrift stehen.
+
+Den Schnitt wählt überall `fontFamily: "Inter"` plus `fontWeight` — Android über die XML-Font-Familie
+aus dem Plugin, iOS über den Familiennamen in den Dateien, Web über die `@font-face`-Regeln; Namen je
+Schnitt gibt es nicht. `Text` setzt `fontFamily.sans` als ersten Style-Eintrag, Preset (`hero`) und
+Aufrufer überschreiben ihn. Was an `Text` vorbei rendert, setzt die Familie selbst: das `TextInput`
+in `Field` und im Tag-Feld des Kinderprofils, das `<input>` in `DateTimePickerSheet.web`,
+`tabBarLabelStyle` und `buildCalendarTheme`. Systemoberflächen (nativer Datumswähler,
+`confirmDialog`) bleiben in der Systemschrift.
+
 The tab bar (Dashboard · Kalender · Essen · Aufgaben · Familie) takes its labels from the `nav.*`
 i18n keys and its colors from the semantic theme tokens via `useTheme()`; `DS.components.tabBar`
-is the visual spec it follows, not a value read at runtime.
+is the visual spec it follows, not a value read at runtime. Its height comes from `tabBarSize`:
+the design's 72, taller on devices with a bottom system inset so that every tab stays 44 high
+(ADR-054).
 
 ## Routing
 
