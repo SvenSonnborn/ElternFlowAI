@@ -43,7 +43,7 @@ export interface FieldProps {
  * `TextInput` (bzw. am `Pressable` der `onPress`-Variante); der sichtbare
  * Label-`Text` ist `aria-hidden`, sonst sagen VoiceOver und TalkBack ihn
  * zusätzlich zum Feldnamen an, also doppelt. Weil das Label den Inhalt der
- * Zeile überdeckt, trägt die `onPress`-Variante den Wert als `aria-valuetext`.
+ * Zeile überdeckt, nimmt die `onPress`-Variante den Wert in ihren Namen auf.
  */
 export function Field({
   label,
@@ -122,10 +122,10 @@ export function Field({
       {onPress ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={label}
           // Das Label überdeckt den Text der Zeile; ohne Wert hörte man nur
-          // „Von (Datum)", nie das gewählte Datum.
-          aria-valuetext={value}
+          // „Von (Datum)", nie das gewählte Datum. Der Wert steht im Namen,
+          // weil `aria-valuetext` auf einem Knopf im Web nicht angesagt wird.
+          accessibilityLabel={value ? `${label}, ${value}` : label}
           onPress={onPress}
           className={rowClassName}
           style={rowStyle}

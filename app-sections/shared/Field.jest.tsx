@@ -18,16 +18,14 @@ describe("Field: das Label ist der Name des Eingabefelds", () => {
 
   it("die onPress-Variante bleibt als Knopf mit Namen auffindbar", async () => {
     const onPress = jest.fn();
-    await renderScreen(<Field label="Datum" value="heute" onPress={onPress} />);
+    await renderScreen(<Field label="Datum" value="" onPress={onPress} />);
     await fireEvent.press(screen.getByRole("button", { name: "Datum" }));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
   it("die onPress-Variante sagt den gewählten Wert an", async () => {
     await renderScreen(<Field label="Datum" value="4. Nov. 2026" onPress={() => {}} />);
-    expect(screen.getByRole("button", { name: "Datum" })).toHaveAccessibilityValue({
-      text: "4. Nov. 2026",
-    });
+    expect(screen.getByRole("button", { name: "Datum, 4. Nov. 2026" })).toBeTruthy();
   });
 
   it("das einzeilige Eingabefeld füllt die Zeilenhöhe, damit die ganze Zeile antippbar ist", async () => {
