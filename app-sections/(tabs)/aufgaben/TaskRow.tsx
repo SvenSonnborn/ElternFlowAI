@@ -7,7 +7,7 @@ import { Pressable, View } from "react-native";
 import type { ChildRow } from "@/features/auth";
 import type { TaskWithType } from "@/features/tasks";
 
-import { ChildAvatar, Icon, Pill, showAlert } from "@/app-sections/shared";
+import { ChildAvatar, Icon, Pill, SelectionPressable, showAlert } from "@/app-sections/shared";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Card, Text } from "@/design-system/ui";
 import { mapTaskError, taskTypeColorFor, useToggleTaskDone } from "@/features/tasks";
@@ -57,7 +57,7 @@ export function TaskRow({ task, child, urgency }: TaskRowProps) {
       tint="warning"
       className="flex-row items-center gap-2.5"
     >
-      <Pressable
+      <SelectionPressable
         onPress={handleToggle}
         disabled={toggle.isPending}
         accessibilityRole="checkbox"
@@ -79,7 +79,7 @@ export function TaskRow({ task, child, urgency }: TaskRowProps) {
         >
           {task.is_done ? <Icon name="check" size={13} color="#FFFFFF" /> : null}
         </View>
-      </Pressable>
+      </SelectionPressable>
 
       <Pressable
         onPress={() => router.push({ pathname: "/task/edit/[id]", params: { id: task.id } })}

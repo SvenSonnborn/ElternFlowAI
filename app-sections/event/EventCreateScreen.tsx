@@ -13,6 +13,7 @@ import {
   MemberPicker,
   DecorativeSwitch,
   newRequestId,
+  SelectionPressable,
   TypePicker,
   useDiscardGuard,
   useToast,
@@ -363,7 +364,7 @@ export function EventCreateScreen() {
           </View>
         </View>
 
-        <Pressable
+        <SelectionPressable
           accessibilityRole="switch"
           aria-checked={allDay}
           accessibilityLabel={t("cal.create.fieldAllDay")}
@@ -387,7 +388,7 @@ export function EventCreateScreen() {
             ios_backgroundColor={theme.line}
             style={{ alignSelf: "center" }}
           />
-        </Pressable>
+        </SelectionPressable>
 
         <View
           className="flex-row gap-3"

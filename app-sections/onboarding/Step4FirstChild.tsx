@@ -2,9 +2,9 @@ import { format } from "date-fns";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 
-import { DateTimePickerSheet, Field, Icon } from "@/app-sections/shared";
+import { DateTimePickerSheet, Field, Icon, SelectionPressable } from "@/app-sections/shared";
 import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
@@ -147,7 +147,7 @@ export function Step4FirstChild() {
             }}
           >
             {AVATAR_COLORS.map((c) => (
-              <Pressable
+              <SelectionPressable
                 key={c}
                 onPress={() => setColor(c)}
                 accessibilityRole="radio"
@@ -167,7 +167,7 @@ export function Step4FirstChild() {
                     borderColor: color === c ? theme.ink : "transparent",
                   }}
                 />
-              </Pressable>
+              </SelectionPressable>
             ))}
           </View>
         </View>
@@ -216,7 +216,7 @@ export function Step4FirstChild() {
             {ALLERGY_KEYS.map((a) => {
               const selected = allergies.has(a);
               return (
-                <Pressable
+                <SelectionPressable
                   key={a}
                   onPress={() => toggleAllergy(a)}
                   style={{
@@ -240,7 +240,7 @@ export function Step4FirstChild() {
                   <Text variant="caption" tone={selected ? "primaryStrong" : "inkSecondary"}>
                     {t(`onb.s4.allergies.${a}`)}
                   </Text>
-                </Pressable>
+                </SelectionPressable>
               );
             })}
           </View>

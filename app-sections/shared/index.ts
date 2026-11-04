@@ -35,6 +35,7 @@ export {
 export { Pill, type PillTone } from "./Pill";
 export { recipeA11yLabel } from "./recipeA11y";
 export { SectionHeader } from "./SectionHeader";
+export { SelectionPressable, type SelectionPressableProps } from "./SelectionPressable";
 export { SyncNotice } from "./SyncNotice";
 export { TopBar } from "./TopBar";
 export { Toast } from "./Toast";

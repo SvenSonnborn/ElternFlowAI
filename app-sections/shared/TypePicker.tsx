@@ -1,8 +1,10 @@
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 
 import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Text } from "@/design-system/ui";
+
+import { SelectionPressable } from "./SelectionPressable";
 
 export interface TypePickerItem {
   id: string;
@@ -40,7 +42,7 @@ export function TypePicker({ label, items, selectedId, onSelect, error }: TypePi
         {items.map((item) => {
           const isSelected = item.id === selectedId;
           return (
-            <Pressable
+            <SelectionPressable
               key={item.id}
               accessibilityRole="radio"
               accessibilityLabel={item.label}
@@ -73,7 +75,7 @@ export function TypePicker({ label, items, selectedId, onSelect, error }: TypePi
                   {item.label}
                 </Text>
               </View>
-            </Pressable>
+            </SelectionPressable>
           );
         })}
       </View>

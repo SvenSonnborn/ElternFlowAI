@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, View } from "react-native";
 
-import { DateTimePickerSheet, Field, useToast } from "@/app-sections/shared";
+import { DateTimePickerSheet, Field, SelectionPressable, useToast } from "@/app-sections/shared";
 import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Text } from "@/design-system/ui";
@@ -132,7 +132,7 @@ export function MealScheduleScreen() {
             {SLOTS.map((key) => {
               const selected = key === slot;
               return (
-                <Pressable
+                <SelectionPressable
                   key={key}
                   accessibilityRole="radio"
                   accessibilityLabel={t(`meals.tabs.${key}`)}
@@ -153,7 +153,7 @@ export function MealScheduleScreen() {
                       {t(`meals.tabs.${key}`)}
                     </Text>
                   </View>
-                </Pressable>
+                </SelectionPressable>
               );
             })}
           </View>

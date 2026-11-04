@@ -113,6 +113,12 @@ module.exports = [
           message:
             "hitSlop wirkt auf Web nicht und wird nativ am Elternteil beschnitten — Pressable mit touchTarget.min als Box (ADR-041).",
         },
+        {
+          selector:
+            "JSXOpeningElement[name.name='Pressable'] > JSXAttribute[name.name='accessibilityRole'] > Literal[value=/^(radio|checkbox|switch)$/]",
+          message:
+            "Pressable nimmt auf Web die Leertaste nur bei Rolle button an — für radio/checkbox/switch SelectionPressable aus @/app-sections/shared nehmen (ADR-054).",
+        },
       ],
     },
   },

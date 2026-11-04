@@ -1,10 +1,11 @@
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 
 import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Text } from "@/design-system/ui";
 
 import { ChildAvatar } from "./ChildAvatar";
+import { SelectionPressable } from "./SelectionPressable";
 
 export type MemberKind = "parent" | "child";
 
@@ -61,7 +62,7 @@ export function MemberPicker({
         {options.map((member) => {
           const active = isSelected(member, selected);
           return (
-            <Pressable
+            <SelectionPressable
               key={`${member.kind}-${member.id}`}
               accessibilityRole="radio"
               accessibilityLabel={member.name}
@@ -88,10 +89,10 @@ export function MemberPicker({
               <Text variant="caption" tone="inkSecondary" className="mt-1">
                 {member.name}
               </Text>
-            </Pressable>
+            </SelectionPressable>
           );
         })}
-        <Pressable
+        <SelectionPressable
           accessibilityRole="radio"
           accessibilityLabel={noMemberLabel}
           aria-checked={selected === null}
@@ -121,7 +122,7 @@ export function MemberPicker({
               {noMemberLabel}
             </Text>
           </View>
-        </Pressable>
+        </SelectionPressable>
       </View>
     </View>
   );

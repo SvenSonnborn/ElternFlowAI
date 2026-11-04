@@ -11,6 +11,7 @@ import {
   confirmDestructive,
   DecorativeSwitch,
   Icon,
+  SelectionPressable,
   showAlert,
 } from "@/app-sections/shared";
 import { touchTarget } from "@/design-system";
@@ -67,7 +68,7 @@ function Row({
   const shownValue = soon ? t("auth.soon") : value;
 
   return (
-    <Pressable
+    <SelectionPressable
       onPress={press}
       disabled={soon || disabled}
       accessibilityRole={switchChecked !== undefined ? "switch" : press ? "button" : undefined}
@@ -93,7 +94,7 @@ function Row({
           ) : null}
         </View>
       )}
-    </Pressable>
+    </SelectionPressable>
   );
 }
 
