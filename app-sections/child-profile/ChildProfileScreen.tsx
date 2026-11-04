@@ -14,7 +14,7 @@ import {
   showAlert,
   TopBar,
 } from "@/app-sections/shared";
-import { touchTarget } from "@/design-system";
+import { fontFamily, touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Screen, Text } from "@/design-system/ui";
 import {
@@ -103,7 +103,7 @@ function TagEditor({
           onSubmitEditing={commit}
           returnKeyType="done"
           className="flex-1 text-base"
-          style={{ fontFamily: "Inter", fontSize: 14, color: theme.ink }}
+          style={{ fontFamily: fontFamily.sans, fontSize: 14, color: theme.ink }}
         />
         <Pressable
           onPress={commit}
