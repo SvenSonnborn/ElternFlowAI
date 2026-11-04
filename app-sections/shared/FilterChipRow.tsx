@@ -58,8 +58,9 @@ export function FilterChipRow<T extends string>({
             // `hitSlop` leistet das nicht, weil React Native es an den Grenzen
             // des Elternteils beschneidet und react-native-web es gar nicht
             // kennt. Umbrochene Zeilen liegen im 44-px-Raster, deshalb kein
-            // senkrechter `gap`. Das Maß ist eine Zahl statt `h-11`: NativeWind
-            // rechnet rem nativ mit 14, `h-11` wären dort 38,5 pt.
+            // senkrechter `gap`. Das Maß ist eine Zahl statt `h-11`: eine Quelle
+            // für die 44; eine rem-Klasse hängt an einer Metro-Einstellung, die
+            // niemand neben dem Pressable sieht.
             className="justify-center active:opacity-70"
             style={{ minWidth: touchTarget.min, height: touchTarget.min }}
           >
