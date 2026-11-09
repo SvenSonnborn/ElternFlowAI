@@ -1919,3 +1919,26 @@ Sechs Einträge aus `docs/TODO.md`, die die Roadmap auf zwei Branches verteilt h
 - **Auf Geräten mit Systemrand sind Tab-Leiste und Mic-FAB höher als im Design.** Hingenommen, weil 44 Non-negotiable ist; ohne Systemrand bleibt die Design-Höhe.
 - Nebenbei behoben, je mit Kommentar am Code: Feldbeschriftung über `accessibilityLabel` mit `aria-hidden` am sichtbaren Label, Icon-Glyphen ohne Ansage, Kopfzeilen-Labels über i18n.
 - **Offen**, in [TODO.md](./TODO.md): Kalender-Tageszellen bei 320 pt schmaler als 44 („Boxen überlappen nie" geht vor), die Monatspfeile von `react-native-calendars` ohne Rolle, Tag-Pillen ohne Hinweis aufs Entfernen, dazu die Theming- und Ansage-Funde des Sichtlaufs außerhalb der sechs Punkte.
+
+## ADR-055 — CI: `expo-doctor` als Warnung im `bundle`-Job, `ci.yml` liest den Bun-Cache nur (2026-11-09)
+
+### Status
+
+Accepted. Setzt [Block 9 der Roadmap](./roadmap.md#block-9--ci-und-toolchain-härten) um und überträgt ADR-048 Decision 3 auf `ci.yml`.
+
+### Context
+
+- `expo-doctor` lief nur in `expo-sdk-sync.yml`, also nur bei SDK-Sprüngen. Der Native-Build zeigt, dass die App kompiliert, nicht, dass die Paketversionen der SDK-Vorgabe folgen. Bei der Umsetzung wich `main` bereits davon ab, nachdem eine Lockfile-Wartung `expo` angehoben hatte, und kein Check hatte es gezeigt.
+- `ci.yml` stellte den Bun-Cache mit dem kombinierten `actions/cache` wieder her und speicherte ihn auch. Jeder PR, der `bun.lock` ändert, legte so einen Eintrag an, den kein anderer PR lesen kann.
+
+### Decisions
+
+1. **`expo-doctor` läuft im `bundle`-Job von `native-build.yml`**, nach den beiden nativen Exports, auf den dort schon installierten Abhängigkeiten. Damit läuft er auf jedem PR, auf `main` und im Wochenbuild.
+2. **Ein Befund ist eine Warnung, kein Gate.** Der Step endet immer grün und setzt bei einem Befund eine `::warning::`-Annotation, die im Checks-Tab des PRs steht. Kein Gate, weil `expo-doctor` Expos API und das React Native Directory abfragt, deren Ausfall einen Required Check rot färben würde, und weil jede Lockfile-Wartung, die `expo` anhebt, die Vorgabe verschiebt und jeden folgenden PR rot färben würde, bis jemand nachzieht. Nicht `continue-on-error` allein wie im Sync-Workflow: Dort trägt ein PR-Kommentar das Ergebnis, hier stünde es nur im Log.
+3. **`ci.yml` liest den Bun-Cache nur** (`actions/cache/restore`), mit Pfad und Schlüssel des `bundle`-Jobs, der ihn auf `main` schreibt.
+
+### Consequences
+
+- **Die Warnung hält niemanden auf.** Wer einen Renovate-PR von Hand mergt, sieht sie im Checks-Tab; die Abweichung behebt `bunx expo install --fix`, solange die Lockfile-Wartung SDK-Pakete nicht selbst nachzieht ([TODO.md](./TODO.md)).
+- **`ci.yml` hängt an `native-build.yml`.** Ändert der `bundle`-Job Pfad oder Schlüssel, findet `ci.yml` keinen Cache mehr und installiert kalt: langsamer, nicht falsch. Kommentare an beiden Stellen nennen die Kopplung.
+- **`bunx expo-doctor` ist nicht gepinnt**, wie im Sync-Workflow. Eine neue Version kann neue Prüfungen und damit neue Warnungen mitbringen.

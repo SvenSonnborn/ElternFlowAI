@@ -121,16 +121,19 @@ Einschätzung („ein Großteil davon können wir jetzt schon umsetzen") trifft 
 Der große Rest teilt sich in Anbieter-Blockaden (Sprachassistent, gustar.io, Notifications, Stripe)
 und Designer-Punkte, die zwar nicht _von uns_ erledigt werden, aber in den Blöcken mitlaufen.
 
-### Die nächsten Branches (Stand 2026-11-04)
+### Die nächsten Branches (Stand 2026-11-09)
 
 Erledigt sind `fix/stille-fehler` ([ADR-049](./decision-log.md)), der Kalender-Cache aus
 [8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-051](./decision-log.md)), der Test
 für `useFamilyRealtime`, ohne `setAuth`-Retry ([ADR-052](./decision-log.md)), das DB-Aufräumen
 mit pg_cron für Einladungen, `anon`-Rechten und Einladungslink nach Kontostand
 ([ADR-053](./decision-log.md)) und a11y nativ samt [4.1](#41-inlinerem-entscheiden--erledigt)
-`inlineRem` und Inter ([ADR-054](./decision-log.md)).
+`inlineRem` und Inter ([ADR-054](./decision-log.md)) und [Block 9](#block-9--ci-und-toolchain-härten)
+mit `expo-doctor` und dem Bun-Cache in `ci.yml` ([ADR-055](./decision-log.md)).
 
-1. Block 9 (`expo-doctor`, `ci.yml`-Cache nur lesen)
+Eine nächste Reihenfolge steht noch nicht fest; offen sind
+[8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) und
+[Block 10](#block-10--große-migrationen).
 
 ### Schlusssteine — was am meisten entsperrt
 
@@ -957,12 +960,9 @@ Alle aus `TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-sco
 
 - **Actions auf Commit-SHA pinnen** — **erledigt über Renovate** ([ADR-045](./decision-log.md)):
   `config:best-practices` öffnet den Pin-PR und hält die Digests danach aktuell.
-- **`expo-doctor`-Step im `bundle`-Job** — der Vorschlag ist seit ADR-016 billiger geworden: statt
-  eines eigenen Workflows genügt ein `bunx expo-doctor`-Step auf bereits installierten Dependencies
-  (kein Gate, `continue-on-error: true`, wie im Sync-Workflow). Was der Native-Build **nicht**
-  abdeckt und nur `expo-doctor` sieht: Paketversionen abseits der SDK-Vorgabe, doppelte/inkompatible
-  Deps, ungültige `app.json`-Felder. Ein Bump kann grün kompilieren und trotzdem von der
-  SDK-Vorgabe abweichen — siehe Block 0.2.
+- **`expo-doctor`-Step im `bundle`-Job** — **erledigt** ([ADR-055](./decision-log.md)): als Warnung
+  im Checks-Tab, nicht als Gate.
+- **`ci.yml` liest den Bun-Cache nur** — **erledigt** ([ADR-055](./decision-log.md)).
 - ~~`platformAutomerge: true` testen~~ und ~~Custom-Manager-Regex gegenprüfen~~ — **entfallen**:
   Renovate merged nicht mehr selbst, und der Regex-Manager ist entfernt
   ([ADR-045](./decision-log.md)).
