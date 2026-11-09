@@ -45,8 +45,12 @@ jobs:
         with:
           bun-version: 1.4.4
 
+      # Nur lesen: Den Cache schreibt allein der `bundle`-Job in
+      # native-build.yml, und nur auf `main`. Ein PR-Cache wäre für andere PRs
+      # unsichtbar (ADR-048). `path` und `key` müssen dort gleich bleiben, sonst
+      # findet dieser Step nichts.
       - name: Cache Bun dependencies
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('**/bun.lock') }}

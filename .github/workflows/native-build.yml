@@ -106,9 +106,20 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bunx expo export --platform android --output-dir dist-android
 
+      # Was ein grüner Build nicht zeigt, sieht nur expo-doctor: Paketversionen
+      # abseits der SDK-Vorgabe, doppelte Deps, ungültige app.json-Felder.
+      # Kein Gate, weil er Expos API und das React Native Directory abfragt und
+      # weil jede Lockfile-Wartung, die `expo` anhebt, die Vorgabe verschiebt.
+      # Ein Befund wird stattdessen zur Warnung im Checks-Tab des PRs, damit ihn
+      # niemand erst im Log suchen muss.
+      - name: expo-doctor
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bunx expo-doctor || echo "::warning title=expo-doctor::expo-doctor meldet Befunde, Details im Log des Steps expo-doctor im Job Metro bundle."
+
       # Kein `always()`: Das implizite `success()` verhindert, dass ein roter
       # Lauf einen Cache schreibt. `path` muss dem Restore-Step entsprechen,
-      # sonst ist der gespeicherte Eintrag für ihn unsichtbar.
+      # sonst ist der gespeicherte Eintrag für ihn unsichtbar; ci.yml liest
+      # denselben Eintrag.
       - name: Save Bun cache (main only)
         if: github.ref == 'refs/heads/main' && steps.bun-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
