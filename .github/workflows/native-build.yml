@@ -61,7 +61,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup toolchain (mise)
-        uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5
         with:
           # mise selbst gepinnt, nicht nur die Tools darin. Ohne `version`
           # fragt die Action nach „latest" — und mise' Versions-Endpunkt kann
@@ -74,7 +74,7 @@ jobs:
           # node, bun und java ohnehin exakt festschreibt. Beim Anheben
           # prüfen, dass das Release wirklich existiert:
           # https://github.com/jdx/mise/releases
-          version: 2026.10.25
+          version: 2026.11.5
           # Schreibt den mise-Cache nur auf main (siehe Cache-Kommentar oben).
           cache_save: ${{ github.ref == 'refs/heads/main' }}
 
@@ -147,7 +147,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup toolchain (mise)
-        uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5
         with:
           # mise selbst gepinnt, nicht nur die Tools darin. Ohne `version`
           # fragt die Action nach „latest" — und mise' Versions-Endpunkt kann
@@ -160,7 +160,7 @@ jobs:
           # node, bun und java ohnehin exakt festschreibt. Beim Anheben
           # prüfen, dass das Release wirklich existiert:
           # https://github.com/jdx/mise/releases
-          version: 2026.10.25
+          version: 2026.11.5
           # Schreibt den mise-Cache nur auf main (siehe Cache-Kommentar oben).
           cache_save: ${{ github.ref == 'refs/heads/main' }}
 
@@ -334,7 +334,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup toolchain (mise)
-        uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5
         with:
           # mise selbst gepinnt, nicht nur die Tools darin. Ohne `version`
           # fragt die Action nach „latest" — und mise' Versions-Endpunkt kann
@@ -347,7 +347,7 @@ jobs:
           # node, bun und java ohnehin exakt festschreibt. Beim Anheben
           # prüfen, dass das Release wirklich existiert:
           # https://github.com/jdx/mise/releases
-          version: 2026.10.25
+          version: 2026.11.5
           # Schreibt den mise-Cache nur auf main (siehe Cache-Kommentar oben).
           cache_save: ${{ github.ref == 'refs/heads/main' }}
 

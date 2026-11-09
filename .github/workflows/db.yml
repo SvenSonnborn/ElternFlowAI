@@ -41,12 +41,12 @@ jobs:
       # lädt zwar `.env.local` per `[env] _.file`, mise überspringt die Datei
       # aber still, wenn sie fehlt — in CI gibt es sie nicht.
       - name: Setup toolchain (mise)
-        uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5
         with:
           # mise selbst gepinnt, siehe native-build.yml: ohne `version` fragt die
           # Action nach „latest", und ein gemeldetes Release kann noch gar nicht
           # existieren (2026-09-08, 404 nach 15 Sekunden).
-          version: 2026.10.25
+          version: 2026.11.5
 
       # Versionsdrift der CLI sieht sonst wie ein Projektfehler aus (andere
       # Migrationsreihenfolge, andere Lint-Ausgabe). Hart prüfen statt vermuten,
