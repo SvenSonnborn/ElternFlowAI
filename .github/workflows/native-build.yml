@@ -111,10 +111,12 @@ jobs:
       # Kein Gate, weil er Expos API und das React Native Directory abfragt und
       # weil jede Lockfile-Wartung, die `expo` anhebt, die Vorgabe verschiebt.
       # Ein Befund wird stattdessen zur Warnung im Checks-Tab des PRs, damit ihn
-      # niemand erst im Log suchen muss.
+      # niemand erst im Log suchen muss. `timeout` beendet einen hängenden Abruf,
+      # bevor der Required Check ins Joblimit läuft, und führt in dieselbe
+      # Warnung.
       - name: expo-doctor
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: bunx expo-doctor || echo "::warning title=expo-doctor::expo-doctor meldet Befunde, Details im Log des Steps expo-doctor im Job Metro bundle."
+        run: timeout 5m bunx expo-doctor || echo "::warning title=expo-doctor::expo-doctor meldet Befunde oder lief ins Zeitlimit, Details im Log des Steps expo-doctor im Job Metro bundle."
 
       # Kein `always()`: Das implizite `success()` verhindert, dass ein roter
       # Lauf einen Cache schreibt. `path` muss dem Restore-Step entsprechen,

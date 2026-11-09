@@ -1934,7 +1934,7 @@ Accepted. Setzt [Block 9 der Roadmap](./roadmap.md#block-9--ci-und-toolchain-hä
 ### Decisions
 
 1. **`expo-doctor` läuft im `bundle`-Job von `native-build.yml`**, nach den beiden nativen Exports, auf den dort schon installierten Abhängigkeiten. Damit läuft er auf jedem PR, auf `main` und im Wochenbuild.
-2. **Ein Befund ist eine Warnung, kein Gate.** Der Step endet immer grün und setzt bei einem Befund eine `::warning::`-Annotation, die im Checks-Tab des PRs steht. Kein Gate, weil `expo-doctor` Expos API und das React Native Directory abfragt, deren Ausfall einen Required Check rot färben würde, und weil jede Lockfile-Wartung, die `expo` anhebt, die Vorgabe verschiebt und jeden folgenden PR rot färben würde, bis jemand nachzieht. Nicht `continue-on-error` allein wie im Sync-Workflow: Dort trägt ein PR-Kommentar das Ergebnis, hier stünde es nur im Log.
+2. **Ein Befund ist eine Warnung, kein Gate.** Der Step endet immer grün und setzt bei einem Befund eine `::warning::`-Annotation, die im Checks-Tab des PRs steht. Ein Zeitlimit von fünf Minuten im Step beendet einen hängenden Abruf, bevor der Job ins Joblimit läuft, und führt in dieselbe Warnung. Kein Gate, weil `expo-doctor` Expos API und das React Native Directory abfragt, deren Ausfall einen Required Check rot färben würde, und weil jede Lockfile-Wartung, die `expo` anhebt, die Vorgabe verschiebt und jeden folgenden PR rot färben würde, bis jemand nachzieht. Nicht `continue-on-error` allein wie im Sync-Workflow: Dort trägt ein PR-Kommentar das Ergebnis, hier stünde es nur im Log.
 3. **`ci.yml` liest den Bun-Cache nur** (`actions/cache/restore`), mit Pfad und Schlüssel des `bundle`-Jobs, der ihn auf `main` schreibt.
 
 ### Consequences
