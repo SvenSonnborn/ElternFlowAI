@@ -9,7 +9,9 @@
 #           untested (docs/TODO.md). 17 is both React Native's canonical JDK and
 #           Gradle 9's own floor. Bump to 21 if a future SDK's Android build
 #           needs it; Renovate is deliberately disabled for this pin (ADR-013).
-# node 24 — current LTS; the Expo/Metro-supported track.
+# node 26 — current LTS. Renovate bumps it together with `node-version:` in
+#           renovate-validate.yml; a major bump waits until Renovate itself
+#           supports it (comment there).
 # bun — same version as `bun-version:` in the workflows and `constraints.bun` in
 #       .github/renovate.json5, so local == CI == the Bun that writes Renovate's
 #       lockfile updates. Renovate bumps all of them in one PR ("bun toolchain").

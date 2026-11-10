@@ -38,7 +38,7 @@ env:
 # them in parallel makes the PR wait max(bundle, android, ios) instead of the
 # sum. iOS dominates either way.
 #
-# Toolchain comes from mise.toml via mise-action (java 17 · node 24 · bun) —
+# Toolchain comes from mise.toml via mise-action (java · node · bun) —
 # NOT from setup-bun as in ci.yml. The native builds are exactly where the pins
 # in mise.toml are load-bearing (see ADR-016), so they read the same file the
 # developer's shell does rather than a second copy in YAML.
