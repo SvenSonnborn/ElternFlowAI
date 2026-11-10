@@ -28,12 +28,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # Renovate 44 deklariert "engines": { "node": "^24.11.0" }. npm behandelt
-      # eine verletzte engines-Anforderung nur als Warnung (EBADENGINE), der
-      # Install schlägt also nicht fehl — Renovate scheitert stattdessen erst
-      # zur Laufzeit mit einem Fehler, der wie ein Config-Problem aussieht statt
-      # wie ein Node-Problem. mise.toml pinnt Node 24 lokal; dieser Schritt
-      # spiegelt das für den Runner.
+      # Renovate nennt in "engines.node" die Node-Majors, die es unterstützt.
+      # npm behandelt eine verletzte engines-Anforderung nur als Warnung
+      # (EBADENGINE), der Install schlägt also nicht fehl — Renovate scheitert
+      # stattdessen erst zur Laufzeit mit einem Fehler, der wie ein
+      # Config-Problem aussieht statt wie ein Node-Problem. Dieser Schritt
+      # spiegelt den Node-Pin aus mise.toml für den Runner, und Renovate hebt
+      # beide im selben PR an. Ein Node-Major-PR wartet deshalb, bis
+      # `npm view renovate engines` den neuen Major erlaubt.
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
