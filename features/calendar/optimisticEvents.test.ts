@@ -444,6 +444,78 @@ describe("visibleOccurrences mit dem echten expandEvents", () => {
   });
 });
 
+describe("Serie durch das echte expandEvents und den Löschfilter", () => {
+  // Vier wöchentliche Occurrences, 19:00 Europe/Berlin: Schlüssel 01., 08., 15., 22.10.
+  const seriesRow = (partial: Partial<EventWithRelations> = {}) =>
+    row({
+      start_at: "2026-10-01T17:00:00.000Z",
+      end_at: "2026-10-01T18:30:00.000Z",
+      rrule_count: 4,
+      ...partial,
+    });
+  const keysAfter = (pending: PendingEventDelete[], r = seriesRow()) =>
+    show({ dataUpdatedAt: 0, rows: [r] }, [], pending).map((o) => o.occurrenceKey);
+  const all4 = ["2026-10-01", "2026-10-08", "2026-10-15", "2026-10-22"];
+
+  test("eine Serie ohne Löschung zeigt alle Occurrences mit Regel-Schlüssel", () => {
+    const out = show({ dataUpdatedAt: 0, rows: [seriesRow()] }, [], []);
+    expect(out.map((o) => o.occurrenceKey)).toEqual(all4);
+    expect(out[0]?.type.labelDe).toBe("family");
+  });
+
+  test("`this` blendet genau diese Occurrence aus", () => {
+    expect(keysAfter([{ eventId: "e9", occurrenceKey: "2026-10-08", scope: "this" }])).toEqual([
+      "2026-10-01",
+      "2026-10-15",
+      "2026-10-22",
+    ]);
+  });
+
+  test("`forward` blendet ab dieser Occurrence aus", () => {
+    expect(keysAfter([{ eventId: "e9", occurrenceKey: "2026-10-08", scope: "forward" }])).toEqual([
+      "2026-10-01",
+    ]);
+  });
+
+  test("`all` blendet die ganze Serie aus", () => {
+    expect(keysAfter([{ eventId: "e9", occurrenceKey: "2026-10-15", scope: "all" }])).toEqual([]);
+  });
+
+  test("die Löschung eines anderen Termins lässt die Serie stehen", () => {
+    expect(keysAfter([{ eventId: "anderer", occurrenceKey: "2026-10-15", scope: "all" }])).toEqual(
+      all4,
+    );
+  });
+
+  test("`forward` schont eine per Exception hinter die Grenze verschobene Occurrence (ADR-034)", () => {
+    // Die Occurrence mit Schlüssel 08.10. liegt als Anzeige auf dem 17.10. Gegen
+    // das Anzeigedatum verglichen (17.10. >= 15.10.), verschwände sie zu Unrecht.
+    const moved = seriesRow({
+      event_exceptions: [
+        {
+          id: "x1",
+          event_id: "e9",
+          occurrence_date: "2026-10-08",
+          action: "modified",
+          override: {
+            start_at: "2026-10-17T17:00:00.000Z",
+            end_at: "2026-10-17T18:30:00.000Z",
+          },
+          created_at: "2026-09-01T00:00:00.000Z",
+          updated_at: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const out = show(
+      { dataUpdatedAt: 0, rows: [moved] },
+      [],
+      [{ eventId: "e9", occurrenceKey: "2026-10-15", scope: "forward" }],
+    );
+    expect(out.map((o) => o.occurrenceKey)).toEqual(["2026-10-01", "2026-10-08"]);
+    expect(out[1]?.startAt.toISOString()).toBe("2026-10-17T17:00:00.000Z");
+  });
+});
+
 describe("Reihenfolge der beiden Overlays", () => {
   test("eine zugleich bearbeitete und gelöschte Occurrence ist weg (scope: all)", () => {
     // Ein Update kann eine bereits gefilterte Occurrence nicht zurückbringen,
