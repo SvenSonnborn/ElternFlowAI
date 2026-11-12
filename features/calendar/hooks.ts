@@ -47,9 +47,8 @@ interface UseFamilyEventsResult {
  * dessen Cache, und eine Uhrzeit-Änderung im Formular erzeugt keinen neuen Key.
  * Nur wer eine Monatsgrenze überquert, löst einen Fetch aus.
  *
- * Keine Obergrenze für die Spanne: `fetchEventsInRange` lädt bei einem späteren
- * Ende nur die Termine bis dorthin zusätzlich, und die Expansion wächst linear
- * mit dem Fenster. Ein Fenster über mehrere Monate ist eine weitere Range-Query
+ * Keine Obergrenze für die Spanne: Ein späteres Ende lädt nur die Termine bis
+ * dorthin dazu, und die Expansion wächst linear mit dem Fenster. Ein Fenster über mehrere Monate ist eine weitere Range-Query
  * unter `calendarKeys.eventsRoot` und damit eine eigene Ansicht im Sinne von
  * [ADR-051](../../docs/decision-log.md); Realtime, Mutationen und
  * `visibleOccurrences` greifen ohne Sonderfall.
