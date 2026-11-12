@@ -121,7 +121,7 @@ Einschätzung („ein Großteil davon können wir jetzt schon umsetzen") trifft 
 Der große Rest teilt sich in Anbieter-Blockaden (Sprachassistent, gustar.io, Notifications, Stripe)
 und Designer-Punkte, die zwar nicht _von uns_ erledigt werden, aber in den Blöcken mitlaufen.
 
-### Die nächsten Branches (Stand 2026-11-09)
+### Die nächsten Branches (Stand 2026-11-12)
 
 Erledigt sind `fix/stille-fehler` ([ADR-049](./decision-log.md)), der Kalender-Cache aus
 [8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-051](./decision-log.md)), der Test
