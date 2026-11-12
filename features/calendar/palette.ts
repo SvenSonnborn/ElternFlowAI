@@ -1,4 +1,4 @@
-import { t as i18nT } from "i18next";
+import i18next, { t as i18nT } from "i18next";
 
 import type { IconName } from "@/app-sections/shared";
 import type { Theme } from "@/design-system/themes";
@@ -60,8 +60,14 @@ const SLUG_LABEL_ALIAS: Record<string, string> = {
  * Resolves user-visible DE/EN labels for an event_types slug via the i18n
  * catalogs (`cal.legend.<slug>`). Falls back to the slug itself when no key
  * matches, preserving the previous "{ de: slug, en: slug }" default.
+ *
+ * Vor `i18n.init()` liefert i18next 26 für `t()` und `getFixedT()` `""` und
+ * ignoriert `defaultValue` (`isInitialized` ist dort `undefined`, nicht
+ * `false`). Der Guard gibt in dem Fall den Slug selbst zurück, nicht den Alias
+ * (ADR-056).
  */
 export function typeLabelsForSlug(slug: string): { de: string; en: string } {
+  if (!i18next.isInitialized) return { de: slug, en: slug };
   const aliased = SLUG_LABEL_ALIAS[slug] ?? slug;
   return {
     de: i18nT(`cal.legend.${aliased}`, { lng: "de", defaultValue: slug }),
