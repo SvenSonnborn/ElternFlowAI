@@ -80,6 +80,7 @@
     "eslint-plugin-i18next": "6.1.5",
     "eslint-plugin-perfectionist": "5.13.0",
     "eslint-plugin-unused-imports": "4.4.1",
+    "expo-mcp": "~0.2.1",
     "jest": "~30.5.2",
     "jest-expo": "~58.0.12",
     "lint-staged": "17.6.0",
