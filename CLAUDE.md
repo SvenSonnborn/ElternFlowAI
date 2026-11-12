@@ -98,7 +98,7 @@ Prüfen heißt hier: ein Befehl aus [Commands](#commands) mit Exit-Code, nicht A
 
 3. **All UI strings live in i18n catalogs.** Use the keys in `docs/COPY.md` — `nav.*`, `dash.*`, `voice.*`, `auth.*`, `onb.*`, `cal.*`, `meals.*`, `hw.*`, `child.*`, `set.*`, `sync.*`. German in `de.json` is the canonical copy; English mirrors.
 
-   `sample.*` is the one exception: QA fixture copy, deliberately absent from `docs/COPY.md`. Fixtures read it through an injected `Translate` ([features/shared/translate.ts](features/shared/translate.ts)), never through i18next's module-level `t` — that returns `undefined` until `i18n.init()` has run ([ADR-020](docs/decision-log.md)).
+   `sample.*` is the one exception: QA fixture copy, deliberately absent from `docs/COPY.md`. Fixtures read it through an injected `Translate` ([features/shared/translate.ts](features/shared/translate.ts)), never through i18next's module-level `t` — that returns an empty string until `i18n.init()` has run ([ADR-020](docs/decision-log.md)).
 
 4. **Touch targets ≥ 44×44.** Mic FAB is 60. Voice overlay mic is 84. Tab bar shows exactly 5 tabs.
 

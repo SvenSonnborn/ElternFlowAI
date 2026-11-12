@@ -129,10 +129,10 @@ für `useFamilyRealtime`, ohne `setAuth`-Retry ([ADR-052](./decision-log.md)), d
 mit pg_cron für Einladungen, `anon`-Rechten und Einladungslink nach Kontostand
 ([ADR-053](./decision-log.md)) und a11y nativ samt [4.1](#41-inlinerem-entscheiden--erledigt)
 `inlineRem` und Inter ([ADR-054](./decision-log.md)) und [Block 9](#block-9--ci-und-toolchain-härten)
-mit `expo-doctor` und dem Bun-Cache in `ci.yml` ([ADR-055](./decision-log.md)).
+mit `expo-doctor` und dem Bun-Cache in `ci.yml` ([ADR-055](./decision-log.md)) und der Rest von
+[8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-056](./decision-log.md)).
 
-Eine nächste Reihenfolge steht noch nicht fest; offen sind
-[8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) und
+Eine nächste Reihenfolge steht noch nicht fest; offen bleibt
 [Block 10](#block-10--große-migrationen).
 
 ### Schlusssteine — was am meisten entsperrt
@@ -913,30 +913,19 @@ Importpfad und den Barrel — deshalb eine eigene, sonst leere Änderung, damit 
 
 ### 8.3 Kleine Korrekturen mit je eigenem Grund — **S–M**
 
+> **Stand 2026-11-12: erledigt** ([ADR-051](./decision-log.md), [ADR-053](./decision-log.md),
+> [ADR-054](./decision-log.md), [ADR-056](./decision-log.md)).
+
 - ~~„Die Mutations-`onSettled`-Blöcke invalidieren weiterhin `calendarKeys.all`"~~ und
   ~~„Doppelte Anzeige, solange zwei Range-Queries aktiv sind"~~ — **erledigt** mit dem
   Kalender-Cache, zusammen mit der Overlay-Hälfte von
   [#111](https://github.com/SvenSonnborn/ElternFlowAI/issues/111) ([ADR-051](./decision-log.md)).
-- **„Kein Kompositions-Test für die Kalender-Filterkette"** ([Undo-Delete](./TODO.md#undo-delete-siehe-adr-026))
-  — ursprünglich zwei Einträge, einer davon erledigt: Die Divergenz zwischen Filter und Server (der
-  Filter verglich das aufgelöste Anzeigedatum, der Server rechnete auf Regel-Daten) ist mit
-  [ADR-034](./decision-log.md) weg — `hidesOccurrence` und `patchesOccurrence` vergleichen jetzt beide
-  `occurrenceKey`. Der verbliebene Eintrag bleibt trotzdem sinnvoll, nur mit anderer Begründung: `TODO.md`
-  sagt ausdrücklich **„Braucht keine neue Infrastruktur"** — eine Event-Zeile durch `expandEvents`
-  schicken und das Ergebnis filtern, also genau die Kette aus `useFamilyEvents`, finge einen
-  Feldnamen-Mismatch oder eine vertauschte Filter-/Expand-Reihenfolge ab, für die die heutigen, gegen
-  handgebaute Occurrence-Objekte laufenden Tests blind sind. **Nach Block 1.3 einplanen**, weil sich
-  das Override-Modell dort ändert.
-- **„`typeLabelsForSlug` liefert `undefined`, solange i18next nicht initialisiert ist"**
-  ([Weitere](./TODO.md#weitere-out-of-scope-items)) · [palette.ts](../features/calendar/palette.ts)
-  — In der App unauffällig, in einem `bun test` ohne i18n-Setup nicht. Die Lösung ist ein
-  `getFixedT`-Paar oder ein Init-Guard, **nicht** Dependency-Injection: die Funktion muss DE **und**
-  EN gleichzeitig liefern, was ein einsprachiges `t` nicht kann. Wird mit Block 5 dringlicher.
-- **„Kollisionsprüfung reicht nur so weit wie das geladene Monatsfenster"**
-  ([Calendar](./TODO.md#calendar-v1--siehe-adr-008)) — `conflicts` arbeitet auf
-  `useFamilyEvents(startAt)`, also dem Monat um den Starttag ±7 Tage; eine längere Terminspanne wird
-  nur im geladenen Ausschnitt geprüft. Sauber ist ein am Formular-Range ausgerichtetes Query-Fenster
-  — eine Änderung an der Query-Ebene.
+- **„Kein Kompositions-Test für die Kalender-Filterkette"**, **„`typeLabelsForSlug` liefert
+  `undefined`, solange i18next nicht initialisiert ist"** und **„Kollisionsprüfung reicht nur so
+  weit wie das geladene Monatsfenster"** ✅ — erledigt mit [ADR-056](./decision-log.md). Der
+  Kompositions-Test schickt eine Serie durch `expandEvents` und den Löschfilter; die Kollisionsprüfung
+  lädt jetzt bis zum Monat des Terminendes. Offen bleibt die Prüfung der Folgetermine einer neuen
+  Serie ([TODO.md](./TODO.md)).
 - **„Invite-Link von bereits-Mitglied geöffnet"** ([Auth](./TODO.md#auth--onboarding)) ✅ —
   erledigt mit [ADR-053](./decision-log.md).
 - **„Abgelaufene Einladungen werden nie aufgeräumt"** ([Familie](./TODO.md#familie--child-profile-live-daten-v1))
@@ -947,7 +936,7 @@ Importpfad und den Barrel — deshalb eine eigene, sonst leere Änderung, damit 
   [ADR-054](./decision-log.md).
 
 **Definition of done Block 8:** `architecture.md` und die Struktur-Datei beschreiben das Repo von
-heute · `familyMutations.ts` heißt so · der Kompositions-Test läuft.
+heute · `familyMutations.ts` heißt so · der Kompositions-Test läuft ✅ (alle drei erledigt).
 
 ---
 

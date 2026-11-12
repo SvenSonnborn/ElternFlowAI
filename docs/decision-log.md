@@ -1942,3 +1942,28 @@ Accepted. Setzt [Block 9 der Roadmap](./roadmap.md#block-9--ci-und-toolchain-hä
 - **Die Warnung hält niemanden auf.** Wer einen Renovate-PR von Hand mergt, sieht sie im Checks-Tab; die Abweichung behebt `bunx expo install --fix`, solange die Lockfile-Wartung SDK-Pakete nicht selbst nachzieht ([TODO.md](./TODO.md)).
 - **`ci.yml` hängt an `native-build.yml`.** Ändert der `bundle`-Job Pfad oder Schlüssel, findet `ci.yml` keinen Cache mehr und installiert kalt: langsamer, nicht falsch. Kommentare an beiden Stellen nennen die Kopplung.
 - **`bunx expo-doctor` ist nicht gepinnt**, wie im Sync-Workflow. Eine neue Version kann neue Prüfungen und damit neue Warnungen mitbringen.
+
+## ADR-056 — Kalender-Korrekturen: Init-Guard in `typeLabelsForSlug`, Ladefenster der Kollisionsprüfung bis zum Monat des Endes (2026-11-12)
+
+### Status
+
+Accepted. Schließt [8.3 der Roadmap](./roadmap.md#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ab. Spec: [2026-11-12-kalender-korrekturen-design.md](./superpowers/specs/2026-11-12-kalender-korrekturen-design.md).
+
+### Context
+
+- `typeLabelsForSlug` fragt i18next ab. Vor `init()` liefert i18next 26 aus `t` und `getFixedT` einen leeren String und ignoriert den `defaultValue`. Unter `bun test` initialisiert niemand das globale i18next, also bekam jede Zeile ohne `label`-Objekt eine leere Bezeichnung, ohne dass ein Test sie las.
+- `EventCreateScreen` prüfte Kollisionen auf `useFamilyEvents(startAt)`, dem Monat des Starts ±7 Tage. Ein Termin, der darüber hinausreicht, wurde nur im geladenen Ausschnitt geprüft.
+- Der Kompositions-Test der Filterkette fehlte für Serien und die Scopes `forward` und `all`.
+
+### Decisions
+
+1. **`typeLabelsForSlug` hat einen Init-Guard.** Ist i18next nicht initialisiert, liefert die Funktion `{ de: slug, en: slug }`, den Wert, den der `defaultValue` bei fehlendem Key liefert. Kein `getFixedT`-Paar: Auch das fixierte `t` liest vor der Initialisierung nichts, es ersetzte nur die zwei `lng`-Optionen. Der Guard setzt an der Ursache an und ändert keinen Aufrufer. Er prüft auf „nicht wahr“, weil `isInitialized` vor `init()` `undefined` ist, nicht `false`.
+2. **`useFamilyEvents(firstMonth, lastMonth = firstMonth)`** lädt von `startOfMonth(firstMonth)` − 7 Tage bis `endOfMonth(lastMonth)` + 7 Tage. `EventCreateScreen` übergibt Start und das spätere von Start und Ende, damit sich das Fenster bei ungültiger Eingabe nicht umkehrt. Monatsgrenzen statt der genauen Formular-Spanne, weil ein Termin im Monat seines Starts (der Normalfall) denselben Query-Key wie Kalender und Dashboard behält, also ein Cache-Treffer ohne Fetch bleibt; eine Spanne auf die Minute wäre bei jeder Uhrzeit-Änderung ein neuer Key. Kein eigener Hook, weil die Prüfung dieselbe Kette (Expansion, Overlay, Löschfilter, Ansichtsregel aus ADR-051) braucht und ein zweiter Hook sie kopieren müsste. Keine Obergrenze: `expandEvents` wächst linear mit dem Fenster, und mehrjährige Spannen legt niemand absichtlich an.
+3. **Der Kompositions-Test** schickt eine wöchentliche Serie durch das echte `expandEvents` und `visibleOccurrences`, mit offenen Löschungen in allen drei Scopes und einer Exception, die eine Occurrence über die `forward`-Grenze verschiebt (der Fall aus [ADR-034](#adr-034)). Er liegt neben der bestehenden Pipeline-Fixture in `optimisticEvents.test.ts`.
+
+### Consequences
+
+- **Die Warnung fehlt kurz beim Monatswechsel.** Wechselt das Formular in einen Monat, dessen Fenster noch nicht im Cache liegt, erscheint die Kollisionswarnung erst nach dem Laden. Hingenommen für einen Hinweis; `placeholderData` ginge für Kalender und Dashboard mit, die den Hook teilen.
+- **Das längere Fenster ist eine weitere Range-Query** unter `calendarKeys.eventsRoot` und damit eine weitere Ansicht im Sinne von ADR-051; Realtime, Mutationen und Ansichtsregel greifen ohne Sonderfall.
+- **Geprüft wird weiter nur die erste Occurrence einer neuen Serie.** Kollisionen der Folgetermine stehen als eigener Eintrag in [TODO.md](./TODO.md).
+- **Unter `bun test` tragen Termine ohne Bezeichnung jetzt den Slug**, nicht mehr einen leeren String. Wer dort eine übersetzte Bezeichnung erwartet, braucht ein initialisiertes i18next (`*.jest.ts`).
