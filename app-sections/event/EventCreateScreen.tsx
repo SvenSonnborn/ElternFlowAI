@@ -110,7 +110,11 @@ export function EventCreateScreen() {
     setTypeHydrated(true);
   }
 
-  const occurrences = useFamilyEvents(startAt).data;
+  // Bis zum Monat des Endes laden, damit die Prüfung die ganze Spanne sieht.
+  // Liegt das Ende vor dem Start (ungültige Eingabe), bleibt es beim Monat des
+  // Starts, statt das Fenster umzukehren. Eines der vorhandenen `Date`-Objekte,
+  // kein neues: Das Memo in `useFamilyEvents` hängt an der Referenz.
+  const occurrences = useFamilyEvents(startAt, endAt > startAt ? endAt : startAt).data;
   const conflicts = useMemo(() => {
     const checked = allDay
       ? toAllDayRange({ startAt, endAt }, deviceTimeZone())

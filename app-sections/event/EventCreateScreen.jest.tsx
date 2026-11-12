@@ -1,5 +1,8 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { addMonths, format } from "date-fns";
 import { router } from "expo-router";
+
+import type { DateTimePickerSheetProps } from "@/app-sections/shared";
 
 import i18n from "@/features/i18n";
 import { renderScreen } from "@/testing/renderScreen";
@@ -8,10 +11,18 @@ import { EventCreateScreen } from "./EventCreateScreen";
 
 const mockCreateEvent = jest.fn();
 const mockShowToast = jest.fn();
+/** Zeichnet die Monate auf, mit denen der Screen die Kollisionsdaten lädt. */
+const mockUseFamilyEvents = jest.fn((..._args: Date[]) => ({ data: [] }));
+/** Die Props des zuletzt gerenderten Pickers; über sein `onPick` wählt ein Test den Tag. */
+let mockPickerProps: DateTimePickerSheetProps | null = null;
 
 jest.mock("@/app-sections/shared", () => ({
   ...jest.requireActual<typeof import("@/app-sections/shared")>("@/app-sections/shared"),
   useToast: () => ({ show: mockShowToast, dismiss: jest.fn() }),
+  DateTimePickerSheet: (props: DateTimePickerSheetProps) => {
+    mockPickerProps = props;
+    return null;
+  },
 }));
 
 jest.mock("@/features/auth", () => ({
@@ -25,7 +36,7 @@ jest.mock("@/features/calendar", () => ({
   ...jest.requireActual<typeof import("@/features/calendar")>("@/features/calendar"),
   useCreateEvent: () => ({ mutateAsync: mockCreateEvent, isPending: false, error: null }),
   useEventTypes: () => ({ data: [{ id: "t1", slug: "family", color: "#00AA88" }] }),
-  useFamilyEvents: () => ({ data: [] }),
+  useFamilyEvents: (...args: Date[]) => mockUseFamilyEvents(...args),
 }));
 
 let mockPrevent: boolean | undefined;
@@ -153,5 +164,34 @@ describe("EventCreateScreen: Ganztägig ist eine Bedienstelle", () => {
     await fireEvent.press(row);
 
     expect(screen.getByRole("switch", { name })).toBeChecked();
+  });
+});
+
+describe("EventCreateScreen: Kollisionsprüfung lädt bis zum Ende", () => {
+  /** Rendert das Formular (Start heute 09:00) und wählt als Enddatum `day`. */
+  async function pickEndDate(day: Date) {
+    await renderScreen(<EventCreateScreen />);
+    const endDateLabel = i18n.t("cal.edit.fieldEndDate").replace(/[()]/g, "\\$&");
+    await fireEvent.press(screen.getByRole("button", { name: new RegExp(`^${endDateLabel},`) }));
+    await act(() => {
+      mockPickerProps?.onPick(day);
+    });
+  }
+
+  it("ein Ende in einem späteren Monat kommt als zweiter Monat an", async () => {
+    await pickEndDate(addMonths(new Date(), 2));
+
+    const [first, last] = mockUseFamilyEvents.mock.calls.at(-1)!;
+    expect(format(last, "yyyy-MM")).toBe(format(addMonths(new Date(), 2), "yyyy-MM"));
+    expect(format(first, "yyyy-MM")).toBe(format(new Date(), "yyyy-MM"));
+  });
+
+  it("ein Ende vor dem Start kehrt das Fenster nicht um", async () => {
+    await pickEndDate(addMonths(new Date(), -2));
+
+    // Gegen einen leeren Test: Die Wahl ist angekommen, das Formular meldet sie.
+    expect(screen.getByText(i18n.t("cal.edit.error.invalidDateRange"))).toBeTruthy();
+    const [first, last] = mockUseFamilyEvents.mock.calls.at(-1)!;
+    expect(last.getTime()).toBe(first.getTime());
   });
 });
