@@ -112,6 +112,7 @@ type EventTypeRow = Database["public"]["Tables"]["event_types"]["Row"];
 
 const OCTOBER = new Date(2026, 9, 1);
 const NOVEMBER = new Date(2026, 10, 1);
+const DECEMBER = new Date(2026, 11, 1);
 const SERVER_ID = "0d4c6f0e-5a8e-4c1a-9a51-6a2b0f3c9e11";
 const OCCURRENCE_KEY = "2026-10-30";
 const offline = new Error("Netzwerk weg");
@@ -190,15 +191,16 @@ function updateVars(event: EventWithRelations): UpdateEventVars {
 }
 
 /**
- * Die Range, die `useFamilyEvents` für `month` lädt — nachgebaut, weil die
- * Tests ihren Cache-Schlüssel vorbefüllen und ihr Laden einzeln beantworten.
+ * Die Range, die `useFamilyEvents` für `first` bis `last` lädt — nachgebaut,
+ * weil die Tests ihren Cache-Schlüssel vorbefüllen und ihr Laden einzeln
+ * beantworten.
  */
-function rangeOf(month: Date): { start: Date; end: Date } {
-  return { start: addDays(startOfMonth(month), -7), end: addDays(endOfMonth(month), 7) };
+function rangeOf(first: Date, last: Date = first): { start: Date; end: Date } {
+  return { start: addDays(startOfMonth(first), -7), end: addDays(endOfMonth(last), 7) };
 }
 
-function rangeKey(month: Date) {
-  const { start, end } = rangeOf(month);
+function rangeKey(first: Date, last: Date = first) {
+  const { start, end } = rangeOf(first, last);
   return calendarKeys.range(start.toISOString(), end.toISOString());
 }
 
@@ -235,12 +237,14 @@ interface Mutations {
 /** Eine Monatsansicht als Titelliste; reicht auf Wunsch die drei Mutationen heraus. */
 function MonthProbe({
   month,
+  lastMonth,
   onMutations,
 }: {
   month: Date;
+  lastMonth?: Date;
   onMutations?: (mutations: Mutations) => void;
 }) {
-  const { data, hasData } = useFamilyEvents(month);
+  const { data, hasData } = useFamilyEvents(month, lastMonth);
   const create = useCreateEvent();
   const update = useUpdateEvent();
   const remove = useDeleteEvent();
@@ -586,5 +590,41 @@ describe("useFamilyEvents: hasData", () => {
     await renderScreen(<MonthProbe month={OCTOBER} />);
 
     expect(screen.getByTestId("hasdata-10").props.children).toBe("false");
+  });
+});
+
+/**
+ * Die Kollisionsprüfung beim Anlegen lädt bis zum Monat des Terminendes. Endet
+ * die Spanne im Monat ihres Starts, bleibt es der Key des Kalender-Tabs.
+ */
+describe("useFamilyEvents: Fenster über mehrere Monate", () => {
+  beforeEach(() => {
+    jest.mocked(fetchEventsInRange).mockReset();
+  });
+
+  it("zwei Monate laden vom Anfang des ersten bis zum Ende des zweiten", async () => {
+    jest.mocked(fetchEventsInRange).mockResolvedValue([]);
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(calendarKeys.types, [familyType]);
+
+    await renderScreen(<MonthProbe month={OCTOBER} lastMonth={DECEMBER} />, { queryClient });
+
+    const { start, end } = rangeOf(OCTOBER, DECEMBER);
+    expect(fetchEventsInRange).toHaveBeenCalledWith(start, end);
+  });
+
+  it("ein Ende im selben Monat trifft den Cache des Ein-Monats-Aufrufs", async () => {
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(calendarKeys.types, [familyType]);
+    queryClient.setQueryData(rangeKey(OCTOBER), []);
+
+    await renderScreen(<MonthProbe month={OCTOBER} lastMonth={new Date(2026, 9, 31)} />, {
+      queryClient,
+    });
+
+    expect(fetchEventsInRange).not.toHaveBeenCalled();
+    expect(queryClient.getQueryCache().findAll({ queryKey: calendarKeys.eventsRoot })).toHaveLength(
+      1,
+    );
   });
 });

@@ -38,7 +38,21 @@ interface UseFamilyEventsResult {
 }
 
 /**
- * Alle Termine im sichtbaren Monat plus jeweils 7 Tage Puffer.
+ * Alle Termine vom Anfang von `firstMonth` bis zum Ende von `lastMonth`, mit
+ * jeweils 7 Tagen Puffer. Kalender-Tab und Dashboard rufen mit einem Monat auf;
+ * die Kollisionsprüfung beim Anlegen reicht den Monat des Terminendes nach.
+ *
+ * Das Fenster folgt Monatsgrenzen, nicht der geprüften Spanne: Endet ein Termin
+ * im Monat seines Starts, ist der Key genau der des Kalender-Tabs und trifft
+ * dessen Cache, und eine Uhrzeit-Änderung im Formular erzeugt keinen neuen Key.
+ * Nur wer eine Monatsgrenze überquert, löst einen Fetch aus.
+ *
+ * Keine Obergrenze für die Spanne: `fetchEventsInRange` lädt bei einem späteren
+ * Ende nur die Termine bis dorthin zusätzlich, und die Expansion wächst linear
+ * mit dem Fenster. Ein Fenster über mehrere Monate ist eine weitere Range-Query
+ * unter `calendarKeys.eventsRoot` und damit eine eigene Ansicht im Sinne von
+ * [ADR-051](../../docs/decision-log.md); Realtime, Mutationen und
+ * `visibleOccurrences` greifen ohne Sonderfall.
  *
  * Gibt die Menge **gefiltert nach Undo-Status** zurück: wenn ein Termin gerade
  * gelöscht wird, steht er im Filter und ist **nicht** in `data` — obwohl die
@@ -51,14 +65,17 @@ interface UseFamilyEventsResult {
  * neuer sind als das Speichern (siehe `visibleOccurrences`); scheitert das
  * Neuladen, bleibt die gespeicherte Änderung sichtbar.
  */
-export function useFamilyEvents(visibleMonth: Date): UseFamilyEventsResult {
+export function useFamilyEvents(
+  firstMonth: Date,
+  lastMonth: Date = firstMonth,
+): UseFamilyEventsResult {
   const { theme } = useTheme();
 
   const { rangeStart, rangeEnd } = useMemo(() => {
-    const s = addDays(startOfMonth(visibleMonth), -7);
-    const e = addDays(endOfMonth(visibleMonth), 7);
+    const s = addDays(startOfMonth(firstMonth), -7);
+    const e = addDays(endOfMonth(lastMonth), 7);
     return { rangeStart: s, rangeEnd: e };
-  }, [visibleMonth]);
+  }, [firstMonth, lastMonth]);
 
   const query = useQuery({
     queryKey: calendarKeys.range(rangeStart.toISOString(), rangeEnd.toISOString()),
