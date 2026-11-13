@@ -347,7 +347,7 @@ jobs:
           ram-size: 4096M
           disable-animations: true
           emulator-boot-timeout: 600
-          script: bash scripts/startcheck.sh run android android/app/build/outputs/apk/release/app-release.apk
+          script: bash scripts/startcheck-anr-probe.sh android/app/build/outputs/apk/release/app-release.apk
 
       # Zweiter Boot des Emulators. Die Action bootet und prüft in einem Step,
       # also steckt die Wiederholung des Boots hier statt im Skript. Ob der
