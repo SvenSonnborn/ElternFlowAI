@@ -106,8 +106,24 @@ run_flow() {
   shift
   if ! maestro test "$@" --debug-output startcheck-artifacts/maestro-1 .maestro/startcheck.yaml; then
     echo "startcheck: Login-Screen nicht erschienen (${platform})." >&2
+    if [ "$platform" = android ]; then
+      diagnose_android
+    fi
     exit 1
   fi
+}
+
+# Schreibt ins Job-Log, was Maestros Meldung offenlässt: welches Fenster vorn
+# ist (App, Absturz- oder ANR-Dialog), ob der App-Prozess noch lebt, was beim
+# Start abgestürzt ist und welche IDs und Texte auf dem Bildschirm stehen.
+# Jeder Teil darf scheitern, der Startcheck ist da schon rot.
+diagnose_android() {
+  echo "startcheck: Diagnose (android)" >&2
+  adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp' || true
+  adb shell pidof com.elternflow.app || echo "startcheck: App-Prozess läuft nicht." >&2
+  adb logcat -d -b crash || true
+  adb logcat -d -s ReactNativeJS:V ReactNative:V AndroidRuntime:E | tail -n 80 || true
+  maestro hierarchy | grep -oE '"(resource-id|text|accessibilityText)" *: *"[^"]+"' | head -n 60 || true
 }
 
 # Relative Pfade (Flow, Artefakte, App) gelten ab der Repo-Wurzel, egal aus
