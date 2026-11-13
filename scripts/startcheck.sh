@@ -103,8 +103,10 @@ boot_ios() {
   echo "startcheck: Simulator ${name}, UDID ${udid}"
   # `-b` bootet das Gerät selbst und wartet, bis es fertig ist; ein `simctl
   # boot` davor scheiterte, falls das Image es schon gebootet hätte.
+  # Wiederholt wird nur ein Boot, der scheitert. Ein hängender läuft ins
+  # Step-Limit des Workflows und endet dort als Warnung, ohne zweiten Anlauf.
   if ! xcrun simctl bootstatus "$udid" -b; then
-    # Zweiter Anlauf auf einem frischen Gerät: Was den ersten Boot hängen
+    # Zweiter Anlauf auf einem frischen Gerät: Was den ersten Boot scheitern
     # ließ, kann im Gerätezustand stecken. Herunterfahren und Löschen dürfen
     # scheitern (Gerät war gar nicht oben), über den Anlauf urteilt der Boot.
     echo "startcheck: Simulator-Boot fehlgeschlagen, zweiter Versuch auf gelöschtem Gerät." >&2

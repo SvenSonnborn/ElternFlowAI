@@ -21,8 +21,8 @@ concurrency:
 # Caches: Nur `main` schreibt (die `actions/cache/save`-Steps am Jobende), PRs
 # lesen nur. Ein PR-Cache ist für andere PRs unsichtbar und verdrängte bei
 # 10 GB Repo-Limit die nützlichen von `main`. Einzige Ausnahme ist die winzige
-# Marke „nativer Stand grün gebaut" der Compile-Jobs, die jedes Ereignis
-# schreibt (siehe `native-key` im Android-Job).
+# Marke „nativer Stand gebaut und gestartet" der Compile-Jobs, die jedes
+# Ereignis schreibt (siehe `native-key` im Android-Job).
 
 # Dieselben Supabase-Platzhalter wie in ci.yml. Metro setzt EXPO_PUBLIC_* beim
 # Bundeln ein; ohne sie stünde `undefined` im Bundle, wo die App einen String
@@ -135,7 +135,7 @@ jobs:
   android:
     name: Android (prebuild · assembleRelease · Startcheck)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -234,7 +234,7 @@ jobs:
             echo "build=true" >> "$GITHUB_OUTPUT"
           else
             echo "build=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Android: Derselbe native Stand wurde bereits grün gebaut (Schlüssel $NATIVE_KEY), Prebuild und Compile entfallen."
+            echo "::notice::Android: Derselbe native Stand wurde bereits gebaut und gestartet (Schlüssel $NATIVE_KEY). Prebuild, Compile und Startcheck entfallen, ein Startabsturz durch JS-Änderungen bleibt in diesem Lauf ungeprüft."
           fi
 
       # `android/` is gitignored (CNG), so it never exists in a fresh checkout.
@@ -296,14 +296,21 @@ jobs:
       # scripts/startcheck.sh). Deshalb laufen die Steps bis zum Urteil mit
       # `continue-on-error`: Ein Fehlschlag färbt den Job nicht selbst, über
       # Grün oder Rot entscheidet allein `verdict` anhand von
-      # startcheck-artifacts/result. Die Zeitlimits je Step sorgen dafür, dass
-      # ein hängender Schritt im Urteil landet statt im Joblimit, das den Job
-      # ohne Urteil rot abbräche.
+      # startcheck-artifacts/result. Die Zeitlimits je Step sollen einen
+      # hängenden Schritt im Urteil landen lassen statt im Joblimit, das den
+      # Job ohne Urteil und ohne Upload rot abbräche. Das hält nur, solange das
+      # Joblimit über Setup und Compile (bislang unter 25 Minuten) plus der
+      # Summe aller Startcheck-Limits liegt, hier 10 + 20 + 20 Minuten. Wer ein
+      # Step-Limit anhebt, hebt das Joblimit mit an.
       #
       # Der Emulator braucht KVM. /dev/kvm gibt es auf dem Runner, aber nur für
       # root und die Gruppe kvm; die Regel öffnet es für den Runner-Nutzer.
+      # Gehört zur Prüfumgebung: Ohne KVM ist der Emulator sinnlos, ein
+      # Fehlschlag endet ohne Ergebnisdatei, also als Warnung ohne Marke.
       - name: Enable KVM
+        id: kvm
         if: steps.decide.outputs.build == 'true'
+        continue-on-error: true
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
@@ -321,9 +328,9 @@ jobs:
       # Shell aus, mehrzeilige Shell-Logik zerfiele dort.
       - name: Startcheck (Android emulator)
         id: startcheck
-        if: steps.decide.outputs.build == 'true' && steps.maestro.outcome == 'success'
+        if: steps.decide.outputs.build == 'true' && steps.kvm.outcome == 'success' && steps.maestro.outcome == 'success'
         continue-on-error: true
-        timeout-minutes: 25
+        timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 35
@@ -345,7 +352,7 @@ jobs:
         id: startcheck-reboot
         if: steps.decide.outputs.build == 'true' && steps.startcheck.outcome == 'failure' && hashFiles('startcheck-artifacts/result') == ''
         continue-on-error: true
-        timeout-minutes: 25
+        timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 35
@@ -367,10 +374,16 @@ jobs:
 
       # Hochgeladen wird, sobald ein Versuch scheiterte, auch wenn der zweite
       # bestand: Ein Aussetzer, der nur die Wiederholung kostet, soll sich
-      # nachträglich erklären lassen. `!cancelled()`, damit der Upload auch nach
-      # rotem Urteil läuft.
+      # nachträglich erklären lassen. Bei rotem Urteil immer, auch ohne
+      # Gerätelog (`run` vom Step-Limit vor der Diagnose beendet), damit die
+      # Fehler-Annotation nie auf ein fehlendes Artefakt zeigt; findet die
+      # Action keine Datei, warnt sie nur (Vorgabe `if-no-files-found: warn`).
+      # `!cancelled()`, damit der Upload nach rotem Urteil überhaupt läuft.
+      # `continue-on-error`, weil ein Aussetzer des Artefaktdienstes einen
+      # bestandenen Lauf sonst rot färbte und die Marke kostete.
       - name: Upload startcheck diagnostics
-        if: ${{ !cancelled() && hashFiles('startcheck-artifacts/device-*.log') != '' }}
+        if: ${{ !cancelled() && (steps.verdict.outcome == 'failure' || hashFiles('startcheck-artifacts/device-*.log') != '') }}
+        continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: startcheck-android
@@ -479,7 +492,7 @@ jobs:
             echo "build=true" >> "$GITHUB_OUTPUT"
           else
             echo "build=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::iOS: Derselbe native Stand wurde bereits grün gebaut (Schlüssel $NATIVE_KEY), Prebuild und Compile entfallen."
+            echo "::notice::iOS: Derselbe native Stand wurde bereits gebaut und gestartet (Schlüssel $NATIVE_KEY). Prebuild, Compile und Startcheck entfallen, ein Startabsturz durch JS-Änderungen bleibt in diesem Lauf ungeprüft."
           fi
 
       # `--no-install` skips BOTH the package-manager run and `pod install`;
@@ -547,9 +560,10 @@ jobs:
             ~/Library/Caches/CocoaPods
           key: ${{ steps.pods-cache.outputs.cache-primary-key }}
 
-      # Startcheck, Urteil und Upload wie im Android-Job, Begründung dort. Den
-      # zweiten Boot erledigt hier `boot-ios` selbst, weil Booten und Prüfen
-      # getrennte Steps sind.
+      # Startcheck, Urteil und Upload wie im Android-Job, Begründung dort,
+      # ebenso die Regel fürs Joblimit: hier Setup und Compile plus 10 + 15 +
+      # 20 Minuten. Den zweiten Boot erledigt hier `boot-ios` selbst, weil
+      # Booten und Prüfen getrennte Steps sind.
       - name: Install Maestro
         id: maestro
         if: steps.decide.outputs.build == 'true'
@@ -577,7 +591,8 @@ jobs:
         run: bash scripts/startcheck.sh verdict ios
 
       - name: Upload startcheck diagnostics
-        if: ${{ !cancelled() && hashFiles('startcheck-artifacts/device-*.log') != '' }}
+        if: ${{ !cancelled() && (steps.verdict.outcome == 'failure' || hashFiles('startcheck-artifacts/device-*.log') != '') }}
+        continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: startcheck-ios
