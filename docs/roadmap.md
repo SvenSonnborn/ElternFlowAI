@@ -121,7 +121,7 @@ Einschätzung („ein Großteil davon können wir jetzt schon umsetzen") trifft 
 Der große Rest teilt sich in Anbieter-Blockaden (Sprachassistent, gustar.io, Notifications, Stripe)
 und Designer-Punkte, die zwar nicht _von uns_ erledigt werden, aber in den Blöcken mitlaufen.
 
-### Die nächsten Branches (Stand 2026-11-12)
+### Die nächsten Branches (Stand 2026-11-13)
 
 Erledigt sind `fix/stille-fehler` ([ADR-049](./decision-log.md)), der Kalender-Cache aus
 [8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-051](./decision-log.md)), der Test
@@ -130,9 +130,10 @@ mit pg_cron für Einladungen, `anon`-Rechten und Einladungslink nach Kontostand
 ([ADR-053](./decision-log.md)) und a11y nativ samt [4.1](#41-inlinerem-entscheiden--erledigt)
 `inlineRem` und Inter ([ADR-054](./decision-log.md)) und [Block 9](#block-9--ci-und-toolchain-härten)
 mit `expo-doctor` und dem Bun-Cache in `ci.yml` ([ADR-055](./decision-log.md)) und der Rest von
-[8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-056](./decision-log.md)).
+[8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-056](./decision-log.md)) und der
+Smoke-Start aus [Block 10](#block-10--große-migrationen) ([ADR-057](./decision-log.md)).
 
-Eine nächste Reihenfolge steht noch nicht fest; offen bleibt
+Eine nächste Reihenfolge steht noch nicht fest; offen bleibt der Rest von
 [Block 10](#block-10--große-migrationen).
 
 ### Schlusssteine — was am meisten entsperrt
@@ -978,10 +979,8 @@ Alle aus `TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-sco
   [Icon.tsx](../app-sections/shared/Icon.tsx) — SDK 56 deprecatet das Bundle-Paket. Codemod
   vorhanden (`npx @react-native-vector-icons/codemod`), Icon-Namen und Imports ändern sich. **Kein
   Breaking Change**, funktioniert unverändert weiter — deshalb echte Kür.
-- **Smoke-Start im Simulator/Emulator** ([native-build.yml](../.github/workflows/native-build.yml))
-  — das Gate beweist „kompiliert", nicht „startet". Ein Absturz beim App-Start (fehlendes
-  Native-Modul, kaputtes Autolinking, defekter Splash/Font-Pfad) käme weiterhin erst am Gerät heraus.
-  Braucht einen laufenden Metro-Prozess im Job und eine Abbruchbedingung, die nicht flaky ist.
+- **Smoke-Start im Simulator/Emulator** — **erledigt** ([ADR-057](./decision-log.md)): Die
+  Compile-Jobs bauen Release und starten die App bis zum Login-Screen.
 - **`eas build --local` als gemeinsame Build-Definition** — erst sinnvoll, wenn `eas.json` für die
   🔒 Release-Iteration existiert; sonst gibt es nichts zusammenzuführen. Zu prüfen ist vorher, ob
   sich die Caches und das Überspringen unveränderter nativer Stände
