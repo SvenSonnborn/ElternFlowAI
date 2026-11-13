@@ -1,0 +1,19 @@
+# Startcheck aus .github/workflows/native-build.yml (über scripts/startcheck.sh):
+# Startet die installierte Release-App und gilt als bestanden, sobald der
+# Login-Screen sichtbar ist. Ohne Sitzung leitet AuthGate dorthin, also ist er
+# in der CI verlässlich der erste Screen. Ein Absturz beim Start und eine App,
+# die hängen bleibt, enden beide im Zeitlimit.
+#
+# Erkannt wird der Login an seiner testID, nicht am Text: Simulator und
+# Emulator in der CI laufen auf Englisch, lokal oft auf Deutsch, und Copy
+# ändert sich. Die testID sichert LoginScreen.jest.tsx ab.
+#
+# Lokal gegen einen laufenden Simulator oder Emulator mit installierter
+# Release-App: maestro test .maestro/startcheck.yaml
+appId: com.elternflow.app
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "login-screen"
+    timeout: 120000
