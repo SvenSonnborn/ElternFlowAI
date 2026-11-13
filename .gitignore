@@ -45,3 +45,6 @@ yarn-error.*
 
 # Arbeitsplaene und SDD-Workspaces (CLAUDE.md → „Wo was steht")
 .superpowers/
+
+# Diagnose-Ausgabe des Startchecks (scripts/startcheck.sh), lokal wie in der CI
+startcheck-artifacts/

@@ -24,11 +24,13 @@ concurrency:
 # Marke „nativer Stand grün gebaut" der Compile-Jobs, die jedes Ereignis
 # schreibt (siehe `native-key` im Android-Job).
 
-# Same Supabase placeholders as ci.yml. Strictly only the `bundle` job needs
-# them: Metro inlines EXPO_PUBLIC_* at bundle time, so leaving them unset would
-# bake `undefined` into the native bundle instead of the string the app expects.
-# The two compile jobs build Debug variants, which don't bundle JS at all —
-# harmless there, and keeping one env block avoids two places to update.
+# Dieselben Supabase-Platzhalter wie in ci.yml. Metro setzt EXPO_PUBLIC_* beim
+# Bundeln ein; ohne sie stünde `undefined` im Bundle, wo die App einen String
+# erwartet. Gebündelt wird in allen drei Jobs: im `bundle`-Job per `expo
+# export`, in den Compile-Jobs durch Gradle und Xcode beim Release-Build. Dort
+# hängt der Startcheck daran: features/supabase/client.ts wirft ohne URL schon
+# beim Start, der Check würde rot, obwohl die App stimmt. Einen Server
+# braucht er nicht, die Platzhalter zeigen auf keinen.
 env:
   EXPO_PUBLIC_SUPABASE_URL: https://test.supabase.invalid
   EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_test
@@ -91,13 +93,14 @@ jobs:
         id: install
         run: bun install --frozen-lockfile
 
-      # The native JS bundle is built NOWHERE else in CI. ci.yml's web export
-      # resolves `DateTimePickerSheet.web.tsx`; the native sibling
-      # `DateTimePickerSheet.tsx` (split off in ADR-010) is never compiled by it.
-      # Debug APK/IPA builds don't close that gap either — they load JS from
-      # Metro at runtime instead of bundling it. Two invocations because
-      # `expo export -p` takes a single platform, and `all` would redo the web
-      # export ci.yml already covers.
+      # Das native JS-Bundle prüft auf jedem PR nur dieser Job. Der Web-Export
+      # in ci.yml löst `DateTimePickerSheet.web.tsx` auf, das native
+      # Gegenstück `DateTimePickerSheet.tsx` (abgetrennt in ADR-010) kompiliert
+      # er nie. Die Release-Builds der Compile-Jobs bundeln zwar ebenfalls, aber
+      # nur, wenn sie bauen: Steht eine Marke für den nativen Stand, entfällt
+      # der Compile, auch bei geändertem JS. Zwei Aufrufe, weil `expo export
+      # -p` genau eine Plattform nimmt und `all` den Web-Export aus ci.yml
+      # wiederholte.
       - name: Metro bundle (iOS)
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bunx expo export --platform ios --output-dir dist-ios
@@ -130,7 +133,7 @@ jobs:
           key: ${{ steps.bun-cache.outputs.cache-primary-key }}
 
   android:
-    name: Android (prebuild · assembleDebug)
+    name: Android (prebuild · assembleRelease · Startcheck)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -289,6 +292,14 @@ jobs:
       # nur am Compile hängt, und vor der Marke, damit nur eine gestartete App
       # eine Marke hinterlässt.
       #
+      # Prüfumgebung und App werden getrennt gewertet (Kopf von
+      # scripts/startcheck.sh). Deshalb laufen die Steps bis zum Urteil mit
+      # `continue-on-error`: Ein Fehlschlag färbt den Job nicht selbst, über
+      # Grün oder Rot entscheidet allein `verdict` anhand von
+      # startcheck-artifacts/result. Die Zeitlimits je Step sorgen dafür, dass
+      # ein hängender Schritt im Urteil landet statt im Joblimit, das den Job
+      # ohne Urteil rot abbräche.
+      #
       # Der Emulator braucht KVM. /dev/kvm gibt es auf dem Runner, aber nur für
       # root und die Gruppe kvm; die Regel öffnet es für den Runner-Nutzer.
       - name: Enable KVM
@@ -299,14 +310,20 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Install Maestro
+        id: maestro
         if: steps.decide.outputs.build == 'true'
+        continue-on-error: true
+        timeout-minutes: 10
         run: bash scripts/startcheck.sh install-maestro
 
       # x86_64, weil der Runner x86_64 ist und das APK alle vier ABIs enthält.
       # `script` bleibt einzeilig: Die Action führt jede Zeile in einer eigenen
       # Shell aus, mehrzeilige Shell-Logik zerfiele dort.
       - name: Startcheck (Android emulator)
-        if: steps.decide.outputs.build == 'true'
+        id: startcheck
+        if: steps.decide.outputs.build == 'true' && steps.maestro.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 25
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 35
@@ -317,32 +334,76 @@ jobs:
           emulator-boot-timeout: 600
           script: bash scripts/startcheck.sh run android android/app/build/outputs/apk/release/app-release.apk
 
-      # Die Marke entsteht erst nach dem Compile und ohne `always()` oder
-      # `!cancelled()`: Das implizite `success()` lässt einen roten oder
-      # abgebrochenen Lauf keine Marke hinterlassen. Anders als die großen
-      # Caches wird sie auf jedem Ereignis gespeichert, auch auf PRs — die
-      # Datei ist winzig, und ein PR-Eintrag lässt die weiteren Pushes
-      # desselben PRs überspringen. Gab es sie schon (Vollbuild per `schedule`
-      # oder `workflow_dispatch`), bleibt sie stehen; Cache-Einträge sind
-      # unveränderlich. `path` muss exakt dem Lookup oben entsprechen: GitHub
-      # versioniert Cache-Einträge über den Pfad, bei Abweichung träfe der
-      # Lookup nie, und es würde still nie übersprungen.
+      # Zweiter Boot des Emulators. Die Action bootet und prüft in einem Step,
+      # also steckt die Wiederholung des Boots hier statt im Skript. Ob der
+      # erste Step am Boot scheiterte, zeigt die fehlende Ergebnisdatei: `run`
+      # legt sie als Erstes an, auf einem gebooteten Emulator gibt es sie also
+      # immer. Scheiterte dagegen die App, gibt es keinen zweiten Boot; ihre
+      # Wiederholung hat `run` schon selbst erledigt. `with` muss dem ersten
+      # Step gleichen, sonst prüfte der zweite Anlauf ein anderes Gerät.
+      - name: Startcheck (Android emulator, zweiter Boot)
+        id: startcheck-reboot
+        if: steps.decide.outputs.build == 'true' && steps.startcheck.outcome == 'failure' && hashFiles('startcheck-artifacts/result') == ''
+        continue-on-error: true
+        timeout-minutes: 25
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-boot-timeout: 600
+          script: bash scripts/startcheck.sh run android android/app/build/outputs/apk/release/app-release.apk
+
+      # Grün nur mit `result` = ok. Fehlt die Datei, kam die App nie an die
+      # Reihe: Warnung im Checks-Tab, Job grün, aber ohne `ok=true` und damit
+      # ohne Marke, sonst übersprünge der nächste Push einen nie geprüften
+      # Start.
+      - name: Startcheck verdict
+        id: verdict
+        if: steps.decide.outputs.build == 'true'
+        run: bash scripts/startcheck.sh verdict android
+
+      # Hochgeladen wird, sobald ein Versuch scheiterte, auch wenn der zweite
+      # bestand: Ein Aussetzer, der nur die Wiederholung kostet, soll sich
+      # nachträglich erklären lassen. `!cancelled()`, damit der Upload auch nach
+      # rotem Urteil läuft.
+      - name: Upload startcheck diagnostics
+        if: ${{ !cancelled() && hashFiles('startcheck-artifacts/device-*.log') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: startcheck-android
+          path: startcheck-artifacts/
+          retention-days: 7
+
+      # Die Marke entsteht erst nach Compile und bestandenem Startcheck
+      # (`steps.verdict.outputs.ok`) und ohne `always()` oder `!cancelled()`:
+      # Das implizite `success()` lässt einen roten oder abgebrochenen Lauf
+      # keine Marke hinterlassen. Anders als die großen Caches wird sie auf
+      # jedem Ereignis gespeichert, auch auf PRs — die Datei ist winzig, und
+      # ein PR-Eintrag lässt die weiteren Pushes desselben PRs überspringen.
+      # Gab es sie schon (Vollbuild per `schedule` oder `workflow_dispatch`),
+      # bleibt sie stehen; Cache-Einträge sind unveränderlich. `path` muss
+      # exakt dem Lookup oben entsprechen: GitHub versioniert Cache-Einträge
+      # über den Pfad, bei Abweichung träfe der Lookup nie, und es würde still
+      # nie übersprungen.
       - name: Write native build marker
-        if: steps.decide.outputs.build == 'true' && steps.marker.outputs.cache-hit != 'true'
+        if: steps.decide.outputs.build == 'true' && steps.marker.outputs.cache-hit != 'true' && steps.verdict.outputs.ok == 'true'
         env:
           NATIVE_KEY: ${{ steps.native-key.outputs.key }}
           COMMIT_SHA: ${{ github.sha }}
         run: printf '%s\n%s\n' "$NATIVE_KEY" "$COMMIT_SHA" > .native-build-marker
 
       - name: Save native build marker
-        if: steps.decide.outputs.build == 'true' && steps.marker.outputs.cache-hit != 'true'
+        if: steps.decide.outputs.build == 'true' && steps.marker.outputs.cache-hit != 'true' && steps.verdict.outputs.ok == 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: .native-build-marker
           key: ${{ steps.native-key.outputs.key }}
 
   ios:
-    name: iOS (prebuild · pod install · xcodebuild)
+    name: iOS (prebuild · pod install · xcodebuild · Startcheck)
     runs-on: macos-latest
     timeout-minutes: 90
     # KEIN ccache hier — bewusst entfernt, nicht vergessen. Zwei Anläufe
@@ -449,11 +510,13 @@ jobs:
         working-directory: ios
         run: pod install
 
-      # Simulator destination + CODE_SIGNING_ALLOWED=NO is what keeps this gate
-      # credential-free: no certificates, no provisioning profiles, no secrets,
-      # no Expo account. It proves the project compiles, which is the question
-      # being asked — producing an installable artifact is a separate concern
-      # (see docs/TODO.md on EAS).
+      # Release statt Debug: Nur Release bundelt das JS in die App, und der
+      # Startcheck unten läuft ohne Metro. Simulator-Destination und
+      # CODE_SIGNING_ALLOWED=NO halten den Build frei von Zugangsdaten: keine
+      # Zertifikate, keine Provisioning-Profile, keine Secrets, kein
+      # Expo-Konto. Heraus kommt eine App für den Simulator, keine für Geräte
+      # oder den Store; das ist eine eigene Baustelle (EAS, siehe
+      # docs/TODO.md).
       #
       # ARCHS=arm64: Die generische Simulator-Destination hat keine aktive
       # Architektur, Xcode baut deshalb arm64 und x86_64. Der Runner ist arm64,
@@ -484,30 +547,54 @@ jobs:
             ~/Library/Caches/CocoaPods
           key: ${{ steps.pods-cache.outputs.cache-primary-key }}
 
-      # Startcheck wie im Android-Job, Begründung dort.
+      # Startcheck, Urteil und Upload wie im Android-Job, Begründung dort. Den
+      # zweiten Boot erledigt hier `boot-ios` selbst, weil Booten und Prüfen
+      # getrennte Steps sind.
       - name: Install Maestro
+        id: maestro
         if: steps.decide.outputs.build == 'true'
+        continue-on-error: true
+        timeout-minutes: 10
         run: bash scripts/startcheck.sh install-maestro
 
       - name: Boot iOS simulator
-        if: steps.decide.outputs.build == 'true'
+        id: boot
+        if: steps.decide.outputs.build == 'true' && steps.maestro.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 15
         run: bash scripts/startcheck.sh boot-ios
 
       - name: Startcheck (iOS simulator)
-        if: steps.decide.outputs.build == 'true'
+        id: startcheck
+        if: steps.decide.outputs.build == 'true' && steps.maestro.outcome == 'success' && steps.boot.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 20
         run: bash scripts/startcheck.sh run ios ios/build/Build/Products/Release-iphonesimulator/ElternFlowAI.app
 
-      # Wie im Android-Job: nur nach erfolgreichem Compile, auf jedem
-      # Ereignis, `path` exakt wie im Lookup.
+      - name: Startcheck verdict
+        id: verdict
+        if: steps.decide.outputs.build == 'true'
+        run: bash scripts/startcheck.sh verdict ios
+
+      - name: Upload startcheck diagnostics
+        if: ${{ !cancelled() && hashFiles('startcheck-artifacts/device-*.log') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: startcheck-ios
+          path: startcheck-artifacts/
+          retention-days: 7
+
+      # Wie im Android-Job: nur nach Compile und bestandenem Startcheck, auf
+      # jedem Ereignis, `path` exakt wie im Lookup.
       - name: Write native build marker
-        if: steps.decide.outputs.build == 'true' && steps.marker.outputs.cache-hit != 'true'
+        if: steps.decide.outputs.build == 'true' && steps.marker.outputs.cache-hit != 'true' && steps.verdict.outputs.ok == 'true'
         env:
           NATIVE_KEY: ${{ steps.native-key.outputs.key }}
           COMMIT_SHA: ${{ github.sha }}
         run: printf '%s\n%s\n' "$NATIVE_KEY" "$COMMIT_SHA" > .native-build-marker
 
       - name: Save native build marker
-        if: steps.decide.outputs.build == 'true' && steps.marker.outputs.cache-hit != 'true'
+        if: steps.decide.outputs.build == 'true' && steps.marker.outputs.cache-hit != 'true' && steps.verdict.outputs.ok == 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: .native-build-marker
