@@ -1967,3 +1967,34 @@ Accepted. Schließt [8.3 der Roadmap](./roadmap.md#83-kleine-korrekturen-mit-je-
 - **Das längere Fenster ist eine weitere Range-Query** unter `calendarKeys.eventsRoot` und damit eine weitere Ansicht im Sinne von ADR-051; Realtime, Mutationen und Ansichtsregel greifen ohne Sonderfall.
 - **Geprüft wird weiter nur die erste Occurrence einer neuen Serie.** Kollisionen der Folgetermine stehen als eigener Eintrag in [TODO.md](./TODO.md).
 - **Unter `bun test` tragen Termine ohne Bezeichnung jetzt den Slug**, nicht mehr einen leeren String. Wer dort eine übersetzte Bezeichnung erwartet, braucht ein initialisiertes i18next (`*.jest.ts`).
+
+## ADR-057 — Native-Build: Release statt Debug, Startcheck bis zum Login-Screen im Simulator und Emulator (2026-11-13)
+
+### Status
+
+Accepted. Ersetzt in [ADR-016](#adr-016--native-build-gate-auf-jedem-pr-auf-github-runnern-statt-eas-2026-08-14) die Wahl, Debug zu bauen (Decision 4: „weil Debug-Varianten JS gar nicht bundeln“), und in den Consequences den Satz „Was weiterhin ungeprüft bleibt: dass die App _startet_“ samt „dass ein Release-Build durchgeht“; ungeprüft bleiben das signierte Artefakt und echte Hardware. Ersetzt in [ADR-048](#adr-048--native-build-unveränderter-nativer-stand-wird-übersprungen-ios-nur-arm64-react-native-vorkompiliert-2026-10-28) Decision 4 die Aussage, jeder grüne Vollbuild schreibe die Marke. Setzt den Smoke-Start aus [Block 10 der Roadmap](./roadmap.md#block-10--große-migrationen) um. Spec: [2026-11-12-smoke-start-design.md](./superpowers/specs/2026-11-12-smoke-start-design.md).
+
+### Context
+
+- `native-build.yml` bewies „kompiliert“, nicht „startet“. Ein Absturz beim Start mit nativer Ursache (Native-Modul fehlt zur Laufzeit, Autolinking-Registrierung kaputt, Splash- oder Font-Ladepfad defekt) käme erst am Gerät heraus. Das Risiko sitzt bei Renovate-Updates und SDK-Sprüngen, wo sich native Pakete ändern; der Check ist Vorsorge, ein solcher Absturz ist bisher nicht passiert.
+- Die Compile-Jobs bauten Debug, und Debug lädt das JS zur Laufzeit von Metro. Ein Metro-Prozess im Job wäre die größte Quelle für Fehlschläge gewesen.
+- Die CI hat keine Supabase und keine Sitzung, `AuthGate` leitet deshalb verlässlich zum Login.
+- Ein grundlos roter Check wiegt schwerer als ein durchgerutschter Absturz: Er erzieht zum „einfach neu starten“, auch beim echten Fehler.
+
+### Decisions
+
+1. **Release statt Debug, auf beiden Plattformen.** Release bündelt das JS ins Paket, der Job braucht kein Metro, und `__DEV__` ist `false`: Ein fataler JS-Fehler beim Start beendet die App, statt einen roten Fehlerbildschirm zu zeigen. Android signiert mit dem Debug-Keystore der Vorlage, iOS bleibt unsigniert für den Simulator; kein Secret, kein Konto. Weil die Compile-Jobs jetzt selbst bündeln, brauchen auch sie die Supabase-Platzhalter, sonst wirft der Client beim Start. Der Debug-Compile wird nicht mehr geprüft, Debug-only-Code kann unbemerkt brechen; hingenommen, weil Release die ausgelieferte Konfiguration ist.
+2. **Maestro wartet auf die `testID` `login-screen`.** Eine Flow-Datei für beide Plattformen, das Warten und der Screenshot sind eingebaut, und derselbe Flow läuft lokal. Die Version ist samt Prüfsumme gepinnt, ohne Maestro Cloud und ohne Konto. Die `testID` statt des Texts, weil der Text an Gerätesprache und Copy hängt.
+3. **Prüfumgebung und App werden getrennt gewertet.** Maestro installieren und Simulator oder Emulator booten gehört der Umgebung; scheitert das auch im zweiten Anlauf, endet der Job grün mit einer Warnung im Checks-Tab, wie `expo-doctor` ([ADR-055](#adr-055--ci-expo-doctor-als-warnung-im-bundle-job-ciyml-liest-den-bun-cache-nur-2026-11-09)). Ab dem Installieren der App zählt jeder Fehler gegen die App und färbt den Step `Startcheck verdict` rot, auch ein Maestro-Treiber, der sich nicht verbindet.
+4. **Die Marke entsteht nur nach geprüftem Start.** Mit Marke übersprünge der nächste Lauf Compile und Startcheck, und ein ungeprüfter Stand gälte als gestartet; nach einer Umgebungswarnung baut und prüft der nächste Lauf deshalb erneut. Das Ergebnis steht zuerst auf `fail` und erst nach bestandenem Flow auf `ok`, damit ein Abbruch dazwischen weder als Erfolg noch als Umgebungsausfall zählt.
+5. **Eine Wiederholung, und sie installiert die App neu.** Ein echter Startabsturz wiederholt sich, ein Aussetzer von Gerät oder Treiber meist nicht. Die Installation gehört zur Wiederholung, sonst wäre ein `adb`-Aussetzer beim Installieren rot. Ein Absturz, der nur manchmal auftritt, kann so durchrutschen; das nimmt die Maßgabe aus dem Context in Kauf.
+6. **Die Wiederholung heilt keinen Gerätezustand, deshalb behandelt der Flow den ANR-Dialog des Launchers.** Direkt nach dem Boot kann der Pixel Launcher hängen, und sein Dialog liegt dann über der gerenderten App; er übersteht die Wiederholung, weil er zum Gerät gehört. Der Flow tippt „Wait“ nur, wenn der Titel des Systemdialogs wörtlich den Launcher nennt. Ein ANR der App trägt einen anderen Titel und bleibt rot. Ändern sich Launcher, Sprache oder Image, greift die Bedingung nicht mehr, und der Check wird sichtbar rot; einen Fehler verdeckt sie nie.
+7. **Der Emulator bekommt 4 GB statt der automatisch gewählten 2,5 GB.** Eine Maßnahme auf eine einzelne Beobachtung: Einmal riss die `adb`-Verbindung ab, während der Speicher nach dem Boot knapp war. Dass das die Ursache war, ist nicht belegt; der Speicher kostet auf dem Runner nichts.
+
+### Consequences
+
+- **Die Marke heißt jetzt „gebaut und gestartet“.** Flow und Startcheck-Skript stehen im Schlüssel, ein PR, der nur sie ändert, prüft also neu. Die Änderung am Workflow hat alle Debug-Marken ungültig gemacht.
+- **Die Required Checks heißen anders**, `Android (prebuild · assembleRelease · Startcheck)` und `iOS (prebuild · pod install · xcodebuild · Startcheck)`. Das Ruleset „main protection“ muss von Hand nachgezogen werden.
+- **Ein Vollbuild dauert länger**, um Release-Compile, Boot und Flow. PRs, deren nativer Stand schon eine Marke hat, warten wie bisher; die Ausweichregel der Spec, den iOS-Startcheck von PRs zu nehmen, war nicht nötig.
+- **Ein reiner JS-Startabsturz auf einem übersprungenen PR fällt nicht auf.** Dort entfallen Compile und Startcheck, und das native JS-Bundle prüft weiterhin nur der `bundle`-Job aus ADR-016 Decision 4.
+- **Grenzen.** Erscheint der Launcher-Dialog erst, nachdem der Flow auf ihn geprüft hat, tippt ihn frühestens die Wiederholung weg; kommt er auch dort zu spät, wird der Check rot, mit Screenshot. Die Kurzdiagnose im Job-Log liest die Ausgabe von `maestro hierarchy` per Muster; ändert Maestro das Format, fehlt diese Zeile, das Artefakt bleibt vollständig.
