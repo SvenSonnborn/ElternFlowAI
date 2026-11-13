@@ -326,6 +326,13 @@ jobs:
       # x86_64, weil der Runner x86_64 ist und das APK alle vier ABIs enthält.
       # `script` bleibt einzeilig: Die Action führt jede Zeile in einer eigenen
       # Shell aus, mehrzeilige Shell-Logik zerfiele dort.
+      #
+      # 4 GB statt der 2,5 GB, die der Emulator sonst nimmt: In der ersten
+      # Minute nach dem Boot startet das Google-Image seine Dienste, und mit
+      # 2,5 GB lief der Speicher dabei knapp. In genau so einem Moment, während
+      # der Low-Memory-Killer einen Prozess beendete, riss die adb-Verbindung
+      # ab, und Maestro brach `launchApp` mit „device offline“ ab. Der Runner
+      # hat 16 GB, der Platz ist da.
       - name: Startcheck (Android emulator)
         id: startcheck
         if: steps.decide.outputs.build == 'true' && steps.kvm.outcome == 'success' && steps.maestro.outcome == 'success'
@@ -337,6 +344,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          ram-size: 4096M
           disable-animations: true
           emulator-boot-timeout: 600
           script: bash scripts/startcheck.sh run android android/app/build/outputs/apk/release/app-release.apk
@@ -359,6 +367,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          ram-size: 4096M
           disable-animations: true
           emulator-boot-timeout: 600
           script: bash scripts/startcheck.sh run android android/app/build/outputs/apk/release/app-release.apk
