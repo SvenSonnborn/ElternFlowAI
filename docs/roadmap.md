@@ -177,7 +177,7 @@ die **`name:`-Anzeigenamen**, nicht die Job-IDs — nach diesen sechs Strings su
 - „Build & Quality (format · lint · typecheck · test · web build)" — [ci.yml](../.github/workflows/ci.yml)
 - „CVE check for new dependencies" — [dependency-review.yml](../.github/workflows/dependency-review.yml)
 - „Apply labels from branch name" — [pr-labeler.yml](../.github/workflows/pr-labeler.yml)
-- „Metro bundle (ios · android)" · „Android (prebuild · assembleDebug)" · „iOS (prebuild · pod install · xcodebuild)" — [native-build.yml](../.github/workflows/native-build.yml)
+- „Metro bundle (ios · android)" · „Android (prebuild · assembleRelease · Startcheck)" · „iOS (prebuild · pod install · xcodebuild · Startcheck)" — [native-build.yml](../.github/workflows/native-build.yml), umbenannt mit [ADR-057](./decision-log.md)
 
 Beim Umsetzen in [ADR-013](./decision-log.md) (Renovate-Bypass-Actor) und [ADR-016](./decision-log.md)
 (Decision zum blockierenden Gate) dorthin verlinken, statt die Begründung zu duplizieren — so steht
