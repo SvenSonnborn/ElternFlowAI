@@ -13,6 +13,22 @@
 appId: com.elternflow.app
 ---
 - launchApp
+# Nur Android: Direkt nach dem Boot schickt die Emulator-Action
+# `input keyevent 82`. Ist der Launcher da noch mit seinem eigenen Start
+# beschäftigt, meldet Android für ihn einen ANR, und dessen Dialog liegt über
+# der App: Der Login ist gerendert, Maestro sieht aber nur den Dialog. „Wait“
+# schließt ihn, ohne den Launcher zu beenden. Getippt wird nur, wenn der Titel
+# den Launcher nennt: Hängt die App selbst beim Start, muss der Check rot
+# werden, ihr Dialog bleibt also stehen.
+- runFlow:
+    when:
+      platform: Android
+      visible:
+        id: "android:id/alertTitle"
+        text: "Pixel Launcher isn't responding"
+    commands:
+      - tapOn:
+          id: "android:id/aerr_wait"
 - extendedWaitUntil:
     visible:
       id: "login-screen"
