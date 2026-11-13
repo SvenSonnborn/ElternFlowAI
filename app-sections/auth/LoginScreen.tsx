@@ -29,7 +29,8 @@ export function LoginScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    // testID: Daran erkennt der Startcheck (.maestro/startcheck.yaml), dass die App gestartet ist.
+    <SafeAreaView testID="login-screen" style={{ flex: 1 }}>
       <ScrollView
         contentContainerStyle={{ flexGrow: 1, padding: 24, justifyContent: "center" }}
         keyboardShouldPersistTaps="handled"
