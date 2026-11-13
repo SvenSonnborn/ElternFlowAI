@@ -72,7 +72,7 @@ install_maestro() {
 fetch_maestro() {
   local dir="$1"
   mkdir -p "$dir" &&
-    curl -fsSL --retry 3 -o "$dir/maestro.zip" "$maestro_url" &&
+    curl -fsSL --retry 3 --connect-timeout 30 --max-time 300 -o "$dir/maestro.zip" "$maestro_url" &&
     echo "${maestro_sha256}  ${dir}/maestro.zip" | shasum -a 256 -c &&
     unzip -q -o "$dir/maestro.zip" -d "$dir"
 }
