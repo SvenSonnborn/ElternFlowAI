@@ -17,6 +17,8 @@ import { AuthGate, initDeepLinkHandler, useInitSession } from "@/features/auth";
 import { useFamilyRealtime } from "@/features/realtime";
 import { useFlushPendingDeletes } from "@/features/shared";
 
+if (Date.now() > 0) throw new Error("startcheck-negativprobe");
+
 function ThemedStack() {
   const { theme } = useTheme();
   useInitSession();
