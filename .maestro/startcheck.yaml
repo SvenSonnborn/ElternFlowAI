@@ -1,0 +1,35 @@
+# Startcheck aus .github/workflows/native-build.yml (über scripts/startcheck.sh):
+# Startet die installierte Release-App und gilt als bestanden, sobald der
+# Login-Screen sichtbar ist. Ohne Sitzung leitet AuthGate dorthin, also ist er
+# in der CI verlässlich der erste Screen. Ein Absturz beim Start und eine App,
+# die hängen bleibt, enden beide im Zeitlimit.
+#
+# Erkannt wird der Login an seiner testID, nicht am Text: Simulator und
+# Emulator in der CI laufen auf Englisch, lokal oft auf Deutsch, und Copy
+# ändert sich. Die testID sichert LoginScreen.jest.tsx ab.
+#
+# Lokal gegen einen laufenden Simulator oder Emulator mit installierter
+# Release-App: maestro test .maestro/startcheck.yaml
+appId: com.elternflow.app
+---
+- launchApp
+# Nur Android: Direkt nach dem Boot schickt die Emulator-Action
+# `input keyevent 82`. Ist der Launcher da noch mit seinem eigenen Start
+# beschäftigt, meldet Android für ihn einen ANR, und dessen Dialog liegt über
+# der App: Der Login ist gerendert, Maestro sieht aber nur den Dialog. „Wait“
+# schließt ihn, ohne den Launcher zu beenden. Getippt wird nur, wenn der Titel
+# den Launcher nennt: Hängt die App selbst beim Start, muss der Check rot
+# werden, ihr Dialog bleibt also stehen.
+- runFlow:
+    when:
+      platform: Android
+      visible:
+        id: "android:id/alertTitle"
+        text: "Pixel Launcher isn't responding"
+    commands:
+      - tapOn:
+          id: "android:id/aerr_wait"
+- extendedWaitUntil:
+    visible:
+      id: "login-screen"
+    timeout: 120000

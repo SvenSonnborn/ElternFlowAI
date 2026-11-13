@@ -101,8 +101,13 @@ features/                Cross-cutting feature logic
 
 scripts/                 Shell-Werkzeuge für CI und Repo-Pflege
 ├─ coderabbit-prepush.sh Pre-Push-Review gegen `main` (warn-only, derzeit deaktiviert)
-├─ native-build-key.sh   Schlüssel der Marke „nativ grün gebaut" für `native-build.yml` (ADR-048)
-└─ setup-labels.sh       legt die PR-Labels an, die Labeler und Renovate setzen
+├─ native-build-key.sh   Schlüssel der Marke „nativ gebaut und gestartet" für `native-build.yml` (ADR-048, ADR-057)
+├─ setup-labels.sh       legt die PR-Labels an, die Labeler und Renovate setzen
+├─ startcheck.sh         Startcheck in `native-build.yml`: Maestro, Simulator-Boot, Installieren + Flow, Urteil (ADR-057)
+└─ startcheck.test.ts    Tests für `run` und `verdict`, Geräte und Maestro als Stubs
+
+.maestro/                Maestro-Flows
+└─ startcheck.yaml       startet die Release-App, bestanden, sobald `login-screen` sichtbar ist (ADR-057)
 
 testing/                 Jest-Setup + renderScreen für Komponenten-Tests (*.jest.tsx, ADR-042)
 

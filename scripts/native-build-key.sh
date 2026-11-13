@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
-# Schlüssel der Marke „nativ grün gebaut" aus .github/workflows/native-build.yml:
-# Trägt ein Lauf einen Schlüssel, der schon grün gebaut wurde, überspringt der
-# Job Prebuild und Compile. Aufruf: scripts/native-build-key.sh <ios|android>,
-# Ausgabe genau eine Zeile `native-build-<plattform>-<40 hex>`.
+# Schlüssel der Marke „nativ gebaut und gestartet" aus
+# .github/workflows/native-build.yml: Trägt ein Lauf einen Schlüssel, der schon
+# grün gebaut und gestartet wurde, überspringt der Job Prebuild, Compile und
+# Startcheck. Aufruf: scripts/native-build-key.sh <ios|android>, Ausgabe genau
+# eine Zeile `native-build-<plattform>-<40 hex>`.
 #
 # Im Schlüssel: der Fingerprint von @expo/fingerprint (native Paketversionen,
 # app.json samt Config-Plugins und referenzierten Dateien, Autolinking), dazu
-# mise.toml, bun.lock, native-build.yml und dieses Skript, bei iOS die
-# Xcode-Version. bun.lock ist drin, weil der Fingerprint native Pakete nur als
-# name@version kennt; die Werkzeuge, die Prebuild und Autolinking ausführen
-# (@expo/cli, @expo/prebuild-config, @expo/config-plugins,
-# expo-modules-autolinking) und deren Abhängigkeiten stehen nur dort. Jede
-# Abhängigkeitsänderung baut daher voll, reine TypeScript-Änderungen nicht.
+# mise.toml, bun.lock, native-build.yml, dieses Skript und der Startcheck
+# (.maestro/startcheck.yaml, scripts/startcheck.sh), bei iOS die
+# Xcode-Version. Der Startcheck ist drin, weil die Marke auch für ihn steht:
+# Ändert sich nur der Check, muss er trotzdem einmal laufen, statt hinter
+# einer alten Marke zu verschwinden. bun.lock ist drin, weil der Fingerprint
+# native Pakete nur als name@version kennt; die Werkzeuge, die Prebuild und
+# Autolinking ausführen (@expo/cli, @expo/prebuild-config,
+# @expo/config-plugins, expo-modules-autolinking) und deren Abhängigkeiten
+# stehen nur dort. Jede Abhängigkeitsänderung baut daher voll, reine
+# TypeScript-Änderungen nicht.
 # Die Versionsfelder (expo.version, ios.buildNumber, android.versionCode)
 # streicht das Preset `balanced`; sie können keinen Compile brechen.
 # Bewusst nicht: das Ubuntu-Image des Android-Runners (sonst nach jedem
@@ -64,7 +69,7 @@ if ! [[ $fingerprint =~ $hex40 ]]; then
   exit 1
 fi
 
-files="$(shasum -a 256 mise.toml bun.lock .github/workflows/native-build.yml scripts/native-build-key.sh)"
+files="$(shasum -a 256 mise.toml bun.lock .github/workflows/native-build.yml scripts/native-build-key.sh .maestro/startcheck.yaml scripts/startcheck.sh)"
 
 xcode=""
 if [ "$platform" = ios ]; then
