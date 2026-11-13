@@ -89,10 +89,17 @@ describe("startcheck.sh verdict", () => {
 // Läufen und hält fest, was in dem Moment in startcheck-artifacts/result steht.
 // Den Weg „grün nach Wiederholung" erreicht CI nur nach einem echten
 // Aussetzer; nachstellen lässt er sich nur hier.
+const installFailsHelper = `fake_install_fails() {
+  n=$(( $(cat "$FAKE_DIR/installs" 2>/dev/null || echo 0) + 1 ))
+  echo "$n" >"$FAKE_DIR/installs"
+  [ "$n" -le "\${FAKE_INSTALL_FAILS:-0}" ]
+}
+`;
 const fakes: Record<string, string> = {
   adb: `#!/usr/bin/env bash
 echo "adb $*" >>"$FAKE_DIR/calls"
 case "$1" in
+  install) fake_install_fails && exit 1 ;;
   exec-out) echo png ;;
   logcat) [ "$2" = -d ] && echo log ;;
 esac
@@ -101,6 +108,7 @@ exit 0
   xcrun: `#!/usr/bin/env bash
 echo "xcrun $*" >>"$FAKE_DIR/calls"
 case "$2" in
+  install) fake_install_fails && exit 1 ;;
   io) echo png >"$5" ;;
   spawn) echo log ;;
 esac
@@ -124,7 +132,7 @@ function artifact(name: string) {
   return join(root, "startcheck-artifacts", name);
 }
 
-function runCheck(platform: "android" | "ios", flowFails: number) {
+function runCheck(platform: "android" | "ios", flowFails: number, installFails = 0) {
   const proc = Bun.spawnSync(
     ["bash", join(root, "scripts", "startcheck.sh"), "run", platform, "app.bin"],
     {
@@ -136,6 +144,7 @@ function runCheck(platform: "android" | "ios", flowFails: number) {
         HOME: root,
         FAKE_DIR: root,
         FAKE_FLOW_FAILS: String(flowFails),
+        FAKE_INSTALL_FAILS: String(installFails),
         STARTCHECK_SIM_UDID: "SIM-UDID",
       },
     },
@@ -152,7 +161,8 @@ describe("startcheck.sh run", () => {
   beforeEach(() => {
     mkdirSync(join(root, "bin"));
     for (const [name, script] of Object.entries(fakes)) {
-      writeFileSync(join(root, "bin", name), script, { mode: 0o755 });
+      const body = script.replace("\n", `\n${installFailsHelper}`);
+      writeFileSync(join(root, "bin", name), body, { mode: 0o755 });
     }
   });
 
@@ -185,6 +195,23 @@ describe("startcheck.sh run", () => {
     expect(run.calls.filter((call) => call.startsWith("maestro test"))).toHaveLength(2);
   });
 
+  test("Installieren scheitert im ersten Versuch: kein Flow, zweiter Versuch installiert neu", () => {
+    const run = runCheck("android", 0, 1);
+    expect(run.exitCode).toBe(0);
+    expect(run.result).toBe("ok\n");
+    expect(run.stdout).toContain(
+      "::warning title=Startcheck::Android: erster Versuch fehlgeschlagen",
+    );
+    const steps = run.calls.filter(
+      (call) => call.startsWith("adb install") || call.startsWith("maestro test"),
+    );
+    expect(steps.map((call) => call.split(" ").slice(0, 2).join(" "))).toEqual([
+      "adb install",
+      "adb install",
+      "maestro test",
+    ]);
+  });
+
   test("iOS: zweiter Versuch installiert neu, auf demselben Simulator", () => {
     const run = runCheck("ios", 1);
     expect(run.exitCode).toBe(0);
@@ -197,5 +224,50 @@ describe("startcheck.sh run", () => {
     const flows = run.calls.filter((call) => call.startsWith("maestro test"));
     expect(flows).toHaveLength(2);
     for (const flow of flows) expect(flow).toContain("--device SIM-UDID");
+  });
+});
+
+// install-maestro: Die Prüfsumme muss vor dem Entpacken und vor dem PATH-Eintrag
+// greifen. Die `&&`-Kette in fetch_maestro trägt das; als einzelne Zeilen liefe
+// sie unter `if` ohne `set -e` einfach weiter.
+describe("startcheck.sh install-maestro", () => {
+  test("falsche Prüfsumme: Exit ≠ 0, kein unzip, kein PATH-Eintrag", () => {
+    const bin = join(root, "bin");
+    mkdirSync(bin);
+    writeFileSync(
+      join(bin, "curl"),
+      `#!/usr/bin/env bash
+while [ "$#" -gt 0 ]; do
+  [ "$1" = -o ] && echo "kein maestro" >"$2"
+  shift
+done
+`,
+      { mode: 0o755 },
+    );
+    writeFileSync(
+      join(bin, "unzip"),
+      `#!/usr/bin/env bash
+echo "unzip $*" >>"$FAKE_DIR/calls"
+`,
+      { mode: 0o755 },
+    );
+    const githubPath = join(root, "github-path");
+    writeFileSync(githubPath, "");
+    const proc = Bun.spawnSync(
+      ["bash", join(root, "scripts", "startcheck.sh"), "install-maestro"],
+      {
+        cwd: root,
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          FAKE_DIR: root,
+          RUNNER_TEMP: join(root, "runner-temp"),
+          GITHUB_PATH: githubPath,
+        },
+      },
+    );
+    expect(proc.exitCode).not.toBe(0);
+    expect(existsSync(join(root, "calls"))).toBe(false);
+    expect(readFileSync(githubPath, "utf8")).toBe("");
   });
 });
