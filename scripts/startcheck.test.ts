@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -73,5 +81,121 @@ describe("startcheck.sh verdict", () => {
     const run = verdict();
     expect(run.exitCode).toBe(2);
     expect(run.stderr).toContain("verdict <ios|android>");
+  });
+});
+
+// Attrappen für `run`, vorn im PATH: Jede protokolliert ihren Aufruf nach
+// $FAKE_DIR/calls. `maestro test` scheitert in den ersten $FAKE_FLOW_FAILS
+// Läufen und hält fest, was in dem Moment in startcheck-artifacts/result steht.
+// Den Weg „grün nach Wiederholung" erreicht CI nur nach einem echten
+// Aussetzer; nachstellen lässt er sich nur hier.
+const fakes: Record<string, string> = {
+  adb: `#!/usr/bin/env bash
+echo "adb $*" >>"$FAKE_DIR/calls"
+case "$1" in
+  exec-out) echo png ;;
+  logcat) [ "$2" = -d ] && echo log ;;
+esac
+exit 0
+`,
+  xcrun: `#!/usr/bin/env bash
+echo "xcrun $*" >>"$FAKE_DIR/calls"
+case "$2" in
+  io) echo png >"$5" ;;
+  spawn) echo log ;;
+esac
+exit 0
+`,
+  maestro: `#!/usr/bin/env bash
+echo "maestro $*" >>"$FAKE_DIR/calls"
+[ "$1" = test ] || exit 0
+cat "$FAKE_DIR/startcheck-artifacts/result" >>"$FAKE_DIR/result-during-flow"
+while [ "$#" -gt 0 ]; do
+  [ "$1" = --debug-output ] && mkdir -p "$2"
+  shift
+done
+flows=$(( $(cat "$FAKE_DIR/flows" 2>/dev/null || echo 0) + 1 ))
+echo "$flows" >"$FAKE_DIR/flows"
+[ "$flows" -gt "$FAKE_FLOW_FAILS" ]
+`,
+};
+
+function artifact(name: string) {
+  return join(root, "startcheck-artifacts", name);
+}
+
+function runCheck(platform: "android" | "ios", flowFails: number) {
+  const proc = Bun.spawnSync(
+    ["bash", join(root, "scripts", "startcheck.sh"), "run", platform, "app.bin"],
+    {
+      cwd: root,
+      env: {
+        ...process.env,
+        PATH: `${join(root, "bin")}:${process.env.PATH}`,
+        // Die iOS-Diagnose kopiert Absturzberichte aus ~/Library; so nur aus dem Temp-Verzeichnis.
+        HOME: root,
+        FAKE_DIR: root,
+        FAKE_FLOW_FAILS: String(flowFails),
+        STARTCHECK_SIM_UDID: "SIM-UDID",
+      },
+    },
+  );
+  return {
+    exitCode: proc.exitCode,
+    stdout: proc.stdout.toString(),
+    result: readFileSync(artifact("result"), "utf8"),
+    calls: readFileSync(join(root, "calls"), "utf8").trimEnd().split("\n"),
+  };
+}
+
+describe("startcheck.sh run", () => {
+  beforeEach(() => {
+    mkdirSync(join(root, "bin"));
+    for (const [name, script] of Object.entries(fakes)) {
+      writeFileSync(join(root, "bin", name), script, { mode: 0o755 });
+    }
+  });
+
+  test("während des Flows steht fail in result, erst danach ok", () => {
+    const run = runCheck("android", 0);
+    expect(run.exitCode).toBe(0);
+    expect(readFileSync(join(root, "result-during-flow"), "utf8")).toBe("fail\n");
+    expect(run.result).toBe("ok\n");
+    expect(run.stdout).not.toContain("::warning");
+  });
+
+  test("erster Versuch scheitert, zweiter besteht: grün mit Warnung und Diagnose", () => {
+    const run = runCheck("android", 1);
+    expect(run.exitCode).toBe(0);
+    expect(run.result).toBe("ok\n");
+    expect(run.stdout).toContain(
+      "::warning title=Startcheck::Android: erster Versuch fehlgeschlagen, zweiter läuft",
+    );
+    expect(existsSync(artifact("device-1.log"))).toBe(true);
+    expect(existsSync(artifact("screen-1.png"))).toBe(true);
+    expect(existsSync(artifact("device-2.log"))).toBe(false);
+    expect(run.calls.filter((call) => call === "adb install -r app.bin")).toHaveLength(2);
+  });
+
+  test("beide Versuche scheitern: rot, result bleibt fail", () => {
+    const run = runCheck("android", 2);
+    expect(run.exitCode).toBe(1);
+    expect(run.result).toBe("fail\n");
+    expect(existsSync(artifact("device-2.log"))).toBe(true);
+    expect(run.calls.filter((call) => call.startsWith("maestro test"))).toHaveLength(2);
+  });
+
+  test("iOS: zweiter Versuch installiert neu, auf demselben Simulator", () => {
+    const run = runCheck("ios", 1);
+    expect(run.exitCode).toBe(0);
+    expect(run.result).toBe("ok\n");
+    expect(existsSync(artifact("screen-1.png"))).toBe(true);
+    expect(existsSync(artifact("device-1.log"))).toBe(true);
+    expect(
+      run.calls.filter((call) => call === "xcrun simctl install SIM-UDID app.bin"),
+    ).toHaveLength(2);
+    const flows = run.calls.filter((call) => call.startsWith("maestro test"));
+    expect(flows).toHaveLength(2);
+    for (const flow of flows) expect(flow).toContain("--device SIM-UDID");
   });
 });
