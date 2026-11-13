@@ -38,7 +38,7 @@ env:
 # Three independent jobs, deliberately WITHOUT `needs:` between them. Runner
 # minutes are free on a public repo, so the only currency is wall-clock: running
 # them in parallel makes the PR wait max(bundle, android, ios) instead of the
-# sum. iOS dominates either way.
+# sum. The longer of the two native jobs sets the wait.
 #
 # Toolchain comes from mise.toml via mise-action (java · node · bun) —
 # NOT from setup-bun as in ci.yml. The native builds are exactly where the pins
