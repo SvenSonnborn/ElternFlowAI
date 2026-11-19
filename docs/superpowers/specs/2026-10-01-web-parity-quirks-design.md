@@ -2,7 +2,7 @@
 
 **Status:** Approved (Brainstorming)
 **Date:** 2026-10-01
-**Auftrag:** [docs/roadmap.md](../../roadmap.md) → Block 3 — Web-Parität, zweiter von zwei PRs. Die Roadmap verlangt für alle drei Punkte zuerst eine Diagnose; dieses Dokument hält ihr Ergebnis und die daraus folgenden Fixes fest.
+**Auftrag:** Roadmap (Fassung bis 2026-11-18) → Block 3 — Web-Parität, zweiter von zwei PRs. Die Roadmap verlangt für alle drei Punkte zuerst eine Diagnose; dieses Dokument hält ihr Ergebnis und die daraus folgenden Fixes fest.
 **Decision-Log:** ein ADR (040) am Branch-Ende.
 
 ## 1. Befund

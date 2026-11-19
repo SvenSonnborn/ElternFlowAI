@@ -593,5 +593,8 @@ Keine Arbeit, solange der Auslöser nicht eintritt.
   Text eines Eintrags lebt nur an einer Stelle (CLAUDE.md → „Wo was steht").
 - **Keine Links auf Schritt-Anker** aus ADRs, Specs oder Plänen — sie verschwinden mit dem Schritt.
   Einzige Ausnahme ist die Überschrift von Block 10.
+- **Alte Nummern.** ADRs, Specs und Pläne bis 2026-11-18 nennen Blöcke und Punkte der vorigen
+  Fassung (Block 1–9, 1.3, 8.3 …). Die Schritte hier sind neu nummeriert und entsprechen ihnen nicht;
+  was ein alter Block umgesetzt hat, steht im ADR, der ihn nennt.
 - **Verschiebt sich die Reihenfolge**, gehört der Grund in den Schritt — diese Datei ist eine
   Begründung, keine Liste.
