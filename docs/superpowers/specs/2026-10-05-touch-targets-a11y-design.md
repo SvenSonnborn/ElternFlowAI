@@ -2,7 +2,7 @@
 
 **Status:** Approved (Brainstorming)
 **Date:** 2026-10-05
-**Auftrag:** [docs/roadmap.md](../../roadmap.md) → [Block 4 — Touch-Targets & a11y](../../roadmap.md#block-4--touch-targets--a11y). Alle Punkte in einem PR, danach eine gemeinsame Sichtprüfung.
+**Auftrag:** [docs/roadmap.md](../../roadmap.md) → Block 4 — Touch-Targets & a11y. Alle Punkte in einem PR, danach eine gemeinsame Sichtprüfung.
 **Decision-Log:** ein ADR (041) am Branch-Ende.
 
 ## 1. Befund

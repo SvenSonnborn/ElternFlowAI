@@ -2,7 +2,7 @@
 
 **Status:** Approved (Brainstorming)
 **Date:** 2026-10-20
-**Auftrag:** [docs/roadmap.md](../../roadmap.md) → [Block 5 — Der RN-Component-Test-Pfad](../../roadmap.md#block-5--der-rn-component-test-pfad-schlussstein). Voraussetzung: PR #129 (Expo-Pakete inklusive `jest-expo` auf SDK-57-Stand) ist gemergt.
+**Auftrag:** [docs/roadmap.md](../../roadmap.md) → Block 5 — Der RN-Component-Test-Pfad. Voraussetzung: PR #129 (Expo-Pakete inklusive `jest-expo` auf SDK-57-Stand) ist gemergt.
 **Decision-Log:** ein ADR (042) am Branch-Ende.
 
 ## 1. Worum es geht

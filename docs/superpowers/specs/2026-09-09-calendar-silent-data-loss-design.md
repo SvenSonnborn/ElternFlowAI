@@ -2,7 +2,7 @@
 
 **Status:** Approved (Brainstorming Phase)
 **Date:** 2026-09-09
-**Auftrag:** [docs/roadmap.md](../../roadmap.md) → [Block 1 — Stiller Datenverlust im Kalender](../../roadmap.md#block-1--stiller-datenverlust-im-kalender)
+**Auftrag:** [docs/roadmap.md](../../roadmap.md) → Block 1 — Stiller Datenverlust im Kalender
 **Decision-Log:** drei ADRs nach Implementation — **032** Serienanker (PR 2), **033** Zonenmodell (PR 3), **034** Occurrence-Schlüssel (PR 4). Drei getrennte Verträge, die nichts miteinander zu tun haben; sie in einen ADR zu pressen hieße, den Grund des einen im Text des anderen zu verstecken. Alle drei ergänzen [ADR-008](../../decision-log.md) (Recurrence-V1) und [ADR-031](../../decision-log.md) (Conflict-Detection), lösen nichts ab
 
 ---
