@@ -8,7 +8,7 @@
 
 **Tech Stack:** Postgres (Supabase MCP `apply_migration`), TypeScript strict, `rrule@2.8.1`, `Intl.DateTimeFormat` (Hermes), `expo-localization`, `bun test`.
 
-**Spec:** [docs/superpowers/specs/2026-09-09-calendar-silent-data-loss-design.md](../specs/2026-09-09-calendar-silent-data-loss-design.md) — §5. Dritter von vier PRs aus [Block 1 der Roadmap](../../roadmap.md#block-1--stiller-datenverlust-im-kalender); PR A (#117) und PR B (#118) sind gemergt.
+**Spec:** [docs/superpowers/specs/2026-09-09-calendar-silent-data-loss-design.md](../specs/2026-09-09-calendar-silent-data-loss-design.md) — §5. Dritter von vier PRs aus Block 1 der Roadmap; PR A (#117) und PR B (#118) sind gemergt.
 
 ## Global Constraints
 

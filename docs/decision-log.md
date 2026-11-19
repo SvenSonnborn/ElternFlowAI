@@ -1269,7 +1269,7 @@ Vor der ersten Zeile Code stand deshalb eine Gegenprobe: Trägt natives `Intl.Da
 
 ### Status
 
-Accepted. Ergänzt [ADR-008](#adr-008--kalender-v1-abgeschlossen-reminder-recurrence-editor-multi-day-2026-07-28), [ADR-032](#adr-032--alle-termine-verankert-die-serie-nicht-neu-2026-09-09) und [ADR-033](#adr-033--serien-werten-in-wandzeit-aus-eventstimezone-kein-tzid-2026-09-09). Löst nichts ab. Dritter von drei ADRs aus Block 1 der Roadmap (032 Anker → 033 Zonenmodell → 034 Occurrence-Schlüssel) — deckt D1 der beiden in [Roadmap 1.3](./roadmap.md#13-das-override-modell-verschwundene-exceptions--versions-schlüssel--erledigt) gebündelten Einträge ab. D2 (die Kandidatenmenge für aus dem Fenster verschobene Exceptions) bleibt offen.
+Accepted. Ergänzt [ADR-008](#adr-008--kalender-v1-abgeschlossen-reminder-recurrence-editor-multi-day-2026-07-28), [ADR-032](#adr-032--alle-termine-verankert-die-serie-nicht-neu-2026-09-09) und [ADR-033](#adr-033--serien-werten-in-wandzeit-aus-eventstimezone-kein-tzid-2026-09-09). Löst nichts ab. Dritter von drei ADRs aus Block 1 der Roadmap (032 Anker → 033 Zonenmodell → 034 Occurrence-Schlüssel) — deckt D1 der beiden in Roadmap 1.3 gebündelten Einträge ab. D2 (die Kandidatenmenge für aus dem Fenster verschobene Exceptions) bleibt offen.
 
 ### Context
 
@@ -1298,13 +1298,13 @@ Der Schreibpfad hatte zusätzlich sein eigenes, symmetrisches Problem: `anchored
 - Der vorbestehende Fehler in `expand.ts` (`occurrenceVersion` mit aufgelöstem statt Regel-Datum aufgerufen) ist mit behoben. Der zugehörige TODO-Eintrag „Eine auf einen anderen Tag verschobene Occurrence fällt aus dem Versions-Schlüssel" ist damit erledigt und entfernt.
 - [ADR-033](#adr-033--serien-werten-in-wandzeit-aus-eventstimezone-kein-tzid-2026-09-09)s Consequences hatten die Schreibpfad-Lücke (Decision 5 hier) als neu benannt; beim Umbau kam zusätzlich der Forward-Schnitt als zweite, unabhängige Vermischung desselben Musters zutage (`occurrenceDate` entstand in der Geräte-Zone, `endOfDayInstant` interpretierte es in `master.timezone`). Beide sind mit diesem PR geschlossen; der zugehörige TODO-Eintrag ist entfernt.
 - Eine Grenze bleibt offen und steht in [docs/TODO.md](./TODO.md): Deep-Links von vor diesem PR landen auf der falschen Occurrence derselben Serie (Decision 4). Die zweite, hier ursprünglich genannte Grenze — `canApplyOptimistically`s Geräte-zonen-Vergleich (Decision 6) — ist noch auf diesem Zweig geschlossen worden, bevor er gemergt wurde; der zugehörige TODO-Eintrag ist entfernt.
-- [Roadmap 1.3](./roadmap.md#13-das-override-modell-verschwundene-exceptions--versions-schlüssel--erledigt) bleibt zur Hälfte offen: Der Versions-Schlüssel-Teil (D1) ist mit diesem ADR abgeschlossen, die Kandidatenmenge für aus dem Fenster verschobene `modified`-Exceptions (D2 — `expand.ts`s `expandRecurrence` müsste `event_exceptions` selbst einbeziehen) bleibt offen und bekommt einen eigenen PR.
+- Roadmap 1.3 bleibt zur Hälfte offen: Der Versions-Schlüssel-Teil (D1) ist mit diesem ADR abgeschlossen, die Kandidatenmenge für aus dem Fenster verschobene `modified`-Exceptions (D2 — `expand.ts`s `expandRecurrence` müsste `event_exceptions` selbst einbeziehen) bleibt offen und bekommt einen eigenen PR.
 
 ## ADR-035 — Der Override-Vertrag: Kandidaten aus `event_exceptions`, `description` im Vertrag (2026-09-15)
 
 ### Status
 
-Accepted. Ergänzt [ADR-008](#adr-008--kalender-v1-abgeschlossen-reminder-recurrence-editor-multi-day-2026-07-28), [ADR-033](#adr-033--serien-werten-in-wandzeit-aus-eventstimezone-kein-tzid-2026-09-09) und [ADR-034](#adr-034--der-occurrence-schlüssel-occurrencekey-trennt-regel-datum-von-anzeigedatum-2026-09-14). Löst nichts ab. Vierter ADR aus Block 1 der Roadmap: ADR-032/033/034 zählten drei, weil die Kandidatenmenge (D2) dort als offener Rest neben dem Occurrence-Schlüssel (D1) stand; dieser ADR schließt sie und damit [Roadmap 1.3](./roadmap.md#13-das-override-modell-verschwundene-exceptions--versions-schlüssel--erledigt).
+Accepted. Ergänzt [ADR-008](#adr-008--kalender-v1-abgeschlossen-reminder-recurrence-editor-multi-day-2026-07-28), [ADR-033](#adr-033--serien-werten-in-wandzeit-aus-eventstimezone-kein-tzid-2026-09-09) und [ADR-034](#adr-034--der-occurrence-schlüssel-occurrencekey-trennt-regel-datum-von-anzeigedatum-2026-09-14). Löst nichts ab. Vierter ADR aus Block 1 der Roadmap: ADR-032/033/034 zählten drei, weil die Kandidatenmenge (D2) dort als offener Rest neben dem Occurrence-Schlüssel (D1) stand; dieser ADR schließt sie und damit Roadmap 1.3.
 
 ### Context
 
@@ -1353,13 +1353,13 @@ Der **Kollisionsfall** fällt damit mit an: Der 20.07. ist ein Montag, an dem di
 - **Die Sichtbarkeit endet am Fetch-Prädikat, nicht an der Kandidatenmenge.** Decision 1 behebt die Expansion, nicht das Laden: `fetchEventsInRange` ([features/calendar/queries.ts](../features/calendar/queries.ts)) lädt eine Zeile nur, wenn `start_at` vor dem Fensterende liegt **und** `rrule_until` entweder `null` ist oder nicht vor dem Fensterstart liegt. Verschiebt ein Override eine Occurrence per Scope „Nur diesen" über `rrule_until` hinaus oder vor `start_at` zurück, greift keine der beiden Bedingungen — die Master-Zeile wird für dieses Fenster gar nicht erst geladen, und die Kandidatenmenge sieht sie nie. Die Occurrence bleibt dann im Monatsraster unsichtbar, an beiden Daten, genau wie vor diesem ADR. Über einen Direktlink bleibt sie erreichbar, weil `useEvent` per `id` über `fetchEventById` lädt, nicht über das Range-Prädikat. Vorbestehend, von diesem ADR nicht behoben; die Grenze steht als eigener Eintrag in [docs/TODO.md](./TODO.md).
 - **Ein Nebenbefund aus derselben Prüfung wurde mitbehoben, stammt aber nicht aus diesem ADR.** Der Rundlauf-Check von Decision 8 deckte auf, dass `zoneOffsetMs` ([timezone.ts](../features/calendar/timezone.ts)) dieselbe Jahrhundert-Abbildung enthält wie der ursprünglich in `zonedDayBounds` entfernte zweite `Date.UTC`-Aufruf — nur unabhängig davon und mit größerem Wirkradius: `asUtc` entstand dort per `Date.UTC(at("year"), …)`, und für jedes Instant, dessen Wandzeit-Jahr in der Zielzone unter 100 liegt, bildete das auf 1900+ ab. Gemessen: `zoneOffsetMs(new Date("0099-06-15T12:00:00.000Z"), "UTC")` lieferte `59958144000000` statt `0` — in **jeder** Zone, auch `UTC`, wo der Offset exakt `0` sein muss, weil `formatToParts` selbst korrekt `year: "99"` liefert (keine `era`, keine Sonderform; geprüft). Betroffen war damit potenziell jede Funktion, die über `instantToFloating`/`floatingToInstant` lokalisiert — `mergeDateAndTimeOfDay`, `zonedDateKey`, `zonedDayBounds` selbst —, nicht nur der hier behandelte Fall. **Dieser Bug stammt aus [ADR-033](#adr-033--serien-werten-in-wandzeit-aus-eventstimezone-kein-tzid-2026-09-09), dem allerersten Commit von `timezone.ts`, und wurde nicht von diesem PR eingeführt** — er wurde bislang nur nie ausgelöst, weil `zonedDayBounds`s eigener (jetzt entfernter) `Date.UTC`-Aufruf jedes Jahr unter 100 schon vor dem Aufruf von `floatingToInstant` auf 1900+ hochgemappt hatte und `zoneOffsetMs` deshalb nie ein rohes zweistelliges Jahr zu Gesicht bekam. Der Fix ändert ausschließlich die Konstruktion von `asUtc` (`new Date(0)` plus `setUTCFullYear`/`setUTCHours` statt `Date.UTC`); für Jahre ≥ 100 ist das Ergebnis nachweislich bit-identisch (u. a. die `America/Sitka`-1867-Fixture in `expand.test.ts` und alle DST-Tests bleiben unverändert grün).
 - **`all_day` bleibt der einzige offene Punkt des Override-Vertrags** und ist 🎨-blockiert: Der Code-Weg ist mit `description` vorgezeichnet, der Blocker ist allein der fehlende `cal.edit.*`-Copy-Key für den Ganztages-Schalter im Bearbeiten-Formular.
-- [Roadmap 1.3](./roadmap.md#13-das-override-modell-verschwundene-exceptions--versions-schlüssel--erledigt) ist damit vollständig — D1 mit [ADR-034](#adr-034--der-occurrence-schlüssel-occurrencekey-trennt-regel-datum-von-anzeigedatum-2026-09-14), D2 mit diesem ADR — und **Block 1 der Roadmap ist damit codeseitig abgearbeitet**: fünf PRs ([#117](https://github.com/SvenSonnborn/ElternFlowAI/pull/117) · [#118](https://github.com/SvenSonnborn/ElternFlowAI/pull/118) · [#119](https://github.com/SvenSonnborn/ElternFlowAI/pull/119) · [#121](https://github.com/SvenSonnborn/ElternFlowAI/pull/121) · dieser), vier ADRs, jeder mit einem Regressionstest, der vor dem Fix rot war. Offen bleibt allein der letzte Punkt der Definition of done dieses Blocks, die **Sichtprüfung der Serienbearbeitung am Simulator** — Web reicht dafür nicht, weil der Termin-Löschpfad dort gar nicht auslösbar ist (Block 3).
+- Roadmap 1.3 ist damit vollständig — D1 mit [ADR-034](#adr-034--der-occurrence-schlüssel-occurrencekey-trennt-regel-datum-von-anzeigedatum-2026-09-14), D2 mit diesem ADR — und **Block 1 der Roadmap ist damit codeseitig abgearbeitet**: fünf PRs ([#117](https://github.com/SvenSonnborn/ElternFlowAI/pull/117) · [#118](https://github.com/SvenSonnborn/ElternFlowAI/pull/118) · [#119](https://github.com/SvenSonnborn/ElternFlowAI/pull/119) · [#121](https://github.com/SvenSonnborn/ElternFlowAI/pull/121) · dieser), vier ADRs, jeder mit einem Regressionstest, der vor dem Fix rot war. Offen bleibt allein der letzte Punkt der Definition of done dieses Blocks, die **Sichtprüfung der Serienbearbeitung am Simulator** — Web reicht dafür nicht, weil der Termin-Löschpfad dort gar nicht auslösbar ist (Block 3).
 
 ## ADR-036 — Der Aufgaben-Schreibpfad bekommt den Schnitt des Kalenders (2026-09-17)
 
 ### Status
 
-Accepted. Ergänzt [ADR-031](#adr-031--conflict-detection-updated_at-beleben-dreiwertig-vergleichen-ein-dialog-im-root-layout-2026-09-04); löst nichts ab. Setzt [Roadmap 2.1](./roadmap.md#21-featurestasksmutationsts-umbauen--erledigt) um. Spec: [2026-09-17-tasks-delete-path-conflict-gaps-design.md](./superpowers/specs/2026-09-17-tasks-delete-path-conflict-gaps-design.md) §3 („PR 1 — Der Aufgaben-Schreibpfad").
+Accepted. Ergänzt [ADR-031](#adr-031--conflict-detection-updated_at-beleben-dreiwertig-vergleichen-ein-dialog-im-root-layout-2026-09-04); löst nichts ab. Setzt Roadmap 2.1 um. Spec: [2026-09-17-tasks-delete-path-conflict-gaps-design.md](./superpowers/specs/2026-09-17-tasks-delete-path-conflict-gaps-design.md) §3 („PR 1 — Der Aufgaben-Schreibpfad").
 
 ### Context
 
@@ -1390,7 +1390,7 @@ Accepted. Zwei verschiedene Verhältnisse zu [ADR-031](#adr-031--conflict-detect
 - **Ergänzung.** Ergänzt außerdem [ADR-036](#adr-036--der-aufgaben-schreibpfad-bekommt-den-schnitt-des-kalenders-2026-09-17); löst keins von beiden ab.
 - **Supersession** der letzten Aussage in ADR-031 Decision 12: „Beim CAS-Fall ohne fremde Fassung (`EventConflictError(null)`) gibt es nichts zu vergleichen; dort erscheint der Dialog **ohne** Zeilen, weil die Alternative — stilles Durchwinken — genau der Fehler wäre, gegen den diese Iteration gebaut ist." Diesen Fall gibt es seit diesem PR nicht mehr: Bei null getroffenen Zeilen liest `updateMaster` seither nach ([features/calendar/recurrence.ts](../features/calendar/recurrence.ts)) und wirft entweder `EventConflictError` **mit** der fremden Zeile oder, wenn auch die Nachlese leer bleibt, `EventNotFoundError` — nie mehr `EventConflictError(null)`. ADR-031 bleibt unverändert stehen; diese eine Aussage dort ist ab 2026-09-18 überholt. **Der Rest von Decision 12 gilt unverändert weiter:** Ein leerer Feldvergleich heißt weiterhin „kein Dialog, Schreibvorgang läuft mit frischer Basis durch", und ein Dialog **ohne** Vergleichszeilen bleibt möglich — aber nicht mehr aus dem in Decision 12 genannten Grund (dem CAS-Fall ohne fremde Fassung), sondern aus den dort nicht behandelten: `theirs === null`, wenn die angeforderte Occurrence außerhalb des Suchfensters lag (Decision 6 unten), einer beim Eintreffen des Konflikts noch nicht hydrierten Basis (`baseOccurrence`/`baseTask === null`), oder einem erschöpften Auto-Retry-Limit, ohne dass ein Feld abweicht. Der leere Dialog verschwindet nicht; nur der eine Auslöser, bei dem die fremde Fassung unbekannt war, tut es.
 
-Setzt den zweiten Spiegelstrich von [Roadmap 2.2](./roadmap.md#22-die-zwei-löcher-in-der-conflict-detection--erledigt) um — der erste, die fehlende Wiederholungsregel im Vergleich, bleibt offen und ist für ADR-038 (PR 3) vorgesehen. Zweiter von drei ADRs aus Block 2 der Roadmap (036 Aufgaben-Schreibpfad → 037 dieser → 038 die Regel im Vergleich). Spec: [2026-09-17-tasks-delete-path-conflict-gaps-design.md](./superpowers/specs/2026-09-17-tasks-delete-path-conflict-gaps-design.md) §4 („PR 2 — Der CAS-Fall trägt seine Zeile").
+Setzt den zweiten Spiegelstrich von Roadmap 2.2 um — der erste, die fehlende Wiederholungsregel im Vergleich, bleibt offen und ist für ADR-038 (PR 3) vorgesehen. Zweiter von drei ADRs aus Block 2 der Roadmap (036 Aufgaben-Schreibpfad → 037 dieser → 038 die Regel im Vergleich). Spec: [2026-09-17-tasks-delete-path-conflict-gaps-design.md](./superpowers/specs/2026-09-17-tasks-delete-path-conflict-gaps-design.md) §4 („PR 2 — Der CAS-Fall trägt seine Zeile").
 
 ### Context
 
@@ -1414,7 +1414,7 @@ Setzt den zweiten Spiegelstrich von [Roadmap 2.2](./roadmap.md#22-die-zwei-löch
 
 ### Status
 
-Accepted. Ergänzt [ADR-031](#adr-031--conflict-detection-updated_at-beleben-dreiwertig-vergleichen-ein-dialog-im-root-layout-2026-09-04) und [ADR-037](#adr-037--der-compare-and-swap-fall-trägt-seine-zeile-updatemaster-liest-nach-eventconflicterrorrow-wird-nicht-nullable-2026-09-18); löst nichts ab. Setzt den ersten Spiegelstrich von [Roadmap 2.2](./roadmap.md#22-die-zwei-löcher-in-der-conflict-detection--erledigt) um — den zweiten hat ADR-037 umgesetzt — und ist der letzte von drei ADRs aus Block 2 der Roadmap (036 Aufgaben-Schreibpfad → 037 Nachlese im CAS-Fall → 038 dieser). Spec: [2026-09-17-tasks-delete-path-conflict-gaps-design.md](./superpowers/specs/2026-09-17-tasks-delete-path-conflict-gaps-design.md) §5 („PR 3 — Die Regel im Vergleich"), einschließlich des Nachtrags §5.0 vom 2026-09-18 und seines Punkts 4 vom 2026-09-30.
+Accepted. Ergänzt [ADR-031](#adr-031--conflict-detection-updated_at-beleben-dreiwertig-vergleichen-ein-dialog-im-root-layout-2026-09-04) und [ADR-037](#adr-037--der-compare-and-swap-fall-trägt-seine-zeile-updatemaster-liest-nach-eventconflicterrorrow-wird-nicht-nullable-2026-09-18); löst nichts ab. Setzt den ersten Spiegelstrich von Roadmap 2.2 um — den zweiten hat ADR-037 umgesetzt — und ist der letzte von drei ADRs aus Block 2 der Roadmap (036 Aufgaben-Schreibpfad → 037 Nachlese im CAS-Fall → 038 dieser). Spec: [2026-09-17-tasks-delete-path-conflict-gaps-design.md](./superpowers/specs/2026-09-17-tasks-delete-path-conflict-gaps-design.md) §5 („PR 3 — Die Regel im Vergleich"), einschließlich des Nachtrags §5.0 vom 2026-09-18 und seines Punkts 4 vom 2026-09-30.
 
 ### Context
 
@@ -1469,14 +1469,14 @@ Der TODO-Eintrag, aus dem dieser Auftrag stammte, fasste den Schaden einmal zu b
   Beide bestehen seit ADR-031 — jeder dieser fremden Schreibvorgänge ändert Master oder Exception, und der Pre-Flight schlägt an —, erkannt sind sie erst mit diesem ADR. ADR-037 bleibt unverändert; dieser ADR hält die richtige Erklärung fest.
 
 - **Zwei Regeln, die dieselben Termine verschieden beschreiben, gelten weiterhin als verschieden** — wöchentlich ohne Wochentag gegen wöchentlich am Wochentag des Serienstarts: `sameRule` vergleicht Spalten, nicht Termine, wie schon das alte `ruleDiffers`. Meldet `differingEventFields` so einen Fall, zeigt der Dialog zwei gleiche Werte (der Rückfall aus Decision 5). Ein Konflikt, der harmloser aussieht, als er formal ist, ist die sichere Richtung.
-- **Der Anker aus Decision 5 hat keinen Regressionstest.** Dass der Screen `range.startAt` an den Helfer übergibt statt `vars.changes.start_at`, steht in `EventEditScreen`, und der ist unter `bun test` nicht ladbar; der Helfer bekommt den Wert als Parameter und kann den Fehler nicht selbst begehen. Belegt ist es durch Codelektüre und den Kommentar an der Aufrufstelle — derselbe fehlende Render-Pfad wie bei ADR-031 und ADR-036 ([Roadmap Block 5](./roadmap.md#block-5--der-rn-component-test-pfad-schlussstein)). Der fremde Anker (`ruleAnchor`, Decision 7) hat dagegen eigene Tests; ungetestet bleibt die Verdrahtung im Screen, etwa dass `showConflict` ihn im Zweig mit `theirs` benutzt — derselbe fehlende Render-Pfad.
-- Ein Eintrag aus [docs/TODO.md](./TODO.md) ist erledigt und entfernt: **„Eine reine Änderung der Wiederholungsregel wird beim Konflikt-Vergleich still überschrieben"** (Calendar-Sektion). [Roadmap 2.2](./roadmap.md#22-die-zwei-löcher-in-der-conflict-detection--erledigt) ist damit vollständig und Block 2 codeseitig bis auf 2.3 (den Toggle-Fehler, wartet auf einen Copy-Key) abgearbeitet. Die Definition of done von Block 2 verlangt, dass eine reine Rhythmus-Änderung durch zwei Clients einen Konflikt erzeugt statt eines stillen Overwrites; belegt ist das durch Tests der Vergleichs- und der Zeilenlogik, die Sichtprüfung des Dialogs im Zwei-Client-Lauf steht noch aus.
+- **Der Anker aus Decision 5 hat keinen Regressionstest.** Dass der Screen `range.startAt` an den Helfer übergibt statt `vars.changes.start_at`, steht in `EventEditScreen`, und der ist unter `bun test` nicht ladbar; der Helfer bekommt den Wert als Parameter und kann den Fehler nicht selbst begehen. Belegt ist es durch Codelektüre und den Kommentar an der Aufrufstelle — derselbe fehlende Render-Pfad wie bei ADR-031 und ADR-036 (Roadmap Block 5). Der fremde Anker (`ruleAnchor`, Decision 7) hat dagegen eigene Tests; ungetestet bleibt die Verdrahtung im Screen, etwa dass `showConflict` ihn im Zweig mit `theirs` benutzt — derselbe fehlende Render-Pfad.
+- Ein Eintrag aus [docs/TODO.md](./TODO.md) ist erledigt und entfernt: **„Eine reine Änderung der Wiederholungsregel wird beim Konflikt-Vergleich still überschrieben"** (Calendar-Sektion). Roadmap 2.2 ist damit vollständig und Block 2 codeseitig bis auf 2.3 (den Toggle-Fehler, wartet auf einen Copy-Key) abgearbeitet. Die Definition of done von Block 2 verlangt, dass eine reine Rhythmus-Änderung durch zwei Clients einen Konflikt erzeugt statt eines stillen Overwrites; belegt ist das durch Tests der Vergleichs- und der Zeilenlogik, die Sichtprüfung des Dialogs im Zwei-Client-Lauf steht noch aus.
 
 ## ADR-039 — Web-Parität der Dialoge: `Alert.alert` nur über die Helfer, Scope-Auswahl als Sheet auf Web und Android (2026-10-01)
 
 ### Status
 
-Accepted. Löst nichts ab. Setzt den ersten PR aus [Roadmap Block 3](./roadmap.md#block-3--web-parität) um und nebenbei [Roadmap 2.3](./roadmap.md#23-toggle-fehler-ist-auf-web-unsichtbar--erledigt). Spec: [2026-10-01-web-parity-dead-paths-design.md](./superpowers/specs/2026-10-01-web-parity-dead-paths-design.md) — mit einer Abweichung, Decision 6.
+Accepted. Löst nichts ab. Setzt den ersten PR aus Roadmap Block 3 um und nebenbei Roadmap 2.3. Spec: [2026-10-01-web-parity-dead-paths-design.md](./superpowers/specs/2026-10-01-web-parity-dead-paths-design.md) — mit einer Abweichung, Decision 6.
 
 ### Context
 
@@ -1493,7 +1493,7 @@ react-native-web implementiert `Alert` als No-op (`static alert() {}`). Jeder Ab
 
 ### Consequences
 
-- Auf Web lassen sich Termine und Serien löschen und Serien speichern, Abmelden und Kind-Löschen fragen nach, alle Meldungen erscheinen (`window.confirm`/`window.alert`). Geprüft per Playwright gegen den Web-Build; Screens und Sheets haben keinen automatisierten Test, weil der RN-Render-Pfad fehlt ([Roadmap Block 5](./roadmap.md#block-5--der-rn-component-test-pfad-schlussstein)). Store, `pickScope`, die Helfer und `parseWebPickerValue` haben eigene Suiten.
+- Auf Web lassen sich Termine und Serien löschen und Serien speichern, Abmelden und Kind-Löschen fragen nach, alle Meldungen erscheinen (`window.confirm`/`window.alert`). Geprüft per Playwright gegen den Web-Build; Screens und Sheets haben keinen automatisierten Test, weil der RN-Render-Pfad fehlt (Roadmap Block 5). Store, `pickScope`, die Helfer und `parseWebPickerValue` haben eigene Suiten.
 - Auf Android sind Abmelden, Termin- und Kind-Löschen jetzt `cancelable` (Tipp neben den Dialog bricht ab) — die Vorgabe von `confirmDestructive`, wie schon in `TaskEditScreen`.
 - Die Geburtstagsfelder sind auf iOS dasselbe Bottom-Sheet wie im Termin-Formular statt des kompakten Inline-Pickers.
 - Die Regel erkennt `Alert.alert` am Namen; `import { Alert as X }` umgeht sie. Sie ist eine Leitplanke gegen Versehen, keine Durchsetzung.
@@ -1502,7 +1502,7 @@ react-native-web implementiert `Alert` als No-op (`static alert() {}`). Jeder Ab
 
 ### Status
 
-Accepted. Löst nichts ab; präzisiert die Begründung in [ADR-030](#adr-030--live-sync-für-den-kalender-broadcast-from-database-ein-familien-topic-ein-mountpunkt-2026-09-02) Decision 5 (siehe Consequences). Setzt den zweiten PR aus [Roadmap Block 3](./roadmap.md#block-3--web-parität) um. Spec: [2026-10-01-web-parity-quirks-design.md](./superpowers/specs/2026-10-01-web-parity-quirks-design.md) — mit einer Abweichung, Decision 2.
+Accepted. Löst nichts ab; präzisiert die Begründung in [ADR-030](#adr-030--live-sync-für-den-kalender-broadcast-from-database-ein-familien-topic-ein-mountpunkt-2026-09-02) Decision 5 (siehe Consequences). Setzt den zweiten PR aus Roadmap Block 3 um. Spec: [2026-10-01-web-parity-quirks-design.md](./superpowers/specs/2026-10-01-web-parity-quirks-design.md) — mit einer Abweichung, Decision 2.
 
 ### Context
 
@@ -1510,7 +1510,7 @@ Die Roadmap verlangte für drei Web-Eigenheiten zuerst eine Diagnose. Gemessen i
 
 ### Decisions
 
-1. **Agenda: keine Code-Änderung.** Dass verdeckte Tabs auf Web den Tastaturfokus annehmen (`aria-hidden`, aber nicht `inert`), ist ein eigener Befund und steht in [Roadmap Block 4](./roadmap.md#block-4--touch-targets--a11y).
+1. **Agenda: keine Code-Änderung.** Dass verdeckte Tabs auf Web den Tastaturfokus annehmen (`aria-hidden`, aber nicht `inert`), ist ein eigener Befund und steht in Roadmap Block 4.
 2. **`AuthGate` hängt den Root-Navigator nicht mehr aus, solange eine Sitzung besteht.** Ist er einmal gemountet, steht ein anstehender Redirect neben ihm, und Warten zeigt den Splash als Deckfläche darüber. Beim Kaltstart und immer, wenn keine Sitzung besteht, ersetzt der Gate seine Kinder wie bisher. **Abweichung von der Spec**, die den Navigator nach dem ersten Mount ausnahmslos stehen ließ: Die Schluss-Review fand, dass beim Abmelden dann `(tabs)` unter `/login` gemountet blieb (`router.replace` tauscht nur die fokussierte Route), nach `qc.clear()` ohne Sitzung nachlud und leere Ergebnisse cachte — nach einem schnellen Wieder-Login zeigte die Familie keine Aufgaben, und der Stack wuchs mit jedem Zyklus. Das Ersetzen beim Abmelden setzt den Stack zurück; die Schleife trat nur beim Umleiten _in_ die App auf.
 3. **Die Regel ist eine reine Funktion**, `gateLayout` in `features/auth/gateLayout.ts` neben `decideRoute`, damit sie unter `bun test` steht; `AuthGate` rendert nur noch ihr Ergebnis. Den Merker „schon gemountet" setzt der Gate beim Rendern, nicht im Effekt — die Lint-Regel `react-hooks/set-state-in-effect` lehnt den Effekt ab, und React verwirft Render-Updates eines abgebrochenen Renders.
 4. **Das Web-Datumsfeld zeigt einen unparsbaren Rohwert als lokalen Entwurf**, statt auf den letzten gültigen Wert zurückzuspringen. Gültige Werte gehen weiter sofort über `onPick` hinaus, der Vertrag aus [ADR-039](#adr-039--web-parität-der-dialoge-alertalert-nur-über-die-helfer-scope-auswahl-als-sheet-auf-web-und-android-2026-10-01) bleibt auf allen Plattformen gleich; „Fertig" bei unvollständigem Entwurf übernimmt den letzten gültigen Wert. Der Entwurf lebt nur, solange das Sheet offen ist. Verworfen: das Feld unkontrolliert führen und erst bei „Fertig" übernehmen — dann verwürfe der Scrim auf Web die Eingabe, auf iOS nicht.
@@ -1528,7 +1528,7 @@ Verworfen für Decision 2: `Stack.Protected` (die Regel, dass der Onboarding-Flo
 
 ### Status
 
-Accepted. Löst nichts ab; präzisiert eine Consequence von [ADR-040](#adr-040--web-eigenheiten-authgate-behält-den-root-navigator-mit-sitzung-das-web-datumsfeld-hält-den-zwischenstand-2026-10-01) (Decision 5). Setzt [Roadmap Block 4](./roadmap.md#block-4--touch-targets--a11y) um. Spec: [2026-10-05-touch-targets-a11y-design.md](./superpowers/specs/2026-10-05-touch-targets-a11y-design.md) — mit einer Abweichung, Decision 1.
+Accepted. Löst nichts ab; präzisiert eine Consequence von [ADR-040](#adr-040--web-eigenheiten-authgate-behält-den-root-navigator-mit-sitzung-das-web-datumsfeld-hält-den-zwischenstand-2026-10-01) (Decision 5). Setzt Roadmap Block 4 um. Spec: [2026-10-05-touch-targets-a11y-design.md](./superpowers/specs/2026-10-05-touch-targets-a11y-design.md) — mit einer Abweichung, Decision 1.
 
 ### Context
 
@@ -1554,7 +1554,7 @@ CLAUDE.md verlangt Touch-Targets von mindestens 44×44. Drei Pillen-Reihen und d
 
 ### Status
 
-Accepted. Setzt [Roadmap Block 5](./roadmap.md#block-5--der-rn-component-test-pfad-schlussstein) um. Spec: [2026-10-20-rn-component-test-path-design.md](./superpowers/specs/2026-10-20-rn-component-test-path-design.md), mit einer Abweichung (Decision 4).
+Accepted. Setzt Roadmap Block 5 um. Spec: [2026-10-20-rn-component-test-path-design.md](./superpowers/specs/2026-10-20-rn-component-test-path-design.md), mit einer Abweichung (Decision 4).
 
 ### Context
 
@@ -1579,7 +1579,7 @@ Im Repo ließ sich keine React-Native-Komponente im Test rendern. `bun test` lie
 
 ### Status
 
-Accepted. Setzt [Roadmap Block 6](./roadmap.md#block-6--meal-plan-mutationen-der-größte-feature-unlock) um. Spec: [2026-10-21-meal-plan-mutations-design.md](./superpowers/specs/2026-10-21-meal-plan-mutations-design.md), mit zwei Abweichungen (Decision 5 und 6).
+Accepted. Setzt Roadmap Block 6 um. Spec: [2026-10-21-meal-plan-mutations-design.md](./superpowers/specs/2026-10-21-meal-plan-mutations-design.md), mit zwei Abweichungen (Decision 5 und 6).
 
 ### Context
 
@@ -1617,7 +1617,7 @@ Der Essensplan war rein lesend. Gebraucht werden zwei Wege: die Wochenplanung (f
 
 ### Status
 
-Accepted. Setzt [Roadmap Block 7](./roadmap.md#block-7--transaktions-rpc-für-den-kalender) um. Spec: [2026-10-21-calendar-transaction-rpc-design.md](./superpowers/specs/2026-10-21-calendar-transaction-rpc-design.md), mit den Abweichungen in Decision 3 und 8.
+Accepted. Setzt Roadmap Block 7 um. Spec: [2026-10-21-calendar-transaction-rpc-design.md](./superpowers/specs/2026-10-21-calendar-transaction-rpc-design.md), mit den Abweichungen in Decision 3 und 8.
 
 Supersedes Teile von drei ADRs; alles Übrige dort gilt weiter:
 
@@ -1894,7 +1894,7 @@ Drei Reste aus Block 7 und 8. Abgelaufene, unbenutzte Einladungen blieben für i
 
 ### Status
 
-Accepted. Ersetzt in ADR-041 die Begründung von Decision 1 („NativeWind rechnet `rem` nativ mit 14 … 38,5 pt"), nicht die Entscheidung: Tippflächen über die Box, das Maß als Zahl. Ersetzt außerdem die ADR-041-Consequence „NativeWind rechnet `rem` nativ mit 14", in Decision 5 den Satz „Nativ rendert der Gate unverändert ein Fragment" und die Consequence, native Screenreader erreichten den Screen unter der Deckfläche (dort und in ADR-040). Setzt [Roadmap 4.1](./roadmap.md#41-inlinerem-entscheiden--erledigt) und den Branch „a11y nativ" um. Spec: [2026-11-04-a11y-nativ-design.md](./superpowers/specs/2026-11-04-a11y-nativ-design.md).
+Accepted. Ersetzt in ADR-041 die Begründung von Decision 1 („NativeWind rechnet `rem` nativ mit 14 … 38,5 pt"), nicht die Entscheidung: Tippflächen über die Box, das Maß als Zahl. Ersetzt außerdem die ADR-041-Consequence „NativeWind rechnet `rem` nativ mit 14", in Decision 5 den Satz „Nativ rendert der Gate unverändert ein Fragment" und die Consequence, native Screenreader erreichten den Screen unter der Deckfläche (dort und in ADR-040). Setzt Roadmap 4.1 und den Branch „a11y nativ" um. Spec: [2026-11-04-a11y-nativ-design.md](./superpowers/specs/2026-11-04-a11y-nativ-design.md).
 
 ### Context
 
@@ -1924,7 +1924,7 @@ Sechs Einträge aus `docs/TODO.md`, die die Roadmap auf zwei Branches verteilt h
 
 ### Status
 
-Accepted. Setzt [Block 9 der Roadmap](./roadmap.md#block-9--ci-und-toolchain-härten) um und überträgt ADR-048 Decision 3 auf `ci.yml`.
+Accepted. Setzt Block 9 der Roadmap um und überträgt ADR-048 Decision 3 auf `ci.yml`.
 
 ### Context
 
@@ -1947,7 +1947,7 @@ Accepted. Setzt [Block 9 der Roadmap](./roadmap.md#block-9--ci-und-toolchain-hä
 
 ### Status
 
-Accepted. Schließt [8.3 der Roadmap](./roadmap.md#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ab. Spec: [2026-11-12-kalender-korrekturen-design.md](./superpowers/specs/2026-11-12-kalender-korrekturen-design.md).
+Accepted. Schließt 8.3 der Roadmap ab. Spec: [2026-11-12-kalender-korrekturen-design.md](./superpowers/specs/2026-11-12-kalender-korrekturen-design.md).
 
 ### Context
 

@@ -2,7 +2,7 @@
 
 **Status:** Approved (Brainstorming)
 **Date:** 2026-10-01
-**Auftrag:** [docs/roadmap.md](../../roadmap.md) → [Block 3 — Web-Parität](../../roadmap.md#block-3--web-parität), erster von zwei PRs. PR B (Agenda-Klickfläche, springender Datums-Input, Render-Schleife beim Login) bekommt einen eigenen Entwurf.
+**Auftrag:** [docs/roadmap.md](../../roadmap.md) → Block 3 — Web-Parität, erster von zwei PRs. PR B (Agenda-Klickfläche, springender Datums-Input, Render-Schleife beim Login) bekommt einen eigenen Entwurf.
 **Decision-Log:** ein ADR (039) am Branch-Ende.
 
 ## 1. Befund
@@ -139,7 +139,7 @@ Rot vor Grün für alles, was ohne Render-Pfad testbar ist:
   ungültige Eingabe → `null` · Tag nach `maximumDate` → `null` · derselbe Tag wie
   `maximumDate`, aber spätere Uhrzeit im Basiswert → gültig.
 
-Ohne automatisierten Test (fehlender RN-Render-Pfad, [Roadmap Block 5](../../roadmap.md#block-5--der-rn-component-test-pfad-schlussstein)):
+Ohne automatisierten Test (fehlender RN-Render-Pfad, Roadmap Block 5):
 die Screen-Verdrahtung, `ScopeSheet` und `ScopeSheetHost`. Belegt durch:
 
 - **Web-Sichtprüfung per Playwright** (`bun run web`, angemeldete Sitzung): Einzeltermin löschen ·

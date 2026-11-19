@@ -1,1144 +1,597 @@
-# Roadmap — Abarbeitungsreihenfolge für `docs/TODO.md`
+# Roadmap — Schritt für Schritt durch `docs/TODO.md`
 
-Stand: **2026-09-08**, Basis `main` @ `2de7c76` (sauber).
-
-Diese Datei ordnet die **158 Einträge** aus [docs/TODO.md](./TODO.md) in eine Reihenfolge. Sie
+Diese Datei ordnet die offenen Einträge aus [docs/TODO.md](./TODO.md) in nummerierte Schritte. Sie
 ersetzt `TODO.md` nicht — dort steht **was** offen ist und **warum** es vertagt wurde, hier steht
-**wann** es drankommt und **woran es hängt**. `TODO.md` bleibt der aktive Backlog: erledigte
-Einträge werden dort gelöscht (CLAUDE.md → „Out-of-scope TODOs"), hier wird der Block abgehakt.
+**wann** es drankommt und **woran es hängt**. Ein Eintrag erscheint hier nur mit seinem Titel,
+gruppiert nach dem Abschnitt, unter dem er in `TODO.md` steht.
 
-Ordnungsprinzip laut Entscheidung: **Korrektheit zuerst.** Erst hört stiller Datenverlust auf,
-dann kommen Feature-Unlocks. Designer-abhängige Punkte stehen bei ihrem Feature, nicht in einem
-eigenen Kapitel.
+Jeder offene Eintrag gehört zu genau einem Schritt oder steht unter
+[Geparkt](#geparkt--wartet-auf-ein-signal) bzw. [Beobachten](#beobachten). Die Schritte laufen der
+Reihe nach. Ordnungsprinzip: **Korrektheit zuerst.** Erst hört stiller Datenverlust auf, dann folgen
+Werkzeug und Komfort, der Designer-Durchgang, die großen Migrationen und zuletzt, was an Anbietern
+hängt. Blockierte Schritte stehen mit in der Liste; ihre Zeile **Vorher nötig** sagt, was wir
+entscheiden oder besorgen müssen, um sie zu entblocken.
 
 ## Legende
 
-| Marker        | Bedeutung                                                                                                                                                            |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🎨            | Braucht eine Designer-Entscheidung oder einen Copy-Key. Handoff-Bundle ist off-limits (CLAUDE.md Non-negotiable 1) — der Code-Teil kann trotzdem vorbereitet werden. |
-| 🔒            | Extern blockiert (Anbieter, Domain, Konto). Nicht umsetzbar, egal wie viel Zeit da ist.                                                                              |
-| ⚙️            | Manuell außerhalb des Repos (GitHub-Settings). Nicht als Datei versionierbar.                                                                                        |
-| ✅            | Heute verifiziert — Beleg steht unter [Ist-Stand](#ist-stand-verifiziert-am-2026-09-08).                                                                             |
-| **S / M / L** | Aufwand: S = ein Commit, M = eine Iteration mit Testlauf, L = eigene Iteration mit Spec, Migration oder Zwei-Client-Durchgang.                                       |
+| Marker           | Bedeutung                                                                                                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 🎨               | Braucht eine Designer-Entscheidung oder einen Copy-Key. Das Handoff-Bundle ist off-limits (CLAUDE.md Non-negotiable 1) — der Code-Teil kann trotzdem vorbereitet werden. |
+| 🔒               | Extern blockiert: Anbieter, Domain, Konto oder Geld.                                                                                                                     |
+| **Vorher nötig** | Was entschieden oder bereitgestellt sein muss, bevor der Schritt beginnt. Fehlt die Zeile, kann er sofort losgehen.                                                      |
+| **S / M / L**    | Aufwand: S = ein Commit, M = eine Iteration mit Testlauf, L = eigene Iteration mit Spec, Migration oder Zwei-Client-Durchgang.                                           |
 
 ---
 
-## Ist-Stand, verifiziert am 2026-09-08
+## Die Schritte auf einen Blick
 
-Vier Annahmen aus `TODO.md` habe ich vor dem Ordnen nachgemessen, weil sie die Reihenfolge tragen.
-Zwei davon sind schlimmer als dort notiert.
-
-> **Dies ist die Messung _vor_ Block 0.** Befund 1 (SDK-Drift) ist mit 0.2 behoben —
-> `expo install --check` meldet seither „Dependencies are up to date". Befund 2 (Required Checks)
-> ist mit 0.1 behoben, Befund 5 (Test-Deps) mit 0.3. Die Zahlen bleiben hier als Beleg stehen, warum die Blöcke so sortiert sind;
-> den aktuellen Stand führt jeweils der Block selbst.
-
-**1. Der SDK-Drift ist gewachsen — 13 Pakete statt der zwei notierten.** ✅
-
-```text
-$ bunx expo install --check
-  @expo/metro-runtime@57.0.9   → ~57.0.15      expo-router@57.0.12        → ~57.0.19
-  expo@57.0.12                 → ~57.0.20      expo-splash-screen@57.0.6  → ~57.0.8
-  expo-constants@57.0.10       → ~57.0.17      react-native@0.86.0        → 0.86.3
-  expo-font@57.0.1             → ~57.0.3       react-native-reanimated@4.5.0 → 4.5.1
-  expo-linking@57.0.5          → ~57.0.9       react-native-screens@4.25.2   → ~4.26.0
-  react-native-worklets@0.10.0 → 0.10.1        eslint-config-expo@57.0.1  → ~57.0.2
-  jest-expo@57.0.4             → ~57.0.5
-```
-
-`TODO.md` → [Renovate / Dependencies](./TODO.md#renovate--dependencies-siehe-adr-013) → **„Das Repo
-driftet bereits von SDK 57"** notierte `expo ~57.0.7 → ~57.0.12` und `react-native 0.86.0 → 0.86.2`.
-Beides ist inzwischen weitergelaufen. `react-native` ist **exakt gepinnt** (`0.86.0`), fällt also
-genau in die Lücke, die ADR-013 Decision 2 beschreibt: Renovates bun-Manager liest keine
-`lockedVersion` aus `bun.lock`, und `lockFileMaintenance` fasst exakte Pins nicht an. Der Drift
-korrigiert sich **nicht** von selbst — er wächst weiter, bis jemand `expo install --fix` committet.
-
-Nebenbefund: `package.json` deklariert `expo: ~57.0.7`, installiert ist `57.0.12`. Manifest und
-Lockfile sind bereits auseinander.
-
-**2. Die Branch-Protection hat keine Required Checks.** ✅
-
-```text
-$ gh api repos/SvenSonnborn/ElternFlowAI/rulesets/17263678
-enforcement: active
-RULE: deletion
-RULE: pull_request
-RULE: required_linear_history
-```
-
-Ein Ruleset „main protection" existiert und ist aktiv — aber **ohne** `required_status_checks`-Regel.
-Damit ist der in [ADR-016](./decision-log.md) als _blockierend_ beschlossene Native-Build-Gate
-faktisch ein Vorschlag: die sechs Workflows laufen, hindern aber niemanden am Mergen. Das bestätigt
-`TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-scope-items) → **„Branch-Protection-Rule
-‚Status-Checks required'"** und macht ihn zum ersten Handgriff überhaupt: jeder Block ab hier
-profitiert davon, dass sein PR wirklich gegated ist.
-
-**3. `insertSplitEvent` setzt tatsächlich kein `parent_id`.** ✅
-
-[features/calendar/recurrence.ts:316](../features/calendar/recurrence.ts) — der Insert führt
-`family_id`, `type_id`, `child_id`, `title`, `description`, `location`, `start_at`, `end_at`,
-`all_day`, die fünf `rrule_*`-Spalten und `created_by`. `parent_id` fehlt. Der Eintrag in
-`TODO.md` stimmt Wort für Wort; der Fix ist eine Zeile.
-
-**4. Der Meals-Layer ist unverändert lesend, die Policies liegen bereit.** ✅
-
-`features/meals/` enthält kein `mutations.ts` — exportiert werden nur `useMealPlans`,
-`useTodaysMeal`, `useRecipeById`, `useRecipes`, `useFamilyAllergies`, `useMealAlternative`,
-`useRecipeJudge`. INSERT/UPDATE/DELETE-Policies auf `meal_plan_entries` existieren seit
-[20260529093329_recipes_and_meal_plan.sql](../supabase/migrations/20260529093329_recipes_and_meal_plan.sql)
-und wurden in `20260529100841_pr3_review_fixes.sql` nachgeschärft. Der Feature-Unlock in Block 6 ist
-technisch unblockiert.
-
-**5. Die Test-Infrastruktur ist wie beschrieben ungenutzt.** ✅
-
-63 Testdateien, davon genau eine `.tsx` ([`__tests__/smoke.test.tsx`](../__tests__/smoke.test.tsx)),
-die Design-Tokens prüft statt zu rendern. `react-test-renderer@19.2.3` steht in
-[package.json:84](../package.json); `test-renderer` steht **nur** in `bun.lock`. Beide Einträge aus
-der Renovate-Sektion sind aktuell.
+| Schritt                                                                                        | Aufwand | Vorher nötig                                       |
+| ---------------------------------------------------------------------------------------------- | ------- | -------------------------------------------------- |
+| [1. Kalender: stille Fehler im Schreibpfad](#1-kalender-stille-fehler-im-schreibpfad)          | L       | —                                                  |
+| [2. Stille Fehlschläge in Hooks und Formularen](#2-stille-fehlschläge-in-hooks-und-formularen) | M       | —                                                  |
+| [3. Datenbank-Hygiene](#3-datenbank-hygiene)                                                   | M       | Grenzwerte für Name, Kürzel, Farbe                 |
+| [4. Allergen-Urteil](#4-allergen-urteil)                                                       | M       | —                                                  |
+| [5. Toast](#5-toast)                                                                           | S       | —                                                  |
+| [6. Barrierefreiheit und Theming ohne Designer](#6-barrierefreiheit-und-theming-ohne-designer) | M       | —                                                  |
+| [7. Kalender-Komfort](#7-kalender-komfort)                                                     | M       | —                                                  |
+| [8. Live-Sync des Essensplans](#8-live-sync-des-essensplans)                                   | L       | —                                                  |
+| [9. Werkzeug und Renovate](#9-werkzeug-und-renovate)                                           | S–M     | —                                                  |
+| [10. Geräte-Runde iOS und Android](#10-geräte-runde-ios-und-android)                           | M       | —                                                  |
+| [11. E2E-Lauf mit Konto](#11-e2e-lauf-mit-konto)                                               | L       | —                                                  |
+| [12. Entscheidungsrunde](#12-entscheidungsrunde)                                               | S       | sechs Antworten von dir                            |
+| [13. Die Entscheidungen bauen](#13-die-entscheidungen-bauen)                                   | M–L     | Schritt 12                                         |
+| [14. Copy-Deck nachtragen](#14-copy-deck-nachtragen) 🎨                                        | M       | Freigabe für `docs/COPY.md`                        |
+| [15. Pattern-Docs nachziehen](#15-pattern-docs-nachziehen) 🎨                                  | M       | Freigabe für `patterns/`, zwei Richtungsfragen     |
+| [16. Kalender-Design](#16-kalender-design) 🎨                                                  | M–L     | Designer                                           |
+| [17. Dashboard-Design](#17-dashboard-design) 🎨                                                | M       | Designer                                           |
+| [18. Familie, Einstellungen, Aufgaben](#18-familie-einstellungen-aufgaben) 🎨                  | M       | Designer, Zielscreens für Coming-soon-Rows         |
+| [19. Undo und Toast](#19-undo-und-toast) 🎨                                                    | M       | Designer                                           |
+| [20. Konto und Einladungen](#20-konto-und-einladungen) 🎨 🔒                                   | L       | Account-Screen, Mail-Zustellweg                    |
+| [21. Essen-Ausbau](#21-essen-ausbau) 🎨                                                        | L       | Patterns für Einkauf, Kochen, Favoriten, Portionen |
+| [22. Icons auf `@react-native-vector-icons`](#22-icons-auf-react-native-vector-icons)          | M       | —                                                  |
+| [23. Tailwind v4](#23-tailwind-v4)                                                             | L       | NativeWind-Unterstützung prüfen                    |
+| [24. `AuthGate` auf `Stack.Protected`](#24-authgate-auf-stackprotected)                        | L       | —                                                  |
+| [25. `rrule` ablösen](#25-rrule-ablösen)                                                       | L       | Ersatz wählen                                      |
+| [26. Release-Grundlage](#26-release-grundlage) 🔒                                              | L       | Apple- und Google-Konto, Bundle-ID, Signing        |
+| [27. Universal Links für Einladungen](#27-universal-links-für-einladungen) 🔒                  | M       | eigene Domain, Schritt 26                          |
+| [28. Erinnerungen](#28-erinnerungen) 🔒                                                        | L       | Schritt 26, Firebase-Projekt                       |
+| [29. Sprachassistent](#29-sprachassistent) 🔒                                                  | L       | STT- und LLM-Anbieter, Kosten, Datenschutz         |
+| [30. Rezepte über gustar.io](#30-rezepte-über-gustario) 🔒                                     | L       | API-Zugang                                         |
+| [31. Abos](#31-abos) 🔒                                                                        | L       | Preismodell, Store-Abo oder Stripe                 |
+| [32. Social Logins](#32-social-logins) 🔒                                                      | M       | Schritt 26, Google-OAuth-Client                    |
 
 ---
 
-## Die Reihenfolge auf einen Blick
+## Sofort machbar
 
-| #   | Block                                                                                   | Aufwand | Löst … Einträge | Warum an dieser Stelle                                                                        |
-| --- | --------------------------------------------------------------------------------------- | ------- | --------------- | --------------------------------------------------------------------------------------------- |
-| 0   | [Hygiene & Gates scharfstellen](#block-0--hygiene--gates-scharfstellen)                 | S       | 6               | Der Drift wächst täglich; ohne Required Checks ist jeder folgende PR ungegated.               |
-| 1   | [Stiller Datenverlust im Kalender](#block-1--stiller-datenverlust-im-kalender)          | M–L     | 5               | Fünf Wege, auf denen Termine ohne Fehlermeldung verschwinden. Höchster Nutzerschaden.         |
-| 2   | [Aufgaben-Löschpfad & Konfliktlücken](#block-2--aufgaben-löschpfad--konfliktlücken)     | M       | 5               | Dieselbe Schadensklasse bei Tasks + die von ADR-031 offen gelassenen Löcher.                  |
-| 3   | [Web-Parität](#block-3--web-parität)                                                    | M       | 6               | Web ist der schnellste Smoke-Test-Loop — heute überspringt er stumm halbe Features.           |
-| 4   | [Touch-Targets & a11y](#block-4--touch-targets--a11y)                                   | S       | 5               | CLAUDE.md Non-negotiable 4 wird in ausgeliefertem Code verletzt. Eine Sichtprüfung für alles. |
-| 5   | [RN-Component-Test-Pfad](#block-5--der-rn-component-test-pfad-schlussstein)             | L       | 4               | Schlussstein: entsperrt drei geparkte Einträge und sichert alles danach ab.                   |
-| 6   | [Meal-Plan-Mutationen](#block-6--meal-plan-mutationen-der-größte-feature-unlock)        | L       | 6               | Größter Einzel-Unlock — eine Mutation löst sechs Einträge über drei Screens.                  |
-| 7   | [Transaktions-RPC für den Kalender](#block-7--transaktions-rpc-für-den-kalender)        | L       | 3               | Teuerste Korrektheitsbaustelle; Pre-Flight + CAS decken den Normalfall bereits ab.            |
-| 8   | [Docs-Resync & Refactors](#block-8--docs-resync--refactors)                             | S–M     | 10              | Blockiert nichts. Aufräumen, wenn die Substanz steht.                                         |
-| 9   | [CI- & Toolchain-Härtung](#block-9--ci-und-toolchain-härten)                            | S–M     | 6               | Verbessert die Gates, die Block 0 überhaupt erst scharf gemacht hat.                          |
-| 10  | [Große Migrationen](#block-10--große-migrationen)                                       | L       | 5               | Kein Zeitdruck, je eine eigene Iteration.                                                     |
-| —   | [Geparkt: extern blockiert](#geparkt--extern-blockiert)                                 | —       | ~28             | Anbieter, Domain oder Konto fehlen.                                                           |
-| —   | [Geparkt: wartet auf ein drittes Vorkommen](#geparkt--wartet-auf-ein-drittes-vorkommen) | —       | ~10             | Bewusst vertagt, bis der zweite Aufrufer die richtige Form zeigt.                             |
+Kein Blocker. Jeder Schritt ist ein eigener Branch; die Reihenfolge folgt dem Schaden, den der
+offene Punkt heute anrichten kann.
 
-**Damit sind rund 57 der 158 Einträge in den Blöcken 0–10 tatsächlich jetzt umsetzbar** — deine
-Einschätzung („ein Großteil davon können wir jetzt schon umsetzen") trifft für die Sachsubstanz zu.
-Der große Rest teilt sich in Anbieter-Blockaden (Sprachassistent, gustar.io, Notifications, Stripe)
-und Designer-Punkte, die zwar nicht _von uns_ erledigt werden, aber in den Blöcken mitlaufen.
+### 1. Kalender: stille Fehler im Schreibpfad
 
-### Die nächsten Branches (Stand 2026-11-13)
+**L** · Hier verliert oder versteckt der Kalender heute Daten, ohne dass es jemand merkt — deshalb
+zuerst.
 
-Erledigt sind `fix/stille-fehler` ([ADR-049](./decision-log.md)), der Kalender-Cache aus
-[8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-051](./decision-log.md)), der Test
-für `useFamilyRealtime`, ohne `setAuth`-Retry ([ADR-052](./decision-log.md)), das DB-Aufräumen
-mit pg_cron für Einladungen, `anon`-Rechten und Einladungslink nach Kontostand
-([ADR-053](./decision-log.md)) und a11y nativ samt [4.1](#41-inlinerem-entscheiden--erledigt)
-`inlineRem` und Inter ([ADR-054](./decision-log.md)) und [Block 9](#block-9--ci-und-toolchain-härten)
-mit `expo-doctor` und dem Bun-Cache in `ci.yml` ([ADR-055](./decision-log.md)) und der Rest von
-[8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-056](./decision-log.md)) und der
-Smoke-Start aus [Block 10](#block-10--große-migrationen) ([ADR-057](./decision-log.md)).
+- [Calendar](./TODO.md#calendar-v1--siehe-adr-008)
+  - Der Forward-Split übernimmt keine Reminder
+  - Eine per Override weit verschobene Occurrence bleibt im Monatsraster unsichtbar …
+  - Ein Override nur mit `start_at` wird strenger gefenstert als aufgelöst
+  - Auf einer per „Nur diesen" verschobenen Occurrence bleibt der Recurrence-Editor verborgen …
+  - `events.timezone` wird nur formal validiert
+- [Weitere](./TODO.md#weitere-out-of-scope-items)
+  - Conflict-Detection (fehlt beim Bearbeiten)
 
-Eine nächste Reihenfolge steht noch nicht fest; offen bleibt der Rest von
-[Block 10](#block-10--große-migrationen).
+### 2. Stille Fehlschläge in Hooks und Formularen
 
-### Schlusssteine — was am meisten entsperrt
+**M** · Dieselbe Fehlerklasse außerhalb des Kalenders: Ein Fehler bleibt stumm oder führt zur
+falschen Rückfrage.
 
-Drei Einzelposten tragen überproportional:
+- [Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)
+  - `useToggleTaskDone` hat keinen 0-Zeilen-Guard
+  - Während eines laufenden Speicherns stimmt die Verwerfen-Rückfrage nicht
+- [Auth / Onboarding](./TODO.md#auth--onboarding)
+  - Die Familien-Queries haben keinen Sitzungs-Guard
+- [Dashboard](./TODO.md#dashboard)
+  - Die Aufgaben-Hälfte von `prepPending` blendet die Prep-Karte bei gescheitertem Refetch aus
 
-1. **Meal-Plan-Mutation** (Block 6) → löst 6 Einträge über `EssenScreen`, `WeekPlanGrid`,
-   `RecipeScreen`, `MealHeroCard` und `MealHeroEmptyCard` auf. Kein anderer Einzelposten kommt in
-   die Nähe.
-2. **RN-Render-Pfad im Test** (Block 5) → entsperrt 3 explizit darauf wartende Einträge
-   (`useFamilyRealtime`, Hydrations-Invariante, `hooks.ts`-Ladeproblem) und ist Voraussetzung für
-   jeden künftigen Screen-Test.
-3. **Transaktions-RPC** (Block 7) → schließt 2 Einträge auf einmal (fünf ungeprüfte Schreib-Ops
-   **und** das `deleteAllExceptions`-Verlustfenster), plus die Serverhälfte von Issue
-   [#111](https://github.com/SvenSonnborn/ElternFlowAI/issues/111).
+### 3. Datenbank-Hygiene
 
----
+**M** · Eine Migration, ein `test:db`-Lauf. Steht vor dem Live-Sync (Schritt 8), weil der auf
+denselben Tabellen aufsetzt.
 
-## Block 0 — Hygiene & Gates scharfstellen
+**Vorher nötig:** Grenzwerte für Name, Kürzel und Farbe. Ich leite einen Vorschlag aus den
+Client-Regeln ab, du bestätigst ihn.
 
-**Aufwand S · ein Nachmittag · macht alles Folgende sicherer**
+- [Conflict-Detection](./TODO.md#conflict-detection-siehe-adr-031)
+  - `families`, `parents` und `children` tragen dasselbe tote `updated_at`
+- [Familie](./TODO.md#familie--child-profile-live-daten-v1)
+  - Name, Kürzel und Farbe haben serverseitig keine Grenzen
+- [Essen](./TODO.md#essen--meal-planner-daten-layer-v1)
+  - Kein Index bedient den Rezept-Query-Pfad
+- [Weitere](./TODO.md#weitere-out-of-scope-items)
+  - Der Performance-Advisor meldet Fremdschlüssel ohne Index und nie benutzte Indizes
+  - Neue Funktionen und Sequenzen in `public` bekommen `anon` weiter über die Default-ACL
 
-Zuerst, weil Punkt 1 die Voraussetzung dafür ist, dass jeder PR ab Block 1 überhaupt geprüft wird,
-und Punkt 2 ein Problem ist, das mit jedem Tag teurer wird.
+### 4. Allergen-Urteil
 
-> **Stand 2026-10-05:** Alle fünf Punkte sind erledigt. 0.2 · 0.3 · 0.4 kamen mit dem Branch
-> `chore/block-0-hygiene`, 0.1 steht im Ruleset.
+**M** · Ein falsches Allergie-Urteil ist der teuerste Fehler, den die App einer Familie machen kann.
+Beide Punkte gehen ohne den gustar.io-Korpus; das Nachschärfen der Begriffslisten nicht
+(Schritt 30).
 
-### 0.1 ⚙️ Required Status Checks eintragen — **erledigt**
+- [Essen](./TODO.md#essen--meal-planner-daten-layer-v1)
+  - Ein negiertes Schlüsselwort räumt den Key nicht ab
+  - Ein geprüftes Rezept ohne Fund hat keine saubere Ausdrucksform
 
-> **Stand 2026-10-05:** Das Ruleset „main protection" trägt die sechs Checks unten, „up to date vor
-> Merge" ist aus. Der Rest dieses Abschnitts beschreibt den Stand davor und bleibt als Begründung
-> stehen.
+### 5. Toast
 
-`TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-scope-items) → **„Branch-Protection-Rule
-‚Status-Checks required' auf `main`"**
+**S** · Klein, und danach melden Web und nativ Erfolge gleich.
 
-Ruleset `17263678` („main protection") um eine `required_status_checks`-Regel ergänzen. GitHub listet
-die **`name:`-Anzeigenamen**, nicht die Job-IDs — nach diesen sechs Strings suchen:
+- [Weitere](./TODO.md#weitere-out-of-scope-items)
+  - Toast statt `showAlert` für Erfolgsmeldungen
+- [Toast](./TODO.md#toast)
+  - Das Ausblenden kollabiert die Höhe nicht
 
-- „Build & Quality (format · lint · typecheck · test · web build)" — [ci.yml](../.github/workflows/ci.yml)
-- „CVE check for new dependencies" — [dependency-review.yml](../.github/workflows/dependency-review.yml)
-- „Apply labels from branch name" — [pr-labeler.yml](../.github/workflows/pr-labeler.yml)
-- „Metro bundle (ios · android)" · „Android (prebuild · assembleRelease · Startcheck)" · „iOS (prebuild · pod install · xcodebuild · Startcheck)" — [native-build.yml](../.github/workflows/native-build.yml), umbenannt mit [ADR-057](./decision-log.md)
+### 6. Barrierefreiheit und Theming ohne Designer
 
-Beim Umsetzen in [ADR-013](./decision-log.md) (Renovate-Bypass-Actor) und [ADR-016](./decision-log.md)
-(Decision zum blockierenden Gate) dorthin verlinken, statt die Begründung zu duplizieren — so steht
-es im TODO-Eintrag.
+**M** · Alles, was ohne neue Copy oder Designentscheidung geht. Der Rest folgt in den Schritten 16
+und 18.
 
-> ⚠️ Reihenfolge-Fußangel: Der iOS-Job läuft ~30 min. Sobald er Pflicht ist, kostet **jeder** PR
-> mindestens so lange. Das ist der beschlossene Preis (ADR-016), aber es ändert den Arbeitsrhythmus
-> ab dem Moment, in dem der Haken gesetzt ist — deshalb bewusst als eigener, benannter Schritt.
+- [Weitere](./TODO.md#weitere-out-of-scope-items)
+  - Die Statusleiste folgt dem System, nicht dem App-Theme
+  - Das Plus-Feld des heutigen Tags im Essensplan ist im dunklen Design hellgrau
+  - Kalender-Tageszellen sagen ein ISO-Datum an und keinen Auswahlzustand
+  - Initialen-Avatare stehen in der Ansage ganzer Zeilen
+  - Radiogruppen wechseln auf Web nicht per Pfeiltaste
 
-**Warum das nicht automatisch ging:** Der Fine-grained-PAT darf Rulesets **lesen**, nicht schreiben
-(`PUT /repos/.../rulesets/17263678` → `403 Resource not accessible by personal access token`; die
-ältere Branch-Protection-API antwortet ebenso). Es braucht `Administration: Read and write` auf dem
-Token — oder den Klickweg. Das Ruleset ist unverändert, `updated_at` steht weiter auf
-`2026-06-04T14:07:28`.
+### 7. Kalender-Komfort
 
-**Klickweg:** Repo → Settings → Rules → Rulesets → „main protection" → **Require status checks to
-pass** aktivieren → die sechs Namen oben hinzufügen. Zwei Fallen dabei:
+**M** · Kein Datenverlust mehr, aber im Alltag spürbar.
 
-- **Nicht** den siebten Check „expo install --fix nach SDK-Bump" auswählen. Der Job läuft nur auf
-  Renovates Expo-SDK-PR; als Required Check bliebe jeder andere PR dauerhaft auf „pending" stehen.
-- **„Require branches to be up to date before merging" ausgelassen lassen.** Bei einem
-  ~30-min-iOS-Job erzwingt die Option nach jedem fremden Merge eine Rebase samt vollem Neulauf. Die
-  lineare Historie sichert bereits `required_linear_history` zusammen mit Rebase-only-Merges.
+- [Calendar](./TODO.md#calendar-v1--siehe-adr-008)
+  - Datumsformat in den Termin-Formularen ist Deutsch-geprägt für beide Sprachen
+- [Calendar Optimistic UI](./TODO.md#calendar-optimistic-ui-siehe-adr-027)
+  - Eine Regeländerung wird nicht optimistisch abgebildet
+- [Weitere](./TODO.md#weitere-out-of-scope-items)
+  - Auf Englisch zeigt der Kalender beim ersten Öffnen deutsche Wochentage
+- [Dashboard](./TODO.md#dashboard)
+  - Der Overflow-Link kann nur einen Tab treffen
 
-**Zwei Befunde aus dem Ruleset, die den Nutzen von 0.1 einordnen** — beide als eigene Einträge in
-[docs/TODO.md](./TODO.md) → Renovate / Dependencies aufgenommen:
+### 8. Live-Sync des Essensplans
 
-1. **Der Haken bindet dich selbst nicht.** Einziger Bypass-Actor ist `RepositoryRole 5` (Repo-Admin)
-   mit `bypass_mode: always`; die API meldet für dich `current_user_can_bypass: "always"`. Die sechs
-   Checks machen einen roten Merge für andere Actors unmöglich und zeigen den Zustand deutlich an —
-   dich hindern sie nicht. Das in ADR-016 als _blockierend_ beschlossene Gate ist für dich eine
-   Anzeige, keine Schranke.
-2. **Renovate ist gar kein Bypass-Actor — sein Automerge hat nie funktioniert.** ADR-013 Decision 4
-   sagt, die App müsse als Bypass-Actor eingetragen werden; im Ruleset steht kein
-   `Integration`-Eintrag. Nachgeprüft: alle zehn zuletzt gemergten Renovate-PRs wurden von dir von
-   Hand gemergt, darunter #86 (`lock file maintenance`) und #75–#79 (Actions) — genau die
-   Automerge-Kategorien. Das macht den späteren Block-9-Punkt „`platformAutomerge: true` testen"
-   bis auf Weiteres gegenstandslos. **Aufgelöst durch [ADR-045](./decision-log.md):** Renovate merged
-   gar nicht mehr selbst, ein Bypass-Eintrag ist damit überflüssig.
+**L** · Zwei-Client-Durchgang nach dem Vorbild des Kalenders ([ADR-030](./decision-log.md)).
 
-### 0.2 SDK-Drift einfangen — **erledigt**
+- [Essen](./TODO.md#essen--meal-planner-daten-layer-v1)
+  - Kein Live-Sync des Essensplans
 
-`TODO.md` → [Renovate / Dependencies](./TODO.md#renovate--dependencies-siehe-adr-013) → **„Das Repo
-driftet bereits von SDK 57"**
+### 9. Werkzeug und Renovate
 
-`bunx expo install --fix` als **eigener Commit**, nichts anderes im Diff. 13 Pakete (siehe
-[Ist-Stand](#ist-stand-verifiziert-am-2026-09-08)). Danach `bunx expo install --check` als Gegenprobe
-und der volle Native-Build — das ist genau der Fall, den `ci.yml` allein **nicht** sieht, weil es
-beim Web-Export endet.
+**S–M** · Mehrere kleine Commits in einem Branch; jeder spätere Schritt profitiert davon.
 
-Je später das passiert, desto mehr trägt der erste echte SDK-Sprung zusätzlich zum SDK-Delta noch
-dieses Alt-Delta mit.
+- [Renovate](./TODO.md#renovate--dependencies-siehe-adr-013)
+  - Workaround für den AssetRegistry-Mock entfernen
+  - Der Maestro-Pin des Startchecks hat keinen Update-Pfad
+  - Die Lockfile-Maintenance kennt kein Mindestalter
+  - Die Lockfile-Wartung zieht exakt gepinnte SDK-Pakete nicht nach
+- [Weitere](./TODO.md#weitere-out-of-scope-items)
+  - Der Linter meldet keine überflüssigen Null-Prüfungen
+- [Calendar](./TODO.md#calendar-v1--siehe-adr-008)
+  - Zwei Tests in `optimisticEvents.test.ts` hängen an der Leserzone
+- [Calendar Optimistic UI](./TODO.md#calendar-optimistic-ui-siehe-adr-027)
+  - `features/calendar/hooks.ts` ist unter `bun test` nicht ladbar
 
-### 0.3 Test-Dependencies bereinigen — **erledigt**
+### 10. Geräte-Runde iOS und Android
 
-Zwei Einträge, eine `package.json`-Änderung, gehören in **einen** Commit:
+**M** · Alles, was sich nur im Simulator oder Emulator prüfen lässt, in einer Sitzung.
 
-- **„`react-test-renderer` ist seit dem v14-Bump vollständig tot"** — entfernen (steht in
-  [package.json:84](../package.json)) und **im selben Commit** den Eintrag aus Renovate-Regel 3 in
-  [.github/renovate.json5](../.github/renovate.json5) streichen. [ADR-015](./decision-log.md)
-  Decision 5 hat ihn ausdrücklich nur bis zu dieser Entscheidung stehen lassen.
-- **„`test-renderer` steht nur in der Lockfile"** — `"test-renderer": "^1"` als devDependency
-  nachtragen. Heute trägt allein, dass Bun den Peer selbsttätig in `bun.lock` aufgenommen hat.
+- [Renovate](./TODO.md#renovate--dependencies-siehe-adr-013)
+  - Ob der JDK-17-Pin noch nötig ist, ist ungeprüft
+- [Weitere](./TODO.md#weitere-out-of-scope-items)
+  - Auf Android verwerfen Wischen und Scrim-Tipp Formular-Sheets ohne Rückfrage
+- [Essen](./TODO.md#essen--meal-planner-daten-layer-v1)
+  - Die Slot-Leiste ist mit vier Tabs am Gerät ungeprüft
+- [Realtime](./TODO.md#realtime-siehe-adr-030)
+  - Debug-Screen: Dark-Theme auf iOS und jede Ansicht auf Android stehen noch aus
 
-### 0.4 `persist-credentials: false` in `ci.yml` — **erledigt**
+### 11. E2E-Lauf mit Konto
 
-`TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-scope-items).
-[native-build.yml](../.github/workflows/native-build.yml) hat es bereits;`ci.yml` macht nach dem
-Checkout ebenfalls keine Git-Operation mehr. **Nicht** für `expo-sdk-sync.yml` — der pusht in den
-PR-Branch und braucht die persistierten Credentials.
+**L** · Erweitert den Maestro-Startcheck ([ADR-057](./decision-log.md)) um die lokale Supabase und
+ein Testkonto. Danach lassen sich weitere Abläufe ohne Handarbeit prüfen.
 
-### 0.5 GitHub-Issues aufräumen — **erledigt**
-
-Nicht in `TODO.md`, aber es verzerrt jede Backlog-Sicht: Laut `CLAUDE.md` sind **#51** (Live-Sync,
-ADR-030) und **#52** (Conflict-Detection, ADR-031) erledigt, ebenso die Phase-1-Issues **#14–#17**
-und die Phase-2-Issues **#19**, **#21**, **#22**, **#48**. Alle stehen noch offen. Vor dem Schließen
-je einmal gegen den ADR gegenlesen und mit dem Merge-Commit verlinken.
-
-**Ergebnis:** Acht geschlossen — #15, #16, #17, #19, #21, #48, #51, #52 —, jeweils mit einem
-Kommentar, der die Checkliste gegen den ADR abgleicht und Abweichungen benennt (etwa #48, dessen
-„Liste mit E-Mail" durch ADR-021 abgelöst ist, oder #51, dessen Subscription anders sitzt als dort
-skizziert).
-
-**Zwei bewusst offen gelassen**, weil sie es nicht sind:
-
-- **#14** (Dashboard live) — alle fünf Checkboxen erfüllt, aber der im Ziel genannte
-  **Familienname** liest weiter `getSampleFamilyName(t)`. Braucht einen Ladezustand für die TopBar
-  oder eine Copy-Variante ohne Namen, also 🎨.
-- **#22** (Optimistic UI/Toast/Undo) — vier von fünf Punkten stehen; `useCreateTask` ist weiterhin
-  nicht optimistisch, dazu fehlen die Toast-Variante `solid` und das Höhen-Kollabieren.
-
-Beide tragen jetzt einen Kommentar mit genau dieser Restliste, damit sie nicht als „irgendwie noch
-offen" herumliegen.
-
-Offen bleiben danach: [#111](https://github.com/SvenSonnborn/ElternFlowAI/issues/111) (→ Block 7),
-[#88](https://github.com/SvenSonnborn/ElternFlowAI/issues/88) und
-[#29](https://github.com/SvenSonnborn/ElternFlowAI/issues/29) (→ geparkt), **#23–#27** (Phase 3,
-🔒 anbieterblockiert), **#70** (Renovate-Dashboard, dauerhaft).
-
-**Definition of done Block 0:** `expo install --check` meldet nichts · sechs Checks stehen als
-Required im Ruleset · `package.json` trägt `test-renderer`, nicht mehr `react-test-renderer` ·
-die Issue-Liste zeigt nur noch echte Offene.
+- [Undo-Delete](./TODO.md#undo-delete-siehe-adr-026)
+  - Hintergrund-Flushen ist nur per E2E prüfbar
 
 ---
 
-## Block 1 — Stiller Datenverlust im Kalender
+## Entscheidungen, dann Bau
 
-**Aufwand M–L · 5 PRs (1.3 zählt doppelt) · die Einträge, bei denen Daten ohne
-jede Meldung verschwinden**
+### 12. Entscheidungsrunde
 
-Alle fünf liegen in `features/calendar/`, alle sind unblockiert, alle haben eine bestehende
-Testsuite ([recurrence.test.ts](../features/calendar/recurrence.test.ts),
-[expand.test.ts](../features/calendar/expand.test.ts)), an die sich der Regressionstest hängt.
-Alle stehen in `TODO.md` → [Calendar](./TODO.md#calendar-v1--siehe-adr-008) bzw.
-[Conflict-Detection](./TODO.md#conflict-detection-siehe-adr-031).
+**S** · Ein Gespräch, eine Frage pro Eintrag. Jede Antwort landet im ADR des Branches, der sie baut.
 
-Reihenfolge innerhalb des Blocks ist nach _Verhältnis Schaden zu Aufwand_ sortiert, nicht nach Datei.
+**Vorher nötig:** deine Antworten auf diese Fragen:
 
-### 1.1 `insertSplitEvent` verliert `parent_id` — **erledigt**
+1. **Fehlt die bearbeitete Occurrence in der fremden Fassung, tut „Deine Fassung speichern" …**
+   ([Calendar](./TODO.md#calendar-v1--siehe-adr-008)) — Was soll „Deine Fassung speichern" für eine
+   Occurrence heißen, die die fremde Fassung nicht mehr erzeugt?
+2. **Onboarding-Schritt 2 übergeht beim Zurück aus Schritt 3 die bestehende Familie**
+   ([Auth / Onboarding](./TODO.md#auth--onboarding)) — Was zeigt Schritt 2 einem Elternteil, das
+   schon eine Familie hat?
+3. **Ein abgelaufener gemerkter Einladungstoken sperrt Schritt 2 auf den Beitritt**
+   ([Auth / Onboarding](./TODO.md#auth--onboarding)) — Token bei `22023` verwerfen und auf „Familie
+   gründen" umschalten, oder den Ablauf schon beim Merken prüfen?
+4. **Verwaiste Familien bleiben für immer stehen**
+   ([Familie](./TODO.md#familie--child-profile-live-daten-v1)) — Wie lange bleiben die Daten einer
+   verwaisten Familie stehen, und wer löscht sie wann?
+5. **`intolerances` wird nicht gelesen** ([Essen](./TODO.md#essen--meal-planner-daten-layer-v1)) —
+   Wie soll die App Intoleranzen (Laktose, Fructose, Histamin) neben dem Allergie-Urteil bewerten?
+6. **Required Status Checks binden den Repo-Admin nicht**
+   ([Renovate](./TODO.md#renovate--dependencies-siehe-adr-013)) — Bleibt der Bypass auf `always`,
+   oder geht er auf `pull_request`? Umstellen kannst nur du; das Token darf keine Rulesets ändern.
 
-**„`insertSplitEvent` verliert `parent_id` — stiller Datenverlust"**
-· [features/calendar/recurrence.ts:316](../features/calendar/recurrence.ts) ✅ verifiziert
+### 13. Die Entscheidungen bauen
 
-Eine Zeile. Szenario: „Papas Sportkurs, wöchentlich" mit gesetztem `parent_id`, bearbeitet mit Scope
-„Ab diesem Termin" — die abgespaltene Hälfte wird stillschweigend familienweit. Der
-Regressionstest ist die eigentliche Arbeit: er muss die **Feldliste des Splits gegen die der
-Master-Zeile halten**, sonst wiederholt sich dieselbe Auslassung bei der nächsten neuen Spalte.
+**M–L** · Je nach Antwort ein oder mehrere Branches: Kalender und Onboarding mit Tests auf dem
+Schreibpfad, verwaiste Familien als Migration, Intoleranzen als eigenes Urteilsmodell.
 
-Das ist der billigste echte Datenverlust-Fix im ganzen Backlog — deshalb zuerst und allein.
-
-**Umgesetzt** in [PR #117](https://github.com/SvenSonnborn/ElternFlowAI/pull/117). Der Regressionstest
-hält die Feldliste nicht gegen die Master-Zeile, sondern über `Record<keyof EventRow, true>` gegen den
-generierten Datenbank-Typ — eine neue Spalte lässt damit schon `bun run typecheck` fehlschlagen.
-Mitgenommen: `createEvent` und `optimisticEventRow` hängen an derselben Prüfung
-([eventColumns.test.ts](../features/calendar/eventColumns.test.ts)).
-
-### 1.2 „Alle Termine"-Scope verschiebt den Serienstart — **erledigt**
-
-**„‚Alle Termine'-Scope verschiebt den Serienstart"**
-· [features/calendar/recurrence.ts](../features/calendar/recurrence.ts) — `applyEditScope`, Zweig `scope === "all"`
-
-`start_at` ist zugleich Termin-Startzeit **und** Serienanker (`dtstart` via
-[rrule.ts](../features/calendar/rrule.ts) → `buildFloatingRule`). Ändert jemand bei einer laufenden Serie
-nur die Uhrzeit einer späteren Occurrence und wählt „Alle Termine", wandert `dtstart` auf das Datum
-_dieser_ Occurrence — alle Vorkommen davor fallen serverseitig aus `rule.all()`/`between()` heraus.
-Trägt die Serie ein `rrule_count`, verschiebt sich zusätzlich das Zähl-Fenster.
-
-**Umgesetzt als [ADR-032](./decision-log.md)** — von den beiden erwogenen Varianten wurde die erste
-gewählt: `anchoredChanges` in [recurrence.ts](../features/calendar/recurrence.ts) behält bei Scope
-„alle" auf einer Serie das `start_at`-**Datum** des Masters und übernimmt nur die **Uhrzeit**; die
-Dauer kommt aus der Eingabe. `dtstart` vom editierten `start_at` zu entkoppeln wäre sauberer, hätte
-aber eine Schemaänderung gebraucht, für die es keinen zweiten Anlass gab. Zwei Grenzen kamen dabei
-heraus: „ab diesem Termin" verankert weiterhin absichtlich neu, und eine **Datumsänderung** unter
-Scope „alle" wird stillschweigend verworfen — der Hinweis dafür braucht einen Copy-Key und steht als
-🎨-Eintrag in [TODO.md](./TODO.md).
-
-### 1.3 Das Override-Modell: verschwundene Exceptions + Versions-Schlüssel — **erledigt**
-
-Zwei Einträge, ursprünglich **eine** vermutete Ursache — beide schlüsselten auf ein Datum, das der
-jeweils andere Pfad anders auflöste. Der Versions-Schlüssel-Teil (D1) ist mit
-[PR #121](https://github.com/SvenSonnborn/ElternFlowAI/pull/121) behoben; die Kandidatenmenge (D2)
-hatte sich dabei als eigenständiges Problem am Override-Modell selbst herausgestellt, nicht als
-dieselbe Stelle zweimal anzufassen, und bekam deshalb einen eigenen PR. Beide sind erledigt: D1
-macht eine verschobene Occurrence **adressierbar**, D2 macht sie **sichtbar**.
-
-- **D1 — „Eine auf einen anderen Tag verschobene Occurrence fällt aus dem Versions-Schlüssel"**
-  · [version.ts](../features/calendar/version.ts) — `occurrenceVersion`
-  **Erledigt, umgesetzt als
-  [ADR-034](./decision-log.md#adr-034--der-occurrence-schlüssel-occurrencekey-trennt-regel-datum-von-anzeigedatum-2026-09-14).**
-  `CalendarOccurrence` trägt jetzt zwei Datumsfelder statt eines: `occurrenceKey` (das von der Regel
-  erzeugte, in `row.timezone` gebildete Datum — benennt die Zeile in `event_exceptions`) und
-  `occurrenceDate` (das aufgelöste Anzeigedatum in der Zone des Lesers). Versionsvergleich,
-  React-Keys, der Route-Parameter `occ` und der gesamte Schreibpfad schlüsseln jetzt auf
-  `occurrenceKey`. Mitbehoben: der vorbestehende Fehler, dass `expand.ts` `occurrenceVersion` mit dem
-  aufgelösten statt dem Regel-Datum aufrief, sowie eine erst beim Umbau benannte zweite Vermischung im
-  Forward-Schnitt (`endOfDayInstant` interpretierte ein gerätezonen-gebildetes Datum in
-  `master.timezone`) und im Schreibpfad selbst (`anchoredChanges`, `withTimeOfDay`/
-  `mergeDateAndTimeOfDay`, `recurrenceToRrule` rechneten in der Geräte- statt der Terminzone).
-- **D2 — „Aus dem Fenster verschobene `modified`-Exceptions verschwinden"**
-  · [expand.ts](../features/calendar/expand.ts) — `expandRecurrence`
-  **Erledigt, umgesetzt als
-  [ADR-035](./decision-log.md#adr-035--der-override-vertrag-kandidaten-aus-event_exceptions-description-im-vertrag-2026-09-15).**
-  Die Kandidatenmenge hat jetzt **zwei** Quellen: die Regel-Vorkommen aus `occurrencesBetween` plus
-  die Regel-Vorkommen jener `modified`-Exceptions, deren Override-Intervall das Fenster schneidet —
-  dedupliziert auf `occurrenceKey` und nur, wenn ihr `occurrence_date` überhaupt ein Vorkommen der
-  Regel ist, damit eine verwaiste Exception keinen Phantom-Termin erzeugt. Nachgemessen an einer
-  Montagsserie ab 01.06.2026, deren Vorkommen vom 29.06. auf den 20.07. verschoben ist: Das
-  Juli-Fenster führte `2026-07-06/13/20/27` **ohne** den Schlüssel `2026-06-29`, das Juni-Fenster
-  `2026-06-01/08/15/22` ebenfalls ohne ihn — an beiden Daten unsichtbar. Jetzt steht sie im
-  Juli-Fenster, neben dem regulären Vorkommen desselben Tages; dass beide überleben, trägt
-  `occurrenceKey` als Identität aus D1. Drei Zusätze aus Spec §6.9 kamen mit: `description` ist
-  seither Teil des Override-Vertrags (eine per „Nur diesen" geänderte Beschreibung erreichte die
-  Anzeige nie), ein unparsbares `override.start_at` wird verworfen statt als `Invalid Date`
-  weitergereicht (ein einziger kaputter Wert leerte über den `RangeError` den **gesamten**
-  Kalenderbereich), und `eventLookupWindow` deckt das Override-Intervall der angeforderten
-  Occurrence mit ab — sonst zeigte ihr eigener Link stillschweigend einen anderen Termin derselben
-  Serie. Der Vertrag liegt jetzt als eigenes Modul in
-  [override.ts](../features/calendar/override.ts), die Tagesgrenzen-Rechnung als `zonedDayBounds` in
-  [timezone.ts](../features/calendar/timezone.ts) (drittes Vorkommen).
-
-> D2 hat den Override-Vertrag ohnehin aufgemacht und **„`applyOverride` kennt `description` nicht"**
-> gleich mit erledigt — der Eintrag ist aus `TODO.md` entfernt. **„Ganztägig ist im Edit-Form nicht
-> umschaltbar"** bleibt als einziger Punkt des Vertrags offen und ist 🎨-blockiert: Der Code-Weg ist
-> mit `description` vorgezeichnet, es fehlt allein der `cal.edit.*`-Copy-Key.
-
-### 1.4 Zeitumstellung: Serien laufen eine Stunde falsch — **erledigt**
-
-**„Serientermine zeigen nach der Zeitumstellung eine Stunde falsch"**
-· [features/calendar/rrule.ts](../features/calendar/rrule.ts) + [features/calendar/timezone.ts](../features/calendar/timezone.ts) ✅ verifiziert
-
-Nachgemessen unter `TZ=Europe/Berlin`: eine wöchentliche Serie ab `2026-10-06 18:00` (CEST) stand ab
-dem 27.10. auf **17:00**; in der Gegenrichtung stand eine Serie ab `2026-03-09 08:00` ab dem 30.03.
-auf **09:00**. `buildFloatingRule` übergab ein nacktes `Date` an `rrule`, das absolut — im gleichbleibenden
-UTC-Abstand — rechnet; gelesen wurde das Ergebnis danach mit lokalen Gettern. Betraf jede Serie, die
-über eine Zeitumstellung läuft — also in der Praxis fast jede wiederkehrende Familienverabredung,
-zweimal im Jahr.
-
-**Umgesetzt als [ADR-033](./decision-log.md)** — der ursprünglich hier vorgeschlagene Weg über
-`rrule`s `tzid`-Option schied aus: Die Bibliothek (`2.8.1`) rechnet in `dateInTimeZone`
-`targetOffset − localOffset` und ist damit nur bei Prozess-Zeitzone UTC korrekt; unter der
-Gerätezone einer React-Native-App — dem Produktionsfall — ist die Option ein reiner No-op.
-Stattdessen wertet [rrule.ts](../features/calendar/rrule.ts) die Regel vollständig in **Wandzeit**
-aus:
-`dtstart`, `until` und die `between`-Grenzen laufen als „floating" (Wandzeit in den UTC-Feldern eines
-`Date`) durch `rrule`, das damit DST-frei rechnet; [timezone.ts](../features/calendar/timezone.ts)
-rechnet an den Rändern zwischen Instant und Wandzeit um und behandelt die doppelte Oktoberstunde
-(früherer Zeitpunkt gewinnt) und die März-Sprung-Lücke (späterer Zeitpunkt gewinnt) explizit über
-zwei Sonden ±26 Stunden statt eines Zweipasses, der auf den falschen Zeitpunkt konvergiert. `events`
-bekam dafür die Spalte `timezone` (Default `Europe/Berlin`); `deviceTimeZone()` füllt sie beim
-Anlegen unsichtbar aus der Gerätezone. Mitgenommen: die Dauer eines Vorkommens wird jetzt in
-Wandzeit gerechnet (sonst verschiebt eine Umstellung das Ende eines mehrtägigen Termins), und
-`setRruleUntil` schreibt einen Tagesende-Instant in der Zone des Termins statt eines nackten
-Datumsstrings, den Postgres zu Mitternacht UTC gecastet hätte.
-
-Erster Schritt der Iteration war eine Gegenprobe, ob natives `Intl.DateTimeFormat` mit `timeZone` und
-`formatToParts` unter Hermes die Sommerzeitregel trägt oder nur einen festen Offset liefert — das
-Repo hatte bis dahin nirgends zur Laufzeit `Intl` benutzt. **Bestanden auf beiden Plattformen:** iOS
-(Apples ICU) und Android (Java-ICU) lieferten für `Europe/Berlin` je `02:00` (1. Juli) und `01:00`
-(1. Januar), also die echte Regel. Kein Polyfill nötig.
-
-**Definition of done Block 1:** Für jeden der fünf PRs ein Regressionstest, der **vor** dem Fix rot
-ist · `bun test` grün · eine Sichtprüfung der Serienbearbeitung am Simulator (Web reicht hier nicht,
-siehe Block 3).
+**Vorher nötig:** Schritt 12.
 
 ---
 
-## Block 2 — Aufgaben-Löschpfad & Konfliktlücken
+## Designer-Durchgang
+
+🎨 Hier hängt alles am Handoff-Bundle.
+
+**Vorher nötig für die ganze Phase:** Entweder gibst du frei, dass ich `docs/COPY.md` und
+`patterns/*.md` aus dem Code heraus entwerfe und der Designer gegenliest, oder der Designer schreibt
+sie selbst. Bis dahin lässt sich nur der Code-Teil vorbereiten.
+
+### 14. Copy-Deck nachtragen
+
+**M** · Reine Nachträge: Die Keys sind gebaut und in beiden Katalogen übersetzt, nur das Deck kennt
+sie nicht.
+
+- [Calendar](./TODO.md#calendar-v1--siehe-adr-008)
+  - Neue Kalender-Keys fehlen in `docs/COPY.md`
+- [Auth / Onboarding](./TODO.md#auth--onboarding)
+  - Neue `dash.resume.*`-Keys fehlen in `docs/COPY.md`
+  - Neue `auth.invite.*`-Keys fehlen in `docs/COPY.md`
+- [Familie](./TODO.md#familie--child-profile-live-daten-v1)
+  - Neue `familie.*`-Invite-Keys fehlen in `docs/COPY.md`
+  - Neuer `color.*`-Namespace fehlt in `docs/COPY.md`
+  - Neue `parent.*`-Keys fehlen in `docs/COPY.md`
+- [Einstellungen](./TODO.md#einstellungen-phase-1)
+  - `set.footer` fehlt in `docs/COPY.md`
+- [Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)
+  - Neue Aufgaben-Keys fehlen in `docs/COPY.md`
+  - `hw.error.*` fehlen in `docs/COPY.md`
+  - Neue Formular-Keys fehlen in `docs/COPY.md`
+  - `form.discard.*` fehlt in `docs/COPY.md`
+  - Neue Filter-Keys fehlen in `docs/COPY.md`
+  - `dash.greeting.evening` fehlt in `docs/COPY.md` und `patterns/dashboard.md` (der Pattern-Teil in
+    Schritt 15)
+- [Essen](./TODO.md#essen--meal-planner-daten-layer-v1)
+  - Neue i18n-Keys fehlen in `docs/COPY.md`
+- [Undo-Delete](./TODO.md#undo-delete-siehe-adr-026)
+  - Die neuen Undo-Copy-Keys fehlen in `docs/COPY.md`
+- [Realtime](./TODO.md#realtime-siehe-adr-030)
+  - Der Debug-Screen steht nicht in `docs/COPY.md`
+- [Weitere](./TODO.md#weitere-out-of-scope-items)
+  - Die EN-Fassung der Sample-Copy ist von uns, nicht vom Designer
+
+### 15. Pattern-Docs nachziehen
+
+**M** · Die Abweichungen im Code sind freigegeben, die Docs müssen nachziehen.
+
+**Vorher nötig:** zwei Richtungsfragen. Soll die Kalender-Legende `ha` zeigen (dann braucht es einen
+`event_types`-Datensatz) oder fällt der Swatch weg? Und ist `dashboard-empty.md` eine Karte oder ein
+eigener Screen?
+
+- [Calendar](./TODO.md#calendar-v1--siehe-adr-008)
+  - Kalender-Legende zeigt eine Kategorie ohne Datenbasis
+- [Auth / Onboarding](./TODO.md#auth--onboarding)
+  - `patterns/dashboard-empty.md` beschreibt einen Screen, den keine Route mountet
+- [Familie](./TODO.md#familie--child-profile-live-daten-v1)
+  - Es gibt kein `patterns/parent-profile.md`
+- [Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)
+  - `patterns/homework.md` beschreibt einen V1/V2-Umschalter, den es nicht gibt
+  - `patterns/homework.md` kennt kein Anlege-Formular
+  - `patterns/homework.md` kennt keine Filterleiste und nennt drei Sektionen statt fünf
+  - `dash.greeting.evening` fehlt in `docs/COPY.md` und `patterns/dashboard.md` (Pattern-Teil)
+- [Essen](./TODO.md#essen--meal-planner-daten-layer-v1)
+  - Designer-Abstimmung Essen-Tab: Zeilen-Menü und Wochen-Blättern
+  - Chip-Reihe in beiden Pattern-Docs veraltet
+  - `patterns/meals.md` beschreibt drei Slot-Tabs, der Screen rendert vier
+
+### 16. Kalender-Design
+
+**M–L** · Was im Kalender nur mit Copy oder einer Designentscheidung weitergeht.
+
+- [Calendar](./TODO.md#calendar-v1--siehe-adr-008)
+  - Ganztägig ist im Edit-Form nicht umschaltbar
+  - Eine Datumsänderung unter Scope „alle Termine" wird stillschweigend verworfen
+  - Der Konflikt-Dialog verschweigt, was an einer Regeländerung hängt
+  - Eine fremde Absage der bearbeiteten Occurrence erscheint als Dialog ohne Zeilen …
+  - Die Zone eines neuen Termins kommt unsichtbar vom Gerät
+  - Bestandstermine tragen pauschal `Europe/Berlin`
+  - Punkte auf der Heute-Zelle sind unsichtbar
+  - Der Sprach-FAB verdeckt die Karte „Termin per Sprache“
+- [Weitere](./TODO.md#weitere-out-of-scope-items)
+  - Kalender-Tageszellen sind bei 320 pt schmaler als 44
+  - Die Monatspfeile des Kalenders haben keine Rolle und keinen Namen
+  - Die Kollisionsprüfung beim Anlegen sieht nur die erste Occurrence einer neuen Serie
+
+### 17. Dashboard-Design
+
+**M** · Fehler- und Leerzustände, die heute gar nichts rendern.
+
+- [Dashboard](./TODO.md#dashboard)
+  - Die Leer-Karte des Heros benennt die Mahlzeit nicht
+  - Ein geplanter Eintrag ohne sichtbares Rezept liest sich auch im Hero als „nichts geplant“
+  - Fehlgeschlagene Meal-Query bleibt stumm
+  - Die Copy der Prep-Karte gehört gegengelesen
+  - Auch die Prep-Karte schweigt bei Fehlern
+  - Der Familienname ist weiter Sample-Data
+  - Die Avatar-Reihe filtert nichts (Filter-Teil; der Long-Press folgt in Schritt 29)
+  - Fehlgeschlagene Event-Query bleibt stumm
+- [Essen](./TODO.md#essen--meal-planner-daten-layer-v1)
+  - Ein geplanter Eintrag ohne sichtbares Rezept liest sich als „nichts geplant“
+- [Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)
+  - Kein Einstieg ins Anlegen vom Dashboard
+
+### 18. Familie, Einstellungen, Aufgaben
 
-**Aufwand M · 2–3 PRs · dieselbe Schadensklasse bei Tasks, plus was ADR-031 offen ließ**
+**M** · Kleinere Copy- und Designfragen aus drei Tabs.
 
-### 2.1 `features/tasks/mutations.ts` umbauen — **erledigt**
+**Vorher nötig:** Zielscreens für Datenschutz, Verknüpfte Apps und Hilfe & Support. Den Inhalt der
+Datenschutz-Seite liefert kein Designer.
 
-Drei TODO-Einträge fassen **dieselbe Mutation** an. Sie einzeln zu erledigen hieße, `mutations.ts`
-dreimal umzubauen — `TODO.md` sagt das bei zweien davon selbst („verwandt mit dem Eintrag …, der
-dieselbe Mutation umbaut").
+- [Familie](./TODO.md#familie--child-profile-live-daten-v1)
+  - Das Kürzel der Eltern passt nicht in jeden Avatar
+  - „+ Andere“-Custom-Allergen
+- [Essen](./TODO.md#essen--meal-planner-daten-layer-v1)
+  - Kein Freitext-Allergen (zusammen mit „+ Andere“)
+- [Einstellungen](./TODO.md#einstellungen-phase-1)
+  - Logout-Confirm hat keinen Body-Text
+  - Coming-soon-Rows ohne Ziel (ohne den Sprachassistenten, der folgt in Schritt 29)
+- [Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)
+  - `hw.due` zeigt ein nacktes Datum, der Mock zeigte relative Wörter
+  - Für „du gehörst nicht mehr zur Familie" fehlt ein eigener Text
+- [Weitere](./TODO.md#weitere-out-of-scope-items)
+  - Tag-Pillen im Kinderprofil sagen nicht an, dass ein Tipp das Tag entfernt
+  - Die Spur eines ausgeschalteten Schalters ist im dunklen Design kaum sichtbar
 
-- **„`useDeleteTask` hat keinen 0-Zeilen-Guard"** ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1))
-  Ein `DELETE`, das unter RLS null Zeilen trifft, meldet `error: null`. Die Mutation „gelingt",
-  gelöscht wurde nichts, die Aufgabe ist beim nächsten Refetch zurück. Das Geschwister
-  `useUpdateTask` hängt genau dafür `.select("id").maybeSingle()` an. Das ist der Mechanismus, der
-  ein verzögertes Löschen nach dem Abmelden lautlos macht — der Grund für das `flush()` in
-  `useSignOut` ([features/auth/mutations.ts](../features/auth/mutations.ts)).
-- **„`useDeleteTask` prüft keine `baseVersion`"** ([Conflict-Detection](./TODO.md#conflict-detection-siehe-adr-031))
-  Im Zwei-Client-Lauf beobachtet: A plant eine Löschung, B ändert innerhalb des 5-s-Undo-Fensters
-  denselben Datensatz und speichert erfolgreich; nach Ablauf ist die Aufgabe weg — ohne Toast,
-  Rückfrage oder Hinweis an B. Die „Trotzdem löschen"-Mechanik, die der Termin-Pfad seit
-  [ADR-031](./decision-log.md) Decision 13 hat, existiert für Aufgaben gar nicht. Braucht
-  `.eq("updated_at", …)` **plus** ein `errorAction` an `useUndoableDelete`.
-- **„`useUpdateTask` hat keine eigene Testsuite"** ([Conflict-Detection](./TODO.md#conflict-detection-siehe-adr-031))
-  Der Hook spricht direkt mit `supabase`; es fehlt der injizierbare Deps-Schnitt, den der Kalender
-  hat (`fetchMaster` + `ops` in [features/calendar/mutations.ts](../features/calendar/mutations.ts)).
-  Sein Compare-and-Swap ist heute **nur** durch einen beobachteten Zwei-Client-Lauf belegt, nicht
-  automatisiert.
+### 19. Undo und Toast
 
-**Reihenfolge im PR: erst der Deps-Schnitt, dann die beiden Fixes.** Andersherum baut man zwei
-Korrekturen ohne Testmöglichkeit ein und zieht den Schnitt hinterher durch fertigen Code.
+**M** · Die beiden offenen Fragen am Undo-Toast und die Benennung der Radien.
 
-**Umgesetzt als [ADR-036](./decision-log.md).** `features/tasks/mutations.ts` hat jetzt
-denselben injizierbaren Schnitt wie der Kalender — `TaskOps` mit `fetchRow`/`updateRow`/
-`deleteRow`, darüber die reinen `updateTask`/`deleteTask` —, und das Löschen prüft die
-gesehene Version per Compare-and-Swap statt gar nicht. Der 0-Zeilen-Guard und der
-Konflikt-Detektor sind dabei dieselbe Zeile: Ohne `.select("id")` meldet PostgREST auch
-dann Erfolg, wenn null Zeilen getroffen wurden. Die Reihenfolge des Blocks — erst der
-Schnitt, dann die Fixes — hat sich bestätigt: Die beiden im TODO getrennt geführten Löcher
-(0-Zeilen-Guard, fehlende Versionsprüfung beim Löschen) liefen über genau diese eine
-Korrektur und ließen sich dank des schon bestehenden Schnitts von Anfang an mit einem roten
-Test belegen. Ein Löschkonflikt zeigt seither denselben Fehler-Toast mit „Trotzdem löschen"
-wie der Termin-Pfad — diese Ergänzung an `TaskEditScreen.tsx` bekam keinen eigenen Test (hier
-fehlt derselbe Render-Pfad für React-Komponenten wie beim Rest des Screens); belegt ist sie
-durch Codelektüre und die für Block 2 vorgesehene Sichtprüfung am Simulator. Eine Grenze
-blieb und steht als eigener Eintrag in [TODO.md](./TODO.md): Eine **RLS-Ablehnung ohne
-Abmeldung** liefert dasselbe Bild wie „schon gelöscht" — null Zeilen, leere Nachlese — und
-nimmt denselben stillen Weg. Sie zu trennen bräuchte eine serverseitige Auskunft und damit
-eine Migration; vertagt bis Block 7 (Transaktions-RPC).
+- [Undo-Delete](./TODO.md#undo-delete-siehe-adr-026)
+  - Das Undo-Fenster ist nicht verlängerbar
+  - Das ✕ am Undo-Toast schließt, ohne rückgängig zu machen und ohne vorzeitig zu committen
+- [Toast](./TODO.md#toast)
+  - Die Design-Prototyp-CSS und die Token-Skala benennen dieselben Radien verschieden
 
-### 2.2 Die zwei Löcher in der Conflict-Detection — **erledigt**
+### 20. Konto und Einladungen
 
-Beide in `TODO.md` → [Calendar](./TODO.md#calendar-v1--siehe-adr-008), beide von ADR-031 bewusst
-außerhalb von Task 8 gelassen:
+**L** · 🔒 zusätzlich zum Designer.
 
-- **„Eine reine Änderung der Wiederholungsregel wird beim Konflikt-Vergleich still überschrieben"**
-  · [conflict.ts](../features/calendar/conflict.ts) — `differingEventFields`
-  Vergleicht nur die fünf `EventChanges`-Felder; `vars.recurrence` fließt nicht ein. Ändern zwei
-  Eltern denselben Termin ausschließlich am Rhythmus, ist die Feldliste leer und `showConflict`
-  speichert lautlos durch — **genau die Klasse stillen Überschreibens, gegen die das Feature gebaut
-  ist.** Mit dem Drei-Wege-Vergleich (Task 13) ist die Lücke _schärfer_ geworden: das zufällige
-  Sicherheitsnetz des alten, zu strengen Vergleichs ist ersatzlos entfallen.
-- **„Der Compare-and-Swap-Fall zeigt den Dialog ohne Vergleichszeilen und ohne frische Basis-Version"**
-  · [EventEditScreen.tsx](../app-sections/event/EventEditScreen.tsx) — `showConflict`
-  Bei `EventConflictError.row === null` fehlen `theirs` **und** eine frische Version — „Deine Fassung
-  speichern" schickt zwangsläufig wieder die alte `baseVersion` und scheitert erneut. Der billigere
-  der beiden möglichen Fixes: `updateMaster` liefert im Fehlerfall die aktuelle Zeile mit, statt
-  `null`. Der teurere wäre ein Retry-Loop mit Backoff im Dialog.
+**Vorher nötig:** ein Design für den Account-Screen (eigene Route oder `/parent/[id]`, mit Abo und
+„Konto löschen"?) und ein Zustellweg für Mails — ein SMTP-Anbieter für Supabase Auth oder eine Edge
+Function.
 
-Der zweite Punkt ist erkennbar der kleinere und sollte zuerst kommen — er verbessert die
-Diagnostizierbarkeit des ersten, während man daran arbeitet.
+- [Einstellungen](./TODO.md#einstellungen-phase-1)
+  - Account-Detail-Route hinter der Profil-Card
+- [Familie](./TODO.md#familie--child-profile-live-daten-v1)
+  - E-Mail-Adresse ist nirgends änderbar
+  - Einladungen sind nicht adressiert
 
-**Umgesetzt als [ADR-037](./decision-log.md).** `updateMaster` liest bei null getroffenen Zeilen
-jetzt dieselbe Zeile nach, die auch die Queries laden (`EVENT_SELECT`, exportiert statt in
-`recurrence.ts` neu geschrieben) — und wirft `EventConflictError(current)` statt
-`EventConflictError(null)`, oder `EventNotFoundError`, wenn auch die Nachlese leer bleibt. Der
-zusätzliche Roundtrip fällt ausschließlich im Fehlerfall an, festgehalten im Test „Treffer → keine
-Nachlese". Mit `row` jetzt garantiert vorhanden ist `EventConflictError.row` nicht mehr nullable;
-zwei defensive Zweige, die kein Test je erreichen konnte, sind ersatzlos entfallen (der
-`if (row)`-Block und der tote `?? vars.baseVersion`-Rückfall in `EventEditScreen`s `showConflict`,
-die zweite Hälfte der Bedingung in `EventDetailScreen`s Lösch-Konflikt). `theirs` bleibt nullable —
-das heißt jetzt in der Praxis nur noch: Die andere Seite hat genau diese Occurrence abgesagt, oder ihre Regel
-erzeugt sie nicht mehr (ein Schnitt per „ab hier löschen", eine kleinere Anzahl, ein anderer
-Rhythmus). ADR-037 selbst nennt stattdessen eine Occurrence außerhalb des Suchfensters — praktisch
-unerreichbar, weil `eventLookupWindow` den Tag des Schlüssels immer abdeckt. Beide wirklichen
-Gründe bestehen seit ADR-031 und wurden erst mit [ADR-038](./decision-log.md) erkannt. Beim Verengen zeigte
-sich, dass Compiler und Linter tote Prüf-Zweige nicht von selbst finden (`no-unnecessary-condition`
-ist in diesem Repo aus); als eigener Eintrag in [TODO.md](./TODO.md) festgehalten. Der erste
-Spiegelstrich (die Wiederholungsregel im Vergleich) blieb damals offen und kam mit PR 3.
+### 21. Essen-Ausbau
 
-**Umgesetzt als [ADR-038](./decision-log.md)** — der erste Spiegelstrich. `differingEventFields`
-kennt die Wiederholungsregel jetzt als eigenes Konfliktfeld (`"recurrence"`), dreiwertig wie die
-anderen und nur, wenn der Schreibvorgang überhaupt eine Regel mitführt. Der Vergleich selbst liegt
-in [rule.ts](../features/calendar/rule.ts) und ist derselbe, mit dem `applyEditScope` entscheidet,
-ob die Exceptions der Serie gelöscht werden — beide urteilen über dieselbe Frage und können nicht
-mehr auseinanderlaufen. Der Dialog zeigt bis zu **zwei** Zeilen aus vorhandenen Keys („Wiederholung",
-„Endet nach … Terminen") statt der einen Zeile aus dem ursprünglichen Spec-Entwurf: `cal.create.fieldRecurrenceCount` ist
-eine Beschriftung, keine Wert-Vorlage, und „Option + Anzahl" kann ein Serienende per Datum nicht
-ausdrücken. Die Regel-Zeilen erscheinen auch, wenn die fremde Regel die bearbeitete Occurrence nicht
-mehr erzeugt: Der Dialog baut sie dann aus der fremden Zeile (`err.row`) — nur bei einer
-Regel-Kollision, die eigene Seite muss die Regel also ebenfalls ändern. Benannte Grenze, als 🎨-Eintrag in [TODO.md](./TODO.md): Der Dialog sagt
-nicht, was an „Deine Fassung speichern" hängt — es löscht alle Exceptions der Serie und macht eine
-fremde Kürzung rückgängig, per „ab hier löschen" ebenso wie per „dieser und folgende", wo ab dem
-Schnitt dann zwei Serien nebeneinander laufen und Termine doppelt stehen —, und ein Enddatum
-erscheint nur als „—". Jede dieser Folgen zu benennen bräuchte einen Copy-Key. Ein zweiter
-🎨-Eintrag, vorbestehend seit ADR-031: Hat die andere Seite genau die bearbeitete Occurrence abgesagt,
-erscheint der Dialog ohne Zeilen, und „Deine Fassung speichern" hebt die Absage mit „Nur diesen"
-oder „dieser und folgende" auf — mit Letzterem außer am Serienanfang, wo der Zweig nicht teilt,
-sondern den Master schreibt (`updateMaster`), und die Absage bleibt. Ohne 🎨, als offene
-Verhaltensfrage, dazu ein dritter Eintrag
-(ebenfalls seit ADR-031): Fehlt die bearbeitete Occurrence in der fremden Fassung und ändert der
-Nutzer die Regel nicht, erscheint der Dialog ohne Zeilen, und „Deine Fassung speichern" tut je nach
-Scope Unerwartetes — mit „dieser und folgende" schiebt es etwa ein fremdes Serienende per Datum nach
-hinten, sodass gelöschte Termine zurückkehren, während die eigene Änderung nirgends erscheint; mit
-„Nur diesen"
-landet die Änderung in einer verwaisten, unsichtbaren Exception. Ein Fix braucht zuerst die
-Entscheidung, was „Deine Fassung speichern" für eine weggefallene Occurrence heißen soll.
+**L** · Neue Funktionen statt Korrekturen, deshalb nach allem anderen im Essen-Tab.
 
-Ein vierter Eintrag, ohne 🎨, fiel beim Gesamt-Review von ADR-038 auf und besteht schon länger:
-**„Auf einer per ‚Nur diesen' verschobenen Occurrence bleibt der Recurrence-Editor verborgen, obwohl
-die Regel darstellbar ist"** · [EventEditScreen.tsx](../app-sections/event/EventEditScreen.tsx) —
-`initial`. Die Hydration verankert `rruleToRecurrence` auf dem per Override aufgelösten Start; liegt
-der bei einer Regel „wöchentlich an einem Tag" auf einem anderen Wochentag, liefert es `null`, und
-Wiederholung wie Serienende sind auf dieser Occurrence ausgeblendet. Kein Datenverlust: Ohne Editor
-führt der Schreibvorgang keine neue Regel mit. Dieselbe Anker-Klasse löst `ruleAnchor` auf der
-fremden Seite des Dialogs schon; ein Fix muss den eigenen Anker in `buildRecurrenceChanges`
-(`range.startAt`) mitziehen, sonst schriebe er die Regel auf den verschobenen Wochentag um.
+**Vorher nötig:** Patterns für Einkaufsliste (`/meals/shopping`), Kochmodus, Favoriten sowie
+Portionen und Notizen.
 
-### 2.3 Toggle-Fehler ist auf Web unsichtbar — **erledigt**
-
-**Erledigt mit Block 3, ohne Copy-Key** ([ADR-039](./decision-log.md) Decision 2): `showAlert` nimmt
-die Meldung als Titel, genau wie nativ `Alert.alert(message)` — Parität statt neuem Design. Der
-Abschnitt darunter ist der Stand vor der Umsetzung.
-
-**„Toggle-Fehler ist auf Web unsichtbar"** · [TaskRow.tsx](<../app-sections/(tabs)/aufgaben/TaskRow.tsx>) — `handleToggle`
-
-`Alert.alert` ohne Titel ist auf react-native-web ein No-op — ein fehlgeschlagenes Abhaken bleibt
-komplett stumm. Die Lösung liegt bereit: `showAlert` aus
-[confirmDialog.ts](../app-sections/shared/confirmDialog.ts), das genau diesen No-op abfängt (und
-laut eigenem TODO-Eintrag **absichtlich** ungenutzt auf diesen Aufrufer wartet). 🎨 Braucht einen
-Titel-String, und der gehört in die designer-eigene [docs/COPY.md](./COPY.md).
-
-Der Code-Teil ist vorbereitbar; der Key ist der einzige Blocker. Gehört zum Designer-Paket, das mit
-Block 3 fällig wird.
-
-**Definition of done Block 2:** `features/tasks/mutations.ts` hat einen Deps-Schnitt und eine
-Testsuite · Löschen einer fremdgeänderten Aufgabe zeigt denselben Dialog wie beim Termin · eine
-reine Rhythmus-Änderung durch zwei Clients erzeugt einen Konflikt statt eines stillen Overwrites.
-
----
-
-## Block 3 — Web-Parität
-
-**Aufwand M · ~2 PRs · macht den schnellsten Prüf-Loop wieder ehrlich**
-
-`CLAUDE.md` nennt `bun run web` den „fastest smoke-test loop". Das stimmt heute nur eingeschränkt:
-Löschen, beide Geburtstags-Picker und jeder Toggle-Fehler sind dort **tot**, ohne dass etwas darauf
-hinweist. Jede Iteration ab hier zahlt für diese Lücke — deshalb kommt der Block früh, direkt nach
-den Datenverlust-Fixes, deren Sichtprüfung er selbst erleichtert.
-
-> **Stand 2026-10-01: erledigt.** Die drei Zeilen der Tabelle hat der erste PR gelöst
-> ([ADR-039](./decision-log.md)). Er hat dabei mehr gefunden als hier stand — Serie speichern,
-> Abmelden und Kind löschen waren auf Web ebenso tot, auf Android fehlte im Scope-Dialog
-> „Abbrechen" — und alles über dieselben Helfer gelöst. Die drei Web-Eigenheiten darunter hat der
-> zweite PR nach einer Diagnose gelöst ([ADR-040](./decision-log.md)); eine davon war gar kein
-> App-Fehler. Der Nebenbefund zur Tastatur steht in Block 4.
-
-Gemeinsame Ursache bei den ersten dreien: `Alert` ist auf react-native-web ein No-op
-(`static alert() {}`).
-
-| Eintrag                                                                                                                  | Datei                                                                                                                                                         | Fix                                                                                                                                                                                                                                   |
-| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **„Der Termin-Löschpfad ist auf Web gar nicht auslösbar"** — erledigt ([Calendar](./TODO.md#calendar-v1--siehe-adr-008)) | [EventDetailScreen.tsx](../app-sections/event/EventDetailScreen.tsx) — `onDeletePress` · [scopeDialog.ts](../app-sections/event/scopeDialog.ts) — `pickScope` | `confirmDestructive` statt rohem `Alert.alert` (`TaskEditScreen` macht es vor) **plus** ein Web-Zweig in `pickScope` ohne `ActionSheetIOS`.                                                                                           |
-| **„Geburtstags-Picker rendert auf Web nicht"** — erledigt ([Familie](./TODO.md#familie--child-profile-live-daten-v1))    | [ChildProfileScreen.tsx](../app-sections/child-profile/ChildProfileScreen.tsx) · [Step4FirstChild.tsx](../app-sections/onboarding/Step4FirstChild.tsx)        | Beide binden `@react-native-community/datetimepicker` **direkt** ein statt des geteilten [DateTimePickerSheet](../app-sections/shared/DateTimePickerSheet.tsx), das seit [ADR-010](./decision-log.md) einen Web-Zweig hat. Umstellen. |
-| **„Toggle-Fehler ist auf Web unsichtbar"** — erledigt                                                                    | siehe [2.3](#23-toggle-fehler-ist-auf-web-unsichtbar--erledigt)                                                                                               | `showAlert` mit der Meldung als Titel                                                                                                                                                                                                 |
-
-Dazu drei Web-Eigenheiten, die keinen Designer brauchen:
-
-- **„Klicks auf die Tagesagenda treffen auf Web eine unsichtbare Kalendertag-Fläche"** — erledigt,
-  kein App-Fehler: Der Testlauf griff die gleichnamige Zeile des verdeckten Dashboard-Tabs
-  ([ADR-040](./decision-log.md) Decision 1). Stand vor der Diagnose:
-  ([Conflict-Detection](./TODO.md#conflict-detection-siehe-adr-031)) ·
-  [KalenderScreen](<../app-sections/(tabs)/kalender/KalenderScreen.tsx>)
-  Im Zwei-Client-Lauf zuverlässig reproduziert: ein Klick auf die Tagesliste landet auf einer
-  absolut positionierten Fläche eines Kalendertags — vermutlich der Pager-Layer, den
-  `enableSwipeMonths` in `react-native-calendars` aufspannt. Erzwungenes Klicken half nicht
-  (`force` umgeht nur Playwrights Prüfung, nicht das Browser-Hit-Testing). **Echtes
-  Usability-Problem**, nicht nur ein Testartefakt — bislang nur festgehalten, nie untersucht. Erster
-  Schritt ist eine Diagnose, keine Korrektur: erst klären, ob der Layer abschaltbar ist oder ob die
-  Agenda aus dem Kalender-Container heraus muss.
-- **„Web-Datums-/Zeit-Input springt beim Tippen zurück"** — erledigt, das Feld hält den getippten
-  Zwischenstand ([ADR-040](./decision-log.md) Decision 4). Stand vor der Diagnose:
-  ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)) ·
-  [DateTimePickerSheet.web.tsx](../app-sections/shared/DateTimePickerSheet.web.tsx)
-  Bekannter Quirk kontrollierter Date-Inputs, seit der `Field`-Pressable-Korrektur überhaupt erst
-  erreichbar. **Erst prüfen, ob es UX-relevant ist** — der TODO-Eintrag verlangt ausdrücklich diese
-  Beobachtung, nicht direkt einen Fix.
-- **„Render-Schleife beim Login-Übergang"** — erledigt, `AuthGate` ersetzte den Root-Navigator
-  ([ADR-040](./decision-log.md) Decision 2). Stand vor der Diagnose: ([Dashboard](./TODO.md#dashboard)) ·
-  [DashboardScreen](<../app-sections/(tabs)/dashboard/DashboardScreen.tsx>)
-  `Maximum update depth exceeded` auf Web, einmalig, nur im Übergang von `/login`. Stack führt über
-  `forceStoreRerender` → `commitHookLayoutEffects`, also ein `useSyncExternalStore`-Abo, das in
-  einem Layout-Effekt eine Zustandsänderung auslöst. Reproduziert auf `main`. Der Screen rendert
-  trotzdem — deshalb zuletzt im Block, aber es ist die Sorte Befund, die später als Flake in einem
-  Component-Test wiederkommt (→ Block 5).
-
-**Definition of done Block 3:** Ein Termin lässt sich im Web-Build löschen · beide
-Geburtstagsfelder öffnen im Web einen Picker · die Konsole ist beim Login-Übergang sauber.
-
----
-
-## Block 4 — Touch-Targets & a11y
-
-**Aufwand S · ein PR · eine gemeinsame Sichtprüfung**
-
-> **Stand 2026-10-05: die fünf Punkte sind erledigt** ([ADR-041](./decision-log.md)). Abweichend
-> vom Vorschlag unten sind die Tippflächen als 44er-Box gebaut statt über `py-1` — `hitSlop` wirkt
-> auf Web gar nicht —, und `FilterChipRow` zog mit. Der Fokus-Punkt kam samt der Deckfläche von
-> `AuthGate`, beides nur auf Web. **Nicht geprüft: iOS und Android.**
->
-> **Offen geblieben war die Wurzel, [4.1](#41-inlinerem-entscheiden--erledigt)** — seit 2026-11-04
-> erledigt, ebenso die nativen Screenreader unter der Deckfläche und die zwei Verweise in
-> [8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-054](./decision-log.md)). Das
-> Kürzel in den Avataren steht weiter in [TODO.md](./TODO.md).
-
-`CLAUDE.md` Non-negotiable 4 lautet „Touch targets ≥ 44×44". Zwei ausgelieferte Screens verletzen
-das, ein dritter Punkt macht einen Filter unsichtbar. Alle zusammen kosten eine
-Sichtprüfungsrunde statt einer je Punkt — genau der Grund, aus dem sie einzeln vertagt wurden.
-
-- **„`hitSlop` in `TypePicker` und `MemberPicker` vergrößert das Touch-Target nicht"** — erledigt
-  ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)) ✅ verifiziert an
-  [TypePicker.tsx:46-47](../app-sections/shared/TypePicker.tsx) (`h-9` + `hitSlop={{top:4,bottom:4}}`,
-  Eltern-`View` exakt so hoch wie die Pille).
-  React Native beschneidet die Touch-Fläche an den Grenzen des Elternteils — die 4 px oben und unten
-  fallen **ersatzlos** weg, die Pillen bleiben bei 36 px. [FilterChipRow](../app-sections/shared/FilterChipRow.tsx)
-  hat dasselbe Muster geerbt und mit einem `py-1` am Container behoben; dieselbe Zeile löst es hier.
-  Betrifft die ausgelieferten Termin- **und** Aufgaben-Formulare.
-- **„Farbfelder im Kinderprofil überlappen sich"** — erledigt ([Familie](./TODO.md#familie--child-profile-live-daten-v1)) ·
-  [ChildProfileScreen.tsx](../app-sections/child-profile/ChildProfileScreen.tsx) — `AVATAR_COLORS`
-  28 px mit `hitSlop={8}` und `gap-2`: die Touch-Rechtecke treffen sich mitten in der 8-px-Lücke, ein
-  Tipp knapp neben einem Feld landet auf dem nächsten. [ParentProfileScreen](../app-sections/parent-profile/ParentProfileScreen.tsx)
-  setzt seit dem CodeRabbit-Review 44×44-Boxen, die kantenbündig kacheln — dieselben zehn Zeilen.
-- **„Ein gelöschtes Kind lässt den Kind-Filter ins Leere zeigen"** — erledigt ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)) ·
-  [filterStore.ts](../features/tasks/filterStore.ts)
-  Der Store hält die `child_id` als freien String und gleicht sie nie gegen die Kinderliste ab. Wird
-  ein Profil gelöscht, während sein Chip aktiv ist, bleibt die Liste leer und **kein** Chip ist
-  hervorgehoben — der Filter ist aktiv, aber unsichtbar. Abgleich gegen `useFamilyChildren` mit
-  Rückfall auf `CHILD_ALL`.
-- **„`short` erscheint nur im Familie-Tab und im Parent-Profil"** — erledigt ([Familie](./TODO.md#familie--child-profile-live-daten-v1)) ·
-  [ChildAvatar.tsx](../app-sections/shared/ChildAvatar.tsx)
-  Dashboard-Avatarreihe und Settings-Profilkarte leiten die Initialen weiter selbst ab; ein
-  geändertes Kürzel wirkt dort nicht. Je eine Zeile — vertagt worden, weil beide Screens eine
-  Sichtprüfung wollten. Die gibt es in diesem Block ohnehin.
-- **„Verdeckte Tabs nehmen auf Web den Tastaturfokus an"** — erledigt ([Weitere](./TODO.md#weitere-out-of-scope-items)) ·
-  [app/(tabs)/_layout.tsx](<../app/(tabs)/_layout.tsx>)
-  Nebenbefund aus Block 3: Inaktive Tab-Szenen sind `aria-hidden`, aber nicht `inert` — die Tab-Taste
-  landet in der unsichtbaren Dashboard-Szene. Erster Schritt: prüfen, ob React Navigation dafür eine
-  Option hat, bevor `inert` von Hand gesetzt wird.
-
-**Definition of done Block 4:** Alle fünf Änderungen in **einem** PR, danach eine Sichtprüfung über
-Termin-Formular, Aufgaben-Formular, Kinderprofil, Dashboard und Einstellungen — light und dark.
-
-### 4.1 `inlineRem` entscheiden — **erledigt**
-
-Entschieden für 16, nach Svens Vorher/Nachher-Vergleich im iOS-Simulator; umgesetzt im Branch
-„a11y nativ" mit nativem Sichtlauf ([ADR-054](./decision-log.md)). `h-11` ist damit auch auf iOS
-und Android 44; die Regel „Maß als Zahl" bleibt.
-
----
-
-## Block 5 — Der RN-Component-Test-Pfad (Schlussstein)
-
-**Aufwand L · eigene Iteration mit Spike · entsperrt vier Einträge**
-
-> **Stand 2026-10-21: erledigt** ([ADR-042](./decision-log.md)). Der Weg ist `jest` mit
-> `jest-expo` für `*.jest.tsx`/`*.jest.ts`, alles andere bleibt unter `bun`. Die
-> Hydrations-Invariante ist in `EventEditScreen` (Speichern) und `TaskEditScreen` (Speichern und
-> Löschen) per Regressionstest gesichert. `features/calendar/hooks.ts` lädt unter `jest`. Die
-> Tests für `useEvent` und `useFamilyRealtime` kamen später ([ADR-049](./decision-log.md),
-> [ADR-052](./decision-log.md)).
-
-Ab hier wird Infrastruktur gebaut. Vier Einträge warten explizit auf **einen** fehlenden Pfad: es
-gibt im Repo keine Möglichkeit, React-Komponenten im Test zu rendern.
-
-- **„Es gibt weiterhin keinen einzigen RN-Component-Test"** ([Renovate](./TODO.md#renovate--dependencies-siehe-adr-013)) ✅
-  63 Testdateien, eine `.tsx`, die nichts rendert. `@testing-library/react-native` und der
-  `jest-expo`-Preset ([jest.config.js](../jest.config.js)) sind vorgehaltene, unbenutzte
-  Infrastruktur.
-- **„`features/calendar/hooks.ts` ist unter `bun test` nicht ladbar"**
-  ([Calendar Optimistic UI](./TODO.md#calendar-optimistic-ui-siehe-adr-027)) — **der eigentliche
-  technische Blocker.** Über `useTheme` zieht die Datei das `nativewind`-Runtime herein, dessen
-  `react-native-css-interop` beim Modul-Laden unter Bun scheitert (erst fehlender
-  `Appearance`-Mock, dann ein tieferer CommonJS-Wrapper-Fehler). Jede Datei in `features/calendar`,
-  die aus `./hooks` importiert, ist damit für Tests unerreichbar — der Grund, warum
-  `useCreateEvent` den Event-Typ aus dem Query-Cache liest statt `useEventTypes()` zu rufen.
-- **„`useFamilyRealtime` ist ungetestet"** ([Realtime](./TODO.md#realtime-siehe-adr-030)) ✅
-- **„Für die Hydrations-Invariante gibt es keinen Regressionstest"**
-  ([Conflict-Detection](./TODO.md#conflict-detection-siehe-adr-031)) — **der wichtigste der vier.**
-  „`baseVersion` ist die Version, aus der der Formular-State entstand" trägt das ganze
-  Conflict-Feature ([ADR-031](./decision-log.md) Decision 6). Läse `onSave` sie wieder aus der
-  lebenden Query, träfe das CAS anstandslos und überschriebe die fremde Änderung **lautlos, ohne
-  dass je ein Dialog erscheint**. Die Invariante lebt in zwei Screens, und geschützt ist sie heute
-  allein durch einen Kommentar an der Deklaration.
-
-### Warum hier und nicht früher
-
-Es ist verlockend, den Test-Pfad an den Anfang zu stellen. Dagegen sprechen zwei Dinge:
-
-1. **Der Pfad ist ein Spike mit offenem Ausgang.** Das nativewind-Ladeproblem unter Bun ist keine
-   Konfigurationsfrage, sondern ein Modul-Lade-Fehler in einer Fremdbibliothek. Die
-   Blöcke 1–4 dahinter zu stauen hieße, Datenverlust-Fixes hinter eine Recherche zu hängen.
-2. **Die Blöcke 1–4 brauchen ihn nicht.** Sie liegen sämtlich in reinen Modulen
-   (`recurrence.ts`, `expand.ts`, `conflict.ts`, `mutations.ts`, `filterStore.ts`) mit bestehenden
-   Suiten. Ihn danach zu bauen heißt außerdem, ihn gegen **vier frische Beispiele** dessen zu bauen,
-   was tatsächlich getestet werden muss.
-
-### Die Wegentscheidung, die am Anfang steht
-
-`CLAUDE.md` hält den `jest-expo`-Preset bewusst „für den seltenen RN-Component-Snapshot-Test, der
-den `jest`-Binary noch braucht" — via `npx jest`. Damit gibt es **zwei** mögliche Pfade, und die
-Iteration beginnt mit der Wahl:
-
-- **Unter `bun test`** — ein Zuhause für alle Tests, aber das nativewind-Ladeproblem muss gelöst
-  werden (Mock, Alias oder Preload-Erweiterung in [bun.test.preload.ts](../bun.test.preload.ts)).
-- **Unter `npx jest`** mit dem bereits verdrahteten `jest-expo`-Preset — der dokumentierte
-  Fluchtweg, aber zwei Runner, zwei CI-Steps und die von `CLAUDE.md` beschriebene
-  `jest-expo`-Versions-Fragilität pro SDK-Bump.
-
-Der TODO-Eintrag zum v14-Bump gibt für beide Wege dieselbe Auflage mit: **gegen die v14-API
-schreiben** — `render()`, `renderHook()`, `fireEvent()` liefern Promises, `act()` immer awaiten —
-nicht gegen Beispiele aus 13.x-Dokumentation.
-
-**Definition of done Block 5:** Ein Test rendert `EventEditScreen` und beweist, dass `baseVersion`
-nach einem Fremd-Refetch **nicht** mitwandert · `features/calendar/hooks.ts` ist importierbar ·
-der Weg (bun vs. jest) ist als ADR festgehalten.
-
----
-
-## Block 6 — Meal-Plan-Mutationen (der größte Feature-Unlock)
-
-**Aufwand L · eigene Iteration · löst sechs Einträge über drei Screens**
-
-> **Stand 2026-10-21: erledigt** ([ADR-043](./decision-log.md)). Leere Tage im Essen-Tab sind
-> planbar, die Woche lässt sich ohne Grenze blättern, und geplante Einträge lassen sich über ihr
-> `⋯` ersetzen oder löschen (mit Rückgängig). Rezepte lassen sich direkt auf einen Tag legen. Der
-> Hero plant und tauscht ein Allergen-Gericht. Optimistik als Cache-Patch, nicht als drittes
-> Overlay; der geparkte Eintrag zur Vereinigung der Overlays bleibt geparkt. Die drei 🎨-Punkte
-> und zwei neue (Wochen blättern in V1, Platz des Einplanen-Knopfs) stehen als Designer-Eintrag
-> in [TODO.md](./TODO.md), ebenso Portionen und Notizen sowie der fehlende Live-Sync.
-
-Technisch unblockiert ✅ — die RLS-Policies für INSERT/UPDATE/DELETE auf `meal_plan_entries` liegen
-seit [20260529093329_recipes_and_meal_plan.sql](../supabase/migrations/20260529093329_recipes_and_meal_plan.sql)
-bereit, `features/meals/` ist rein lesend. Es fehlt genau eine Mutationsschicht — und mit ihr fallen
-sechs Einträge.
-
-**Der Kern:** [features/meals/queries.ts](../features/meals/queries.ts) →
-**„Mutationen fehlen"** ([Essen](./TODO.md#essen--meal-planner-daten-layer-v1)). Der Eintrag
-zählt seine wartenden Aufrufer selbst auf:
-
-1. **Leere Tageszeile im [WeekPlanGrid](<../app-sections/(tabs)/essen/WeekPlanGrid.tsx>)** — kennt
-   `date` **und** `slot` bereits, hat also alles beisammen. Der naheliegendste erste Aufrufer.
-2. **„Zum Essensplan hinzufügen" in [RecipeScreen](../app-sections/recipe/RecipeScreen.tsx)** —
-   braucht zusätzlich eine Auswahl _wohin_, weil die Detailansicht weder `date` noch `slot` kennt.
-3. 🎨 **Das `more`-Kebab der geplanten Zeile** — bewusst entfernt, kommt mit der Mutation zurück
-   (dann ≥44×44 und mit a11y-Label, nicht als 18-px-Icon). **Designer:** trägt das Kebab in der
-   V1-Anatomie von [patterns/meals.md](../patterns/meals.md) — und welche Aktionen (Tauschen ·
-   Löschen · Portionen?).
-4. 🎨 **„Der Meal-Hero kann die geplante Mahlzeit nicht austauschen"** ([Dashboard](./TODO.md#dashboard)) ·
-   [MealHeroCard](<../app-sections/(tabs)/dashboard/MealHeroCard.tsx>) — trifft das geplante Gericht
-   ein Familien-Allergen, bietet die Karte ein sicheres Ausweichgericht an, der Button öffnet aber
-   nur dessen Rezept. **Designer:** Copy-Key für den Tausch-Button („Stattdessen kochen"?).
-5. **„Der Hero-CTA plant nicht, er navigiert nur"** ([Dashboard](./TODO.md#dashboard)) ·
-   [MealHeroEmptyCard](<../app-sections/(tabs)/dashboard/MealHeroEmptyCard.tsx>) — „Essen planen"
-   führt in den Essen-Tab, wo man ebenfalls nichts eintragen kann. Der Weg endet im Raster statt in
-   einem Formular. Mit der Mutation wird aus der Navigation eine Handlung.
-6. 🎨 **„Der Essen-Tab kennt nur die aktuelle Woche"** ([Essen](./TODO.md#essen--meal-planner-daten-layer-v1)) ·
-   [EssenScreen](<../app-sections/(tabs)/essen/EssenScreen.tsx>) — `useMealPlans(weekStart)` nimmt
-   jede Woche entgegen, der Screen übergibt immer die aktuelle. Der Screen ist vorbereitet:
-   `weekStart` ist die einzige Stelle, an der die Woche entsteht, `formatWeekRange` beschriftet jede.
-   **Designer:** `patterns/meals.md` führt die Wochenleiste unter **V2** — planen ohne Blättern ist
-   halb nutzlos, aber die Reihenfolge gehört dem Designer.
-
-### Reihenfolge innerhalb des Blocks
-
-Mutationsschicht zuerst (`features/meals/mutations.ts` — setzen, tauschen, löschen), dann Aufrufer 1
-als einfachster Beweis, dann 5 und 4, dann 2 und 3. Die Designer-Punkte (3, 4, 6) blockieren die
-Schicht **nicht** — sie blockieren nur ihre jeweilige Oberfläche.
-
-**Vorher zu klären:** Ob die Mutationen optimistisch werden. Der Kalender hat dafür ein
-Overlay-Modell ([ADR-027](./decision-log.md)), Tasks patchen den Cache
-([mutations.ts](../features/tasks/mutations.ts)) — es gibt also **zwei** Präzedenzfälle mit
-unterschiedlicher Form. Diese Wahl gehört in den ADR, nicht in den Code.
-
-> **Kollisionshinweis:** Kommt ein drittes Occurrence-Overlay dazu, wird der geparkte Eintrag
-> **„Vereinigung der beiden Occurrence-Overlays"** ([Calendar Optimistic UI](./TODO.md#calendar-optimistic-ui-siehe-adr-027))
-> fällig — er wartet ausdrücklich auf genau dieses dritte Vorkommen. Beim Entwurf mitdenken.
-
-**Definition of done Block 6:** Eine leere Tageszeile ist drückbar und schreibt eine Mahlzeit · der
-Hero-CTA plant statt zu navigieren · ein ADR hält die Optimistik-Entscheidung fest · die drei
-🎨-Punkte sind als Frage an den Designer formuliert.
-
----
-
-## Block 7 — Transaktions-RPC für den Kalender
-
-**Aufwand L · eigene Iteration mit Migration und Zwei-Client-Durchgang**
-
-> **Stand 2026-10-26: erledigt** ([ADR-044](./decision-log.md)). Kalenderänderungen laufen als
-> eine Transaktion über `apply_event_change`: Der Server prüft Master und Exception, bevor er
-> irgendetwas schreibt, und eine Kennung pro Absicht macht „Erneut versuchen" idempotent. Damit
-> sind die beiden Einträge unten und die Serverhälfte von #111 aus [TODO.md](./TODO.md)
-> verschwunden; `createSupabaseEventOps` gibt es nicht mehr. Aufgaben löschen über `delete_task`,
-> das „keine Familie" von „schon weg" unterscheidet. Dazu kamen eine lokale Supabase als
-> Testumgebung, Datenbank-Tests in der CI (`db.yml`) und ein Sicherheitsdurchgang. Die Overlay-
-> Hälfte von #111 kam später mit dem Kalender-Cache aus
-> [8.3](#83-kleine-korrekturen-mit-je-eigenem-grund--sm) ([ADR-051](./decision-log.md)). Offen
-> bleiben Änderungen an _anderen_ Occurrences beim Regelwechsel (Spec §5.5, im 🎨-Eintrag zum
-> Konfliktdialog).
-
-Die teuerste verbleibende Korrektheitsbaustelle — und die einzige, die **eine** Lösung für zwei
-Einträge ist. `TODO.md` beschreibt die RPC bei beiden als den sauberen Fix.
-
-- **„Fünf Schreib-Ops laufen ohne bedingte Versionsprüfung"**
-  ([Conflict-Detection](./TODO.md#conflict-detection-siehe-adr-031)) ·
-  [recurrence.ts](../features/calendar/recurrence.ts) — `createSupabaseEventOps`
-  `modifyOccurrence`, `cancelOccurrence`, `deleteMaster`, `setRruleCount`, `setRruleUntil` schreiben
-  unbedingt. Der Pre-Flight deckt sie ab, aber nur gegen den Stand, den er selbst gelesen hat — eine
-  Fremdänderung **danach** trifft keine Prüfung. Zwei Clients können dieselbe Occurrence ändern, der
-  letzte `upsert` gewinnt ohne `EventConflictError`. In ADR-031 als bewusste Grenze dokumentiert;
-  aufgekommen als CodeRabbit-Finding an [PR #115](https://github.com/SvenSonnborn/ElternFlowAI/pull/115)
-  und dort mit dieser Begründung abgelehnt.
-- **„`deleteAllExceptions` vor `updateMaster` öffnet seit dem Compare-and-Swap ein neues
-  Verlustfenster"** ([Calendar](./TODO.md#calendar-v1--siehe-adr-008))
-  Beide Aufrufe sind nicht-transaktional, die Reihenfolge steht bewusst so. Seit dem CAS scheitert
-  der zweite Call zusätzlich bei **jedem** fremden Schreibvorgang zwischen den beiden — genau dem
-  Szenario, für das das Feature gebaut ist. Die Exceptions sind dann unwiederbringlich gelöscht, die
-  Regel unverändert, und der Nutzer liest „jemand anderes hat geändert". Das Fenster ist ein voller
-  Roundtrip, nicht Millisekunden.
-
-Dazu gehört die Serverhälfte von **Issue [#111](https://github.com/SvenSonnborn/ElternFlowAI/issues/111)**
-— **„Die Retry-Aktion des Fehler-Toasts ist nicht idempotent"**
-([Calendar Optimistic UI](./TODO.md#calendar-optimistic-ui-siehe-adr-027)): Ging der erste Versuch
-serverseitig durch und nur die Antwort verloren, legt „Erneut versuchen" einen zweiten Termin an
-oder spaltet eine Serie ein zweites Mal. Der TODO-Eintrag sagt es deutlich: **„Ein echter Fix
-braucht Idempotenz auf der Server-Seite (ein Dedup-Key), nicht mehr Client-Logik."** Dieselbe
-Migration, dieselbe Iteration.
-
-> Die zweite Hälfte von #111 — `onSettled` räumt den optimistischen Eintrag ab, obwohl
-> `invalidateQueries` auch bei fehlgeschlagenem Refetch auflöst — ist **kein** RPC-Thema. Sie ändert
-> den Kern von ADR-027 Decision 1 (Lebensdauer an eine bestätigte Serverprojektion hängen) und
-> gehört in eine eigene Runde am Overlay-Modell.
-
-**Warum so spät:** Pre-Flight und CAS decken den Normalfall bereits ab; die verbleibende Lücke ist
-eine Größenordnung unwahrscheinlicher. ADR-031 hat sie deshalb bewusst offen gelassen. Sie braucht
-eine neue Migration, einen neuen `EventOps`-Zuschnitt, einen eigenen Testlauf **und** einen zweiten
-Zwei-Client-Durchgang — das rechtfertigt sich erst, wenn die häufigen Fehler weg sind.
-
-**Definition of done Block 7:** Eine Transaktions-RPC prüft Master und betroffene Exception bedingt,
-bevor sie irgendetwas schreibt oder löscht · der Zwei-Client-Lauf aus
-[2026-09-04-conflict-detection-verification.md](./superpowers/plans/2026-09-04-conflict-detection-verification.md)
-wiederholt und um die fünf Ops erweitert · ADR-031 wird **superseded**, nicht editiert.
-
----
-
-## Block 8 — Docs-Resync & Refactors
-
-**Aufwand S–M · blockiert nichts · zehn Einträge**
-
-### 8.1 Der Docs-Pass — **erledigt**
-
-Drei Einträge, die `TODO.md` selbst als „eigener Docs-Pass" zusammenfasst:
-
-- **„`docs/architecture.md` ‚What's not here yet' ist veraltet"** ([Einstellungen](./TODO.md#einstellungen-phase-1))
-  — Zeile ~67 behauptet „no Supabase … no auth, no onboarding, no settings screen". Alles vorhanden.
-- **„`docs/architecture.md` nennt noch drei Themes"** ([Einstellungen](./TODO.md#einstellungen-phase-1))
-  — Zeile ~42 führt `warmLight`/`softDark`/`pastelBlue`; es gibt `light` und `dark`
-  ([themes.ts](../design-system/themes.ts)).
-- **„`docs/eltern-flow-ai-project-structure.md` ist veraltet"** ([Essen](./TODO.md#essen--meal-planner-daten-layer-v1))
-  — `meal-planner/ (placeholder)`, `design-system/components/`, eine `essensplanung.tsx`-Route, drei
-  Themes, `supabase/ (placeholder)`. Braucht einen Re-Sync, keinen Ein-Zeilen-Patch.
-
-Beim Durchgang gleich diese Datei hier mit auf Stand halten.
-
-### 8.2 `onboardingMutations.ts` → `familyMutations.ts` — **erledigt**
-
-([Familie](./TODO.md#familie--child-profile-live-daten-v1)) Die Datei hält längst das gesamte
-Familien-CRUD; nur zwei ihrer Hooks kommen im Onboarding vor. Mechanisch, aber berührt jeden
-Importpfad und den Barrel — deshalb eine eigene, sonst leere Änderung, damit der Diff lesbar bleibt.
-
-### 8.3 Kleine Korrekturen mit je eigenem Grund — **S–M**
-
-> **Stand 2026-11-12: erledigt** ([ADR-051](./decision-log.md), [ADR-053](./decision-log.md),
-> [ADR-054](./decision-log.md), [ADR-056](./decision-log.md)).
-
-- ~~„Die Mutations-`onSettled`-Blöcke invalidieren weiterhin `calendarKeys.all`"~~ und
-  ~~„Doppelte Anzeige, solange zwei Range-Queries aktiv sind"~~ — **erledigt** mit dem
-  Kalender-Cache, zusammen mit der Overlay-Hälfte von
-  [#111](https://github.com/SvenSonnborn/ElternFlowAI/issues/111) ([ADR-051](./decision-log.md)).
-- **„Kein Kompositions-Test für die Kalender-Filterkette"**, **„`typeLabelsForSlug` liefert
-  `undefined`, solange i18next nicht initialisiert ist"** und **„Kollisionsprüfung reicht nur so
-  weit wie das geladene Monatsfenster"** ✅ — erledigt mit [ADR-056](./decision-log.md). Der
-  Kompositions-Test schickt eine Serie durch `expandEvents` und den Löschfilter; die Kollisionsprüfung
-  lädt jetzt bis zum Monat des Terminendes. Offen bleibt die Prüfung der Folgetermine einer neuen
-  Serie ([TODO.md](./TODO.md)).
-- **„Invite-Link von bereits-Mitglied geöffnet"** ([Auth](./TODO.md#auth--onboarding)) ✅ —
-  erledigt mit [ADR-053](./decision-log.md).
-- **„Abgelaufene Einladungen werden nie aufgeräumt"** ([Familie](./TODO.md#familie--child-profile-live-daten-v1))
-  ✅ — erledigt mit [ADR-053](./decision-log.md).
-
-- **„Weitere Tippflächen hängen an `hitSlop`"** und **„`accessibilityState` kommt auf Web nicht im
-  DOM an"** ([Weitere](./TODO.md#weitere-out-of-scope-items)) ✅ — erledigt mit
-  [ADR-054](./decision-log.md).
-
-**Definition of done Block 8:** `architecture.md` und die Struktur-Datei beschreiben das Repo von
-heute · `familyMutations.ts` heißt so · der Kompositions-Test läuft ✅ (alle drei erledigt).
-
----
-
-## Block 9 — CI und Toolchain härten
-
-**Aufwand S–M · verbessert, was Block 0 scharf gemacht hat**
-
-Alle aus `TODO.md` → [Weitere Out-of-Scope-Items](./TODO.md#weitere-out-of-scope-items) und
-[Renovate](./TODO.md#renovate--dependencies-siehe-adr-013).
-
-- **Actions auf Commit-SHA pinnen** — **erledigt über Renovate** ([ADR-045](./decision-log.md)):
-  `config:best-practices` öffnet den Pin-PR und hält die Digests danach aktuell.
-- **`expo-doctor`-Step im `bundle`-Job** — **erledigt** ([ADR-055](./decision-log.md)): als Warnung
-  im Checks-Tab, nicht als Gate.
-- **`ci.yml` liest den Bun-Cache nur** — **erledigt** ([ADR-055](./decision-log.md)).
-- ~~`platformAutomerge: true` testen~~ und ~~Custom-Manager-Regex gegenprüfen~~ — **entfallen**:
-  Renovate merged nicht mehr selbst, und der Regex-Manager ist entfernt
-  ([ADR-045](./decision-log.md)).
-- ~~`RCT_USE_PREBUILT_RNCORE` über `expo-build-properties` setzen~~ — **entfallen**:
-  Der Pin ist weg und Expos Default gilt ([ADR-048](./decision-log.md)).
-- **Regel 3 gegen `relatedPackages` abgleichen** — für SDK 58 **erledigt**, die Liste blieb gleich.
-  Fällt bei jedem SDK-Sprung wieder an; Gegenprobe ist `bunx expo install --check`. Bewusst nicht
-  automatisiert.
-- **`dependency-review.yml` vs. Renovates `vulnerabilityAlerts`** — nach ein paar Monaten prüfen, ob
-  beide gebraucht werden. Reine Beobachtung, kein Handgriff.
+- [Essen](./TODO.md#essen--meal-planner-daten-layer-v1)
+  - Portionen und Notizen pro Eintrag fehlen
+  - Kein Favorisieren von Rezepten
+  - Fußzeilen-Buttons sind unverdrahtet
 
 ---
 
 ## Block 10 — Große Migrationen
 
-**Aufwand L · kein Zeitdruck · je eine eigene Iteration**
+Kein Zeitdruck, je eine eigene Iteration. Der Block heißt weiter so, weil
+[ADR-057](./decision-log.md) auf ihn verweist.
 
-- **Tailwind v3 → v4** ([tailwind.config.js](../tailwind.config.js) + [global.css](../global.css)) —
-  beim SDK-54→57-Update (ADR-007) bewusst zurückgestellt. Neue CSS-first-Config `@theme`, geändertes
-  Content-Scanning, NativeWind-v4-Kompatibilität prüfen. Berührt das Theming-Fundament aus
-  `docs/architecture.md` → Theme system (CSS-Variablen + `vars()`), also die Stelle, an der ein Fehler **jeden**
-  Screen trifft.
-- **`@expo/vector-icons` → scoped `@react-native-vector-icons/*`** ·
-  [Icon.tsx](../app-sections/shared/Icon.tsx) — SDK 56 deprecatet das Bundle-Paket. Codemod
-  vorhanden (`npx @react-native-vector-icons/codemod`), Icon-Namen und Imports ändern sich. **Kein
-  Breaking Change**, funktioniert unverändert weiter — deshalb echte Kür.
-- **Smoke-Start im Simulator/Emulator** — **erledigt** ([ADR-057](./decision-log.md)): Die
-  Compile-Jobs bauen Release und starten die App bis zum Login-Screen.
-- **`eas build --local` als gemeinsame Build-Definition** — erst sinnvoll, wenn `eas.json` für die
-  🔒 Release-Iteration existiert; sonst gibt es nichts zusammenzuführen. Zu prüfen ist vorher, ob
-  sich die Caches und das Überspringen unveränderter nativer Stände
-  ([ADR-048](./decision-log.md)) in den lokalen EAS-Build durchreichen lassen.
-- **„`AuthGate` folgt nicht Expos Auth-Muster"** ([Auth](./TODO.md#auth--onboarding)) ·
-  [gateLayout.ts](../features/auth/gateLayout.ts) — Umbau auf `Stack.Protected` bzw. Guards in
-  verschachtelten Layouts. Kein Fehler heute ([ADR-040](./decision-log.md)), aber eine Abhängigkeit
-  von einem expo-router-Detail. Erst klären, wie Onboarding-Regel und Parent-Warten als Guards
-  aussehen; Sichtprüfung auf iOS und Android Pflicht, weil jeder Login- und Abmelde-Pfad betroffen ist.
+### 22. Icons auf `@react-native-vector-icons`
 
----
+**M** · Kein Breaking Change, deshalb die erste der Migrationen.
 
-## Geparkt — extern blockiert
+- [Weitere](./TODO.md#weitere-out-of-scope-items)
+  - `@expo/vector-icons` → scoped `@react-native-vector-icons/*`
 
-Nicht umsetzbar, unabhängig von verfügbarer Zeit. Hier steht **woran** es hängt, damit beim Wegfall
-der Blockade sofort klar ist, was mitkommt.
+### 23. Tailwind v4
 
-### STT-/LLM-Provider fehlt → Issue [#23](https://github.com/SvenSonnborn/ElternFlowAI/issues/23)
+**L** · Trifft das Theming-Fundament und damit jeden Screen.
 
-Der größte einzelne Block. Es hängen daran:
+**Vorher nötig:** prüfen, ob eine stabile NativeWind-Version Tailwind v4 trägt. Wenn nicht, wartet
+der Schritt darauf.
 
-- Voice-Overlay überhaupt ([patterns/settings-voice.md](../patterns/settings-voice.md)) — der FAB
-  öffnet heute einen Platzhalter
-- **„Voice-Add-Flow"** (Kalender) und **„Voice-Add im Child-Profile"** (Familie)
-- **„Likes/Dislikes ohne AI-Vorschläge"** (Familie) — heute reiner Freitext-Tag-Editor
-- **„Die Prep-Karte ist eine Liste, keine Vorbereitung"** (Dashboard) — `patterns/dashboard.md`
-  beschreibt abgeleitete Handlungen („Schwimmsachen einpacken" zum Termin „Schwimmen"); verdrahtet
-  ist die ehrliche Vorstufe. **Bis der Provider da ist, wäre jede „abgeleitete" Zeile erfunden.**
-- **„Die Avatar-Reihe filtert nichts"** (Dashboard) — der Long-Press-Voice-Einstieg. Der
-  Personen-Filter selbst ist 🎨, nicht 🔒.
-- **„Coming-soon-Rows ohne Ziel"** (Einstellungen) — der Sprachassistent-Teil
+- [Weitere](./TODO.md#weitere-out-of-scope-items)
+  - Tailwind v3 → v4
 
-### gustar.io-Worker fehlt → Issues [#24](https://github.com/SvenSonnborn/ElternFlowAI/issues/24), [#88](https://github.com/SvenSonnborn/ElternFlowAI/issues/88)
+### 24. `AuthGate` auf `Stack.Protected`
 
-- **„Die Rezept-Detailansicht hat keine Nährwerte"** — Tab hält den Platz, `recipes` hat keine
-  einzige Nährwert-Spalte. Braucht `nutrition jsonb` + Normalisierung.
-- 🎨 **„`diet_tags` werden roh angezeigt"** — lokalisierter Katalog ist eine Designer-Entscheidung
-  über die Tag-Palette, keine Übersetzungsarbeit.
-- **„Die Begriffslisten sind ein Startkorpus"** — an echten Daten nachschärfen. Jeder neue Term
-  braucht einen Testfall, jeder False Positive einen `exclude`-Eintrag.
-- **„Nur sechs Seed-Rezepte, alle ohne Bild"** — genug für die vier Urteilszustände, nicht für Such-
-  oder Lasttests. Der `Image`-Zweig in `RecipeScreen` ist bisher nur gegen ein manuell gesetztes
-  `image_url` geprüft.
-- **„Kein Index bedient den Rezept-Query-Pfad"** — bei sechs Seeds irrelevant, **„sollte aber vor
-  dem gustar.io-Worker auf dem Zettel stehen, nicht erst, wenn der Tab spürbar langsam wird"**.
-  Kandidaten: `pg_trgm` + `gin (title gin_trgm_ops)`, B-Tree auf `created_at desc, id`.
-- **„Die Klassifizierungs-Edge-Function fehlt weiterhin"** — Owner des `declared`-Kanals. Muss
-  `features/meals/allergens/` **importieren**, statt ein zweites Vokabular aufzumachen; das Modul
-  ist genau dafür frei von React- und Supabase-Imports (ADR-014 Decision 2).
+**L** · Jeder Login- und Abmeldepfad ist betroffen; Sichtprüfung auf iOS und Android ist Pflicht.
 
-> **Teil-unblockiert:** **„Ein negiertes Schlüsselwort räumt den Key nicht ab"** („glutenfreie
-> Nudeln" meldet `gluten`) ist **keine** Datenfrage. Der Fix ist ein `selfTerms`-Feld je Spec —
-> wird ein Term negiert, der das Allergen _selbst_ benennt, fällt der ganze Key. Der naheliegende
-> Fix „Negation gilt für den ganzen Key" ist **falsch**, daran hängt der laktosefrei-Fall
-> (ADR-014 Decision 5). Das ließe sich jederzeit bauen; sinnvoll ist es trotzdem erst am echten
-> Korpus. Ebenso **„`intolerances` wird nicht gelesen"** — braucht ein eigenes Urteilsmodell.
+- [Auth / Onboarding](./TODO.md#auth--onboarding)
+  - `AuthGate` folgt nicht Expos Auth-Muster
 
-### Expo Notifications fehlt → Issue [#25](https://github.com/SvenSonnborn/ElternFlowAI/issues/25)
+### 25. `rrule` ablösen
 
-- **„Reminder-Rows werden noch nicht zugestellt"** (Calendar) — der Client schreibt und löscht
-  `reminders`-Zeilen, `sent_at` stempelt niemand. Es fehlt der pg_cron + Edge-Function-Worker.
-- **„Task-Zeilen haben keine Erinnerungs-Aktion mehr"** (Aufgaben) — `reminders` kennt `task_id`,
-  aber es gibt keinen Zusteller.
-- **„Mitteilungen zeigen keinen echten Status"** (Einstellungen) — die Row deep-linkt in die
-  OS-Einstellungen, kennt den Berechtigungsstatus nicht.
+**L** · Nach Schritt 1, damit der Tausch auf einem Schreibpfad ohne bekannte stille Fehler passiert.
 
-### Weitere externe Blockaden
+**Vorher nötig:** Ersatz wählen — eigene Berechnung oder eine gepflegte Bibliothek. Ich bereite den
+Vergleich vor, wir entscheiden zusammen.
 
-- **Stripe** → Issue [#26](https://github.com/SvenSonnborn/ElternFlowAI/issues/26)
-- **Social Logins** → Issue [#27](https://github.com/SvenSonnborn/ElternFlowAI/issues/27)
-- **Release / EAS** — **„EAS für Release, Signing und Store-Auslieferung"** (kein `eas.json`,
-  Account `sf-sven` existiert) zusammen mit **„Build-Nummer fehlt"** (weder `ios.buildNumber` noch
-  `android.versionCode` in [app.json](../app.json), deshalb zeigt der Settings-Footer nur `v{semver}`).
-  `TODO.md` weist beide ausdrücklich **einer gemeinsamen Release-Iteration** zu. Das EAS-Free-Kontingent
-  (15 iOS + 15 Android/Monat) bleibt dafür unangetastet — an ein Per-PR-Gate verfüttert wäre es nach
-  ~15 Pushes leer.
-- **„Invite-Link ist ein Custom Scheme ohne Web-Fallback"** (Auth) — setzt eine eigene Domain samt
-  `apple-app-site-association` und `assetlinks.json` voraus und erzwingt einen Native-Rebuild.
-  Praktische Folge heute: WhatsApp und die meisten Mail-Clients linkifizieren `elternflow://` nicht,
-  der Eingeladene bekommt untappbaren Rohtext — und hat die App per Definition meist noch gar nicht.
-- **„Hintergrund-Flushen ist nur per E2E prüfbar"** (Undo-Delete) — braucht einen Maestro-Lauf. Ein
-  Unit-Test wäre wertlos, weil der RN-Mock in [bun.test.preload.ts](../bun.test.preload.ts)
-  registrierte `AppState`-Listener nie aufruft. Nicht anbieterblockiert, aber Infrastruktur, die es
-  nicht gibt — Kandidat für eine eigene kleine Iteration nach Block 5.
-- 🎨 **„Debug-Screen: Dark-Theme auf iOS und jede Ansicht auf Android"** (Realtime) — braucht
-  Gerätezeit, kein Blocker. Risiko gering: ausschließlich `Screen`/`Card`/`Text`/`Button`/`Pill`.
+- [Renovate](./TODO.md#renovate--dependencies-siehe-adr-013)
+  - `rrule` wird nicht mehr gepflegt
 
 ---
 
-## Geparkt — wartet auf ein drittes Vorkommen
+## Extern blockiert — entblocken wir zusammen
 
-Diese Einträge sind **absichtlich** offen. `TODO.md` benennt bei jedem die Bedingung, unter der er
-fällig wird — sie jetzt zu erledigen hieße, ohne den zweiten Datenpunkt zu raten.
+🔒 Diese Schritte hängen an Konten, Anbietern oder Geld. Unter **Vorher nötig** steht, was du
+besorgen oder entscheiden musst; den Rest übernehme ich. Der Sammeleintrag **„gustar.io Worker +
+Stripe + Expo Notifications"** ([Weitere](./TODO.md#weitere-out-of-scope-items)) fällt weg, sobald
+die Schritte 28, 30 und 31 erledigt sind.
 
-| Eintrag                                                                                                                                           | Wird fällig, wenn …                                                                                                                                                                                       |
-| ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **„Vereinigung der beiden Occurrence-Overlays"** ([Optimistic UI](./TODO.md#calendar-optimistic-ui-siehe-adr-027))                                | ein **drittes** Overlay dazukommt — siehe Hinweis in [Block 6](#block-6--meal-plan-mutationen-der-größte-feature-unlock)                                                                                  |
-| **„`TaskCreateScreen` und `TaskEditScreen` teilen sich Kopfzeile und Shell"** ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1))              | ein **dritter** Task-Screen dazukommt (ADR-010 Decision 4 nimmt die ~30 identischen Zeilen bewusst in Kauf)                                                                                               |
-| **„`subscribeToFamilyChanges` entsorgt Altkanäle ohne Zustandsprüfung"** ([Realtime](./TODO.md#realtime-siehe-adr-030))                           | ein **zweiter** Abonnent desselben Topics existiert — an dem sich die richtige Verengung entscheiden lässt. Die Falle ist nicht hypothetisch: genau sie hat den Debug-Screen auf den Ringpuffer umgebaut. |
-| **„`useTasksSections` hat keinen Aufrufer"** ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1))                                               | **gar nicht** — bleibt absichtlich. Der Eintrag steht da, damit der Hook bei der nächsten Aufräumrunde nicht als Löschkandidat wirkt.                                                                     |
-| **„Reminder gelten für die ganze Serie"** ([Calendar](./TODO.md#calendar-v1--siehe-adr-008))                                                      | Pro-Occurrence-Erinnerungen real gebraucht werden (Schema-Erweiterung)                                                                                                                                    |
-| **„Recurrence-Editor bleibt für nicht-darstellbare Regeln verborgen"** ([Calendar](./TODO.md#calendar-v1--siehe-adr-008))                         | Regeln aus einem iCal-Import oder echten RRULE-Editor stammen — beides existiert nicht                                                                                                                    |
-| **„Wiederholung lässt sich nicht ‚ab hier' ändern"** ([Calendar](./TODO.md#calendar-v1--siehe-adr-008))                                           | es ein Nutzersignal gibt; ohne das ist es Spekulation                                                                                                                                                     |
-| **„Balken-Budget im Monatsraster ist zwei pro Tag"** ([Calendar](./TODO.md#calendar-v1--siehe-adr-008))                                           | drei parallele Spannen real vorkommen                                                                                                                                                                     |
-| **„Erledigte Tasks sind nur 7 Tage weit sichtbar"** ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1))                                        | ein Verlauf-/Archiv-Screen entsteht (braucht eigene paginierte Query)                                                                                                                                     |
-| **„`useCreateTask` ist nicht optimistisch"** ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1))                                               | ein Screen die Latenz beim Anlegen spürbar macht                                                                                                                                                          |
-| **„Ein verlorenes Broadcast ist stumm"** ([Realtime](./TODO.md#realtime-siehe-adr-030))                                                           | es serverseitige Beobachtbarkeit gibt (Alert auf die `WARNING`-Logzeile) oder einen Client-Heartbeat                                                                                                      |
-| **„Ein geplanter Eintrag ohne sichtbares Rezept"** (2×: [Essen](./TODO.md#essen--meal-planner-daten-layer-v1) + [Dashboard](./TODO.md#dashboard)) | 🎨 ein Copy-Key existiert — praktisch unerreichbar, solange nur globale und eigene Rezepte verplant werden                                                                                                |
+### 26. Release-Grundlage
+
+**L** · Voraussetzung für die Schritte 27, 28 und 32.
+
+**Vorher nötig:**
+
+- Mitgliedschaft im Apple Developer Program und ein Konto in der Google Play Console
+- Bundle-ID und Package-Name festlegen
+- Signing von EAS verwalten lassen oder selbst halten (der EAS-Account `sf-sven` existiert)
+
+- [Weitere](./TODO.md#weitere-out-of-scope-items)
+  - EAS für Release, Signing und Store-Auslieferung
+  - `app.json` heißt noch „Eltern Flow AI"
+  - `eas build --local` als gemeinsame Build-Definition (erst, wenn `eas.json` steht)
+- [Einstellungen](./TODO.md#einstellungen-phase-1)
+  - Build-Nummer fehlt
+
+### 27. Universal Links für Einladungen
+
+**M** · Erst dann lassen sich Einladungen aus WhatsApp und Mail-Clients antippen.
+
+**Vorher nötig:** eine eigene Domain mit Hosting für `/.well-known/` und Schritt 26 (Team-ID und
+Signing-Fingerprint stehen in den Dateien dort).
+
+- [Auth / Onboarding](./TODO.md#auth--onboarding)
+  - Invite-Link ist ein Custom Scheme ohne Web-Fallback
+
+### 28. Erinnerungen
+
+**L** · Expo Notifications, Issue [#25](https://github.com/SvenSonnborn/ElternFlowAI/issues/25).
+Bringt die erste Edge Function samt pg_cron ins Repo.
+
+**Vorher nötig:** Schritt 26 (der APNs-Key kommt aus dem Apple-Konto) und ein Firebase-Projekt für
+FCM.
+
+- [Calendar](./TODO.md#calendar-v1--siehe-adr-008)
+  - Reminder-Rows werden noch nicht zugestellt
+- [Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)
+  - Task-Zeilen haben keine Erinnerungs-Aktion mehr
+- [Einstellungen](./TODO.md#einstellungen-phase-1)
+  - Mitteilungen zeigen keinen echten Status
+
+### 29. Sprachassistent
+
+**L** · Issue [#23](https://github.com/SvenSonnborn/ElternFlowAI/issues/23), der größte einzelne
+Block: das Voice-Overlay nach [patterns/settings-voice.md](../patterns/settings-voice.md). Heute
+öffnet der FAB einen Platzhalter.
+
+**Vorher nötig:** STT- und LLM-Anbieter wählen, ein Kostenrahmen und die Datenschutzfrage
+(Auftragsverarbeitung, Daten von Kindern).
+
+- [Calendar](./TODO.md#calendar-v1--siehe-adr-008)
+  - Voice-Add-Flow
+- [Familie](./TODO.md#familie--child-profile-live-daten-v1)
+  - Voice-Add im Child-Profile
+  - Likes/Dislikes ohne AI-Vorschläge
+- [Einstellungen](./TODO.md#einstellungen-phase-1)
+  - Coming-soon-Rows ohne Ziel (Sprachassistent-Teil)
+- [Dashboard](./TODO.md#dashboard)
+  - Die Prep-Karte ist eine Liste, keine Vorbereitung
+  - Die Avatar-Reihe filtert nichts (Long-Press-Teil)
+  - Die leere Hero-Karte hat keinen Voice-Einstieg
+
+### 30. Rezepte über gustar.io
+
+**L** · Issues [#24](https://github.com/SvenSonnborn/ElternFlowAI/issues/24) und
+[#88](https://github.com/SvenSonnborn/ElternFlowAI/issues/88). Erst mit echtem Korpus lassen sich die
+Allergen-Begriffe nachschärfen.
+
+**Vorher nötig:** API-Zugang zu gustar.io.
+
+- [Essen](./TODO.md#essen--meal-planner-daten-layer-v1)
+  - Nur sechs Seed-Rezepte, alle ohne Bild
+  - Die Rezept-Detailansicht hat keine Nährwerte
+  - Die Klassifizierungs-Edge-Function fehlt weiterhin
+  - Die Begriffslisten sind ein Startkorpus
+  - Der Meal-Picker aus V2/V3 fehlt weiterhin
+  - 🎨 `diet_tags` werden roh angezeigt
+- [Toast](./TODO.md#toast)
+  - 🎨 `solid` ist nicht gebaut (sein Anlass ist der Allergie-Konflikt im Essensplaner)
+
+### 31. Abos
+
+**L** · Issue [#26](https://github.com/SvenSonnborn/ElternFlowAI/issues/26). In `TODO.md` steht dazu
+nur der Sammeleintrag.
+
+**Vorher nötig:** ein Preismodell und die Entscheidung zwischen Abo über die Stores (In-App-Kauf) und
+Stripe, danach das passende Konto.
+
+### 32. Social Logins
+
+**M** · Issue [#27](https://github.com/SvenSonnborn/ElternFlowAI/issues/27). In `TODO.md` steht dazu
+kein Eintrag.
+
+**Vorher nötig:** das Apple-Konto aus Schritt 26 (Sign in with Apple) und ein Google-OAuth-Client.
 
 ---
 
-## Die 🎨-Punkte, gebündelt zur Übergabe
+## Geparkt — wartet auf ein Signal
 
-Sie stehen oben bei ihrem Feature — hier nur als Index, damit ein Designer-Durchgang sie in **einem**
-Rutsch abarbeiten kann statt in acht.
+Diese Einträge sind **absichtlich** offen. Sie jetzt zu erledigen hieße, ohne den nächsten
+Datenpunkt zu raten; die rechte Spalte nennt das Signal.
 
-**Copy-Deck-Nachträge** ([docs/COPY.md](./COPY.md) — Kataloge tragen DE + EN bereits, das Deck
-gehört dem Designer): die Kalender-Keys · `dash.resume.*` · `familie.invite*` · `color.*` ·
-`parent.*` · `set.footer` · die Aufgaben-Keys (`hw.loadError`, `hw.empty.*`, `hw.error.*`,
-`hw.create/edit/form/delete/type.*`, die Filter-Keys) · die Meal- und Rezept-Keys · die Undo-Keys
-(`action.undo`, `cal.delete.undo*`, `hw.delete.undoTitle`, `cal.error.*`) · `cal.create/edit.error.saveFailed`.
-Dazu die EN-Gegenlese von `sample.*` ([ADR-020](./decision-log.md)) und `dash.tomorrow.*`.
+| Eintrag                                                                                                                                                         | Wird fällig, wenn …                                                                                                                                                                                       |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Vereinigung der beiden Occurrence-Overlays** ([Optimistic UI](./TODO.md#calendar-optimistic-ui-siehe-adr-027))                                                | ein **drittes** Overlay dazukommt                                                                                                                                                                         |
+| **`TaskCreateScreen` und `TaskEditScreen` teilen sich weiterhin Kopfzeile und Shell** ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1))                    | ein **dritter** Task-Screen dazukommt (ADR-010 Decision 4 nimmt die ~30 identischen Zeilen bewusst in Kauf)                                                                                               |
+| **`subscribeToFamilyChanges` entsorgt Altkanäle ohne Zustandsprüfung** ([Realtime](./TODO.md#realtime-siehe-adr-030))                                           | ein **zweiter** Abonnent desselben Topics existiert — an dem sich die richtige Verengung entscheiden lässt. Die Falle ist nicht hypothetisch: genau sie hat den Debug-Screen auf den Ringpuffer umgebaut. |
+| **`useTasksSections` hat keinen Aufrufer mehr** ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1))                                                          | **gar nicht** — bleibt absichtlich. Der Eintrag steht da, damit der Hook bei der nächsten Aufräumrunde nicht als Löschkandidat wirkt.                                                                     |
+| **Reminder gelten für die ganze Serie, nicht pro Termin** ([Calendar](./TODO.md#calendar-v1--siehe-adr-008))                                                    | Pro-Occurrence-Erinnerungen real gebraucht werden (Schema-Erweiterung)                                                                                                                                    |
+| **Recurrence-Editor bleibt für nicht-darstellbare Regeln verborgen** ([Calendar](./TODO.md#calendar-v1--siehe-adr-008))                                         | Regeln aus einem iCal-Import oder echten RRULE-Editor stammen — beides existiert nicht                                                                                                                    |
+| **Wiederholung lässt sich nicht „ab hier“ ändern** ([Calendar](./TODO.md#calendar-v1--siehe-adr-008))                                                           | es ein Nutzersignal gibt; ohne das ist es Spekulation                                                                                                                                                     |
+| **Balken-Budget im Monatsraster ist zwei pro Tag** ([Calendar](./TODO.md#calendar-v1--siehe-adr-008))                                                           | drei parallele Spannen real vorkommen                                                                                                                                                                     |
+| **Deep-Links von vor diesem PR können auf die falsche Occurrence schreiben, nicht nur eine andere anzeigen** ([Calendar](./TODO.md#calendar-v1--siehe-adr-008)) | **gar nicht** — kein Fix vorgesehen. Der Eintrag hält fest, dass die Prämisse „nur ein falsches Ziel" nicht mehr uneingeschränkt gilt.                                                                    |
+| **Toasts liegen hinter nativen Modal-Screens** ([Toast](./TODO.md#toast))                                                                                       | ein Sheet einen Toast zeigen will, solange es offen ist                                                                                                                                                   |
+| **Erledigte Tasks sind nur 7 Tage weit sichtbar** ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1))                                                        | ein Verlauf-/Archiv-Screen entsteht (braucht eigene paginierte Query)                                                                                                                                     |
+| **`useCreateTask` ist nicht optimistisch** ([Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1))                                                               | ein Screen die Latenz beim Anlegen spürbar macht                                                                                                                                                          |
+| **Ein verlorenes Broadcast ist stumm** ([Realtime](./TODO.md#realtime-siehe-adr-030))                                                                           | es serverseitige Beobachtbarkeit gibt (Alert auf die `WARNING`-Logzeile) oder einen Client-Heartbeat                                                                                                      |
 
-**Neue Keys, die ein Block braucht:** „Stattdessen kochen"? für den Meal-Hero-Tausch (→ [Block 6](#block-6--meal-plan-mutationen-der-größte-feature-unlock))
-· `set.logoutConfirm` (Body-Text, auf Android heute sichtbar leer) · „Rezept nicht verfügbar" ·
-`hw.dueRelative.today`/`tomorrow` (relative Wörter statt nacktem Datum — der gelöschte Mock konnte
-das besser) · Hinweistext für die bei Scope „alle Termine" verworfene Datumsänderung (→ [Block 1](#block-1--stiller-datenverlust-im-kalender), Vorbild `cal.edit.recurrenceAppliesToAll`, [ADR-032](./decision-log.md)) ·
-Warnsatz im Konflikt-Dialog einer Regeländerung („Deine Fassung speichern" löscht alle Ausnahmen der Serie und macht eine fremde Kürzung rückgängig — nach „dieser und folgende" mit doppelten Terminen ab dem Schnitt) und ein Wert „endet am …" für das Serienende (→ [2.2](#22-die-zwei-löcher-in-der-conflict-detection--erledigt), [ADR-038](./decision-log.md)) ·
-eine Zeile „abgesagt" im Konflikt-Dialog, wenn die andere Seite genau die bearbeitete Occurrence abgesagt hat (→ [2.2](#22-die-zwei-löcher-in-der-conflict-detection--erledigt), vorbestehend seit [ADR-031](./decision-log.md)).
+---
 
-**Pattern-Docs, die vom Code abweichen** (`patterns/` ist off-limits, Abweichung ist freigegeben,
-der Doc muss nachziehen): `homework.md` (kennt weder Filterleiste noch fünf Sektionen noch die
-Formulare, beschreibt einen V1/V2-Umschalter, den es nicht gibt) · `meals.md` (drei Slot-Tabs statt
-vier seit ADR-017, Kebab-Anatomie, Wochennavigation) · `calendar.md` (Legende zeigt `ha` ohne
-`event_types`-Datensatz — der Swatch kann **nie** erscheinen; „Endet nach … Terminen"; Spannen-Balken)
-· `onboarding.md` + `child-profile.md` (sechs Allergie-Chips, gerendert werden vierzehn) ·
-**fehlt ganz:** `parent-profile.md`.
+## Beobachten
 
-**Richtungsentscheidungen:** `dashboard-empty.md` — beschreibt einen Screen, den keine Route mountet
-(Karte oder Screen?) · Account-Detail-Route hinter der Profil-Card (`/parent/[id]` oder eigener
-Screen mit Abo/Konto löschen?) · der Personen-Filter der Avatar-Reihe · Fehlerzustände für Event-,
-Meal- und Prep-Query (heute rendert alles **gar nichts** — ehrlich, aber stumm) · der Familienname,
-der noch Sample-Data ist (braucht Ladezustand oder Copy-Variante ohne Namen) · das Undo-Fenster und
-WCAG 2.2 SC 2.2.1 (fünf feste Sekunden sind nicht verlängerbar) · das ✕ am Undo-Toast (schließt,
-ohne rückgängig zu machen **und** ohne vorzeitig zu committen — liest sich neben „Rückgängig"
-plausibel als „Abbrechen") · die Radien-Benennung zwischen Design-CSS und Token-Skala
-([ADR-024](./decision-log.md)).
+Keine Arbeit, solange der Auslöser nicht eintritt.
+
+- **Type-aware Lint in CI ohne Expo-Typen** ([Weitere](./TODO.md#weitere-out-of-scope-items)) —
+  sobald CI-Lint und lokaler Lint auseinanderlaufen
+- **`dependency-review.yml` und Renovates `vulnerabilityAlerts` überlappen im Zweck**
+  ([Renovate](./TODO.md#renovate--dependencies-siehe-adr-013)) — nach einigen Monaten Betrieb
+  vergleichen
+- **Die Git-Hooks laufen im Sync-Workflow mit**
+  ([Renovate](./TODO.md#renovate--dependencies-siehe-adr-013)) — sobald jemand den Pre-Push-Hook
+  wieder aktiviert
+- **Regel 3 muss bei jedem SDK-Sprung gegen `relatedPackages` abgeglichen werden**
+  ([Renovate](./TODO.md#renovate--dependencies-siehe-adr-013)) — bei jedem SDK-Sprung
 
 ---
 
 ## Pflege dieser Datei
 
 - **`TODO.md` bleibt der Backlog.** Erledigtes wird dort **gelöscht** (CLAUDE.md → „Out-of-scope
-  TODOs"), nicht abgehakt. Hier wird der Punkt als erledigt markiert — mit einem Satz und einem Verweis
-  auf den ADR, ohne dessen Inhalt zu wiederholen.
-- **Neue Funde** gehen nach `TODO.md` und stehen hier höchstens als **Verweis** im passenden Block. Der
+  TODOs"), nicht abgehakt. Hier verschwindet ein erledigter Eintrag ebenso, ein leerer Schritt ganz;
+  die übrigen Schritte behalten ihre Nummer.
+- **Neue Funde** gehen nach `TODO.md` und stehen hier höchstens als Titel im passenden Schritt. Der
   Text eines Eintrags lebt nur an einer Stelle (CLAUDE.md → „Wo was steht").
-- **Verschiebt sich die Reihenfolge**, gehört der Grund dazu — diese Datei ist eine Begründung, keine
-  Liste.
-- **Die Blöcke 1–4 sind gegeneinander verschiebbar**, 5–7 nicht: Block 6 sollte nach Block 5 kommen
-  (Testpfad für neue Screens), Block 7 nach Block 1 (dasselbe Override-Modell).
+- **Keine Links auf Schritt-Anker** aus ADRs, Specs oder Plänen — sie verschwinden mit dem Schritt.
+  Einzige Ausnahme ist die Überschrift von Block 10.
+- **Verschiebt sich die Reihenfolge**, gehört der Grund in den Schritt — diese Datei ist eine
+  Begründung, keine Liste.
