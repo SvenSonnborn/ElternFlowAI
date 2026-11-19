@@ -2,7 +2,7 @@
 
 **Status:** Approved (Brainstorming)
 **Date:** 2026-10-21
-**Auftrag:** [docs/roadmap.md](../../roadmap.md) → [Block 6 — Meal-Plan-Mutationen](../../roadmap.md#block-6--meal-plan-mutationen-der-größte-feature-unlock)
+**Auftrag:** Roadmap (Fassung bis 2026-11-18) → Block 6 — Meal-Plan-Mutationen
 **Decision-Log:** ein ADR (043) am Branch-Ende, darin die Optimistik-Entscheidung.
 
 ## 1. Worum es geht

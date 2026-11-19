@@ -2,7 +2,7 @@
 
 **Status:** Approved (Brainstorming)
 **Date:** 2026-11-03
-**Branch:** `chore/db-aufraeumen`, Punkt 1 der „nächsten Branches" in [roadmap.md](../../roadmap.md#die-nächsten-branches-stand-2026-11-02)
+**Branch:** `chore/db-aufraeumen`, Punkt 1 der „nächsten Branches" der Roadmap-Fassung bis 2026-11-18
 **Decision-Log:** ein kurzer ADR (053) am Branch-Ende
 
 ## 1. Worum es geht

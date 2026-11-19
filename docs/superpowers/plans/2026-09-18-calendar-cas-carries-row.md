@@ -10,7 +10,7 @@
 
 **Spec:** [docs/superpowers/specs/2026-09-17-tasks-delete-path-conflict-gaps-design.md](../specs/2026-09-17-tasks-delete-path-conflict-gaps-design.md) — **§4** ist dieser PR. §1.3 begründet die Richtung (die Aufgaben machen dem Kalender diese Nachlese seit ADR-031 vor), §8 Decision 7 die Verengung.
 
-**Roadmap:** [docs/roadmap.md](../../roadmap.md) → Block 2, Punkt **2.2b** („Der Compare-and-Swap-Fall zeigt den Dialog ohne Vergleichszeilen und ohne frische Basis-Version").
+**Roadmap:** Fassung bis 2026-11-18 → Block 2, Punkt **2.2b** („Der Compare-and-Swap-Fall zeigt den Dialog ohne Vergleichszeilen und ohne frische Basis-Version").
 
 ## Global Constraints
 

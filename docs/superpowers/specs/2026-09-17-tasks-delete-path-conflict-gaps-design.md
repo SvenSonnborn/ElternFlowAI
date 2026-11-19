@@ -2,14 +2,14 @@
 
 **Status:** Approved (Brainstorming Phase)
 **Date:** 2026-09-17
-**Auftrag:** [docs/roadmap.md](../../roadmap.md) → [Block 2 — Aufgaben-Löschpfad & Konfliktlücken](../../roadmap.md#block-2--aufgaben-löschpfad--konfliktlücken)
+**Auftrag:** Roadmap (Fassung bis 2026-11-18) → Block 2 — Aufgaben-Löschpfad & Konfliktlücken
 **Decision-Log:** drei ADRs nach Implementation statt der ursprünglich geplanten zwei — **036** der Aufgaben-Schreibpfad bekommt den Schnitt des Kalenders (PR 1), **037** der Compare-and-Swap-Fall trägt seine Zeile (PR 2), **038** die Regel im Vergleich (PR 3). Ein gemeinsamer ADR-037 für PR 2 **und** PR 3 ginge nicht: PR 2 merged vor PR 3, ADR-037 wäre dann schon Historie, und CLAUDE.md verbietet das Umschreiben älterer ADRs — ohnehin der sauberere Schnitt, denn es sind zwei Verträge: einer über das, was ein Konflikt-Fehler mitträgt, einer über das Vokabular des Vergleichs. Alle drei ergänzen [ADR-031](../../decision-log.md) (Conflict-Detection) — mit **einer** Ausnahme, die nicht untergehen darf: ADR-037 löst zusätzlich eine einzelne Aussage daraus ab, den letzten Satz von Decision 12 über den CAS-Fall ohne fremde Fassung, den es nach PR 2 nicht mehr gibt. ADR-031 bleibt unverändert stehen; die Supersession ist in ADR-037s Status-Abschnitt ausgewiesen. ADR-036 und ADR-038 ergänzen ohne Ablösung
 
 ---
 
 ## 1. Context
 
-Block 2 fasst sechs Einträge aus `docs/TODO.md` an: **dieselbe Schadensklasse wie Block 1, nur bei Aufgaben** — plus die beiden Löcher, die ADR-031 bewusst außerhalb von Task 8 gelassen hat. **Fünf davon werden in dieser Iteration erledigt** (drei unter 2.1, je einer unter 2.2a und 2.2b). Der sechste ist 2.3; er wartet auf einen Copy-Key und wird deshalb nicht hier gezählt, sondern wandert sichtbar zu Block 3 — genau so führt ihn auch [roadmap.md](../../roadmap.md), dessen Block-2-Zeile „5" nennt und den Toggle-Eintrag in Block 3 mitzählt.
+Block 2 fasst sechs Einträge aus `docs/TODO.md` an: **dieselbe Schadensklasse wie Block 1, nur bei Aufgaben** — plus die beiden Löcher, die ADR-031 bewusst außerhalb von Task 8 gelassen hat. **Fünf davon werden in dieser Iteration erledigt** (drei unter 2.1, je einer unter 2.2a und 2.2b). Der sechste ist 2.3; er wartet auf einen Copy-Key und wird deshalb nicht hier gezählt, sondern wandert sichtbar zu Block 3 — genau so führt ihn auch die Roadmap (Fassung bis 2026-11-18), deren Block-2-Zeile „5" nennt und den Toggle-Eintrag in Block 3 mitzählt.
 
 Vor dem Entwurf habe ich die tragenden Behauptungen nachgestellt. Zwei Ergebnisse weichen von dem ab, was `TODO.md` und `roadmap.md` notieren, und beide ändern die Arbeit.
 

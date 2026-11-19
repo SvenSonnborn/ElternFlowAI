@@ -833,7 +833,7 @@ Ans **Ende** von `docs/decision-log.md`, hinter ADR-035. Ältere ADRs bleiben un
 ## ADR-036 — Der Aufgaben-Schreibpfad bekommt den Schnitt des Kalenders (2026-09-17)
 
 **Status:** Accepted
-**Kontext:** [Block 2](./roadmap.md#block-2--aufgaben-löschpfad--konfliktlücken) · [Spec §3](./superpowers/specs/2026-09-17-tasks-delete-path-conflict-gaps-design.md) · ergänzt [ADR-031](#adr-031--conflict-detection-updated_at-beleben-dreiwertig-vergleichen-ein-dialog-im-root-layout-2026-09-04), löst nichts ab
+**Kontext:** Block 2 · [Spec §3](./superpowers/specs/2026-09-17-tasks-delete-path-conflict-gaps-design.md) · ergänzt [ADR-031](#adr-031--conflict-detection-updated_at-beleben-dreiwertig-vergleichen-ein-dialog-im-root-layout-2026-09-04), löst nichts ab
 
 ADR-031 hat den Aufgaben-Pfad mit einem Compare-and-Swap versehen, aber ohne Schnitt, an dem er ohne Netz zu prüfen wäre — belegt war er allein durch einen beobachteten Zwei-Client-Lauf. Und das _Löschen_ hatte gar keinen: Ein DELETE, das unter RLS oder nach einer Fremdlöschung null Zeilen trifft, meldet `error: null`, die Mutation „gelingt", gelöscht wurde nichts. Im Zwei-Client-Lauf beobachtet: A plant eine Löschung, B ändert dieselbe Aufgabe im 5-Sekunden-Undo-Fenster und speichert erfolgreich; nach Ablauf ist sie weg, ohne dass B ein Wort davon erfährt.
 

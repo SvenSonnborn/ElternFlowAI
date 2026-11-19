@@ -2,7 +2,7 @@
 
 **Status:** Approved (Brainstorming)
 **Date:** 2026-10-21
-**Auftrag:** [docs/roadmap.md](../../roadmap.md) → [Block 7 — Transaktions-RPC für den Kalender](../../roadmap.md#block-7--transaktions-rpc-für-den-kalender)
+**Auftrag:** Roadmap (Fassung bis 2026-11-18) → Block 7 — Transaktions-RPC für den Kalender
 **Decision-Log:** ein ADR (044) am Branch-Ende. Er löst die „bewusste Grenze" aus ADR-031 ab, ADR-031 selbst bleibt unverändert.
 
 ## 1. Worum es geht
