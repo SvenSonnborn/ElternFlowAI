@@ -9,7 +9,7 @@
 
 ## 1. Context
 
-Block 2 fasst sechs Einträge aus `docs/TODO.md` an: **dieselbe Schadensklasse wie Block 1, nur bei Aufgaben** — plus die beiden Löcher, die ADR-031 bewusst außerhalb von Task 8 gelassen hat. **Fünf davon werden in dieser Iteration erledigt** (drei unter 2.1, je einer unter 2.2a und 2.2b). Der sechste ist 2.3; er wartet auf einen Copy-Key und wird deshalb nicht hier gezählt, sondern wandert sichtbar zu Block 3 — genau so führt ihn auch [roadmap.md](../../roadmap.md), dessen Block-2-Zeile „5" nennt und den Toggle-Eintrag in Block 3 mitzählt.
+Block 2 fasst sechs Einträge aus `docs/TODO.md` an: **dieselbe Schadensklasse wie Block 1, nur bei Aufgaben** — plus die beiden Löcher, die ADR-031 bewusst außerhalb von Task 8 gelassen hat. **Fünf davon werden in dieser Iteration erledigt** (drei unter 2.1, je einer unter 2.2a und 2.2b). Der sechste ist 2.3; er wartet auf einen Copy-Key und wird deshalb nicht hier gezählt, sondern wandert sichtbar zu Block 3 — genau so führt ihn auch die Roadmap (Fassung bis 2026-11-18), deren Block-2-Zeile „5" nennt und den Toggle-Eintrag in Block 3 mitzählt.
 
 Vor dem Entwurf habe ich die tragenden Behauptungen nachgestellt. Zwei Ergebnisse weichen von dem ab, was `TODO.md` und `roadmap.md` notieren, und beide ändern die Arbeit.
 
