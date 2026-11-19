@@ -2,7 +2,7 @@
 
 **Status:** Entschieden ohne Rückfragen (Sven, 2026-11-12: „entscheide du“)
 **Date:** 2026-11-12
-**Branch:** `fix/kalender-korrekturen`, [roadmap.md](../../roadmap.md) 8.3
+**Branch:** `fix/kalender-korrekturen`, Roadmap (Fassung bis 2026-11-18) 8.3
 **Decision-Log:** ein kurzer ADR (056) am Branch-Ende
 
 ## 1. Worum es geht

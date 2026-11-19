@@ -2,7 +2,7 @@
 
 **Status:** Approved (Brainstorming)
 **Date:** 2026-10-01
-**Auftrag:** [docs/roadmap.md](../../roadmap.md) → Block 3 — Web-Parität, erster von zwei PRs. PR B (Agenda-Klickfläche, springender Datums-Input, Render-Schleife beim Login) bekommt einen eigenen Entwurf.
+**Auftrag:** Roadmap (Fassung bis 2026-11-18) → Block 3 — Web-Parität, erster von zwei PRs. PR B (Agenda-Klickfläche, springender Datums-Input, Render-Schleife beim Login) bekommt einen eigenen Entwurf.
 **Decision-Log:** ein ADR (039) am Branch-Ende.
 
 ## 1. Befund
