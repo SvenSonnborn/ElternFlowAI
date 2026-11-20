@@ -54,7 +54,7 @@
     "nativewind": "4.2.7",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "react-i18next": "17.1.13",
+    "react-i18next": "18.0.2",
     "react-native": "0.88.1",
     "react-native-calendars": "^1.1314.0",
     "react-native-gesture-handler": "~3.3.0",
