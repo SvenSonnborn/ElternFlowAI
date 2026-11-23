@@ -36,7 +36,7 @@
   // `bun` in mise.toml und `bun-version:` in den Workflows sein — Regel 8 hebt
   // alle Fundstellen gemeinsam.
   constraints: {
-    bun: "1.4.4",
+    bun: "1.4.5",
   },
 
   osvVulnerabilityAlerts: true,
