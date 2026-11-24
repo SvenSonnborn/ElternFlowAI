@@ -6,7 +6,7 @@ import { lightTheme } from "@/design-system/themes";
 
 import type { EventWithRelations } from "./expand";
 
-import { eventLookupWindow, pickOccurrence } from "./eventWindow";
+import { eventLookupWindow, pickOccurrence, pickRuleOccurrence } from "./eventWindow";
 import { expandEvents } from "./expand";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
@@ -286,5 +286,53 @@ describe("pickOccurrence", () => {
   test("leere Liste: null", () => {
     expect(pickOccurrence([], "2026-05-04")).toBeNull();
     expect(pickOccurrence([])).toBeNull();
+  });
+});
+
+describe("pickRuleOccurrence", () => {
+  // „Klavier" aus Spec B (2026-11-19): montags 16:00–17:00 in Berlin, zehnmal.
+  // Der 22.06. ist per „Nur diesen" auf Dienstag, 23.06., 18:00–19:00 verschoben.
+  function klavier(): EventWithRelations {
+    const row = makeRow({
+      id: "e1",
+      title: "Musikschule",
+      start_at: "2026-06-01T14:00:00.000Z",
+      end_at: "2026-06-01T15:00:00.000Z",
+      rrule_byweekday: [1],
+      rrule_count: 10,
+    });
+    row.event_exceptions = [
+      {
+        id: "ex-2026-06-22",
+        event_id: "e1",
+        occurrence_date: "2026-06-22",
+        action: "modified",
+        override: {
+          title: "Musikschule Raum 2",
+          start_at: "2026-06-23T16:00:00.000Z",
+          end_at: "2026-06-23T17:00:00.000Z",
+        },
+        created_at: "2026-06-01T00:00:00.000Z",
+        updated_at: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+    return row;
+  }
+
+  test("verschobene Occurrence: Start, Ende und Titel der Regel, nicht des Overrides", () => {
+    const rule = pickRuleOccurrence(klavier(), "2026-06-22", lightTheme);
+    expect(rule?.startAt.toISOString()).toBe("2026-06-22T14:00:00.000Z");
+    expect(rule?.endAt.toISOString()).toBe("2026-06-22T15:00:00.000Z");
+    expect(rule?.title).toBe("Musikschule");
+  });
+
+  test("Einzeltermin: der Termin selbst", () => {
+    const rule = pickRuleOccurrence(makeRow({ rrule_freq: null }), "2026-05-04", lightTheme);
+    expect(rule?.eventId).toBe("evt-1");
+    expect(rule?.startAt.toISOString()).toBe(MASTER_START.toISOString());
+  });
+
+  test("Serie mit unbekanntem Schlüssel: null", () => {
+    expect(pickRuleOccurrence(klavier(), "2026-06-23", lightTheme)).toBeNull();
   });
 });

@@ -52,9 +52,15 @@ function stackedOverDetail(detailId = "e1"): NavState {
 let mockNavState: NavState = stackedOverDetail();
 let mockPrevent: boolean | undefined;
 const mockDisable = jest.fn();
+/** Die Routen-Parameter des Bearbeiten-Sheets; ein Test setzt `occ` für eine bestimmte Occurrence. */
+let mockSearchParams: { id: string; occ?: string } = { id: "e1" };
+
+beforeEach(() => {
+  mockSearchParams = { id: "e1" };
+});
 
 jest.mock("expo-router", () => ({
-  useLocalSearchParams: () => ({ id: "e1" }),
+  useLocalSearchParams: () => mockSearchParams,
   useNavigation: () => ({ getState: () => mockNavState }),
   router: {
     canGoBack: jest.fn(() => true),
@@ -119,6 +125,7 @@ type SaveVars = {
   occurrenceKey: string;
   scope: string;
   changes: { title: string };
+  recurrence: { rrule_byweekday: number[] | null } | null;
 };
 
 function savedVars(): SaveVars {
@@ -513,5 +520,90 @@ describe("EventEditScreen: Kollisionshinweis", () => {
     await renderLoaded();
 
     expect(screen.queryByText(/Kollision/)).toBeNull();
+  });
+});
+
+/**
+ * „Klavier" aus Spec B (2026-11-19): montags 16:00–17:00 in Berlin, zehnmal. Der 22.06. ist per
+ * „Nur diesen" auf Dienstag, 23.06., 18:00–19:00 verschoben.
+ */
+const klavier: EventWithRelations = {
+  ...versionA,
+  title: "Musikschule",
+  start_at: "2026-06-01T14:00:00.000Z",
+  end_at: "2026-06-01T15:00:00.000Z",
+  rrule_freq: "weekly",
+  rrule_interval: 1,
+  rrule_byweekday: [1],
+  rrule_count: 10,
+  event_exceptions: [
+    {
+      id: "x-2026-06-22",
+      event_id: "e1",
+      occurrence_date: "2026-06-22",
+      action: "modified",
+      override: {
+        title: "Musikschule Raum 2",
+        start_at: "2026-06-23T16:00:00.000Z",
+        end_at: "2026-06-23T17:00:00.000Z",
+      },
+      created_at: "2026-06-01T00:00:00.000Z",
+      updated_at: "2026-06-01T00:00:00.000Z",
+    },
+  ],
+};
+
+describe("EventEditScreen: Wiederholung auf einer verschobenen Occurrence", () => {
+  beforeEach(() => {
+    mockUpdateEvent.mockReset();
+    mockUpdateEvent.mockResolvedValue(undefined);
+    mockNavState = stackedOverDetail();
+  });
+
+  async function renderKlavier(occ: string) {
+    mockSearchParams = { id: "e1", occ };
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(calendarKeys.one("e1"), klavier);
+    await renderScreen(<EventEditScreen />, { queryClient });
+  }
+
+  /** Setzt die Anzahl und speichert; eine Regeländerung fragt nicht nach dem Scope. */
+  async function saveWithCount(count: string) {
+    await fireEvent.changeText(
+      screen.getByLabelText(i18n.t("cal.create.fieldRecurrenceCount")),
+      count,
+    );
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.edit.save") }));
+    await waitFor(() => expect(mockUpdateEvent).toHaveBeenCalledTimes(1));
+  }
+
+  it("verschobene Occurrence zeigt den Recurrence-Editor mit Wöchentlich und dem Serienende", async () => {
+    await renderKlavier("2026-06-22");
+
+    expect(screen.getByRole("radio", { name: i18n.t("cal.recur.weekly") })).toBeChecked();
+    expect(screen.getByLabelText(i18n.t("cal.create.fieldRecurrenceCount"))).toHaveDisplayValue(
+      "10",
+    );
+  });
+
+  it("nur die Anzahl geändert: Wochentag vom Regel-Tag", async () => {
+    await renderKlavier("2026-06-22");
+    await saveWithCount("12");
+
+    expect(savedVars().recurrence?.rrule_byweekday).toEqual([1]);
+  });
+
+  it("unverschobener Montag, Datum auf Mittwoch plus Anzahl: Wochentag vom Formular", async () => {
+    await renderKlavier("2026-06-29");
+    const startDateLabel = i18n.t("cal.edit.fieldStartDate").replace(/[()]/g, "\\$&");
+    await fireEvent.press(screen.getByRole("button", { name: new RegExp(`^${startDateLabel},`) }));
+    // Genau zwei Tage nach dem Start: Der Picker übernimmt das lokale Datum, die Uhrzeit bleibt.
+    // So liegt der neue Start in jeder Zone des Testlaufs am Mittwoch, 01.07., 16:00 Berlin.
+    await act(() => {
+      mockPickerProps?.onPick(new Date("2026-07-01T14:00:00.000Z"));
+    });
+    await saveWithCount("12");
+
+    expect(savedVars().recurrence?.rrule_byweekday).toEqual([3]);
   });
 });
