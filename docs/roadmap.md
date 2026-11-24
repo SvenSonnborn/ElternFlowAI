@@ -420,7 +420,7 @@ der Schritt darauf.
 
 ### 25. `rrule` ablösen
 
-**L** · Nach Schritt 1, damit der Tausch auf einem Schreibpfad ohne bekannte stille Fehler passiert.
+**L** · Der Schreibpfad ist seit [ADR-058](./decision-log.md#adr-058--kalender-stille-fehler-im-schreibpfad-laden-über-events_in_range-regel-occurrence-als-anker-2026-11-24) frei von bekannten stillen Fehlern, der Tausch kann also darauf aufsetzen.
 
 **Vorher nötig:** Ersatz wählen — eigene Berechnung oder eine gepflegte Bibliothek. Ich bereite den
 Vergleich vor, wir entscheiden zusammen.

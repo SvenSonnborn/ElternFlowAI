@@ -171,9 +171,9 @@ Daten unsichtbar**: am Regel-Datum verwirft sie der Fensterfilter, am neuen ents
 Override-Start — nur so läuft der Kandidat durch dieselbe Auflösung wie jedes andere Vorkommen und
 trägt hinterher denselben Schlüssel, dasselbe Versions-Token und dieselbe Exception-Kennzeichnung.
 Geladen wird über die RPC `events_in_range` ([queries.ts](../features/calendar/queries.ts)): Eine
-Zeile kommt mit, wenn ihr eigener Bereich das Fenster berührt oder der Start oder das Ende einer
-ihrer Exceptions (`private.override_instant`, Polster von einem Tag) hineinfällt — damit auch eine
-per Override weit verschobene Occurrence im Zielmonat erscheint ([ADR-058](./decision-log.md)).
+Zeile kommt mit, wenn ihr eigener Bereich das Fenster berührt oder das Override-Intervall einer
+`modified`-Exception (`private.override_instant`) das gepolsterte Fenster schneidet — damit auch
+eine per Override weit verschobene Occurrence im Zielmonat erscheint ([ADR-058](./decision-log.md)).
 Derselbe ADR nimmt `description` in den Vertrag von `event_exceptions.override` auf, der jetzt als
 eigenes Modul in [features/calendar/override.ts](../features/calendar/override.ts) liegt, und lässt
 `eventLookupWindow` zusätzlich das Override-Intervall der angeforderten Occurrence abdecken, damit
