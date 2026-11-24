@@ -179,10 +179,11 @@ export function EventEditScreen() {
     // hide the editor although the rule is representable (Spec 2026-11-19,
     // B). The master's dtstart is no substitute either: it stays put when the
     // rule changes (ADR-032) and can sit on a different weekday than the rule.
-    // Without a rule occurrence (single event, or a key the bare rule doesn't
-    // produce) the anchor falls back to `source.startAt`.
-    // `ruleAnchor()` in `recurrenceConflictRows.ts` solves the same anchor
-    // problem for the other side of the conflict dialog.
+    // The `?? source.startAt` is a type-level guard only: `useEvent` keys the
+    // rule occurrence on the resolved one, every resolved key is a date the
+    // rule produces (a single event yields itself), and both are frozen
+    // together at hydration. `ruleAnchor()` in `recurrenceConflictRows.ts`
+    // solves the same anchor problem for the other side of the conflict dialog.
     //
     // The check also needs this occurrence's zone (`source.timezone`), not the
     // device's — `recurrenceToRrule` wrote `rrule_byweekday` there, and reading
