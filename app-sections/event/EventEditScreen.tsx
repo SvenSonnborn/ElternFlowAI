@@ -29,6 +29,7 @@ import {
   mapEventError,
   occurrenceVersion,
   parseRecurrenceCount,
+  pickRuleOccurrence,
   rangeFieldLabelKey,
   toAllDayRange,
   recurrenceToRrule,
@@ -500,10 +501,21 @@ export function EventEditScreen() {
       // wie bei `pickOccurrence` (`features/calendar/eventWindow.ts`).
       const theirs: CalendarOccurrence | null =
         expanded.find((o) => o.occurrenceKey === vars.occurrenceKey) ?? null;
+      // Unter „Alle" schreibt `vars.changes` die Werte des Masters
+      // (`seriesChanges`), nicht die der geöffneten Occurrence. Verglichen wird
+      // dann auf derselben Seite: die eingefrorene Regel-Occurrence gegen die
+      // frische. Gegen den Override einer per „Nur diesen" geänderten
+      // Occurrence sähe der Vergleich eine fremde Änderung am Master nicht, und
+      // das stille Nachspeichern überschriebe sie. Die Version bleibt die von
+      // `theirs`, die Regel-Occurrence trägt keine (`pickRuleOccurrence`).
+      const seriesWrite = vars.scope === "all" && vars.isRecurring && baseRuleOccurrence !== null;
+      const theirsSide =
+        theirs && seriesWrite ? pickRuleOccurrence(row, theirs.occurrenceKey, theme) : theirs;
+      const baseSide = seriesWrite ? baseRuleOccurrence : baseOccurrence;
 
-      // Fehlt `baseOccurrence` (theoretisch: der Konflikt trifft vor der
+      // Fehlt die Basis (theoretisch: der Konflikt trifft vor der
       // Hydration ein), bleibt `fields` leer — aber der Guard darunter prüft
-      // `baseOccurrence` zusätzlich zu `fields.length === 0`, damit eine
+      // `baseSide` zusätzlich zu `fields.length === 0`, damit eine
       // fehlende Basis nicht denselben Weg nimmt wie ein echtes „niemand hat
       // etwas geändert". Ohne Basis lässt sich das gar nicht feststellen, also
       // muss der Dialog erscheinen — ohne Zeilen, aber sichtbar. Genau die
@@ -511,8 +523,8 @@ export function EventEditScreen() {
       // Occurrence abgesagt, oder ihre Regel erzeugt sie nicht mehr) in den
       // Dialog statt ins Durchspeichern schickt.
       const fields =
-        theirs && baseOccurrence
-          ? differingEventFields(theirs, vars.changes, baseOccurrence, vars.recurrence)
+        theirsSide && baseSide
+          ? differingEventFields(theirsSide, vars.changes, baseSide, vars.recurrence)
           : [];
       // Der Zähler begrenzt **nur** diese stille Wiederholung, nicht den Tap
       // auf „Deine Fassung speichern": Ohne ihn liefe `speichern → Konflikt →
@@ -521,7 +533,7 @@ export function EventEditScreen() {
       // Roundtrip, ohne dass der Nutzer je etwas sähe. Nach dem Limit fällt
       // der Ablauf in den Dialog darunter, der dann ohne Vergleichszeilen
       // erscheint (es weicht ja nichts ab) — sichtbar statt endlos.
-      if (theirs && baseOccurrence && fields.length === 0) {
+      if (theirs && theirsSide && baseSide && fields.length === 0) {
         if (autoRetries < MAX_CONFLICT_AUTO_RETRIES) {
           save({ ...vars, baseVersion: theirs.version }, autoRetries + 1);
           return;
@@ -551,7 +563,7 @@ export function EventEditScreen() {
         title: t("conflict.title"),
         body: t("conflict.body.event"),
         rows:
-          theirs === null
+          theirsSide === null
             ? // Die Occurrence fehlt in der fremden Fassung: abgesagt, oder die
               // fremde Regel erzeugt sie nicht mehr. `err.row` kennt die fremde
               // Regel trotzdem; Zeilen entstehen nur bei einer Regel-Kollision
@@ -568,7 +580,7 @@ export function EventEditScreen() {
                   return [
                     {
                       label: t(FIELD_LABEL_KEY[field]),
-                      theirs: `${t("conflict.theirs")}: ${formatField(field, theirs)}`,
+                      theirs: `${t("conflict.theirs")}: ${formatField(field, theirsSide)}`,
                       mine: `${t("conflict.mine")}: ${formatField(field, mineSource)}`,
                     },
                   ];
@@ -582,9 +594,9 @@ export function EventEditScreen() {
                 // verschobenen Occurrence neben dem Wochentag der Regel.
                 return recurrenceConflictRows(
                   {
-                    rrule: theirs.rrule,
+                    rrule: theirsSide.rrule,
                     startAt: ruleAnchor(row, expanded),
-                    timezone: theirs.timezone,
+                    timezone: theirsSide.timezone,
                   },
                   mineRuleSide,
                   t,
