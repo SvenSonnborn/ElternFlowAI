@@ -5,7 +5,8 @@ import type { DateTimePickerSheetProps } from "@/app-sections/shared";
 import type { CalendarOccurrence, EditScope, EventChanges } from "@/features/calendar";
 import type { EventWithRelations } from "@/features/calendar/expand";
 
-import { occurrenceVersion } from "@/features/calendar";
+import { useConflictStore } from "@/app-sections/shared";
+import { EventConflictError, occurrenceVersion } from "@/features/calendar";
 import { calendarKeys } from "@/features/calendar/queries";
 import i18n from "@/features/i18n";
 import { createTestQueryClient, renderScreen } from "@/testing/renderScreen";
@@ -645,6 +646,7 @@ describe("EventEditScreen: unter „Alle“ nur Geändertes in die Serie", () =>
     mockUpdateEvent.mockResolvedValue(undefined);
     mockPickScope.mockReset();
     mockNavState = stackedOverDetail();
+    useConflictStore.setState({ queue: [] });
   });
 
   /** Öffnet `row`; mit `occ` an dieser Occurrence, sonst an der ersten. */
@@ -768,5 +770,44 @@ describe("EventEditScreen: unter „Alle“ nur Geändertes in die Serie", () =>
       location: null,
       description: null,
     });
+  });
+
+  /** Öffnet den verschobenen 22.06., ändert nur die Anzahl (erzwingt „Alle“) und speichert. */
+  async function saveCountAgainst(theirs: EventWithRelations) {
+    mockUpdateEvent.mockRejectedValueOnce(new EventConflictError(theirs));
+    await renderRow(klavier, "2026-06-22");
+    await fireEvent.changeText(
+      screen.getByLabelText(i18n.t("cal.create.fieldRecurrenceCount")),
+      "12",
+    );
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.edit.save") }));
+  }
+
+  it("Konflikt: eine fremd umbenannte Serie wird nicht still überschrieben", async () => {
+    // `changes.title` ist der Master-Titel beim Öffnen. Gegen den unveränderten Override-Titel
+    // des 22.06. verglichen, sähe niemand die Umbenennung, und das stille Nachspeichern schriebe
+    // „Musikschule“ über „Klavierstunde“.
+    await saveCountAgainst({
+      ...klavier,
+      title: "Klavierstunde",
+      updated_at: "2026-10-01T09:00:00.000Z",
+    });
+
+    await waitFor(() => expect(useConflictStore.getState().queue).toHaveLength(1));
+    expect(mockUpdateEvent).toHaveBeenCalledTimes(1);
+    const { rows } = useConflictStore.getState().queue[0];
+    expect(rows.map((row) => row.label)).toEqual([i18n.t("cal.edit.fieldTitle")]);
+    expect(rows[0].theirs).toContain("Klavierstunde");
+  });
+
+  it("Konflikt ohne fremde Änderung an der Serie: speichert still nach", async () => {
+    const theirs = { ...klavier, updated_at: "2026-10-01T09:00:00.000Z" };
+    await saveCountAgainst(theirs);
+
+    await waitFor(() => expect(mockUpdateEvent).toHaveBeenCalledTimes(2));
+    expect(mockUpdateEvent.mock.calls[1][0].baseVersion).toBe(
+      occurrenceVersion(theirs, "2026-06-22"),
+    );
+    expect(useConflictStore.getState().queue).toHaveLength(0);
   });
 });
