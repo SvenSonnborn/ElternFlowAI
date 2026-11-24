@@ -732,6 +732,37 @@ export type Database = {
         Args: { p_seen_updated_at: string; p_task_id: string };
         Returns: string;
       };
+      events_in_range: {
+        Args: { p_end: string; p_start: string };
+        Returns: {
+          all_day: boolean;
+          child_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          end_at: string;
+          family_id: string;
+          id: string;
+          location: string | null;
+          parent_id: string | null;
+          rrule_byweekday: number[] | null;
+          rrule_count: number | null;
+          rrule_freq: Database["public"]["Enums"]["rrule_freq_enum"] | null;
+          rrule_interval: number;
+          rrule_until: string | null;
+          start_at: string;
+          timezone: string;
+          title: string;
+          type_id: string;
+          updated_at: string;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "events";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
       regenerate_invitation: { Args: { p_token: string }; Returns: string };
     };
     Enums: {

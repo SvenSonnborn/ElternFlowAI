@@ -3,7 +3,7 @@
 --
 -- Läuft in einer Transaktion und rollt am Ende zurück; die Seed-Daten bleiben unberührt.
 --
--- Vier Teile:
+-- Fünf Teile:
 --   1. Die drei Trigger-Funktionen sind nicht mehr per RPC aufrufbar — und ihre Trigger
 --      feuern trotzdem weiter. Postgres prüft EXECUTE nur bei CREATE TRIGGER.
 --   2. Die vier gewollten security-definer-Funktionen: Einstellungen und Rechte, dazu ein
@@ -13,6 +13,8 @@
 --      und benutztem Token, kein zweiter Beitritt, keine fremde Familie.
 --   4. Einladungen nur mit Server-Token: `authenticated` darf beim Anlegen einer Einladung
 --      nur `family_id` setzen, Token und Ablauf kommen aus den Defaults.
+--   5. Das Laden des Kalenders (`events_in_range`) und sein Helfer in `private`: nur für
+--      `authenticated`.
 --
 -- Feste Kennungen (Seed-IDs siehe Kopf von supabase/seed.sql):
 --   Einladungen (Testfamilie)   1e000000-0000-4000-8000-0000000000NN   01 gültig, 02 abgelaufen, 03 benutzt
@@ -22,7 +24,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(49);
+select plan(53);
 
 -- ── Helfer ──────────────────────────────────────────────────────────────────
 
@@ -495,6 +497,31 @@ select throws_ok(
 );
 
 reset role;
+
+-- ── 5. Laden des Kalenders ──────────────────────────────────────────────────
+--
+-- `events_in_range` ruft `private.override_instant` mit den Rechten des Aufrufers; ohne
+-- execute darauf scheiterte das Laden für jede Familie mit einer verschobenen Occurrence.
+
+select ok(
+  not has_function_privilege('anon', 'public.events_in_range(timestamptz,timestamptz)', 'execute'),
+  'anon hat kein execute auf events_in_range'
+);
+
+select ok(
+  has_function_privilege('authenticated', 'public.events_in_range(timestamptz,timestamptz)', 'execute'),
+  'authenticated hat execute auf events_in_range'
+);
+
+select ok(
+  not has_function_privilege('anon', 'private.override_instant(jsonb)', 'execute'),
+  'anon hat kein execute auf private.override_instant'
+);
+
+select ok(
+  has_function_privilege('authenticated', 'private.override_instant(jsonb)', 'execute'),
+  'authenticated hat execute auf private.override_instant'
+);
 
 select * from finish();
 

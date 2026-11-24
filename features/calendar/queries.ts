@@ -40,17 +40,31 @@ export const calendarKeys = {
   reminders: (eventId: string) => ["calendar", "reminders", eventId] as const,
 };
 
+/**
+ * Lädt die Termine eines Kalenderfensters in der Form von `EVENT_SELECT` —
+ * über die RPC `events_in_range`, nicht über `.from("events")`: Eine Serie, deren
+ * Occurrence ein Override weit hinter `rrule_until` oder vor den Serienstart
+ * verschiebt, findet nur der Vergleich mit dem Zeitpunkt aus
+ * `event_exceptions.override`. PostgREST vergleicht Werte aus jsonb aber nur
+ * als Text, ein Override mit Offset (`+02:00`) sortierte falsch; die Funktion
+ * castet in SQL. Sie liefert eher zu viel, `expandEvents` filtert exakt.
+ *
+ * `client` ist injizierbar wie bei `fetchEventById` (Integrationstests); die App
+ * ruft ohne drittes Argument. Deshalb, wie dort, nie als nacktes
+ * `queryFn: fetchEventsInRange` übergeben — TanStack Query riefe die Funktion
+ * mit seinem Kontext als Argument auf.
+ */
 export async function fetchEventsInRange(
   rangeStart: Date,
   rangeEnd: Date,
+  client: SupabaseClient<Database> = supabase,
 ): Promise<EventWithRelations[]> {
-  const startIso = rangeStart.toISOString();
-  const endIso = rangeEnd.toISOString();
-  const { data, error } = await supabase
-    .from("events")
-    .select(EVENT_SELECT)
-    .lte("start_at", endIso)
-    .or(`rrule_until.is.null,rrule_until.gte.${startIso}`);
+  const { data, error } = await client
+    .rpc("events_in_range", {
+      p_start: rangeStart.toISOString(),
+      p_end: rangeEnd.toISOString(),
+    })
+    .select(EVENT_SELECT);
   if (error) throw error;
   return data ?? [];
 }
