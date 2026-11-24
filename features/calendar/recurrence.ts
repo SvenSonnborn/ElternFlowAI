@@ -258,15 +258,30 @@ function ruleDiffers(master: EventRow, next: RecurrenceChanges): boolean {
  * Occurrence-Dauer bereits gelöst.
  */
 function anchoredChanges(master: EventRow, changes: EventChanges): EventChanges {
+  return anchorChangesToDate(new Date(master.start_at), changes, master.timezone);
+}
+
+/**
+ * Der Körper von `anchoredChanges` mit frei wählbarem Datum: Tageszeit und
+ * Wandzeit-Dauer aus `changes`, das Datum aus `dateSource`, beides in
+ * `timeZone`. Warum in Wandzeit und nicht absolut, steht an `anchoredChanges`.
+ * `seriesChanges` (`app-sections/event/seriesChanges.ts`) verankert damit eine
+ * geänderte Uhrzeit am Tag der Regel-Occurrence statt am Master (Spec
+ * 2026-11-19, B5).
+ */
+export function anchorChangesToDate(
+  dateSource: Date,
+  changes: EventChanges,
+  timeZone: string,
+): EventChanges {
   const newStart = new Date(changes.start_at);
   const newEnd = new Date(changes.end_at);
-  const start = mergeDateAndTimeOfDay(new Date(master.start_at), newStart, master.timezone);
+  const start = mergeDateAndTimeOfDay(dateSource, newStart, timeZone);
   const floatingDurationMs =
-    instantToFloating(newEnd, master.timezone).getTime() -
-    instantToFloating(newStart, master.timezone).getTime();
+    instantToFloating(newEnd, timeZone).getTime() - instantToFloating(newStart, timeZone).getTime();
   const end = floatingToInstant(
-    new Date(instantToFloating(start, master.timezone).getTime() + floatingDurationMs),
-    master.timezone,
+    new Date(instantToFloating(start, timeZone).getTime() + floatingDurationMs),
+    timeZone,
   );
   return {
     ...changes,
