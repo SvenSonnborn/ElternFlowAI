@@ -20,7 +20,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(140);
+select plan(147);
 
 -- ── Helfer ──────────────────────────────────────────────────────────────────
 
@@ -96,7 +96,7 @@ begin
 
   -- Wochenserie e2 (Exception 2026-11-09)
   perform pg_temp.clone_event('e2e2e2e2-0000-4000-8000-000000000001', ('e2e2e2e2-0000-4000-8000-1000000000' || n)::uuid)
-  from unnest(array['02','03','04','05','06','07','08','12','13','14','15','16','17','18','19']) as n;
+  from unnest(array['02','03','04','05','06','07','08','12','13','14','15','16','17','18','19','46','47']) as n;
 
   -- Serie mit rrule_count 10 (e3)
   perform pg_temp.clone_event('e3e3e3e3-0000-4000-8000-000000000001', ('e3e3e3e3-0000-4000-8000-1000000000' || n)::uuid)
@@ -124,6 +124,14 @@ begin
   select ('e2e2e2e2-0000-4000-8000-1000000000' || n)::uuid, d::date, 'cancelled', null, '2026-10-01T00:00:00Z'
   from unnest(array['06', '07', '17']) as n,
        unnest(array['2026-11-16', '2026-11-30']) as d;
+
+  -- Fall 46: zwei Erinnerungen, eine an alle, eine an B (nicht an den Aufrufer A). Die an
+  -- B ist schon einmal verschickt, damit sich zeigt, dass `sent_at` nicht mitwandert.
+  -- `family_id` setzt der Trigger.
+  insert into public.reminders (event_id, offset_minutes, recipient_parent_id, sent_at) values
+    ('e2e2e2e2-0000-4000-8000-100000000046', 15, null, null),
+    ('e2e2e2e2-0000-4000-8000-100000000046', 1440, 'bbbbbbbb-0000-4000-8000-000000000011',
+     '2026-11-08T15:00:00Z');
 end;
 $$;
 
@@ -483,6 +491,76 @@ select results_eq(
   $$ select rrule_until, rrule_count from public.events where title = 'Training (gezählt)' $$,
   $$ values (null::timestamptz, 4) $$,
   '11 mit rrule_count bleibt rrule_until leer (events_rrule_count_xor_until)'
+);
+
+-- 46 insert_split_event übernimmt die Erinnerungen der Serie; die alte behält ihre
+select is(
+  public.apply_event_change(
+    '0a000000-0000-4000-8000-000000000046', 'e2e2e2e2-0000-4000-8000-100000000046', '2026-11-16',
+    pg_temp.master_version('e2e2e2e2-0000-4000-8000-100000000046'), null,
+    '[{"op":"insert_split_event","changes":{"title":"Training (Split 46)","start_at":"2026-11-16T16:00:00.000Z",
+       "end_at":"2026-11-16T17:00:00.000Z","location":null,"description":null},"rrule_count":null}]'),
+  'applied',
+  '46 insert_split_event aus einer Serie mit zwei Erinnerungen → applied'
+);
+
+select results_eq(
+  $$ select r.offset_minutes, r.recipient_parent_id, r.sent_at is null, r.family_id = s.family_id
+     from public.reminders r
+     join public.events s on s.id = r.event_id
+     where s.title = 'Training (Split 46)'
+     order by r.offset_minutes $$,
+  $$ values (15, null::uuid, true, true),
+            (1440, 'bbbbbbbb-0000-4000-8000-000000000011'::uuid, true, true) $$,
+  '46 die neue Serie hat beide Erinnerungen mit Offset und Empfänger, sent_at leer, ihre family_id'
+);
+
+select results_eq(
+  $$ select offset_minutes, recipient_parent_id, sent_at, family_id from public.reminders
+     where event_id = 'e2e2e2e2-0000-4000-8000-100000000046'
+     order by offset_minutes $$,
+  $$ values (15, null::uuid, null::timestamptz, 'f1f1f1f1-0000-4000-8000-000000000001'::uuid),
+            (1440, 'bbbbbbbb-0000-4000-8000-000000000011'::uuid, '2026-11-08T15:00:00Z'::timestamptz,
+             'f1f1f1f1-0000-4000-8000-000000000001'::uuid) $$,
+  '46 die alte Serie behält ihre beiden Erinnerungen unverändert'
+);
+
+select is(
+  public.apply_event_change(
+    '0a000000-0000-4000-8000-000000000046', 'e2e2e2e2-0000-4000-8000-100000000046', '2026-11-16',
+    pg_temp.master_version('e2e2e2e2-0000-4000-8000-100000000046'), null,
+    '[{"op":"insert_split_event","changes":{"title":"Training (Split 46)","start_at":"2026-11-16T16:00:00.000Z",
+       "end_at":"2026-11-16T17:00:00.000Z","location":null,"description":null},"rrule_count":null}]'),
+  'already_applied',
+  '46 derselbe Aufruf noch einmal → already_applied'
+);
+
+select is(
+  (select count(*) from public.reminders r
+   join public.events s on s.id = r.event_id
+   where s.title = 'Training (Split 46)'),
+  2::bigint,
+  '46 nach der Wiederholung hat die neue Serie weiterhin genau zwei Erinnerungen'
+);
+
+-- 47 insert_split_event aus einer Serie ohne Erinnerungen
+select is(
+  public.apply_event_change(
+    '0a000000-0000-4000-8000-000000000047', 'e2e2e2e2-0000-4000-8000-100000000047', '2026-11-16',
+    pg_temp.master_version('e2e2e2e2-0000-4000-8000-100000000047'), null,
+    '[{"op":"insert_split_event","changes":{"title":"Training (Split 47)","start_at":"2026-11-16T16:00:00.000Z",
+       "end_at":"2026-11-16T17:00:00.000Z","location":null,"description":null},"rrule_count":null}]'),
+  'applied',
+  '47 insert_split_event aus einer Serie ohne Erinnerungen → applied'
+);
+
+select results_eq(
+  $$ select count(r.id) from public.events s
+     left join public.reminders r on r.event_id = s.id
+     where s.title = 'Training (Split 47)'
+     group by s.id $$,
+  $$ values (0::bigint) $$,
+  '47 die neue Serie hat keine Erinnerungen'
 );
 
 -- ── Konflikte (EF409) ───────────────────────────────────────────────────────
