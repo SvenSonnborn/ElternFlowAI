@@ -56,6 +56,7 @@ import {
 import { RecurrenceCountField } from "./RecurrenceCountField";
 import { RecurrenceRadio } from "./RecurrenceRadio";
 import { pickScope } from "./scopeDialog";
+import { seriesChanges } from "./seriesChanges";
 import { createSubmitLock } from "./submitLock";
 
 /**
@@ -700,6 +701,44 @@ export function EventEditScreen() {
       }
       scope = chosen;
     }
+    const formChanges = {
+      title: title.trim(),
+      start_at: finalRange.startAt.toISOString(),
+      end_at: finalRange.endAt.toISOString(),
+      location: location.trim() || null,
+      description: notes.trim() || null,
+    };
+    // Unter „Alle" geht in die Serie nur, was gegenüber dem geöffneten Stand
+    // geändert ist, auch wenn eine Regeländerung „Alle" erzwungen hat
+    // (`seriesChanges`). `opened` normalisiert `initial` wie `formChanges` das
+    // Formular, sonst zählte schon das Schnappen eines ganztägigen Termins als
+    // Änderung. Hier und nicht später: Retry, stilles Nachspeichern und „Deine
+    // Fassung speichern" schicken `{ ...vars }` weiter.
+    let changes = formChanges;
+    const rule = initial.ruleOccurrence;
+    if (scope === "all" && isRecurring && rule) {
+      const openedRange = { startAt: initial.startAt, endAt: initial.endAt };
+      const opened = allDay ? toAllDayRange(openedRange, initial.occurrence.timezone) : openedRange;
+      changes = seriesChanges({
+        form: formChanges,
+        opened: {
+          title: initial.title.trim(),
+          start_at: opened.startAt.toISOString(),
+          end_at: opened.endAt.toISOString(),
+          location: initial.location.trim() || null,
+          description: initial.notes.trim() || null,
+        },
+        rule: {
+          title: rule.title,
+          start_at: rule.startAt.toISOString(),
+          end_at: rule.endAt.toISOString(),
+          location: rule.location,
+          description: rule.description,
+        },
+        timeZone: initial.occurrence.timezone,
+        literal: recurrenceChanges?.rrule_freq === null,
+      });
+    }
     const vars = {
       scope,
       eventId: initial.eventId,
@@ -710,13 +749,7 @@ export function EventEditScreen() {
       // Formular-State ist auf `initial` eingefroren, siehe die Begründung
       // dort oben.
       timezone: initial.occurrence.timezone,
-      changes: {
-        title: title.trim(),
-        start_at: finalRange.startAt.toISOString(),
-        end_at: finalRange.endAt.toISOString(),
-        location: location.trim() || null,
-        description: notes.trim() || null,
-      },
+      changes,
       recurrence: recurrenceChanges,
       baseVersion,
       // Eine Kennung für diese Absicht. „Erneut versuchen", das stille

@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { router } from "expo-router";
 
 import type { DateTimePickerSheetProps } from "@/app-sections/shared";
-import type { CalendarOccurrence, EditScope } from "@/features/calendar";
+import type { CalendarOccurrence, EditScope, EventChanges } from "@/features/calendar";
 import type { EventWithRelations } from "@/features/calendar/expand";
 
 import { occurrenceVersion } from "@/features/calendar";
@@ -125,7 +125,7 @@ type SaveVars = {
   baseVersion: string;
   occurrenceKey: string;
   scope: string;
-  changes: { title: string };
+  changes: EventChanges;
   recurrence: { rrule_byweekday: number[] | null } | null;
 };
 
@@ -636,5 +636,105 @@ describe("EventEditScreen: Wiederholung auf einer verschobenen Occurrence", () =
     await waitFor(() => expect(mockUpdateEvent).toHaveBeenCalledTimes(1));
 
     expect(savedVars().recurrence?.rrule_byweekday).toEqual([2]);
+  });
+});
+
+describe("EventEditScreen: unter „Alle“ nur Geändertes in die Serie", () => {
+  beforeEach(() => {
+    mockUpdateEvent.mockReset();
+    mockUpdateEvent.mockResolvedValue(undefined);
+    mockPickScope.mockReset();
+    mockNavState = stackedOverDetail();
+  });
+
+  /** Öffnet `row`; mit `occ` an dieser Occurrence, sonst an der ersten. */
+  async function renderRow(row: EventWithRelations, occ?: string) {
+    if (occ) mockSearchParams = { id: "e1", occ };
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(calendarKeys.one("e1"), row);
+    await renderScreen(<EventEditScreen />, { queryClient });
+  }
+
+  /** Speichert; fragt der Screen nach dem Scope, antwortet er mit `scope`. */
+  async function save(scope?: EditScope) {
+    if (scope) mockPickScope.mockResolvedValue(scope);
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.edit.save") }));
+    await waitFor(() => expect(mockUpdateEvent).toHaveBeenCalledTimes(1));
+  }
+
+  /** Wählt im Uhrzeit-Picker hinter dem Feld `labelKey` den Zeitpunkt `iso`. */
+  async function pickTime(labelKey: string, iso: string) {
+    await fireEvent.press(
+      screen.getByRole("button", { name: new RegExp(`^${i18n.t(labelKey)},`) }),
+    );
+    await act(() => {
+      mockPickerProps?.onPick(new Date(iso));
+    });
+  }
+
+  it("nur die Anzahl: Master bleibt 16–17 Uhr Musikschule", async () => {
+    await renderRow(klavier, "2026-06-22");
+    await fireEvent.changeText(
+      screen.getByLabelText(i18n.t("cal.create.fieldRecurrenceCount")),
+      "12",
+    );
+    await save();
+
+    expect(savedVars().changes).toEqual({
+      title: "Musikschule",
+      start_at: "2026-06-22T14:00:00.000Z",
+      end_at: "2026-06-22T15:00:00.000Z",
+      location: null,
+      description: null,
+    });
+  });
+
+  it("nur der Titel unter Alle", async () => {
+    await renderRow(klavier, "2026-06-22");
+    await fireEvent.changeText(screen.getByDisplayValue("Musikschule Raum 2"), "Klavier");
+    await save("all");
+
+    const { changes } = savedVars();
+    expect(changes.title).toBe("Klavier");
+    expect(changes.start_at).toBe("2026-06-22T14:00:00.000Z");
+    expect(changes.end_at).toBe("2026-06-22T15:00:00.000Z");
+  });
+
+  it("Zeit 17–18 Uhr unter Alle", async () => {
+    await renderRow(klavier, "2026-06-22");
+    // Der Picker setzt die lokale Uhrzeit auf den lokalen Tag des Feldes. Eine Stunde früher als
+    // bisher bleibt in UTC wie in Berlin derselbe Tag: 23.06., 17:00–18:00 Berlin.
+    await pickTime("cal.edit.fieldStart", "2026-06-23T15:00:00.000Z");
+    await pickTime("cal.edit.fieldEnd", "2026-06-23T16:00:00.000Z");
+    await save("all");
+
+    const { changes } = savedVars();
+    expect(changes.start_at).toBe("2026-06-22T15:00:00.000Z");
+    expect(changes.end_at).toBe("2026-06-22T16:00:00.000Z");
+    expect(changes.title).toBe("Musikschule");
+  });
+
+  it("Nur diesen bleibt beim Formular", async () => {
+    await renderRow(klavier, "2026-06-22");
+    await fireEvent.changeText(screen.getByDisplayValue("Musikschule Raum 2"), "Klavier");
+    await save("this");
+
+    const { changes } = savedVars();
+    expect(changes.start_at).toBe("2026-06-23T16:00:00.000Z");
+    expect(changes.title).toBe("Klavier");
+  });
+
+  it("unverschoben, nur Titel unter Alle", async () => {
+    await renderRow(seriesA);
+    await fireEvent.changeText(screen.getByDisplayValue("Elternabend"), "Elternabend 2");
+    await save("all");
+
+    expect(savedVars().changes).toEqual({
+      title: "Elternabend 2",
+      start_at: "2026-10-01T17:00:00.000Z",
+      end_at: "2026-10-01T18:30:00.000Z",
+      location: null,
+      description: null,
+    });
   });
 });
