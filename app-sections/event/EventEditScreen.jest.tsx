@@ -57,6 +57,7 @@ let mockSearchParams: { id: string; occ?: string } = { id: "e1" };
 
 beforeEach(() => {
   mockSearchParams = { id: "e1" };
+  mockFamilyOccurrences = [];
 });
 
 jest.mock("expo-router", () => ({
@@ -605,5 +606,35 @@ describe("EventEditScreen: Wiederholung auf einer verschobenen Occurrence", () =
     await saveWithCount("12");
 
     expect(savedVars().recurrence?.rrule_byweekday).toEqual([3]);
+  });
+
+  it("Link ohne occ, erste Occurrence abgesagt: Wöchentlich nimmt den Tag der geöffneten", async () => {
+    // Täglich ab Montag, 01.06., 16:00 Berlin; der 01.06. ist abgesagt. Ohne `occ` öffnet das
+    // Sheet die erste aufgelöste Occurrence, Dienstag 02.06. — der Regel-Anker muss derselbe sein.
+    const taeglich: EventWithRelations = {
+      ...klavier,
+      rrule_freq: "daily",
+      rrule_byweekday: null,
+      event_exceptions: [
+        {
+          id: "x-2026-06-01",
+          event_id: "e1",
+          occurrence_date: "2026-06-01",
+          action: "cancelled",
+          override: null,
+          created_at: "2026-06-01T00:00:00.000Z",
+          updated_at: "2026-06-01T00:00:00.000Z",
+        },
+      ],
+    };
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(calendarKeys.one("e1"), taeglich);
+    await renderScreen(<EventEditScreen />, { queryClient });
+
+    await fireEvent.press(screen.getByRole("radio", { name: i18n.t("cal.recur.weekly") }));
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.edit.save") }));
+    await waitFor(() => expect(mockUpdateEvent).toHaveBeenCalledTimes(1));
+
+    expect(savedVars().recurrence?.rrule_byweekday).toEqual([2]);
   });
 });

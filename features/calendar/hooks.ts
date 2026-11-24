@@ -131,9 +131,15 @@ export function useFamilyEvents(
 interface UseEventResult {
   data: CalendarOccurrence | null;
   /**
-   * Dieselbe Occurrence ohne Exceptions, so wie die Regel sie erzeugt — siehe
+   * Dieselbe Occurrence wie `data`, aber so, wie die Regel sie erzeugt — siehe
    * `pickRuleOccurrence`. Bei einer per Override verschobenen Occurrence weicht
-   * sie in Datum, Uhrzeit und Texten von `data` ab.
+   * sie in Datum, Uhrzeit und Texten von `data` ab. `null`, wenn `data` `null`
+   * ist.
+   *
+   * Geschlüsselt auf `data.occurrenceKey`, nicht auf den Routen-Schlüssel: Ohne
+   * `occ` ist `data` die erste **aufgelöste** Occurrence, und ist die erste der
+   * Regel abgesagt, ist das eine spätere — die bloße Regel lieferte für einen
+   * fehlenden Schlüssel ihre erste, einen anderen Tag.
    */
   ruleOccurrence: CalendarOccurrence | null;
   isLoading: boolean;
@@ -165,9 +171,9 @@ export function useEvent(id: string, occurrenceKey?: string): UseEventResult {
 
   const ruleOccurrence = useMemo<CalendarOccurrence | null>(() => {
     const row = query.data;
-    if (!row) return null;
-    return pickRuleOccurrence(row, occurrenceKey, theme);
-  }, [query.data, occurrenceKey, theme]);
+    if (!row || !occurrence) return null;
+    return pickRuleOccurrence(row, occurrence.occurrenceKey, theme);
+  }, [query.data, occurrence, theme]);
 
   return {
     data: occurrence,

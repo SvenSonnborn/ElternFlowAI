@@ -120,7 +120,16 @@ export function pickOccurrence(
  * Das Fenster ist das von `eventLookupWindow` für die Zeile **mit** ihren
  * Exceptions — es deckt den Regel-Tag ohnehin ab. Eine Absage (`cancelled`)
  * blendet hier nichts aus; ob es die Occurrence noch gibt, entscheidet
- * `pickOccurrence` auf der aufgelösten Expansion.
+ * `pickOccurrence` auf der aufgelösten Expansion. Deshalb bekommt diese
+ * Funktion den `occurrenceKey` der **aufgelösten** Occurrence (`useEvent`),
+ * nicht den Routen-Schlüssel: Ohne Schlüssel lieferte sie die erste
+ * Occurrence der Regel, auch wenn die abgesagt ist und die aufgelöste
+ * Expansion mit einem späteren Tag beginnt.
+ *
+ * Kein Versionsträger: `version` ist hier aus einer Zeile ohne Exceptions
+ * gerechnet (Exception-Teil `NO_EXCEPTION`, siehe [version.ts](./version.ts))
+ * und `isException` immer `false`. Für Compare-and-Swap und jeden
+ * Versionsvergleich gilt die aufgelöste Occurrence (`useEvent().data`).
  */
 export function pickRuleOccurrence(
   row: EventWithRelations,
