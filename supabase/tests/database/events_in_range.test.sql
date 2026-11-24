@@ -16,12 +16,13 @@
 --   e2…06      Fall 5  wie 1, Exception aber abgesagt
 --   e2…07–10   Fall 6  wie 1, Override-Start unbrauchbar: "kaputt", 30. Februar, Zahl, fehlt
 --   e1…11      Fall 7  Einzeltermin im Oktober 2026
+--   e2…12, 13  Fall 8  wie 5, Override-Start Ende Juli: Ende 13 Stunden bzw. 1 Tag 13 Stunden vor August
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(13);
+select plan(15);
 
 -- ── Helfer ──────────────────────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ as $$ select exists (select 1 from public.events_in_range(p_start, p_end) where 
 
 select pg_temp.clone_series(('e2e2e2e2-0000-4000-8000-3000000000' || n)::uuid,
                             '2026-06-01T14:00:00Z', '2026-06-30T23:59:59Z')
-from unnest(array['01', '03', '04', '05', '06', '07', '08', '09', '10']) as n;
+from unnest(array['01', '03', '04', '05', '06', '07', '08', '09', '10', '12', '13']) as n;
 
 select pg_temp.clone_series('e2e2e2e2-0000-4000-8000-300000000002', '2027-01-04T14:00:00Z', null);
 
@@ -81,7 +82,12 @@ insert into public.event_exceptions (event_id, occurrence_date, action, override
   ('e2e2e2e2-0000-4000-8000-300000000009', '2026-06-22', 'modified',
    '{"start_at":123,"end_at":"2026-08-10T08:00:00.000Z"}'),
   ('e2e2e2e2-0000-4000-8000-300000000010', '2026-06-22', 'modified',
-   '{"end_at":"2026-08-10T08:00:00.000Z"}');
+   '{"end_at":"2026-08-10T08:00:00.000Z"}'),
+  -- Fall 8: Nur start_at, die Dauer erbt der Override vom Master (eine Stunde).
+  ('e2e2e2e2-0000-4000-8000-300000000012', '2026-06-22', 'modified',
+   '{"start_at":"2026-07-31T10:00:00.000Z"}'),
+  ('e2e2e2e2-0000-4000-8000-300000000013', '2026-06-22', 'modified',
+   '{"start_at":"2026-07-30T10:00:00.000Z"}');
 
 set local role authenticated;
 set local request.jwt.claims to '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}';
@@ -151,7 +157,22 @@ select ok(
   'Override ohne start_at → im August-Fenster nicht geladen'
 );
 
--- ── 4. Kontrolle ────────────────────────────────────────────────────────────
+-- ── 4. Polster von einem Tag ────────────────────────────────────────────────
+--
+-- Pinnt das Polster von einem Tag und die geerbte Dauer: Ohne Polster fiele 12 heraus, bei
+-- einem Polster von zwei Tagen oder mehr käme 13 hinein.
+
+select ok(
+  pg_temp.loads('e2e2e2e2-0000-4000-8000-300000000012', '2026-08-01T00:00:00Z', '2026-08-31T23:59:59Z'),
+  'Override endet 13 Stunden vor dem Fenster (innerhalb des Tages Polster) → geladen'
+);
+
+select ok(
+  not pg_temp.loads('e2e2e2e2-0000-4000-8000-300000000013', '2026-08-01T00:00:00Z', '2026-08-31T23:59:59Z'),
+  'Override endet 1 Tag 13 Stunden vor dem Fenster (jenseits des Polsters) → nicht geladen'
+);
+
+-- ── 5. Kontrolle ────────────────────────────────────────────────────────────
 
 select ok(
   not pg_temp.loads('e2e2e2e2-0000-4000-8000-300000000001', '2026-10-01T00:00:00Z', '2026-10-31T23:59:59Z'),
