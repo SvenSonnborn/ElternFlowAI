@@ -9,7 +9,7 @@ import { useTheme } from "@/design-system/ThemeProvider";
 import type { DaySegment } from "./spans";
 import type { CalendarOccurrence, MarkedDates } from "./types";
 
-import { eventLookupWindow, pickOccurrence } from "./eventWindow";
+import { eventLookupWindow, pickOccurrence, pickRuleOccurrence } from "./eventWindow";
 import { expandEvents } from "./expand";
 import { useOptimisticEvents, visibleOccurrences } from "./optimisticEvents";
 import { usePendingEventDeletes } from "./pendingDeletes";
@@ -130,6 +130,12 @@ export function useFamilyEvents(
 
 interface UseEventResult {
   data: CalendarOccurrence | null;
+  /**
+   * Dieselbe Occurrence ohne Exceptions, so wie die Regel sie erzeugt — siehe
+   * `pickRuleOccurrence`. Bei einer per Override verschobenen Occurrence weicht
+   * sie in Datum, Uhrzeit und Texten von `data` ab.
+   */
+  ruleOccurrence: CalendarOccurrence | null;
   isLoading: boolean;
   error: unknown;
 }
@@ -157,8 +163,15 @@ export function useEvent(id: string, occurrenceKey?: string): UseEventResult {
     return pickOccurrence(expanded, occurrenceKey);
   }, [query.data, occurrenceKey, theme]);
 
+  const ruleOccurrence = useMemo<CalendarOccurrence | null>(() => {
+    const row = query.data;
+    if (!row) return null;
+    return pickRuleOccurrence(row, occurrenceKey, theme);
+  }, [query.data, occurrenceKey, theme]);
+
   return {
     data: occurrence,
+    ruleOccurrence,
     isLoading: query.isLoading,
     error: query.error,
   };

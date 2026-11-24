@@ -1,9 +1,11 @@
 import { addDays, max as dateMax, min as dateMin } from "date-fns";
 
+import type { Theme } from "@/design-system/themes";
+
 import type { EventWithRelations } from "./expand";
 import type { CalendarOccurrence } from "./types";
 
-import { overrideWindowDurationMs } from "./expand";
+import { expandEvents, overrideWindowDurationMs } from "./expand";
 import { overrideInterval } from "./override";
 import { zonedDayBounds } from "./timezone";
 
@@ -100,4 +102,32 @@ export function pickOccurrence(
   const first = expanded[0] ?? null;
   if (!occurrenceKey || first?.isRecurring === false) return first;
   return expanded.find((o) => o.occurrenceKey === occurrenceKey) ?? null;
+}
+
+/**
+ * Dieselbe Occurrence wie `pickOccurrence`, aber so, wie die Regel sie
+ * erzeugt: ohne Exceptions expandiert, also mit Titel, Ort und Beschreibung
+ * des Masters und Start und Ende auf dem Regel-Tag, den `occurrenceKey`
+ * benennt.
+ *
+ * Gebraucht vom Bearbeiten-Formular (Spec 2026-11-19, Punkt B): Anker und
+ * „Alle"-Werte kommen von der Regel, nicht vom Override. Eine per „Nur
+ * diesen" auf einen anderen Wochentag verschobene Occurrence liegt mit ihrem
+ * aufgelösten Start neben dem Wochentag der Regel; `rruleToRecurrence`
+ * erkennt „Wöchentlich" dann nicht mehr, und `recurrenceToRrule` schriebe den
+ * verschobenen Tag in die Regel.
+ *
+ * Das Fenster ist das von `eventLookupWindow` für die Zeile **mit** ihren
+ * Exceptions — es deckt den Regel-Tag ohnehin ab. Eine Absage (`cancelled`)
+ * blendet hier nichts aus; ob es die Occurrence noch gibt, entscheidet
+ * `pickOccurrence` auf der aufgelösten Expansion.
+ */
+export function pickRuleOccurrence(
+  row: EventWithRelations,
+  occurrenceKey: string | undefined,
+  theme: Theme,
+): CalendarOccurrence | null {
+  const { start, end } = eventLookupWindow(row, occurrenceKey);
+  const expanded = expandEvents([{ ...row, event_exceptions: [] }], start, end, theme);
+  return pickOccurrence(expanded, occurrenceKey);
 }

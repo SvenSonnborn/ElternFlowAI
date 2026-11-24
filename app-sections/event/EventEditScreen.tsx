@@ -44,6 +44,7 @@ import {
   type RecurrenceChanges,
   type RecurrenceOption,
 } from "@/features/calendar";
+import { zonedDateKey } from "@/features/calendar/timezone";
 
 import { findConflicts } from "./eventConflicts";
 import { eventFormChanged } from "./eventFormChanged";
@@ -77,7 +78,7 @@ export function EventEditScreen() {
   const lang = i18n.language.startsWith("de") ? "de" : "en";
   const dateLocale = lang === "de" ? deLocale : enLocale;
 
-  const { data: occurrence, isLoading } = useEvent(id ?? "", occ);
+  const { data: occurrence, ruleOccurrence, isLoading } = useEvent(id ?? "", occ);
   const navigation = useNavigation();
   const { show } = useToast();
   const conflict = useConflict();
@@ -120,6 +121,11 @@ export function EventEditScreen() {
   // (`theirs` weicht von *dieser* Basis ab) zu unterscheiden — siehe
   // `conflict.ts`.
   const [baseOccurrence, setBaseOccurrence] = useState<CalendarOccurrence | null>(null);
+  // Die Regel-Fassung derselben Occurrence (`useEvent().ruleOccurrence`),
+  // eingefroren im selben Moment wie `baseOccurrence` — sonst läse der Anker
+  // der Regel nach einem fremden Refetch einen anderen Stand als der Rest des
+  // Formulars.
+  const [baseRuleOccurrence, setBaseRuleOccurrence] = useState<CalendarOccurrence | null>(null);
   const { startAt, endAt } = range;
 
   /**
@@ -158,30 +164,39 @@ export function EventEditScreen() {
    * alles, was hier hängt, nicht nur die Version.
    */
   const source = baseOccurrence ?? occurrence;
+  // Kein `??`: Nach der Hydration gilt die eingefrorene Regel-Fassung, auch
+  // wenn sie `null` ist — ein Rückfall auf die lebende Query liefe genau dem
+  // Refetch hinterher, gegen den `source` eingefroren wird.
+  const ruleSource = baseOccurrence ? baseRuleOccurrence : ruleOccurrence;
 
   const initial = useMemo(() => {
     if (!source) return null;
-    // The weekday check in `rruleToRecurrence` runs against this occurrence's
-    // start rather than the master's dtstart, which stays put when the rule
-    // changes (ADR-032) and can sit on a different weekday than the rule.
-    // Not a full substitute either: `source.startAt` is the override-resolved
-    // start. An occurrence moved to another weekday via "Nur diesen" no longer
-    // lies on the rule's day, `rruleToRecurrence` returns `null` for a
-    // single-weekday rule, and the editor stays hidden although the rule is
-    // representable — open limitation, see docs/TODO.md; `ruleAnchor`
-    // (`recurrenceConflictRows.ts`) solves the same anchor problem for the
-    // other side of the conflict dialog.
+    // `ruleAnchor` is this occurrence's start as the rule generates it
+    // (`pickRuleOccurrence`, expanded without exceptions), not `source.startAt`.
+    // The latter is override-resolved: an occurrence moved to another weekday
+    // via "Nur diesen" no longer lies on the rule's day, and the weekday check
+    // in `rruleToRecurrence` would return `null` for a single-weekday rule and
+    // hide the editor although the rule is representable (Spec 2026-11-19,
+    // B). The master's dtstart is no substitute either: it stays put when the
+    // rule changes (ADR-032) and can sit on a different weekday than the rule.
+    // Without a rule occurrence (single event, or a key the bare rule doesn't
+    // produce) the anchor falls back to `source.startAt`.
+    // `ruleAnchor()` in `recurrenceConflictRows.ts` solves the same anchor
+    // problem for the other side of the conflict dialog.
     //
     // The check also needs this occurrence's zone (`source.timezone`), not the
     // device's — `recurrenceToRrule` wrote `rrule_byweekday` there, and reading
     // it back in a different zone can land on the wrong weekday for a start
     // near midnight (ADR-034 follow-up, Befund 1 of the final review).
+    const anchor = ruleSource?.startAt ?? source.startAt;
     const rrule = source.rrule;
     return {
       // Mitgeführt, damit die Hydration unten genau die Occurrence einfriert,
       // aus der diese Felder stammen — die beiden können so nicht
       // auseinanderlaufen.
       occurrence: source,
+      ruleOccurrence: ruleSource,
+      ruleAnchor: anchor,
       eventId: source.eventId,
       occurrenceKey: source.occurrenceKey,
       isRecurring: source.isRecurring,
@@ -197,7 +212,7 @@ export function EventEditScreen() {
           rrule_interval: rrule.interval,
           rrule_byweekday: rrule.byweekday,
         },
-        source.startAt,
+        anchor,
         source.timezone,
       ),
       countText: rrule.count == null ? "" : String(rrule.count),
@@ -206,7 +221,7 @@ export function EventEditScreen() {
       // eingefroren werden kann — siehe `baseVersion` oben.
       version: source.version,
     };
-  }, [source]);
+  }, [source, ruleSource]);
 
   if (initial && !hydrated) {
     setTitle(initial.title);
@@ -217,6 +232,7 @@ export function EventEditScreen() {
     setCountText(initial.countText);
     setBaseVersion(initial.version);
     setBaseOccurrence(initial.occurrence);
+    setBaseRuleOccurrence(initial.ruleOccurrence);
     setHydrated(true);
   }
 
@@ -311,9 +327,27 @@ export function EventEditScreen() {
       ),
   );
 
+  // Der Tag, von dem eine neu gebaute Regel ihren Wochentag nimmt. Solange das
+  // Startdatum auf dem geladenen Tag steht, ist es der Regel-Tag
+  // (`initial.ruleAnchor`): Bei einer per „Nur diesen" verschobenen Occurrence
+  // schriebe der Override-Start sonst seinen Wochentag in die ganze Serie, nur
+  // weil jemand die Anzahl geändert hat. Wählt der Nutzer ein anderes Datum,
+  // gilt das Formular. Verglichen wird der Kalendertag in der Zone des Termins,
+  // nicht der Zeitpunkt — eine neue Uhrzeit am selben Tag lässt den Anker stehen.
+  const recurrenceAnchor =
+    initial &&
+    zonedDateKey(startAt, initial.occurrence.timezone) ===
+      zonedDateKey(initial.startAt, initial.occurrence.timezone)
+      ? initial.ruleAnchor
+      : startAt;
+
   /**
    * The series rule, rebuilt from the radio. `null` when the user left the
    * recurrence untouched — the update then keeps the stored rule verbatim.
+   *
+   * The weekday comes from `recurrenceAnchor`, not from the form's `startAt`:
+   * on an occurrence moved via "Nur diesen" the form shows the override's
+   * day, but an untouched date keeps the rule's weekday (Spec 2026-11-19, B).
    *
    * `recurrenceToRrule` needs the **event's** zone (`source.timezone`), not the
    * device's, to place `rrule_byweekday` on the day the rule is evaluated in
@@ -331,7 +365,7 @@ export function EventEditScreen() {
         rrule_until: null,
       };
     }
-    const rule = recurrenceToRrule(recurrence, startAt, source.timezone);
+    const rule = recurrenceToRrule(recurrence, recurrenceAnchor, source.timezone);
     return {
       ...rule,
       rrule_count: parsedCount,
@@ -501,15 +535,14 @@ export function EventEditScreen() {
       };
 
       // Die eigene Regel-Seite, gelesen von beiden Zweigen unten. `startAt`
-      // aus der Formular-Range (`const { startAt, endAt } = range` oben im
-      // Screen), nicht `vars.changes.start_at`:
+      // ist `recurrenceAnchor` (oben im Screen), nicht `vars.changes.start_at`:
       // `buildRecurrenceChanges` hat die Regel mit genau diesem Wert gebaut.
-      // Bei einem ganztägigen Termin ist `vars.changes.start_at` der auf
-      // Mitternacht geschnappte Start (`toAllDayRange`), am selben Tag in
-      // `vars.timezone` wie `range.startAt`. `range.startAt` bleibt der Wert
-      // der Wahl, weil die Regel damit gebaut wurde.
+      // Auf einer verschobenen Occurrence mit unverändertem Datum ist das der
+      // Regel-Tag, nicht der Override-Start in `vars.changes`; bei einem
+      // ganztägigen Termin ist `vars.changes.start_at` außerdem der auf
+      // Mitternacht geschnappte Start (`toAllDayRange`).
       const mineRuleSide = vars.recurrence
-        ? { recurrence: vars.recurrence, startAt, timezone: vars.timezone }
+        ? { recurrence: vars.recurrence, startAt: recurrenceAnchor, timezone: vars.timezone }
         : null;
 
       conflict.show({
