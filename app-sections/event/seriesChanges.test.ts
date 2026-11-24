@@ -55,6 +55,32 @@ describe("seriesChanges", () => {
     expect(out.title).toBe("Musikschule");
   });
 
+  test("Uhrzeit fiele am Regel-Tag in die Sprunglücke: Formular-Zeiten bleiben", () => {
+    // Regel-Tag So 29.03., Berlin springt um 02:00 auf 03:00; die Occurrence liegt
+    // per „Nur diesen" auf Mo 30.03., gewählt wird dort 02:30–03:30. Am Regel-Tag
+    // verankert würde daraus 03:30, und `anchoredChanges` schriebe 03:30 in die Serie.
+    const gapRule = {
+      ...rule,
+      start_at: "2026-03-29T14:00:00.000Z",
+      end_at: "2026-03-29T15:00:00.000Z",
+    };
+    const gapOpened = {
+      ...opened,
+      start_at: "2026-03-30T16:00:00.000Z",
+      end_at: "2026-03-30T17:00:00.000Z",
+    };
+    const form = {
+      ...gapOpened,
+      start_at: "2026-03-30T00:30:00.000Z",
+      end_at: "2026-03-30T01:30:00.000Z",
+    };
+
+    const out = seriesChanges({ form, opened: gapOpened, rule: gapRule, timeZone, literal: false });
+
+    expect(out.start_at).toBe(form.start_at);
+    expect(out.end_at).toBe(form.end_at);
+  });
+
   test("nur das Datum geändert zählt nicht", () => {
     const form = {
       ...opened,

@@ -46,12 +46,12 @@ describe("overrideInterval", () => {
     const interval = overrideInterval(
       {
         start_at: "2026-07-20T07:00:00.000Z",
-        end_at: "2026-07-20T08:00:00.000Z",
+        end_at: "2026-07-20T08:30:00.000Z",
       },
       3_600_000,
     );
     expect(interval?.start.toISOString()).toBe("2026-07-20T07:00:00.000Z");
-    expect(interval?.end.toISOString()).toBe("2026-07-20T08:00:00.000Z");
+    expect(interval?.end.toISOString()).toBe("2026-07-20T08:30:00.000Z");
   });
 
   test("ohne brauchbaren Start gibt es kein Intervall", () => {

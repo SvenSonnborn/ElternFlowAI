@@ -21,7 +21,7 @@
 -- Sitzung. Liegt in `private`, damit PostgREST sie nicht als RPC anbietet; `authenticated`
 -- braucht trotzdem execute, weil `events_in_range` sie mit seinen Rechten aufruft.
 
-create function private.override_instant(p_value jsonb)
+create or replace function private.override_instant(p_value jsonb)
 returns timestamptz
 language plpgsql
 stable
@@ -59,7 +59,7 @@ grant execute on function private.override_instant(jsonb) to authenticated;
 -- security invoker: RLS auf `events` und `event_exceptions` gilt wie bei einer direkten
 -- Abfrage. Kein eigener Index, die Datenmengen pro Familie sind klein.
 
-create function public.events_in_range(p_start timestamptz, p_end timestamptz)
+create or replace function public.events_in_range(p_start timestamptz, p_end timestamptz)
 returns setof public.events
 language sql
 stable

@@ -23,7 +23,7 @@ const DAY_MS = 86_400_000;
  * Uhrzeit wird am Tag der Regel-Occurrence verankert, nicht am Master: Dann
  * liegt `start_at` weiter auf dem `occurrenceKey`, `canApplyOptimistically`
  * bleibt wahr, und optimistische Anzeige, Konflikt-Dialog und Schreibpfad
- * lesen dasselbe `vars.changes`.
+ * lesen dasselbe `vars.changes`. Ausnahme Zeitumstellung: `anchorAtRuleDay`.
  *
  * `literal` (Serie wird Einzeltermin, `recurrence.rrule_freq === null`): Dann
  * verankert der Schreibpfad nichts mehr, also zählt auch das Datum, und eine
@@ -43,7 +43,7 @@ export function seriesChanges(input: {
     ? rule
     : literal
       ? form
-      : anchorChangesToDate(new Date(rule.start_at), form, timeZone);
+      : anchorAtRuleDay(form, rule, timeZone);
   return {
     title: pick("title"),
     start_at: times.start_at,
@@ -51,6 +51,20 @@ export function seriesChanges(input: {
     location: pick("location"),
     description: pick("description"),
   };
+}
+
+/**
+ * Fällt die gewählte Zeit am Regel-Tag in die Lücke der Sommerzeit-Umstellung
+ * (02:30 am Sprungtag), schiebt `floatingToInstant` sie eine Stunde weiter, und
+ * `anchoredChanges` schriebe 03:30 in die ganze Serie. Dann bleiben die
+ * Formularzeiten: Die Wandzeit stimmt, nur `canApplyOptimistically` wird falsch,
+ * und die Anzeige wartet auf das Laden nach dem Speichern.
+ */
+function anchorAtRuleDay(form: EventChanges, rule: EventChanges, timeZone: string): EventChanges {
+  const anchored = anchorChangesToDate(new Date(rule.start_at), form, timeZone);
+  const a = wallClock(anchored, timeZone);
+  const b = wallClock(form, timeZone);
+  return a.timeOfDay === b.timeOfDay && a.durationMs === b.durationMs ? anchored : form;
 }
 
 function timeChanged(

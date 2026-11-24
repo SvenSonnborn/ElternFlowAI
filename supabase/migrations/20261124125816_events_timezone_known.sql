@@ -14,7 +14,7 @@
 -- Warum eine unveränderte Zone durchgelassen wird: Eine Altlast mit unbekannter Zone
 -- bleibt sonst gesperrt, sobald ein UPDATE die Spalte nur mitschreibt. Der Trigger
 -- feuert zwar nur bei `update of timezone`, `set timezone = timezone` zählt aber dazu.
-create function public.events_timezone_known()
+create or replace function public.events_timezone_known()
 returns trigger
 security invoker
 set search_path = ''
@@ -41,6 +41,7 @@ $$;
 -- Nur der Trigger ruft sie; Postgres prüft EXECUTE nur bei CREATE TRIGGER.
 revoke execute on function public.events_timezone_known() from public, anon, authenticated;
 
+drop trigger if exists events_timezone_known on public.events;
 create trigger events_timezone_known
   before insert or update of timezone on public.events
   for each row execute function public.events_timezone_known();
