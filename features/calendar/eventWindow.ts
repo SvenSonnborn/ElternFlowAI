@@ -63,10 +63,11 @@ export function eventLookupWindow(
   // Beide Grenzen bekommen beide Werte, weil `overrideInterval` ein
   // invertiertes Intervall nicht abfängt (`end_at` vor `start_at`): Ein
   // fehlendes `end_at` erbt die Basisdauer (`overrideWindowDurationMs`), ein
-  // vorhandenes, aber zu frühes `end_at` wird nicht geprüft. Bekäme nur `starts` `interval.start`
-  // und nur `ends` `interval.end`, verfehlte ein solches Intervall im
-  // invertierten Fall beide Extreme — `dateMin`/`dateMax` laufen ohnehin über
-  // die ganzen Arrays und decken die Richtung des Overrides damit schon ab.
+  // vorhandenes, aber zu frühes `end_at` wird nicht
+  // geprüft. Bekäme nur `starts` `interval.start` und nur `ends`
+  // `interval.end`, verfehlte ein solches Intervall im invertierten Fall beide
+  // Extreme — `dateMin`/`dateMax` laufen ohnehin über die ganzen Arrays und
+  // decken die Richtung des Overrides damit schon ab.
   const interval = overrideInterval(
     (row.event_exceptions ?? []).find(
       (ex) => ex.occurrence_date === occurrenceKey && ex.action === "modified",

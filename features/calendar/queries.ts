@@ -29,7 +29,9 @@ export const calendarKeys = {
   /**
    * Präfix über **alle** Range-Queries — `range()` hängt nur Start und Ende an.
    * Existiert getrennt von `all`, weil `all` (`["calendar"]`) auch `types` und
-   * `reminders` überdeckt, die eine Termin-Änderung nie betrifft.
+   * `reminders` überdeckt. Reminder einer bestehenden Event-Id ändert eine
+   * Termin-Änderung nie; der Forward-Split legt sie nur unter einer neuen Id
+   * an, die noch nie im Cache stand (ADR-058).
    */
   eventsRoot: ["calendar", "events"] as const,
   /** Präfix über alle Einzeltermin-Queries. Siehe `eventsRoot`. */
