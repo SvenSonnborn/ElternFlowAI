@@ -10,7 +10,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(13);
+select plan(16);
 
 -- ── Helfer ──────────────────────────────────────────────────────────────────
 
@@ -53,6 +53,12 @@ select lives_ok($$ select pg_temp.clone_event('e1e1e1e1-0000-4000-8000-200000000
 select lives_ok($$ select pg_temp.clone_event('e1e1e1e1-0000-4000-8000-200000000006', 'America/Ciudad_Juarez') $$,
   'America/Ciudad_Juarez wird angenommen');
 
+-- Ein BEFORE-Trigger, der `null` liefert, verwirft die Zeile ohne Fehler; `lives_ok` sähe das nicht.
+select is(
+  (select count(*)::int from public.events
+    where id between 'e1e1e1e1-0000-4000-8000-200000000001' and 'e1e1e1e1-0000-4000-8000-200000000006'),
+  6, 'alle sechs Kopien stehen in der Tabelle');
+
 -- ── 2. Unbekannte Zonen werden abgewiesen ───────────────────────────────────
 
 select throws_ok($$ select pg_temp.clone_event('e1e1e1e1-0000-4000-8000-200000000007', 'Mars/Olympus') $$,
@@ -79,6 +85,10 @@ select lives_ok(
   $$ update public.events set title = 'Umbenannt' where id = 'e1e1e1e1-0000-4000-8000-200000000009' $$,
   'eine Altlast lässt sich umbenennen');
 
+select is(
+  (select title from public.events where id = 'e1e1e1e1-0000-4000-8000-200000000009'),
+  'Umbenannt', 'der neue Titel der Altlast steht in der Zeile');
+
 select lives_ok(
   $$ update public.events set timezone = timezone where id = 'e1e1e1e1-0000-4000-8000-200000000009' $$,
   'eine unveränderte Zone wird nicht erneut geprüft');
@@ -90,6 +100,10 @@ select throws_ok(
 select lives_ok(
   $$ update public.events set timezone = 'Europe/Berlin' where id = 'e1e1e1e1-0000-4000-8000-200000000009' $$,
   'die Altlast lässt sich auf eine bekannte Zone korrigieren');
+
+select is(
+  (select timezone from public.events where id = 'e1e1e1e1-0000-4000-8000-200000000009'),
+  'Europe/Berlin', 'die korrigierte Zone steht in der Zeile');
 
 select * from finish();
 
