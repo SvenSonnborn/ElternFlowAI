@@ -714,6 +714,23 @@ describe("EventEditScreen: unter „Alle“ nur Geändertes in die Serie", () =>
     expect(changes.title).toBe("Musikschule");
   });
 
+  it("Keine Wiederholung auf verschobener Occurrence: Master am Regel-Tag mit Master-Titel", async () => {
+    await renderRow(klavier, "2026-06-22");
+    await fireEvent.press(screen.getByRole("radio", { name: i18n.t("cal.recur.none") }));
+    // Die Regeländerung erzwingt „Alle"; der Scope-Dialog erscheint nicht.
+    await save();
+
+    const vars = savedVars();
+    expect(vars.changes).toEqual({
+      title: "Musikschule",
+      start_at: "2026-06-22T14:00:00.000Z",
+      end_at: "2026-06-22T15:00:00.000Z",
+      location: null,
+      description: null,
+    });
+    expect(vars.recurrence?.rrule_freq).toBeNull();
+  });
+
   it("Nur diesen bleibt beim Formular", async () => {
     await renderRow(klavier, "2026-06-22");
     await fireEvent.changeText(screen.getByDisplayValue("Musikschule Raum 2"), "Klavier");
