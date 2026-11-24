@@ -9,8 +9,8 @@
  * ergänzt werden.
  *
  * Alles geht durch den echten Client-Pfad (`updateEvent`, `createEvent`,
- * `createSupabaseApplyEventChange`, `fetchEventById`), nur mit eingesetzten
- * Clients statt des Modul-Clients. Jeder Test legt seine Termine selbst an und
+ * `createSupabaseApplyEventChange`, `fetchEventById`, `fetchEventsInRange`),
+ * nur mit eingesetzten Clients statt des Modul-Clients. Jeder Test legt seine Termine selbst an und
  * räumt sie in `afterEach` über den Service-Role-Client wieder ab; der Seed
  * bleibt unberührt, und der Lauf ist beliebig oft wiederholbar, weil Titel und
  * Kennungen jedes Mal frisch sind.
@@ -21,7 +21,7 @@ import { createEvent, type CreateEventVars } from "@/features/calendar/createMut
 import { EventConflictError } from "@/features/calendar/errors";
 import { createSupabaseApplyEventChange } from "@/features/calendar/eventChange";
 import { updateEvent, type UpdateEventDeps } from "@/features/calendar/mutations";
-import { EVENT_SELECT, fetchEventById } from "@/features/calendar/queries";
+import { EVENT_SELECT, fetchEventById, fetchEventsInRange } from "@/features/calendar/queries";
 import { occurrenceVersion, parseOccurrenceVersion } from "@/features/calendar/version";
 
 import { adminClient, purgeBookings, SEED, signedInClient, type Client } from "./clients";
@@ -399,5 +399,60 @@ describe("createEvent gegen die lokale Instanz", () => {
     expect(after.data).toEqual(before.data);
     const { data: stray } = await admin.from("events").select("id").like("title", `${RUN}%`);
     expect(stray).toHaveLength(0);
+  });
+});
+
+describe("events_in_range gegen die lokale Instanz", () => {
+  const AUGUST_START = new Date("2026-08-01T00:00:00Z");
+  const AUGUST_END = new Date("2026-08-31T23:59:59Z");
+
+  it("Serie bis Juni, eine Occurrence per Override im August: im August geladen, mit beiden Relationen", async () => {
+    // Montags 16:00 Berlin. `rrule_until` setzt `createEvent` nicht, deshalb der Admin danach;
+    // ohne das Ende im Juni fände schon das alte Prädikat die Serie.
+    const { id } = await seedEvent({
+      recurrence: "weekly",
+      startAt: "2026-06-01T14:00:00.000Z",
+      endAt: "2026-06-01T15:00:00.000Z",
+    });
+    const until = await admin
+      .from("events")
+      .update({ rrule_until: "2026-06-30T23:59:59.000Z" })
+      .eq("id", id);
+    if (until.error) throw until.error;
+    const { error } = await admin.from("event_exceptions").insert({
+      event_id: id,
+      occurrence_date: "2026-06-22",
+      action: "modified",
+      override: { start_at: "2026-08-10T07:00:00.000Z", end_at: "2026-08-10T08:00:00.000Z" },
+    });
+    if (error) throw error;
+
+    const rows = await fetchEventsInRange(AUGUST_START, AUGUST_END, clientA);
+
+    const row = rows.find((r) => r.id === id);
+    if (!row) throw new Error(`Serie ${id} fehlt im August`);
+    expect(row.event_exceptions).toHaveLength(1);
+    expect(row.event_types?.id).toBe(familyTypeId);
+  });
+
+  it("ein Termin der Fremdfamilie im selben Fenster: nicht im Ergebnis von A", async () => {
+    // Der Titel mit `RUN` fängt ihn im Aufräumen.
+    const { data, error } = await admin
+      .from("events")
+      .insert({
+        family_id: SEED.foreignFamilyId,
+        type_id: familyTypeId,
+        title: `${RUN} fremd`,
+        start_at: "2026-08-10T07:00:00.000Z",
+        end_at: "2026-08-10T08:00:00.000Z",
+        timezone: "Europe/Berlin",
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+
+    const rows = await fetchEventsInRange(AUGUST_START, AUGUST_END, clientA);
+
+    expect(rows.map((r) => r.id)).not.toContain(data.id);
   });
 });
