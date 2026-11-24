@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { router } from "expo-router";
 
 import type { DateTimePickerSheetProps } from "@/app-sections/shared";
-import type { EditScope } from "@/features/calendar";
+import type { CalendarOccurrence, EditScope } from "@/features/calendar";
 import type { EventWithRelations } from "@/features/calendar/expand";
 
 import { occurrenceVersion } from "@/features/calendar";
@@ -16,6 +16,8 @@ const mockUpdateEvent = jest.fn();
 const mockShowToast = jest.fn();
 /** Die Props des zuletzt gerenderten Pickers; über sein `onPick` wählt ein Test den Tag. */
 let mockPickerProps: DateTimePickerSheetProps | null = null;
+/** Was `useFamilyEvents` an Occurrences liefert; die Kollisionsprüfung liest daraus. */
+let mockFamilyOccurrences: CalendarOccurrence[] = [];
 
 jest.mock("@/app-sections/shared", () => ({
   ...jest.requireActual<typeof import("@/app-sections/shared")>("@/app-sections/shared"),
@@ -28,6 +30,7 @@ jest.mock("@/app-sections/shared", () => ({
 
 jest.mock("@/features/calendar", () => ({
   ...jest.requireActual<typeof import("@/features/calendar")>("@/features/calendar"),
+  useFamilyEvents: () => ({ data: mockFamilyOccurrences, segments: [], hasData: true }),
   useUpdateEvent: () => ({ mutateAsync: mockUpdateEvent, isPending: false, error: null }),
 }));
 
@@ -453,5 +456,62 @@ describe("EventEditScreen: Ganztägig, gelesen aus einer anderen Zone", () => {
     expect(screen.getByText(error)).toBeTruthy();
     await fireEvent.press(screen.getByRole("button", { name: i18n.t("cal.edit.save") }));
     expect(mockUpdateEvent).not.toHaveBeenCalled();
+  });
+});
+
+/** Eine Occurrence in der Form, die `useFamilyEvents` liefert; Standard: familienweit, von e1. */
+function occurrenceOf(over: Partial<CalendarOccurrence>): CalendarOccurrence {
+  return {
+    eventId: "e1",
+    occurrenceKey: "2026-10-01",
+    occurrenceDate: "2026-10-01",
+    timezone: "Europe/Berlin",
+    startAt: new Date(versionA.start_at),
+    endAt: new Date(versionA.end_at),
+    title: "Elternabend",
+    description: null,
+    location: null,
+    allDay: false,
+    childId: null,
+    parentId: null,
+    isException: false,
+    isRecurring: false,
+    version: "v",
+    rrule: { freq: null, interval: 1, byweekday: null, count: null, until: null },
+    type: { slug: "family", color: "#000", iconName: "calendar", labelDe: "", labelEn: "" },
+    ...over,
+  };
+}
+
+describe("EventEditScreen: Kollisionshinweis", () => {
+  beforeEach(() => {
+    mockFamilyOccurrences = [];
+  });
+
+  async function renderLoaded() {
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(calendarKeys.one("e1"), versionA);
+    await renderScreen(<EventEditScreen />, { queryClient });
+  }
+
+  it("zeigt den Kollisionshinweis bei einer echten Überschneidung", async () => {
+    mockFamilyOccurrences = [
+      occurrenceOf({
+        eventId: "e2",
+        title: "Zahnarzt",
+        startAt: new Date("2026-10-01T17:30:00.000Z"),
+        endAt: new Date("2026-10-01T18:00:00.000Z"),
+      }),
+    ];
+    await renderLoaded();
+
+    expect(screen.getByText(/Kollision mit Zahnarzt/)).toBeTruthy();
+  });
+
+  it("zeigt keinen Hinweis beim unveränderten Öffnen", async () => {
+    mockFamilyOccurrences = [occurrenceOf({})];
+    await renderLoaded();
+
+    expect(screen.queryByText(/Kollision/)).toBeNull();
   });
 });

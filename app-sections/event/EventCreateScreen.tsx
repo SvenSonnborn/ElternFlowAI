@@ -45,14 +45,11 @@ import {
   type RecurrenceOption,
 } from "@/features/calendar";
 
+import { findConflicts } from "./eventConflicts";
 import { eventFormChanged } from "./eventFormChanged";
 import { RecurrenceCountField } from "./RecurrenceCountField";
 import { RecurrenceRadio } from "./RecurrenceRadio";
 import { createSubmitLock } from "./submitLock";
-
-function rangesOverlap(a1: Date, a2: Date, b1: Date, b2: Date): boolean {
-  return a1.getTime() < b2.getTime() && b1.getTime() < a2.getTime();
-}
 
 function initialRange(paramDate: string | undefined): DateRange {
   const day = paramDate ? parseISO(paramDate) : new Date();
@@ -119,18 +116,10 @@ export function EventCreateScreen() {
     const checked = allDay
       ? toAllDayRange({ startAt, endAt }, deviceTimeZone())
       : { startAt, endAt };
-    const samePerson = (o: { childId: string | null; parentId: string | null }) => {
-      if (member === null) return true; // family-wide event conflicts with everything
-      if (o.childId === null && o.parentId === null) return true; // existing family-wide conflicts with anyone
-      if (member.kind === "child" && o.childId === member.id) return true;
-      if (member.kind === "parent" && o.parentId === member.id) return true;
-      return false;
-    };
-    // `rangesOverlap` already compares absolute instants — the old
-    // `occurrenceDate === startDate` guard was what hid multi-day collisions.
-    return occurrences.filter(
-      (o) => samePerson(o) && rangesOverlap(o.startAt, o.endAt, checked.startAt, checked.endAt),
-    );
+    return findConflicts(occurrences, checked, {
+      childId: member?.kind === "child" ? member.id : null,
+      parentId: member?.kind === "parent" ? member.id : null,
+    });
   }, [occurrences, startAt, endAt, member, allDay]);
 
   const titleMissing = !title.trim();
