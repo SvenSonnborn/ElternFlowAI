@@ -728,7 +728,22 @@ describe("EventEditScreen: unter „Alle“ nur Geändertes in die Serie", () =>
       location: null,
       description: null,
     });
-    expect(vars.recurrence?.rrule_freq).toBeNull();
+    expect(vars.recurrence).toMatchObject({ rrule_freq: null });
+  });
+
+  it("Keine Wiederholung mit geänderter Zeit gilt wörtlich: bleibt am geöffneten Tag", async () => {
+    await renderRow(klavier, "2026-06-22");
+    await fireEvent.press(screen.getByRole("radio", { name: i18n.t("cal.recur.none") }));
+    // Wie bei „Zeit 17–18 Uhr unter Alle": 23.06., 17:00–18:00 Berlin. `literal` übernimmt die
+    // Formularzeiten, statt sie am Regel-Tag (22.06.) zu verankern.
+    await pickTime("cal.edit.fieldStart", "2026-06-23T15:00:00.000Z");
+    await pickTime("cal.edit.fieldEnd", "2026-06-23T16:00:00.000Z");
+    await save();
+
+    const vars = savedVars();
+    expect(vars.changes.start_at).toBe("2026-06-23T15:00:00.000Z");
+    expect(vars.changes.end_at).toBe("2026-06-23T16:00:00.000Z");
+    expect(vars.recurrence).toMatchObject({ rrule_freq: null });
   });
 
   it("Nur diesen bleibt beim Formular", async () => {
