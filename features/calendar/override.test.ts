@@ -43,10 +43,13 @@ describe("overrideDate", () => {
 
 describe("overrideInterval", () => {
   test("liefert Start und Ende, wenn beide da sind", () => {
-    const interval = overrideInterval({
-      start_at: "2026-07-20T07:00:00.000Z",
-      end_at: "2026-07-20T08:00:00.000Z",
-    });
+    const interval = overrideInterval(
+      {
+        start_at: "2026-07-20T07:00:00.000Z",
+        end_at: "2026-07-20T08:00:00.000Z",
+      },
+      3_600_000,
+    );
     expect(interval?.start.toISOString()).toBe("2026-07-20T07:00:00.000Z");
     expect(interval?.end.toISOString()).toBe("2026-07-20T08:00:00.000Z");
   });
@@ -54,13 +57,20 @@ describe("overrideInterval", () => {
   test("ohne brauchbaren Start gibt es kein Intervall", () => {
     // Ein Override ohne `start_at` verschiebt nichts — es gibt also nichts zu
     // fenstern und keinen Kandidaten zu erzeugen.
-    expect(overrideInterval({ title: "Nur ein neuer Titel" })).toBeNull();
-    expect(overrideInterval({ start_at: "kein-datum" })).toBeNull();
-    expect(overrideInterval(null)).toBeNull();
+    expect(overrideInterval({ title: "Nur ein neuer Titel" }, 3_600_000)).toBeNull();
+    expect(overrideInterval({ start_at: "kein-datum" }, 3_600_000)).toBeNull();
+    expect(overrideInterval(null, 3_600_000)).toBeNull();
   });
 
-  test("ohne brauchbares Ende gilt der Start auch als Ende", () => {
-    const interval = overrideInterval({ start_at: "2026-07-20T07:00:00.000Z" });
-    expect(interval?.end.toISOString()).toBe("2026-07-20T07:00:00.000Z");
+  test("ohne brauchbares Ende erbt das Intervall die Basisdauer", () => {
+    expect(
+      overrideInterval({ start_at: "2026-07-20T07:00:00.000Z" }, 3_600_000)?.end.toISOString(),
+    ).toBe("2026-07-20T08:00:00.000Z");
+    expect(
+      overrideInterval(
+        { start_at: "2026-07-20T07:00:00.000Z", end_at: "kaputt" },
+        3_600_000,
+      )?.end.toISOString(),
+    ).toBe("2026-07-20T08:00:00.000Z");
   });
 });

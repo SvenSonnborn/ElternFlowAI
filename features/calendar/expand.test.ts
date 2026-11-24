@@ -513,6 +513,55 @@ describe("Override-Vertrag (ADR-035)", () => {
   });
 });
 
+describe("Override nur mit start_at, weit verschoben (Basisdauer im Fenster)", () => {
+  function startOnlySeries(startAt: string): EventWithRelations {
+    const row = makeRow({
+      id: "evt-start-only",
+      start_at: "2026-06-01T14:00:00.000Z",
+      end_at: "2026-06-01T15:00:00.000Z",
+      rrule_freq: "weekly",
+      rrule_byweekday: [1],
+      timezone: "Europe/Berlin",
+    });
+    row.event_exceptions = [
+      {
+        id: "ex-start-only",
+        event_id: row.id,
+        occurrence_date: "2026-06-22",
+        action: "modified",
+        override: { start_at: startAt },
+        created_at: "2026-06-01T00:00:00.000Z",
+        updated_at: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+    return row;
+  }
+
+  test("Override nur mit start_at, weit verschoben: nur das geerbte Ende liegt im Fenster", () => {
+    const out = expandEvents(
+      [startOnlySeries("2026-08-09T22:30:00.000Z")],
+      new Date("2026-08-09T23:00:00.000Z"),
+      new Date("2026-08-16T22:00:00.000Z"),
+      lightTheme,
+    );
+    const moved = out.find((o) => o.occurrenceKey === "2026-06-22");
+    expect(moved?.startAt.toISOString()).toBe("2026-08-09T22:30:00.000Z");
+    expect(moved?.endAt.toISOString()).toBe("2026-08-09T23:30:00.000Z");
+  });
+
+  test("Override nur mit start_at in der Umstellungsnacht: die Occurrence bleibt im Fenster", () => {
+    const out = expandEvents(
+      [startOnlySeries("2026-10-25T00:30:00.000Z")],
+      new Date("2026-10-25T01:00:00.000Z"),
+      new Date("2026-10-31T23:00:00.000Z"),
+      lightTheme,
+    );
+    const moved = out.find((o) => o.occurrenceKey === "2026-06-22");
+    expect(moved).toBeDefined();
+    expect(moved?.endAt.toISOString()).toBe("2026-10-25T01:30:00.000Z");
+  });
+});
+
 describe("Kandidatenmenge aus event_exceptions (ADR-035)", () => {
   const JUNI_START = new Date("2026-06-01T00:00:00.000Z");
   const JUNI_END = new Date("2026-06-30T23:59:59.000Z");

@@ -227,6 +227,29 @@ describe("eventLookupWindow deckt das Override-Intervall mit ab (ADR-035)", () =
   });
 });
 
+describe("eventLookupWindow und Override nur mit start_at", () => {
+  test("das Fensterende deckt das geerbte Ende des Overrides ab", () => {
+    const row = makeRow({
+      start_at: "2026-06-01T14:00:00.000Z",
+      end_at: "2026-06-01T15:00:00.000Z",
+      rrule_byweekday: [1],
+    });
+    row.event_exceptions = [
+      {
+        id: "ex-start-only",
+        event_id: row.id,
+        occurrence_date: "2026-06-22",
+        action: "modified",
+        override: { start_at: "2026-08-09T22:30:00.000Z" },
+        created_at: "2026-06-01T00:00:00.000Z",
+        updated_at: "2026-06-02T00:00:00.000Z",
+      },
+    ];
+    const { end } = eventLookupWindow(row, "2026-06-22");
+    expect(end.getTime()).toBeGreaterThanOrEqual(new Date("2026-08-09T23:30:00.000Z").getTime());
+  });
+});
+
 describe("pickOccurrence", () => {
   function expandSeries(row: EventWithRelations, occurrenceKey?: string) {
     const { start, end } = eventLookupWindow(row, occurrenceKey);
