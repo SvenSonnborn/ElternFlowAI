@@ -14,7 +14,9 @@ import { calendarKeys } from "./queries";
  *
  * Bewusst **nicht** `calendarKeys.all`: Das ist der Präfix `["calendar"]` und
  * zöge `types` (eine Nachschlagetabelle) und `reminders` (eine eigene Tabelle
- * ohne Trigger) mit, die von einer Termin-Änderung nie betroffen sind.
+ * ohne Trigger) mit. Reminder einer bestehenden Event-Id ändert eine
+ * Termin-Änderung nie; der Forward-Split legt zwar Zeilen an, aber unter der
+ * neuen Id, deren Query noch nie im Cache stand (ADR-058).
  *
  * Ist keine Event-Id zuordenbar (etwa bei einer Exception ohne `event_id`-Feld),
  * fällt die Funktion auf `[calendarKeys.eventsRoot]` zurück: Die Range hat sich

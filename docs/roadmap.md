@@ -27,7 +27,6 @@ entscheiden oder besorgen müssen, um sie zu entblocken.
 
 | Schritt                                                                                        | Aufwand | Vorher nötig                                       |
 | ---------------------------------------------------------------------------------------------- | ------- | -------------------------------------------------- |
-| [1. Kalender: stille Fehler im Schreibpfad](#1-kalender-stille-fehler-im-schreibpfad)          | L       | —                                                  |
 | [2. Stille Fehlschläge in Hooks und Formularen](#2-stille-fehlschläge-in-hooks-und-formularen) | M       | —                                                  |
 | [3. Datenbank-Hygiene](#3-datenbank-hygiene)                                                   | M       | Grenzwerte für Name, Kürzel, Farbe                 |
 | [4. Allergen-Urteil](#4-allergen-urteil)                                                       | M       | —                                                  |
@@ -38,7 +37,7 @@ entscheiden oder besorgen müssen, um sie zu entblocken.
 | [9. Werkzeug und Renovate](#9-werkzeug-und-renovate)                                           | S–M     | —                                                  |
 | [10. Geräte-Runde iOS und Android](#10-geräte-runde-ios-und-android)                           | M       | —                                                  |
 | [11. E2E-Lauf mit Konto](#11-e2e-lauf-mit-konto)                                               | L       | —                                                  |
-| [12. Entscheidungsrunde](#12-entscheidungsrunde)                                               | S       | sechs Antworten von dir                            |
+| [12. Entscheidungsrunde](#12-entscheidungsrunde)                                               | S       | sieben Antworten von dir                           |
 | [13. Die Entscheidungen bauen](#13-die-entscheidungen-bauen)                                   | M–L     | Schritt 12                                         |
 | [14. Copy-Deck nachtragen](#14-copy-deck-nachtragen) 🎨                                        | M       | Freigabe für `docs/COPY.md`                        |
 | [15. Pattern-Docs nachziehen](#15-pattern-docs-nachziehen) 🎨                                  | M       | Freigabe für `patterns/`, zwei Richtungsfragen     |
@@ -66,20 +65,6 @@ entscheiden oder besorgen müssen, um sie zu entblocken.
 
 Kein Blocker. Jeder Schritt ist ein eigener Branch; die Reihenfolge folgt dem Schaden, den der
 offene Punkt heute anrichten kann.
-
-### 1. Kalender: stille Fehler im Schreibpfad
-
-**L** · Hier verliert oder versteckt der Kalender heute Daten, ohne dass es jemand merkt — deshalb
-zuerst.
-
-- [Calendar](./TODO.md#calendar-v1--siehe-adr-008)
-  - Der Forward-Split übernimmt keine Reminder
-  - Eine per Override weit verschobene Occurrence bleibt im Monatsraster unsichtbar …
-  - Ein Override nur mit `start_at` wird strenger gefenstert als aufgelöst
-  - Auf einer per „Nur diesen" verschobenen Occurrence bleibt der Recurrence-Editor verborgen …
-  - `events.timezone` wird nur formal validiert
-- [Weitere](./TODO.md#weitere-out-of-scope-items)
-  - Conflict-Detection (fehlt beim Bearbeiten)
 
 ### 2. Stille Fehlschläge in Hooks und Formularen
 
@@ -151,6 +136,9 @@ und 18.
   - Datumsformat in den Termin-Formularen ist Deutsch-geprägt für beide Sprachen
 - [Calendar Optimistic UI](./TODO.md#calendar-optimistic-ui-siehe-adr-027)
   - Eine Regeländerung wird nicht optimistisch abgebildet
+  - Unter „Alle“ ohne Regeländerung zeigt die bearbeitete verschobene Occurrence kurz Master-Werte
+- [Conflict-Detection](./TODO.md#conflict-detection-siehe-adr-031)
+  - Unter „Alle“ auf einer Occurrence mit Override beschreibt der Konflikt-Dialog einen Schreibvorgang, der sie nicht erreicht
 - [Weitere](./TODO.md#weitere-out-of-scope-items)
   - Auf Englisch zeigt der Kalender beim ersten Öffnen deutsche Wochentage
 - [Dashboard](./TODO.md#dashboard)
@@ -175,7 +163,7 @@ und 18.
 - [Weitere](./TODO.md#weitere-out-of-scope-items)
   - Der Linter meldet keine überflüssigen Null-Prüfungen
 - [Calendar](./TODO.md#calendar-v1--siehe-adr-008)
-  - Zwei Tests in `optimisticEvents.test.ts` hängen an der Leserzone
+  - Tests hängen an der Leserzone
 - [Calendar Optimistic UI](./TODO.md#calendar-optimistic-ui-siehe-adr-027)
   - `features/calendar/hooks.ts` ist unter `bun test` nicht ladbar
 
@@ -227,6 +215,9 @@ ein Testkonto. Danach lassen sich weitere Abläufe ohne Handarbeit prüfen.
 6. **Required Status Checks binden den Repo-Admin nicht**
    ([Renovate](./TODO.md#renovate--dependencies-siehe-adr-013)) — Bleibt der Bypass auf `always`,
    oder geht er auf `pull_request`? Umstellen kannst nur du; das Token darf keine Rulesets ändern.
+7. **„Diesen und alle folgenden“ von einer per „Nur diesen“ verschobenen Occurrence übernimmt …**
+   ([Calendar](./TODO.md#calendar-v1--siehe-adr-008)) — Wo und mit welchen Werten beginnt die
+   abgespaltene Serie, wenn die geöffnete Occurrence per „Nur diesen“ verschoben wurde?
 
 ### 13. Die Entscheidungen bauen
 
@@ -579,6 +570,9 @@ Keine Arbeit, solange der Auslöser nicht eintritt.
 - **Die Git-Hooks laufen im Sync-Workflow mit**
   ([Renovate](./TODO.md#renovate--dependencies-siehe-adr-013)) — sobald jemand den Pre-Push-Hook
   wieder aktiviert
+- **Das Lade-Prädikat lädt jeden vergangenen Einzeltermin der Familie**
+  ([Calendar](./TODO.md#calendar-v1--siehe-adr-008)) — sobald eine Familie so viele vergangene
+  Einzeltermine hat, dass ein Fensterwechsel spürbar langsam wird
 - **Regel 3 muss bei jedem SDK-Sprung gegen `relatedPackages` abgeglichen werden**
   ([Renovate](./TODO.md#renovate--dependencies-siehe-adr-013)) — bei jedem SDK-Sprung
 
