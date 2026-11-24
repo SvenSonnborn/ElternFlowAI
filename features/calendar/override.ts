@@ -92,17 +92,24 @@ export function overrideDate(value: Json | undefined): Date | null {
  * Titel oder Beschreibung ändert, verschiebt nichts, erzeugt also weder einen
  * Kandidaten (§6.2) noch eine Fensterweitung (§6.9 Nr. 2).
  *
- * Fehlt oder bricht `end_at`, gilt der Start auch als Ende. Das macht die
- * Vorprüfung in `expandEvents` in diesem einen Fall **strenger** als den
- * Fensterfilter dahinter, der stattdessen das Regel-Ende der Occurrence
- * heranzieht. Über den App-Schreibpfad ist der Fall nicht erreichbar —
- * `modifyOccurrence` schreibt `EventChanges` vollständig, also immer beide
- * Felder. Ein Override nur mit `start_at` kann heute nur von außen entstehen;
- * die Abweichung steht als Grenze in `docs/TODO.md`.
+ * Fehlt oder bricht `end_at`, erbt das Intervall die Dauer: `end = start +
+ * fallbackDurationMs` — dieselbe Regel wie `applyOverride` ([expand.ts](./expand.ts)),
+ * die in diesem Fall die Dauer der Regel-Occurrence übernimmt. Die Vorprüfung
+ * in `expandEvents` und das Suchfenster in `eventLookupWindow` dürfen nie
+ * strenger sein als diese Auflösung; deshalb übergeben beide die großzügige
+ * Obergrenze `overrideWindowDurationMs`, nicht die Dauer einer bestimmten
+ * Occurrence (die kennt die Vorprüfung noch nicht). Ein ausdrücklich gesetztes,
+ * gültiges `end_at` gewinnt unverändert.
  */
-export function overrideInterval(override: Json | null): { start: Date; end: Date } | null {
+export function overrideInterval(
+  override: Json | null,
+  fallbackDurationMs: number,
+): { start: Date; end: Date } | null {
   if (!isJsonObject(override)) return null;
   const start = overrideDate(override.start_at);
   if (!start) return null;
-  return { start, end: overrideDate(override.end_at) ?? start };
+  return {
+    start,
+    end: overrideDate(override.end_at) ?? new Date(start.getTime() + fallbackDurationMs),
+  };
 }

@@ -3,6 +3,7 @@ import { addDays, max as dateMax, min as dateMin } from "date-fns";
 import type { EventWithRelations } from "./expand";
 import type { CalendarOccurrence } from "./types";
 
+import { overrideWindowDurationMs } from "./expand";
 import { overrideInterval } from "./override";
 import { zonedDayBounds } from "./timezone";
 
@@ -59,8 +60,8 @@ export function eventLookupWindow(
   //
   // Beide Grenzen bekommen beide Werte, weil `overrideInterval` ein
   // invertiertes Intervall nicht abfängt (`end_at` vor `start_at`): Ein
-  // fehlendes `end_at` wird per `?? start` aufgefüllt, ein vorhandenes, aber
-  // zu frühes `end_at` nicht geprüft. Bekäme nur `starts` `interval.start`
+  // fehlendes `end_at` erbt die Basisdauer (`overrideWindowDurationMs`), ein
+  // vorhandenes, aber zu frühes `end_at` wird nicht geprüft. Bekäme nur `starts` `interval.start`
   // und nur `ends` `interval.end`, verfehlte ein solches Intervall im
   // invertierten Fall beide Extreme — `dateMin`/`dateMax` laufen ohnehin über
   // die ganzen Arrays und decken die Richtung des Overrides damit schon ab.
@@ -68,6 +69,7 @@ export function eventLookupWindow(
     (row.event_exceptions ?? []).find(
       (ex) => ex.occurrence_date === occurrenceKey && ex.action === "modified",
     )?.override ?? null,
+    overrideWindowDurationMs(row),
   );
   if (interval) {
     starts.push(interval.start, interval.end);

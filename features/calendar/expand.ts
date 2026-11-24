@@ -56,6 +56,26 @@ function readLabel(slug: string, label: Json | null | undefined): { de: string; 
 const MAX_ZONE_SHIFT_MS = 26 * 3600_000;
 
 /**
+ * Obergrenze für die Dauer, die ein Override ohne `end_at` von der
+ * Regel-Occurrence erbt (`applyOverride`): `max(durationMs, floatingDurationMs)`
+ * des Masters plus `MAX_ZONE_SHIFT_MS`. Die Vorprüfung auf Kandidaten und das
+ * Suchfenster von `eventLookupWindow` kennen die einzelne Occurrence noch nicht,
+ * deren Dauer die Auflösung heranzieht — sie dürfen aber nie strenger sein als
+ * diese. Zu weit zu suchen kostet nichts (siehe `MAX_ZONE_SHIFT_MS`).
+ */
+export function overrideWindowDurationMs(row: EventRow): number {
+  const masterStart = new Date(row.start_at);
+  const masterEnd = new Date(row.end_at);
+  return (
+    Math.max(
+      masterEnd.getTime() - masterStart.getTime(),
+      instantToFloating(masterEnd, row.timezone).getTime() -
+        instantToFloating(masterStart, row.timezone).getTime(),
+    ) + MAX_ZONE_SHIFT_MS
+  );
+}
+
+/**
  * Occurrence starts inside the window — widened backwards by the event's own
  * duration, because a span that began before `rangeStart` still paints days
  * inside it, plus `MAX_ZONE_SHIFT_MS` (Befund A/E): the widened window must
@@ -118,10 +138,11 @@ function movedExceptionOccurrences(
   rangeEnd: Date,
 ): Date[] {
   const out: Date[] = [];
+  const overrideDurationMs = overrideWindowDurationMs(row);
   let ruleKeys: Set<string> | null = null;
   for (const ex of exceptions) {
     if (ex.action !== "modified") continue;
-    const interval = overrideInterval(ex.override);
+    const interval = overrideInterval(ex.override, overrideDurationMs);
     if (!interval) continue;
     // Derselbe Schnitt, den der Filter in `expandEvents` gleich noch einmal
     // zieht — hier nur, um den rrule-Aufruf unten zu sparen.
