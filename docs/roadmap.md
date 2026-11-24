@@ -309,7 +309,7 @@ eigener Screen?
 - [Weitere](./TODO.md#weitere-out-of-scope-items)
   - Kalender-Tageszellen sind bei 320 pt schmaler als 44
   - Die Monatspfeile des Kalenders haben keine Rolle und keinen Namen
-  - Die Kollisionsprüfung beim Anlegen sieht nur die erste Occurrence einer neuen Serie
+  - Die Kollisionsprüfung sieht nur eine Occurrence einer Serie (Anlegen: die erste, Bearbeiten: die bearbeitete)
 
 ### 17. Dashboard-Design
 

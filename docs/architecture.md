@@ -174,7 +174,7 @@ Geladen wird über die RPC `events_in_range` ([queries.ts](../features/calendar/
 Zeile kommt mit, wenn ihr eigener Bereich das Fenster berührt oder das Override-Intervall einer
 `modified`-Exception (`private.override_instant`) das gepolsterte Fenster schneidet — damit auch
 eine per Override weit verschobene Occurrence im Zielmonat erscheint ([ADR-058](./decision-log.md)).
-Derselbe ADR nimmt `description` in den Vertrag von `event_exceptions.override` auf, der jetzt als
+[ADR-035](./decision-log.md) nimmt `description` in den Vertrag von `event_exceptions.override` auf, der jetzt als
 eigenes Modul in [features/calendar/override.ts](../features/calendar/override.ts) liegt, und lässt
 `eventLookupWindow` zusätzlich das Override-Intervall der angeforderten Occurrence abdecken, damit
 eine weit verschobene Occurrence über ihren eigenen Link erreichbar bleibt. Neue Termine bekommen

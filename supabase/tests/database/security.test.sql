@@ -501,7 +501,8 @@ reset role;
 -- ── 5. Laden des Kalenders ──────────────────────────────────────────────────
 --
 -- `events_in_range` ruft `private.override_instant` mit den Rechten des Aufrufers; ohne
--- execute darauf scheiterte das Laden für jede Familie mit einer verschobenen Occurrence.
+-- execute darauf scheiterte jeder `events_in_range`-Aufruf, denn das EXECUTE-Recht wird schon beim
+-- Aufbau des Ausdrucks geprüft: das Laden des Kalenders für jede Familie.
 
 select ok(
   not has_function_privilege('anon', 'public.events_in_range(timestamptz,timestamptz)', 'execute'),

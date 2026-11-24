@@ -14,7 +14,7 @@ const DAY_MS = 86_400_000;
  *   (ganztägig: geschnappt wie `finalRange`) — sonst zählte schon die
  *   Normalisierung als Änderung.
  * - `rule` ist die Regel-Occurrence (`initial.ruleOccurrence`): die Werte des
- *   Masters am Tag dieser Occurrence. Auf einer unverschobenen Occurrence
+ *   Masters am Tag dieser Occurrence. Auf einer Occurrence ohne Override
  *   gleicht sie `opened`, und es ändert sich nichts gegenüber früher.
  *
  * Die Uhrzeit ist **eine** Einheit aus Start-Tageszeit und Wandzeit-Dauer in
