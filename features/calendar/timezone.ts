@@ -36,7 +36,7 @@ const FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
  * `RangeError` von `Intl.DateTimeFormat` durchzureichen (Befund D, PR #119).
  *
  * Die Datenbank weist unbekannte Zonen seit Befund F ab (Trigger
- * `events_timezone_known`, `supabase/migrations/20261124125816_events_timezone_known.sql`);
+ * `events_timezone_known`, `supabase/migrations/20261124145500_events_timezone_known.sql`);
  * die Offset-Form (`+00:00`, von `deviceTimeZone()` unter TZ=GMT) lässt sie
  * durch, obwohl `pg_timezone_names` sie nicht kennt. Der Rückfall fängt damit
  * nur noch Altlasten und Laufzeiten mit älteren tz-Daten als der Server.
