@@ -34,6 +34,7 @@ import {
   recurrenceToRrule,
   rruleToRecurrence,
   useEvent,
+  useFamilyEvents,
   useUpdateEvent,
   type CalendarOccurrence,
   type DateRange,
@@ -44,6 +45,7 @@ import {
   type RecurrenceOption,
 } from "@/features/calendar";
 
+import { findConflicts } from "./eventConflicts";
 import { eventFormChanged } from "./eventFormChanged";
 import {
   recurrenceConflictRows,
@@ -239,6 +241,26 @@ export function EventEditScreen() {
   // read from another zone, an end on the start's local day may fall on the day
   // before in the event's zone — so `dateError` checks the snapped range too.
   const finalRange = allDay && initial ? toAllDayRange(range, initial.occurrence.timezone) : range;
+
+  // Dasselbe Ladefenster wie beim Anlegen: eines der vorhandenen `Date`-Objekte,
+  // kein neues, weil das Memo in `useFamilyEvents` an der Referenz hängt. Der
+  // Aufruf steht vor jedem frühen Return und ist vom Laden unabhängig (Regeln
+  // der Hooks); bis `initial` da ist, bleibt die Liste leer.
+  const occurrences = useFamilyEvents(startAt, endAt > startAt ? endAt : startAt).data;
+  const conflicts = useMemo(
+    () =>
+      initial
+        ? findConflicts(
+            occurrences,
+            finalRange,
+            { childId: initial.occurrence.childId, parentId: initial.occurrence.parentId },
+            { eventId: initial.eventId, occurrenceKey: initial.occurrenceKey },
+          )
+        : [],
+    // `finalRange` entsteht je Render neu; seine Quellen stehen in der Liste.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [occurrences, initial, range, allDay],
+  );
 
   const titleError = !title.trim() ? t("cal.edit.error.titleRequired") : "";
   const dateError =
@@ -790,6 +812,19 @@ export function EventEditScreen() {
                 />
               </View>
             </View>
+
+            {conflicts.length > 0 ? (
+              <View className="rounded-xl bg-warning-soft px-3 py-2">
+                <Text variant="caption" tone="accentStrong">
+                  {t("cal.create.conflict", {
+                    count: conflicts.length,
+                    title: conflicts[0].title,
+                    from: format(conflicts[0].startAt, "HH:mm"),
+                    to: format(conflicts[0].endAt, "HH:mm"),
+                  })}
+                </Text>
+              </View>
+            ) : null}
 
             <Field
               label={t("cal.edit.fieldLocation")}
