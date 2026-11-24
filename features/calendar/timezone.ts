@@ -35,17 +35,13 @@ const FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
  * Fällt für eine zur Laufzeit unbekannte Zone auf UTC zurück, statt den
  * `RangeError` von `Intl.DateTimeFormat` durchzureichen (Befund D, PR #119).
  *
- * `events.timezone` ist nur syntaktisch validiert (Regex-Constraint,
- * `supabase/migrations/20260909131554_events_timezone_iana_widen.sql`) — eine
- * Prüfung gegen `pg_timezone_names` scheidet aus: Diese Liste kennt
- * `Europe/Berlin`, aber nicht die Offset-Form `+00:00`, die
- * `deviceTimeZone()`s `Intl`-Fallback unter `TZ=GMT` legitim liefert
- * (gemessen — 1196 Einträge, `+00:00` nicht darunter). Eine DB-Validierung
- * gegen diese Liste brächte also denselben harten Anlege-Fehler zurück, den
- * die zweite Migration gerade behoben hat.
+ * Die Datenbank weist unbekannte Zonen seit Befund F ab (Trigger
+ * `events_timezone_known`, `supabase/migrations/20261124125816_events_timezone_known.sql`);
+ * die Offset-Form (`+00:00`, von `deviceTimeZone()` unter TZ=GMT) lässt sie
+ * durch, obwohl `pg_timezone_names` sie nicht kennt. Der Rückfall fängt damit
+ * nur noch Altlasten und Laufzeiten mit älteren tz-Daten als der Server.
  *
- * Ohne diesen Fallback wirft `formatterFor` für jede syntaktisch gültige,
- * aber real unbekannte Zone (Tippfehler, veralteter Alias) einen
+ * Ohne diesen Fallback wirft `formatterFor` für jede der Laufzeit unbekannte Zone einen
  * `RangeError`, den `expandEvents` nicht fängt — eine einzige kaputte Zeile
  * würde damit den gesamten Kalenderbereich leer ausgeben statt nur den einen
  * Termin falsch darzustellen. Ein Termin zur falschen Uhrzeit ist ungleich

@@ -22,7 +22,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(47);
+select plan(49);
 
 -- ── Helfer ──────────────────────────────────────────────────────────────────
 
@@ -80,6 +80,16 @@ select ok(
 select ok(
   not has_function_privilege('authenticated', 'public.set_reminder_family_id()', 'execute'),
   'authenticated hat kein execute auf set_reminder_family_id'
+);
+
+select ok(
+  not has_function_privilege('anon', 'public.events_timezone_known()', 'execute'),
+  'anon hat kein execute auf events_timezone_known'
+);
+
+select ok(
+  not has_function_privilege('authenticated', 'public.events_timezone_known()', 'execute'),
+  'authenticated hat kein execute auf events_timezone_known'
 );
 
 -- Vorher endete ein direkter Aufruf erst im Funktionsrumpf (0A000, „trigger functions can
