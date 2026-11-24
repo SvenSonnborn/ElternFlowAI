@@ -240,13 +240,13 @@ describe("eventLookupWindow und Override nur mit start_at", () => {
         event_id: row.id,
         occurrence_date: "2026-06-22",
         action: "modified",
-        override: { start_at: "2026-08-09T22:30:00.000Z" },
+        override: { start_at: "2027-08-09T22:30:00.000Z" },
         created_at: "2026-06-01T00:00:00.000Z",
         updated_at: "2026-06-02T00:00:00.000Z",
       },
     ];
     const { end } = eventLookupWindow(row, "2026-06-22");
-    expect(end.getTime()).toBeGreaterThanOrEqual(new Date("2026-08-09T23:30:00.000Z").getTime());
+    expect(end.getTime()).toBeGreaterThanOrEqual(new Date("2027-08-09T23:30:00.000Z").getTime());
   });
 });
 
