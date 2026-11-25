@@ -1,12 +1,12 @@
 import { router, Stack } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, View } from "react-native";
+import { Keyboard, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { TaskFormState } from "@/features/tasks";
 
-import { useDiscardGuard } from "@/app-sections/shared";
+import { useDiscardGuard, useToast } from "@/app-sections/shared";
 import { touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
 import { Button, Card, Text } from "@/design-system/ui";
@@ -33,6 +33,23 @@ export function TaskCreateScreen() {
   const { data: parent } = useCurrentParent();
   const { data: children } = useFamilyChildren(parent?.family_id);
   const createMutation = useCreateTask();
+  const { show } = useToast();
+  const saving = createMutation.isPending;
+  // Gesetzt, sobald der Screen weg ist: Wer ihn während des Speicherns
+  // verlässt — per Android-Wischen, das die Sperre bewusst durchlässt
+  // (`useDiscardGuard`) —, soll weder ein zweites Mal navigieren noch den
+  // Fehler verlieren, denn die Inline-Zeile ist dann mit dem Screen weg.
+  // `useRef` statt `useState`: steuert keinen Render und muss synchron
+  // gelten. Der Effekt setzt beim Mount `false` zurück, damit der
+  // StrictMode-Probelauf (Mount, Cleanup, Mount) das Ref nicht auf `true`
+  // stehen lässt.
+  const hasLeft = useRef(false);
+  useEffect(() => {
+    hasLeft.current = false;
+    return () => {
+      hasLeft.current = true;
+    };
+  }, []);
 
   const [state, setState] = useState<TaskFormState>(() => emptyTaskForm(new Date()));
   // Ausgangsstand für „geändert?" (`taskFormChanged`): erst mit dem
@@ -69,8 +86,8 @@ export function TaskCreateScreen() {
   const { typeItems, childOptions } = useTaskFormOptions(types.data, children);
 
   const errors = validateTaskForm(state);
-  const canSave = !hasTaskFormErrors(errors) && !createMutation.isPending;
-  const allowLeave = useDiscardGuard(taskFormChanged(state, pristine));
+  const canSave = !hasTaskFormErrors(errors) && !saving;
+  const allowLeave = useDiscardGuard(taskFormChanged(state, pristine), saving);
 
   // No history to fall back to on a cold-start deep link straight to
   // `/task/new` — `router.back()` alone would strand the sheet with no way
@@ -82,13 +99,36 @@ export function TaskCreateScreen() {
 
   function onSave() {
     const vars = toCreateVars(state);
-    if (!vars || createMutation.isPending) return;
-    createMutation.mutate(vars, {
-      onSuccess: () => {
-        allowLeave();
-        goBackOrToTasks();
+    if (!vars || saving) return;
+    Keyboard.dismiss();
+    // `mutateAsync` mit eigenem Fehlerzweig statt `mutate` mit Per-Call-
+    // Callbacks: Nach dem Unmount feuern die nicht mehr (festgehalten in
+    // `features/tasks/mutateAsyncSurvivesUnmount.test.ts`), der Fehler bliebe
+    // stumm. Die Closure hier überlebt das Verlassen des Screens, sei es per
+    // Android-Wischen oder sonst.
+    createMutation.mutateAsync(vars).then(
+      () => {
+        // Nach dem Verlassen wäre ein zweites `goBackOrToTasks()` ein Pop
+        // eines fremden Screens.
+        if (!hasLeft.current) {
+          allowLeave();
+          goBackOrToTasks();
+        }
       },
-    });
+      (err: unknown) => {
+        // Steht der Screen noch, trägt die Inline-Zeile (`createMutation.error`)
+        // den Fehler; ein Toast wäre ein zweiter Kanal. Ist er verlassen, ist
+        // der Toast der einzige.
+        if (hasLeft.current) {
+          show({
+            title: t("hw.create.error.saveFailed"),
+            message: t(mapTaskError(err)),
+            variant: "error",
+            position: "bottom",
+          });
+        }
+      },
+    );
   }
 
   return (
@@ -140,6 +180,7 @@ export function TaskCreateScreen() {
               accessibilityRole="button"
               accessibilityLabel={t("action.cancel")}
               onPress={goBackOrToTasks}
+              disabled={saving}
               className="items-center justify-center px-2 py-1 active:opacity-70"
               // 44er-Box um den Text; -9 oben und unten lässt sie nur 26 hoch
               // zählen (Text 18 + py-1), so wächst der Kopf nicht.
@@ -152,6 +193,7 @@ export function TaskCreateScreen() {
           </View>
 
           <TaskForm
+            disabled={saving}
             state={state}
             onChange={handleChange}
             types={typeItems}
@@ -174,7 +216,7 @@ export function TaskCreateScreen() {
           >
             <Button
               block
-              label={createMutation.isPending ? t("hw.create.saving") : t("hw.create.save")}
+              label={saving ? t("hw.create.saving") : t("hw.create.save")}
               tone="primary"
               disabled={!canSave}
               onPress={onSave}

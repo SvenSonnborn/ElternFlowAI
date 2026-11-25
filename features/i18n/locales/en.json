@@ -525,7 +525,10 @@
     "create": {
       "title": "Add task",
       "save": "Add",
-      "saving": "Saving…"
+      "saving": "Saving…",
+      "error": {
+        "saveFailed": "Couldn't add the task"
+      }
     },
     "edit": {
       "title": "Edit task",
