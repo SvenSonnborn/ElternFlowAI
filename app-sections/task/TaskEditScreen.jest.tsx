@@ -4,6 +4,7 @@ import { Alert, type AlertButton } from "react-native";
 
 import type { TaskTypeRow, TaskWithType } from "@/features/tasks";
 
+import { useToastStore } from "@/app-sections/shared";
 import i18n from "@/features/i18n";
 import { usePendingDeleteStore } from "@/features/shared";
 import { taskKeys } from "@/features/tasks";
@@ -13,10 +14,11 @@ import { TaskEditScreen } from "./TaskEditScreen";
 
 const mockUpdateTask = jest.fn();
 const mockDeleteTask = jest.fn();
+let mockPending = false;
 
 jest.mock("@/features/tasks", () => ({
   ...jest.requireActual<typeof import("@/features/tasks")>("@/features/tasks"),
-  useUpdateTask: () => ({ mutateAsync: mockUpdateTask, isPending: false, error: null }),
+  useUpdateTask: () => ({ mutateAsync: mockUpdateTask, isPending: mockPending, error: null }),
   useDeleteTask: () => ({ mutateAsync: mockDeleteTask }),
 }));
 
@@ -217,5 +219,64 @@ describe("TaskEditScreen: Verwerfen-Rückfrage", () => {
       jest.mocked(router.back).mock.invocationCallOrder[0],
     );
     expect(mockPrevent).toBe(false);
+  });
+});
+
+describe("TaskEditScreen: Sperre beim Speichern", () => {
+  beforeEach(() => {
+    mockUpdateTask.mockReset();
+    mockDisable.mockReset();
+    mockPrevent = undefined;
+    mockPending = false;
+    useToastStore.getState().clear();
+    jest.mocked(router.back).mockReset();
+    jest.mocked(router.replace).mockReset();
+  });
+
+  /** Ändert den Titel, speichert und liefert die zurückgehaltene Antwort. */
+  async function saveWithHeldResult() {
+    let resolve!: () => void;
+    let reject!: (err: unknown) => void;
+    mockUpdateTask.mockReturnValue(
+      new Promise<void>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      }),
+    );
+    await renderScreen(<TaskEditScreen />, { queryClient: seededClient() });
+    await fireEvent.changeText(screen.getByDisplayValue("Mathe Übungsblatt"), "Mathe 2");
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("hw.edit.save") }));
+    expect(mockUpdateTask).toHaveBeenCalledTimes(1);
+    return { resolve, reject };
+  }
+
+  it("während des Speicherns sind Felder, „Abbrechen“ und „Löschen“ gesperrt", async () => {
+    mockPending = true;
+    await renderScreen(<TaskEditScreen />, { queryClient: seededClient() });
+
+    expect(screen.getByRole("button", { name: i18n.t("action.cancel") })).toBeDisabled();
+    expect(screen.getByRole("button", { name: i18n.t("hw.delete.confirmOk") })).toBeDisabled();
+    expect(screen.getByDisplayValue("Mathe Übungsblatt").props.editable).toBe(false);
+    expect(mockPrevent).toBe(true);
+  });
+
+  it("Erfolg nach dem Verlassen navigiert nicht", async () => {
+    const { resolve } = await saveWithHeldResult();
+    await screen.unmount();
+    await act(() => resolve());
+
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("Fehler nach dem Verlassen ohne Konflikt kommt als Toast", async () => {
+    const { reject } = await saveWithHeldResult();
+    await screen.unmount();
+    await act(() => reject(new Error("Failed to fetch")));
+
+    const { toasts } = useToastStore.getState();
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0].title).toBe(i18n.t("hw.edit.error.saveFailed"));
+    expect(toasts[0].message).toBe(i18n.t("hw.error.network"));
   });
 });

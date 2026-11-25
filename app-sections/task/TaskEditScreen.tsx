@@ -1,7 +1,7 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, View } from "react-native";
+import { Keyboard, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
@@ -77,12 +77,24 @@ export function TaskEditScreen() {
   const undoableDelete = useUndoableDelete();
   const conflict = useConflict();
   const { show } = useToast();
-  // Gesetzt, sobald `showConflict` den Screen verlässt. Danach ist die
-  // Inline-Fehlerzeile mit dem Screen weg, und ein erfolgreicher Retry darf
-  // nicht ein zweites Mal navigieren — `submit` liest beides hieraus.
-  // `useRef` statt `useState`: Der Wert steuert keinen Render, und er muss
-  // synchron gelten, nicht erst im nächsten.
-  const leftAfterConflict = useRef(false);
+  const saving = updateMutation.isPending;
+  // Gesetzt, sobald der Screen weg ist — auf zwei Wegen: `showConflict`
+  // verlässt ihn bewusst, und unter Android lässt `useDiscardGuard` das
+  // Wischen auch mitten im Speichern durch. Danach ist die Inline-Fehlerzeile
+  // mit dem Screen weg, und ein erfolgreicher Retry darf nicht ein zweites Mal
+  // navigieren — `submit` liest beides hieraus. `useRef` statt `useState`: Der
+  // Wert steuert keinen Render, und er muss synchron gelten, nicht erst im
+  // nächsten. Der Effekt setzt beim Mount `false` zurück, damit der
+  // StrictMode-Probelauf (Mount, Cleanup, Mount) das Ref nicht auf `true`
+  // stehen lässt; `showConflict` setzt es zusätzlich vor dem Verlassen von
+  // Hand, weil `goBackOrToTasks()` den Cleanup erst nach dem Render auslöst.
+  const hasLeft = useRef(false);
+  useEffect(() => {
+    hasLeft.current = false;
+    return () => {
+      hasLeft.current = true;
+    };
+  }, []);
 
   const [state, setState] = useState<TaskFormState>(() => emptyTaskForm(new Date()));
   const [hydrated, setHydrated] = useState(false);
@@ -136,8 +148,8 @@ export function TaskEditScreen() {
   const { typeItems, childOptions } = useTaskFormOptions(types.data, children);
 
   const errors = validateTaskForm(state);
-  const canSave = hydrated && !hasTaskFormErrors(errors) && !updateMutation.isPending;
-  const allowLeave = useDiscardGuard(pristine !== null && taskFormChanged(state, pristine));
+  const canSave = hydrated && !hasTaskFormErrors(errors) && !saving;
+  const allowLeave = useDiscardGuard(pristine !== null && taskFormChanged(state, pristine), saving);
 
   // No history to fall back to on a cold-start deep link straight to
   // `/task/edit/[id]` — `router.back()` alone would strand the sheet with no
@@ -149,7 +161,8 @@ export function TaskEditScreen() {
 
   function onSave() {
     const changes = toTaskChanges(state);
-    if (!changes || !taskId || !task || updateMutation.isPending || baseVersion == null) return;
+    if (!changes || !taskId || !task || saving || baseVersion == null) return;
+    Keyboard.dismiss();
     submit({ taskId, changes, baseVersion });
   }
 
@@ -161,9 +174,10 @@ export function TaskEditScreen() {
    * Der Meldekanal hängt daran, ob der Screen noch steht: Solange er montiert
    * ist, trägt die Inline-Zeile unter dem Formular (`updateMutation.error`)
    * jeden Nicht-Konflikt-Fehler, und ein Toast wäre ein zweiter Kanal für
-   * dieselbe Sache. Nach einem Konflikt ist der Screen verlassen — dann ist
-   * der Toast der einzige. Ein erneuter Konflikt geht in beiden Fällen in den
-   * Dialog, weil der im Root-Layout lebt.
+   * dieselbe Sache. Ist er verlassen — nach einem Konflikt oder per
+   * Android-Wischen mitten im Speichern —, ist der Toast der einzige. Ein
+   * erneuter Konflikt geht in beiden Fällen in den Dialog, weil der im
+   * Root-Layout lebt.
    */
   function submit(vars: Parameters<typeof updateMutation.mutateAsync>[0], autoRetries = 0) {
     // `mutateAsync` mit eigenem Fehlerzweig statt `mutate` mit
@@ -175,9 +189,10 @@ export function TaskEditScreen() {
     // hier überlebt den Screenwechsel.
     updateMutation.mutateAsync(vars).then(
       () => {
-        // Nach einem Konflikt hat `showConflict` den Screen schon verlassen —
-        // ein zweites `goBackOrToTasks()` poppte sonst einen fremden Screen weg.
-        if (!leftAfterConflict.current) {
+        // Nach einem Konflikt (`showConflict`) oder einem Android-Wischen ist
+        // der Screen schon verlassen — ein zweites `goBackOrToTasks()` poppte
+        // sonst einen fremden Screen weg.
+        if (!hasLeft.current) {
           allowLeave();
           goBackOrToTasks();
         }
@@ -189,8 +204,9 @@ export function TaskEditScreen() {
         }
         // Solange der Screen steht, rendert `updateMutation.error` die
         // Inline-Zeile unter dem Formular — ein Toast wäre ein zweiter Kanal
-        // für dieselbe Sache. Ist er verlassen, ist der Toast der einzige.
-        if (leftAfterConflict.current) {
+        // für dieselbe Sache. Ist er verlassen (Konflikt oder Android-Wischen),
+        // ist der Toast der einzige.
+        if (hasLeft.current) {
           show({
             title: t("hw.edit.error.saveFailed"),
             message: t(mapTaskError(err)),
@@ -312,13 +328,15 @@ export function TaskEditScreen() {
     // Dialog (`ConflictDialogHost.onKeepTheirs` kennt diesen Screen gar
     // nicht mehr).
     //
-    // Der Wiederholungsversuch aus `onKeepMine` läuft damit nach dem Unmount.
+    // Der Wiederholungsversuch aus `onKeepMine` läuft damit nach dem Unmount —
+    // wie ein Speichern, das der Nutzer unter Android per Wischen verlässt.
     // `submit` benutzt deshalb `mutateAsync` mit eigenem Fehlerzweig: Ein
     // erneuter Konflikt öffnet wieder den Dialog (der lebt im Root-Layout),
     // jeder andere Fehler kommt als Toast — die Inline-Zeile ist mit dem
-    // Screen weg. Das Ref hält beides auseinander und verhindert zugleich,
-    // dass ein erfolgreicher Retry ein zweites Mal navigiert.
-    leftAfterConflict.current = true;
+    // Screen weg. `hasLeft` hält beides auseinander und verhindert zugleich,
+    // dass ein erfolgreicher Retry ein zweites Mal navigiert. Hier von Hand
+    // gesetzt, weil der Cleanup erst nach dem Navigieren läuft.
+    hasLeft.current = true;
     allowLeave();
     goBackOrToTasks();
   }
@@ -485,6 +503,7 @@ export function TaskEditScreen() {
               accessibilityRole="button"
               accessibilityLabel={t("action.cancel")}
               onPress={goBackOrToTasks}
+              disabled={saving}
               className="items-center justify-center px-2 py-1 active:opacity-70"
               // 44er-Box um den Text; -9 oben und unten lässt sie nur 26 hoch
               // zählen (Text 18 + py-1), so wächst der Kopf nicht.
@@ -497,6 +516,7 @@ export function TaskEditScreen() {
           </View>
 
           <TaskForm
+            disabled={saving}
             state={state}
             onChange={handleChange}
             types={typeItems}
@@ -519,7 +539,7 @@ export function TaskEditScreen() {
           >
             <Button
               block
-              label={updateMutation.isPending ? t("hw.edit.saving") : t("hw.edit.save")}
+              label={saving ? t("hw.edit.saving") : t("hw.edit.save")}
               tone="primary"
               disabled={!canSave}
               onPress={onSave}
@@ -530,7 +550,7 @@ export function TaskEditScreen() {
                 variant="soft"
                 tone="danger"
                 label={t("hw.delete.confirmOk")}
-                disabled={updateMutation.isPending}
+                disabled={saving}
                 onPress={() => void onDelete()}
               />
             </View>

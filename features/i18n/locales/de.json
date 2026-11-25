@@ -525,7 +525,10 @@
     "create": {
       "title": "Aufgabe hinzufügen",
       "save": "Hinzufügen",
-      "saving": "Speichere…"
+      "saving": "Speichere…",
+      "error": {
+        "saveFailed": "Aufgabe konnte nicht hinzugefügt werden"
+      }
     },
     "edit": {
       "title": "Aufgabe bearbeiten",
