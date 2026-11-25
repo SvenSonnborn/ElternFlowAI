@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import type { Database } from "@/features/supabase/database.types";
 
 import { useTheme } from "@/design-system/ThemeProvider";
+import { useIsSignedIn } from "@/features/auth/session";
 
 import type { DaySegment } from "./spans";
 import type { CalendarOccurrence, MarkedDates } from "./types";
@@ -69,6 +70,7 @@ export function useFamilyEvents(
   lastMonth: Date = firstMonth,
 ): UseFamilyEventsResult {
   const { theme } = useTheme();
+  const signedIn = useIsSignedIn();
 
   const { rangeStart, rangeEnd } = useMemo(() => {
     const s = addDays(startOfMonth(firstMonth), -7);
@@ -79,6 +81,7 @@ export function useFamilyEvents(
   const query = useQuery({
     queryKey: calendarKeys.range(rangeStart.toISOString(), rangeEnd.toISOString()),
     queryFn: () => fetchEventsInRange(rangeStart, rangeEnd),
+    enabled: signedIn,
   });
 
   const pending = usePendingEventDeletes();
@@ -148,11 +151,12 @@ interface UseEventResult {
 
 export function useEvent(id: string, occurrenceKey?: string): UseEventResult {
   const { theme } = useTheme();
+  const signedIn = useIsSignedIn();
 
   const query = useQuery({
     queryKey: calendarKeys.one(id),
     queryFn: () => fetchEventById(id),
-    enabled: !!id,
+    enabled: signedIn && !!id,
   });
 
   const occurrence = useMemo<CalendarOccurrence | null>(() => {
@@ -184,9 +188,11 @@ export function useEvent(id: string, occurrenceKey?: string): UseEventResult {
 }
 
 export function useEventTypes(): UseQueryResult<EventTypeRow[], Error> {
+  const signedIn = useIsSignedIn();
   return useQuery({
     queryKey: calendarKeys.types,
     queryFn: fetchEventTypes,
+    enabled: signedIn,
     staleTime: 5 * 60_000,
   });
 }

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 
+import { useIsSignedIn } from "@/features/auth/session";
 import { supabase } from "@/features/supabase";
 
 import { calendarKeys } from "./queries";
@@ -28,10 +29,11 @@ export async function fetchEventReminderOffsets(eventId: string): Promise<number
 }
 
 export function useEventReminders(eventId: string): UseQueryResult<number[], Error> {
+  const signedIn = useIsSignedIn();
   return useQuery({
     queryKey: calendarKeys.reminders(eventId),
     queryFn: () => fetchEventReminderOffsets(eventId),
-    enabled: !!eventId,
+    enabled: signedIn && !!eventId,
   });
 }
 

@@ -4,6 +4,8 @@
  * offenen Timer.
  */
 import "@testing-library/react-native"; // muss vor dem Wächter unten stehen, s. dort
+import type { Session } from "@supabase/supabase-js";
+
 import { notifyManager } from "@tanstack/react-query";
 import { dirname } from "node:path";
 import { format } from "node:util";
@@ -78,9 +80,28 @@ jest.doMock(
 // `act()` und warnt. Synchron zustellen hält React-Updates innerhalb des Tests.
 notifyManager.setScheduler((cb) => cb());
 
+/**
+ * Minimale Test-Sitzung. Ohne sie wären alle Familien-Queries (`useIsSignedIn`,
+ * Spec §4 C) in jedem Komponenten-Test abgeschaltet, und der vorbefüllte oder
+ * stubbende Test sähe nie Daten. Tests, die den abgemeldeten Zustand brauchen,
+ * setzen den Store selbst um.
+ */
+export const TEST_SESSION = {
+  access_token: "test-access-token",
+  refresh_token: "test-refresh-token",
+  expires_in: 3600,
+  token_type: "bearer",
+  user: { id: "test-user-id" },
+} as Session;
+
 let consoleCalls: string[] = [];
 
 beforeEach(() => {
+  // Lazy: Das Session-Modul lädt den Supabase-Client, und ein Import oben liefe
+  // vor `mockSupabaseStub` (die `const` steht erst nach den Imports).
+  const { useSessionStore } =
+    jest.requireActual<typeof import("@/features/auth/session")>("@/features/auth/session");
+  useSessionStore.setState({ session: TEST_SESSION, initialized: true });
   consoleCalls = [];
   const record =
     (level: string) =>
