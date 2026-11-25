@@ -3,6 +3,7 @@ import { addDays } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
 
+import { useIsSignedIn } from "@/features/auth/session";
 import { useToday } from "@/features/shared";
 import { supabase } from "@/features/supabase";
 
@@ -184,11 +185,13 @@ interface UseMealPlansResult {
  */
 export function useMealPlans(weekStart: Date): UseMealPlansResult {
   const today = useToday();
+  const signedIn = useIsSignedIn();
   const start = useMemo(() => weekStartFor(weekStart), [weekStart]);
 
   const query = useQuery({
     queryKey: mealKeys.plan(toDateKey(start)),
     queryFn: () => fetchMealPlanWeek(start),
+    enabled: signedIn,
   });
 
   const pendingIds = usePendingMealIds();
@@ -276,10 +279,11 @@ export function useTodaysMeal(): UseTodaysMealResult {
  * lange `staleTime`.
  */
 export function useRecipeById(id: string): UseQueryResult<RecipeRow | null, Error> {
+  const signedIn = useIsSignedIn();
   return useQuery({
     queryKey: mealKeys.recipe(id),
     queryFn: () => fetchRecipeById(id),
-    enabled: !!id,
+    enabled: signedIn && !!id,
     staleTime: 5 * 60_000,
   });
 }
@@ -294,10 +298,12 @@ export function useRecipeById(id: string): UseQueryResult<RecipeRow | null, Erro
  */
 export function useRecipes(filter: RecipeFilter = {}): UseQueryResult<RecipeRow[], Error> {
   const normalized = normalizeRecipeFilter(filter);
+  const signedIn = useIsSignedIn();
 
   return useQuery({
     queryKey: mealKeys.recipes(normalized),
     queryFn: () => fetchRecipes(normalized),
+    enabled: signedIn,
     placeholderData: keepPreviousData,
   });
 }

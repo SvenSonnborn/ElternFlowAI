@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import type { MealPlanDay, MealPlanEntryWithRecipe, MealSlot, RecipeRow } from "@/features/meals";
 
+import { useSessionStore } from "@/features/auth/session";
 import {
   mealKeys,
   normalizeRecipeFilter,
@@ -18,6 +19,13 @@ import { createTestQueryClient, renderScreen } from "@/testing/renderScreen";
 
 import { EssenScreen } from "./EssenScreen";
 import { WeekPlanGrid } from "./WeekPlanGrid";
+
+// Abgemeldet statt der globalen Test-Sitzung: Der Screen liest nur vorbefüllte
+// Daten, mit Sitzung liefe zusätzlich `useCurrentParent` los und träfe den
+// Supabase-Stub.
+beforeEach(() => {
+  useSessionStore.setState({ session: null, initialized: true });
+});
 
 const mockRemove = jest.fn();
 

@@ -43,6 +43,20 @@ export function useSession(): {
   return { status, session, userId: session?.user.id ?? null };
 }
 
+/**
+ * `true` nur mit gültiger Sitzung. Familien-Queries (Spec §4 C) binden ihr
+ * `enabled` daran, wenn sie keine eigene Sitzungs-Id im Key haben: Ohne
+ * Sitzung fragten sie anonym ab, bekämen `42501` und blieben danach im
+ * Fehlerzustand, obwohl der Login sie kurz darauf hätte füllen können. Mit
+ * `enabled` läuft die Abfrage sofort los, sobald die Sitzung da ist, und bei
+ * Abmeldung ruht auch eine Invalidierung. Aufrufer importieren aus
+ * `@/features/auth/session`, nicht aus dem Barrel: Das zieht unter `bun test`
+ * nativewind nach.
+ */
+export function useIsSignedIn(): boolean {
+  return useSession().status === "authenticated";
+}
+
 export function useInitSession(): void {
   const setSession = useSessionStore((s) => s.setSession);
   const setInitialized = useSessionStore((s) => s.setInitialized);

@@ -5,12 +5,20 @@ import { Alert, type AlertButton } from "react-native";
 import type { TaskTypeRow, TaskWithType } from "@/features/tasks";
 
 import { useConflictStore, useToastStore } from "@/app-sections/shared";
+import { useSessionStore } from "@/features/auth/session";
 import i18n from "@/features/i18n";
 import { usePendingDeleteStore } from "@/features/shared";
 import { TaskConflictError, taskKeys } from "@/features/tasks";
 import { createTestQueryClient, renderScreen } from "@/testing/renderScreen";
 
 import { TaskEditScreen } from "./TaskEditScreen";
+
+// Abgemeldet statt der globalen Test-Sitzung: Der Screen liest nur vorbefüllte
+// Daten, mit Sitzung liefe zusätzlich `useCurrentParent` los und träfe den
+// Supabase-Stub.
+beforeEach(() => {
+  useSessionStore.setState({ session: null, initialized: true });
+});
 
 const mockUpdateTask = jest.fn();
 const mockDeleteTask = jest.fn();

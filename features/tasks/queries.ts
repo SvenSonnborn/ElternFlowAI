@@ -3,6 +3,7 @@ import { subDays } from "date-fns";
 import { useMemo } from "react";
 
 import { useCurrentParent, useFamilyChildren } from "@/features/auth";
+import { useIsSignedIn } from "@/features/auth/session";
 import { useToday } from "@/features/shared";
 import { supabase } from "@/features/supabase";
 
@@ -91,11 +92,13 @@ interface UseFamilyTasksResult {
  */
 export function useFamilyTasks(): UseFamilyTasksResult {
   const today = useToday();
+  const signedIn = useIsSignedIn();
   const doneSince = useMemo(() => subDays(today, DONE_WINDOW_DAYS).toISOString(), [today]);
 
   const query = useQuery({
     queryKey: taskKeys.family(doneSince),
     queryFn: () => fetchFamilyTasks(doneSince),
+    enabled: signedIn,
   });
 
   const pendingIds = usePendingTaskIds();
@@ -220,9 +223,11 @@ export async function fetchTaskTypes(): Promise<TaskTypeRow[]> {
 }
 
 export function useTaskTypes(): UseQueryResult<TaskTypeRow[], Error> {
+  const signedIn = useIsSignedIn();
   return useQuery({
     queryKey: taskKeys.types,
     queryFn: fetchTaskTypes,
+    enabled: signedIn,
     staleTime: 5 * 60_000,
   });
 }
