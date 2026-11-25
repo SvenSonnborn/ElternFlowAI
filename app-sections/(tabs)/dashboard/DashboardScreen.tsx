@@ -64,9 +64,9 @@ import { buildTomorrowPrep } from "./tomorrowPrep";
  *   (ADR-018, ADR-019). Für die Heute-Liste gilt das nur ohne Serverdaten
  *   (`hasData`): Scheitert ein Neuladen, zeigt sie den letzten Stand weiter —
  *   ein belegter Stand ist keine Behauptung ins Blaue. Dasselbe gilt für die
- *   Prep-Karte (`prepPending`), für Termine wie Aufgaben. Dieselbe Zurückhaltung trägt
- *   die Fortsetzen-Karte (ADR-023), nur über den Zustand des Accounts statt
- *   über den Tag.
+ *   Prep-Karte (`prepPending`), für Termine wie Aufgaben. Dieselbe
+ *   Zurückhaltung trägt die Fortsetzen-Karte (ADR-023), nur über den Zustand
+ *   des Accounts statt über den Tag.
  */
 export function DashboardScreen() {
   const { t, i18n } = useTranslation();
