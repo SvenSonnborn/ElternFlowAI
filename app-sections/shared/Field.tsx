@@ -130,6 +130,7 @@ export function Field({
           // weil `aria-valuetext` auf einem Knopf im Web nicht angesagt wird.
           accessibilityLabel={value ? `${label}, ${value}` : label}
           onPress={onPress}
+          disabled={!editable}
           className={rowClassName}
           style={rowStyle}
         >

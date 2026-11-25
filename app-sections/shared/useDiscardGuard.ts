@@ -28,19 +28,28 @@ import { confirmDestructive } from "./confirmDialog";
  * Geisterroute zurück (docs/TODO.md). Der native Dismiss ist die POP-Aktion
  * mit der eigenen Route als `source` (`makePopAction` des NativeStack);
  * „Abbrechen“ und die Zurück-Taste sind `GO_BACK` und fragen weiter.
+ *
+ * `saving` markiert ein laufendes Speichern. Dann bleibt die Sperre auch bei
+ * unverändertem Formular stehen — ein Schließen mitten im Schreiben ließe den
+ * Fehlschlag ins Leere laufen —, doch der Callback kehrt ohne Rückfrage
+ * zurück: „Änderungen verwerfen?“ wäre falsch, weil das Speichern ohnehin
+ * weiterläuft. Der Android-Fall bleibt davor und geht auch jetzt durch, weil
+ * das Sheet dort nativ schon zu ist (siehe oben). Endet das Speichern ohne
+ * `allowLeave()`, also mit Fehler, gilt wieder `dirty` allein.
  */
-export function useDiscardGuard(dirty: boolean): () => void {
+export function useDiscardGuard(dirty: boolean, saving = false): () => void {
   const { t } = useTranslation();
   const [leaving, setLeaving] = useState(false);
   const { key: routeKey } = useRoute();
 
-  const disablePrevention = usePreventRemove(dirty && !leaving, ({ data, repeat }) => {
+  const disablePrevention = usePreventRemove((dirty || saving) && !leaving, ({ data, repeat }) => {
     const { action } = data;
     if (Platform.OS === "android" && action.type === "POP" && action.source === routeKey) {
       setLeaving(true);
       repeat();
       return;
     }
+    if (saving) return;
     void confirmDestructive({
       title: t("form.discard.title"),
       body: t("form.discard.body"),

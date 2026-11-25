@@ -91,6 +91,61 @@ describe("useDiscardGuard", () => {
     expect(mockPrevent).toBe(false);
   });
 
+  describe("während des Speicherns", () => {
+    const originalOS = Platform.OS;
+    afterEach(() => {
+      Platform.OS = originalOS;
+    });
+
+    it("sperrt beim Speichern auch ohne Änderungen", async () => {
+      await renderHook(() => useDiscardGuard(false, true));
+      expect(mockPrevent).toBe(true);
+    });
+
+    it("fragt beim Speichern nicht", async () => {
+      const repeat = jest.fn();
+      await renderHook(() => useDiscardGuard(true, true));
+
+      await act(() => {
+        mockCallback?.({ data: { action: { type: "GO_BACK" } }, repeat });
+      });
+
+      expect(mockConfirm).not.toHaveBeenCalled();
+      expect(repeat).not.toHaveBeenCalled();
+    });
+
+    it("Android: Wischen der eigenen Route geht auch beim Speichern durch", async () => {
+      Platform.OS = "android";
+      const repeat = jest.fn();
+      await renderHook(() => useDiscardGuard(true, true));
+
+      await act(() => {
+        mockCallback?.({
+          data: { action: { type: "POP", payload: { count: 1 }, source: "own-key" } },
+          repeat,
+        });
+      });
+
+      expect(repeat).toHaveBeenCalledTimes(1);
+      expect(mockConfirm).not.toHaveBeenCalled();
+    });
+
+    it("nach dem Speichern fragt ein geändertes Formular wieder", async () => {
+      mockConfirm.mockResolvedValue(false);
+      const { rerender } = await renderHook<() => void, { saving: boolean }>(
+        ({ saving }) => useDiscardGuard(true, saving),
+        { initialProps: { saving: true } },
+      );
+      await rerender({ saving: false });
+
+      await act(() => {
+        mockCallback?.({ data: { action: { type: "GO_BACK" } }, repeat: jest.fn() });
+      });
+
+      expect(mockConfirm).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("nativer Dismiss auf Android", () => {
     const originalOS = Platform.OS;
     const nativeDismiss = { type: "POP", payload: { count: 1 }, source: "own-key" };
