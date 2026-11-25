@@ -38,22 +38,25 @@ async function renderForm(disabled?: boolean) {
   return onChange;
 }
 
+const dueRow = () =>
+  screen.getByRole("button", { name: new RegExp(`${i18n.t("hw.form.fieldDue")},`) });
+const dueTimeRow = () =>
+  screen.getByRole("button", { name: new RegExp(`${i18n.t("hw.form.fieldDueTime")},`) });
+
 describe("TaskForm", () => {
   it("disabled sperrt jede Eingabe", async () => {
     const onChange = await renderForm(true);
 
     await fireEvent.press(screen.getByRole("radio", { name: "Besorgung" }));
     await fireEvent.press(screen.getByRole("radio", { name: "Mia" }));
-    await fireEvent.press(
-      screen.getByRole("button", { name: new RegExp(i18n.t("hw.form.fieldDue") + ",") }),
-    );
-    await fireEvent.press(
-      screen.getByRole("button", { name: new RegExp(i18n.t("hw.form.fieldDueTime") + ",") }),
-    );
     await fireEvent.press(screen.getByRole("button", { name: i18n.t("hw.form.clearTime") }));
 
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.getByDisplayValue("Mathe").props.editable).toBe(false);
+    // Datum und Uhrzeit rufen `onChange` erst nach der Wahl im Sheet; gesperrt
+    // ist die Zeile selbst, also den Zustand der Knöpfe prüfen.
+    expect(dueRow()).toBeDisabled();
+    expect(dueTimeRow()).toBeDisabled();
   });
 
   it("ohne disabled nimmt der Typ-Picker an", async () => {
@@ -62,5 +65,7 @@ describe("TaskForm", () => {
     await fireEvent.press(screen.getByRole("radio", { name: "Besorgung" }));
 
     expect(onChange).toHaveBeenCalledWith("typeId", "type-2");
+    expect(dueRow()).toBeEnabled();
+    expect(dueTimeRow()).toBeEnabled();
   });
 });
