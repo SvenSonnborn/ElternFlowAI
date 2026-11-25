@@ -50,7 +50,6 @@ const settle = () => act(async () => void (await new Promise((r) => setTimeout(r
 
 describe("Sitzungs-Guard", () => {
   it.each(HOOKS)("%s: ohne Sitzung kein Abruf, mit Sitzung sofort", async (_name, hook) => {
-    jest.spyOn(console, "error").mockImplementation(() => {});
     useSessionStore.setState({ session: null, initialized: true });
     const { queryClient, render } = setup(hook);
     const view = await render();
@@ -73,7 +72,6 @@ describe("Sitzungs-Guard", () => {
   });
 
   it("abgemeldet bleibt eine Invalidierung folgenlos", async () => {
-    jest.spyOn(console, "error").mockImplementation(() => {});
     const { queryClient, render } = setup(() => useFamilyTasks());
     const view = await render();
     await settle();

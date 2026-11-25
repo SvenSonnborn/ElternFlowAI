@@ -86,7 +86,7 @@ notifyManager.setScheduler((cb) => cb());
  * stubbende Test sähe nie Daten. Tests, die den abgemeldeten Zustand brauchen,
  * setzen den Store selbst um.
  */
-export const TEST_SESSION = {
+const TEST_SESSION = {
   access_token: "test-access-token",
   refresh_token: "test-refresh-token",
   expires_in: 3600,
