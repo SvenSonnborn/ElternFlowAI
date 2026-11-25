@@ -167,11 +167,28 @@ describe("useDiscardGuard", () => {
       expect(mockPrevent).toBe(false);
     });
 
+    it("Android: Wischen meldet onNativeDismiss vor repeat()", async () => {
+      Platform.OS = "android";
+      const repeat = jest.fn();
+      const onNativeDismiss = jest.fn();
+      await renderHook(() => useDiscardGuard(true, true, onNativeDismiss));
+
+      await act(() => {
+        mockCallback?.({ data: { action: nativeDismiss }, repeat });
+      });
+
+      expect(onNativeDismiss).toHaveBeenCalledTimes(1);
+      expect(onNativeDismiss.mock.invocationCallOrder[0]).toBeLessThan(
+        repeat.mock.invocationCallOrder[0],
+      );
+    });
+
     it("Android: „Abbrechen“ (GO_BACK) fragt", async () => {
       Platform.OS = "android";
       mockConfirm.mockResolvedValue(false);
       const repeat = jest.fn();
-      await renderHook(() => useDiscardGuard(true));
+      const onNativeDismiss = jest.fn();
+      await renderHook(() => useDiscardGuard(true, false, onNativeDismiss));
 
       await act(() => {
         mockCallback?.({ data: { action: { type: "GO_BACK" } }, repeat });
@@ -179,6 +196,7 @@ describe("useDiscardGuard", () => {
 
       expect(mockConfirm).toHaveBeenCalledTimes(1);
       expect(repeat).not.toHaveBeenCalled();
+      expect(onNativeDismiss).not.toHaveBeenCalled();
     });
 
     it("iOS: dieselbe POP-Aktion fragt", async () => {

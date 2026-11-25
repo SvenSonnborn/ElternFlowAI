@@ -36,8 +36,18 @@ import { confirmDestructive } from "./confirmDialog";
  * weiterläuft. Der Android-Fall bleibt davor und geht auch jetzt durch, weil
  * das Sheet dort nativ schon zu ist (siehe oben). Endet das Speichern ohne
  * `allowLeave()`, also mit Fehler, gilt wieder `dirty` allein.
+ *
+ * `onNativeDismiss` läuft im Android-Fall synchron vor `repeat()`: Der Screen
+ * ist dann für den Nutzer weg, abgebaut wird er aber erst nach dem nächsten
+ * Render, und ein Effekt-Cleanup läuft noch später. Ein Formular, das am Ende
+ * seines Speicherns wissen muss, ob es noch steht (`hasLeft` in den
+ * Aufgaben-Formularen), setzt sein Flag hier statt erst im Cleanup.
  */
-export function useDiscardGuard(dirty: boolean, saving = false): () => void {
+export function useDiscardGuard(
+  dirty: boolean,
+  saving = false,
+  onNativeDismiss?: () => void,
+): () => void {
   const { t } = useTranslation();
   const [leaving, setLeaving] = useState(false);
   const { key: routeKey } = useRoute();
@@ -45,6 +55,7 @@ export function useDiscardGuard(dirty: boolean, saving = false): () => void {
   const disablePrevention = usePreventRemove((dirty || saving) && !leaving, ({ data, repeat }) => {
     const { action } = data;
     if (Platform.OS === "android" && action.type === "POP" && action.source === routeKey) {
+      onNativeDismiss?.();
       setLeaving(true);
       repeat();
       return;

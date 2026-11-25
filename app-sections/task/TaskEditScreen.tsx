@@ -86,8 +86,9 @@ export function TaskEditScreen() {
   // Wert steuert keinen Render, und er muss synchron gelten, nicht erst im
   // nächsten. Der Effekt setzt beim Mount `false` zurück, damit der
   // StrictMode-Probelauf (Mount, Cleanup, Mount) das Ref nicht auf `true`
-  // stehen lässt; `showConflict` setzt es zusätzlich vor dem Verlassen von
-  // Hand, weil `goBackOrToTasks()` den Cleanup erst nach dem Render auslöst.
+  // stehen lässt. `showConflict` und das Wischen (`onNativeDismiss` des
+  // Guards) setzen es zusätzlich von Hand, weil der Cleanup erst nach dem
+  // Abbau läuft.
   const hasLeft = useRef(false);
   useEffect(() => {
     hasLeft.current = false;
@@ -149,7 +150,13 @@ export function TaskEditScreen() {
 
   const errors = validateTaskForm(state);
   const canSave = hydrated && !hasTaskFormErrors(errors) && !saving;
-  const allowLeave = useDiscardGuard(pristine !== null && taskFormChanged(state, pristine), saving);
+  const allowLeave = useDiscardGuard(
+    pristine !== null && taskFormChanged(state, pristine),
+    saving,
+    () => {
+      hasLeft.current = true;
+    },
+  );
 
   // No history to fall back to on a cold-start deep link straight to
   // `/task/edit/[id]` — `router.back()` alone would strand the sheet with no
