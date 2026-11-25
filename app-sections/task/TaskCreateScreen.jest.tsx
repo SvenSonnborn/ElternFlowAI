@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { router } from "expo-router";
-import { Keyboard } from "react-native";
+import { Keyboard, Platform } from "react-native";
 
 import type { TaskTypeRow } from "@/features/tasks";
 
@@ -26,14 +26,17 @@ jest.mock("@/features/tasks", () => ({
 }));
 
 let mockPrevent: boolean | undefined;
+let mockPreventCallback:
+  ((options: { data: { action: unknown }; repeat: () => void }) => void) | undefined;
 const mockDisable = jest.fn();
 
 jest.mock("expo-router", () => ({
   router: { canGoBack: () => true, back: jest.fn(), replace: jest.fn(), push: jest.fn() },
   Stack: { Screen: () => null },
   useRoute: () => ({ key: "own-key" }),
-  usePreventRemove: (prevent: boolean) => {
+  usePreventRemove: (prevent: boolean, cb: typeof mockPreventCallback) => {
     mockPrevent = prevent;
+    mockPreventCallback = cb;
     return mockDisable;
   },
 }));
@@ -177,5 +180,40 @@ describe("TaskCreateScreen: Sperre beim Speichern", () => {
     await act(() => reject(new Error("Failed to fetch")));
 
     expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+
+  describe("Android-Wischen, bevor der Screen abgebaut ist", () => {
+    const originalOS = Platform.OS;
+    afterEach(() => {
+      Platform.OS = originalOS;
+    });
+
+    /** Wischt das Sheet weg, ohne dass der Cleanup schon gelaufen ist. */
+    async function swipeAway() {
+      Platform.OS = "android";
+      await act(() => {
+        mockPreventCallback?.({
+          data: { action: { type: "POP", payload: { count: 1 }, source: "own-key" } },
+          repeat: jest.fn(),
+        });
+      });
+    }
+
+    it("Erfolg navigiert nicht ein zweites Mal", async () => {
+      const { resolve } = await saveWithHeldResult();
+      await swipeAway();
+      await act(() => resolve());
+
+      expect(router.back).not.toHaveBeenCalled();
+      expect(router.replace).not.toHaveBeenCalled();
+    });
+
+    it("Fehler kommt als Toast", async () => {
+      const { reject } = await saveWithHeldResult();
+      await swipeAway();
+      await act(() => reject(new Error("Failed to fetch")));
+
+      expect(useToastStore.getState().toasts).toHaveLength(1);
+    });
   });
 });

@@ -42,7 +42,8 @@ export function TaskCreateScreen() {
   // `useRef` statt `useState`: steuert keinen Render und muss synchron
   // gelten. Der Effekt setzt beim Mount `false` zurück, damit der
   // StrictMode-Probelauf (Mount, Cleanup, Mount) das Ref nicht auf `true`
-  // stehen lässt.
+  // stehen lässt. Das Wischen setzt es zusätzlich über `onNativeDismiss` des
+  // Guards von Hand, weil der Cleanup erst nach dem Abbau läuft.
   const hasLeft = useRef(false);
   useEffect(() => {
     hasLeft.current = false;
@@ -87,7 +88,9 @@ export function TaskCreateScreen() {
 
   const errors = validateTaskForm(state);
   const canSave = !hasTaskFormErrors(errors) && !saving;
-  const allowLeave = useDiscardGuard(taskFormChanged(state, pristine), saving);
+  const allowLeave = useDiscardGuard(taskFormChanged(state, pristine), saving, () => {
+    hasLeft.current = true;
+  });
 
   // No history to fall back to on a cold-start deep link straight to
   // `/task/new` — `router.back()` alone would strand the sheet with no way
