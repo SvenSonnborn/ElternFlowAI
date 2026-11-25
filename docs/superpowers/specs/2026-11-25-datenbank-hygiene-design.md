@@ -49,7 +49,7 @@ Fünf Punkte:
 - `updated_at` für Konflikterkennung in den Profil-Formularen nutzen.
 - Die negierte Overlap-Bedingung (`excludeAllergens`) indexieren. Das geht grundsätzlich nicht.
 - Die Default-ACLs von `supabase_admin` (kann `postgres` nicht ändern, siehe ADR zu
-  `trim_table_privileges`) und das Default-`execute` von `authenticated` in `public`.
+  `trim_table_privileges`) und das Default-`execute` von `authenticated` (bleibt überall wie heute).
 
 **Anti-Ziele** — wäre ein Fehlschlag, auch wenn es technisch läuft
 
@@ -103,7 +103,7 @@ Fünf Punkte:
   in der Datenbank müsste bei jeder Paletten-Änderung mitwandern.
 - **Client:** `export const NAME_MAX_LENGTH = 50` neben `SHORT_MAX_LENGTH` in `avatarColor.ts`, mit
   Docstring zur Zählweise. `Field` ([app-sections/shared/Field.tsx](../../../app-sections/shared/Field.tsx))
-  bekommt eine optionale Prop `maxLength` und reicht sie an den `TextInput` durch. Diese vier Felder
+  bekommt eine optionale Prop `maxLength` und reicht sie an den `TextInput` durch. Diese fünf Felder
   setzen sie: Familienname und eigener Name in
   [Step2FamilyAndName.tsx](../../../app-sections/onboarding/Step2FamilyAndName.tsx), Kindername in
   [Step4FirstChild.tsx](../../../app-sections/onboarding/Step4FirstChild.tsx), Name in
@@ -124,7 +124,8 @@ Drei Trigger `families_set_updated_at`, `parents_set_updated_at`, `children_set_
 `before update … for each row execute function public.set_updated_at()`. Name und Form wie die drei
 Trigger in `20260904075041_conflict_detection.sql`; die Funktion existiert dort schon. Der
 Schlusskommentar jener Migration bleibt stehen (angewandte Migrationen werden nicht editiert), die
-neue Migration verweist darauf.
+neue Migration verweist darauf. `useUpdateParent` und `useUpdateChild` schicken selbst ein
+`updated_at` mit. Der Trigger überschreibt es, der Client bleibt unverändert.
 
 ### C. Indizes
 
@@ -166,22 +167,36 @@ und der Advisor prüft nur die führenden Spalten.
 **Befund (lokal geprüft):** Ein `revoke … from anon` auf Schema-Ebene allein wirkt bei Funktionen
 nicht. Neue Funktionen bekommen `execute` für `PUBLIC` über die eingebaute globale Vorgabe, und
 `anon` ist Mitglied von `PUBLIC`. Eine Schema-Vorgabe kann der globalen nur etwas hinzufügen, nichts
-wegnehmen. Deshalb drei Anweisungen:
+wegnehmen. Deshalb vier Anweisungen:
 
 ```sql
 alter default privileges for role postgres revoke execute on functions from public;
+alter default privileges for role postgres grant execute on functions to authenticated, service_role;
 alter default privileges for role postgres in schema public revoke execute on functions from anon;
 alter default privileges for role postgres in schema public revoke usage, select, update on sequences from anon;
 ```
 
-- Die erste wirkt global für alle Schemas. In `public` behalten `authenticated` und `service_role`
-  ihr `execute` über die Schema-Vorgabe. Außerhalb von `public` (etwa `private`) ist eine neue
-  Funktion danach nur für ihren Besitzer ausführbar, bis eine Migration sie ausdrücklich freigibt.
-  So arbeiten die Migrationen schon (`grant execute on function private.override_instant(jsonb) to
-authenticated`). Wer es vergisst, bekommt in einer RLS-Policy `42501`. Das ist eine Falle für jede
-  Sitzung, deshalb eine Zeile in `CLAUDE.md` unter „Datenschicht — Fallen".
+- Die ersten beiden wirken global, in jedem Schema. Sie tauschen `PUBLIC` gegen `authenticated` und
+  `service_role` aus (meine Entscheidung). Für diese beiden Rollen bleibt alles wie heute, sie hatten
+  `execute` bisher über `PUBLIC`. Neu ist nur: `anon` und die übrigen Mitglieder von `PUBLIC` bekommen
+  kein `execute` mehr auf neue Funktionen.
+- **Warum nicht nur der Entzug für `PUBLIC`:** Der Prüfer hat gefunden, und ich habe lokal
+  nachgestellt: Ohne die zweite Zeile sind auch Funktionen in `pg_temp` nur noch für ihren Besitzer
+  ausführbar. `events_in_range.test.sql` und `apply_event_change.test.sql` rufen solche Helfer nach
+  `set local role authenticated` auf und scheitern dann mit `42501`. Dasselbe träfe neue Funktionen
+  in `private` (RLS-Policies scheitern, bis jemand ausdrücklich `grant` schreibt) und Funktionen, die
+  im Studio angelegt werden. Mit der zweiten Zeile liefen im Probelauf fünf der sechs pgTAP-Suites
+  unverändert. `delete_task` braucht die TCP-Verbindung von `supabase test db` und ließ sich so nicht
+  nachstellen; der erste `test:db`-Lauf nach der Migration klärt das.
+- Die dritte Zeile ist nötig, weil Supabase `anon` in `public` über die Schema-Vorgabe ausdrücklich
+  `execute` gibt, nicht nur über `PUBLIC`.
+- Wer eine Funktion für `authenticated` sperren will, entzieht es weiter je Funktion, wie die
+  Migrationen es heute schon tun. Ein Auth-Hook bräuchte ein ausdrückliches `grant … to
+supabase_auth_admin`; das schreibt Supabases Anleitung ohnehin vor.
 - Sequenzen haben keine globale `PUBLIC`-Vorgabe; dort reicht der Entzug auf Schema-Ebene. `public`
   hat heute keine Sequenz.
+- Das Inventar in `security.test.sql` („anon darf keine Funktion in public ausführen") bleibt die
+  Prüfung für bestehende Funktionen.
 - `supabase/parity.sql` vergleicht `pg_default_acl` schon mit, global wie je Schema.
 
 ## 6. Tests
@@ -198,10 +213,13 @@ Ein neues pgTAP-File `supabase/tests/database/hygiene.test.sql`, Stil wie `secur
 - **`updated_at`:** pro Tabelle `updated_at` auf einen alten Wert setzen, danach steht `now()` drin.
 - **Fremdschlüssel-Abdeckung:** eine Katalogabfrage, die jeden Fremdschlüssel in `public` ohne Index
   mit passenden führenden Spalten zählt, ergibt 0. Diese Prüfung bleibt und hält künftige Migrationen.
+  Sie zählt wie der Advisor, also gilt auch ein Teilindex (meine Entscheidung). Deshalb gelten
+  `reminders.family_id` und `tasks.child_id` heute schon als abgedeckt.
 - **Rezept-Indizes:** vorhanden (`has_index`).
-- **Default-ACL:** in der Testtransaktion eine Funktion in `public` und eine in `private` sowie eine
-  Sequenz in `public` anlegen. `anon` kann keine der Funktionen ausführen und die Sequenz nicht
-  nutzen; `authenticated` kann die Funktion in `public` ausführen.
+- **Default-ACL:** in der Testtransaktion je eine Funktion in `public`, `private` und `pg_temp` sowie
+  eine Sequenz in `public` anlegen. `anon` kann keine der Funktionen ausführen und die Sequenz nicht
+  nutzen; `authenticated` kann alle drei Funktionen ausführen.
+- **Bestehende Suites:** laufen unverändert grün. Das ist die Abnahme für die zweite Zeile in D.
 
 Jest: ein Test, dass `Field` `maxLength` an den `TextInput` weitergibt, und in
 `ChildProfileScreen.jest.tsx`, dass das Namensfeld `NAME_MAX_LENGTH` trägt.
@@ -230,5 +248,4 @@ Nach grünem `test:db` lokal und vor dem Merge, mit Svens OK. Ablauf nach SETUP.
 - `docs/architecture.md`: der Absatz zu den Default-ACLs gilt künftig auch für Funktionen und Sequenzen.
 - `docs/TODO.md`: Einträge zu Grenzen, `updated_at`, Rezept-Index und Default-ACL löschen; den
   Advisor-Eintrag auf die unbenutzten Indizes kürzen.
-- `CLAUDE.md`: eine Zeile zu `grant execute` außerhalb von `public` (siehe D).
 - `docs/roadmap.md`: Schritt 3 erledigt.
