@@ -30,13 +30,16 @@ export class TaskConflictError extends Error {
 
 /**
  * Der Server hat die Änderung verweigert, obwohl die Aufgabe noch steht:
- * `delete_task` meldet `'forbidden'`, oder ein Abhaken trifft null Zeilen und
- * die Zeile ist trotzdem lesbar. Beides heißt: Der Aufrufer gehört zu keiner
- * Familie (mehr), typischerweise weil er entfernt wurde, während der
- * Undo-Timer des Löschens lief. Eine eigene Klasse statt eines Konflikts, weil
- * es nichts zu vergleichen gibt — und statt eines stillen Erfolgs, weil die
- * Aufgabe dann noch existiert. `mapTaskError` legt sie auf denselben Key wie
- * die RLS-Ablehnung 42501 (`hw.error.notAuthenticated`).
+ * `delete_task` meldet `'forbidden'` (der Aufrufer gehört zu keiner Familie
+ * mehr, typischerweise weil er entfernt wurde, während der Undo-Timer des
+ * Löschens lief), oder ein Abhaken trifft null Zeilen und die Zeile ist
+ * trotzdem lesbar. Das Abhaken-Ende ist heute nur ein Netz für den Fall, dass
+ * SELECT- und UPDATE-Policy je auseinanderlaufen: Beide tragen denselben
+ * USING-Ausdruck, ein aus der Familie Entfernter kann die Zeile nicht mehr
+ * lesen und sieht `TaskGoneError`. Eine eigene Klasse statt eines Konflikts,
+ * weil es nichts zu vergleichen gibt — und statt eines stillen Erfolgs, weil
+ * die Aufgabe dann noch existiert. `mapTaskError` legt sie auf denselben Key
+ * wie die RLS-Ablehnung 42501 (`hw.error.notAuthenticated`).
  */
 export class TaskForbiddenError extends Error {
   constructor() {
