@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { mapTaskError, MissingParentError, TaskConflictError, TaskForbiddenError } from "./errors";
+import {
+  mapTaskError,
+  MissingParentError,
+  TaskConflictError,
+  TaskForbiddenError,
+  TaskGoneError,
+} from "./errors";
 
 describe("mapTaskError", () => {
   test("MissingParentError → hw.error.notAuthenticated", () => {
@@ -9,6 +15,16 @@ describe("mapTaskError", () => {
 
   test("TaskForbiddenError → hw.error.notAuthenticated", () => {
     expect(mapTaskError(new TaskForbiddenError())).toBe("hw.error.notAuthenticated");
+  });
+
+  test("TaskGoneError → hw.notFound", () => {
+    expect(mapTaskError(new TaskGoneError())).toBe("hw.notFound");
+  });
+
+  test("TaskGoneError wird an name erkannt", () => {
+    const err = new Error("irgendwas");
+    err.name = "TaskGoneError";
+    expect(mapTaskError(err)).toBe("hw.notFound");
   });
 
   test("TaskConflictError → hw.error.conflict", () => {
