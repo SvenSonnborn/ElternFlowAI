@@ -336,9 +336,16 @@ export function TaskEditScreen() {
     // Screen weg. `hasLeft` hält beides auseinander und verhindert zugleich,
     // dass ein erfolgreicher Retry ein zweites Mal navigiert. Hier von Hand
     // gesetzt, weil der Cleanup erst nach dem Navigieren läuft.
-    hasLeft.current = true;
-    allowLeave();
-    goBackOrToTasks();
+    //
+    // Nur navigieren, wenn der Screen noch steht: Ein Android-Wischen mitten
+    // im Speichern hat ihn schon verlassen, und ein Konflikt danach — auch ein
+    // erneuter nach `onKeepMine` — soll den Dialog öffnen, aber nicht einen
+    // fremden Screen wegpoppen.
+    if (!hasLeft.current) {
+      hasLeft.current = true;
+      allowLeave();
+      goBackOrToTasks();
+    }
   }
 
   /**
