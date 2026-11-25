@@ -1,11 +1,10 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { router } from "expo-router";
-import { Alert, type AlertButton } from "react-native";
+import { Alert, Keyboard, type AlertButton } from "react-native";
 
 import type { TaskTypeRow, TaskWithType } from "@/features/tasks";
 
 import { useConflictStore, useToastStore } from "@/app-sections/shared";
-import { useSessionStore } from "@/features/auth/session";
 import i18n from "@/features/i18n";
 import { usePendingDeleteStore } from "@/features/shared";
 import { TaskConflictError, taskKeys } from "@/features/tasks";
@@ -13,12 +12,11 @@ import { createTestQueryClient, renderScreen } from "@/testing/renderScreen";
 
 import { TaskEditScreen } from "./TaskEditScreen";
 
-// Abgemeldet statt der globalen Test-Sitzung: Der Screen liest nur vorbefüllte
-// Daten, mit Sitzung liefe zusätzlich `useCurrentParent` los und träfe den
-// Supabase-Stub.
-beforeEach(() => {
-  useSessionStore.setState({ session: null, initialized: true });
-});
+jest.mock("@/features/auth", () => ({
+  ...jest.requireActual<typeof import("@/features/auth")>("@/features/auth"),
+  useCurrentParent: () => ({ data: { id: "p1", family_id: "f1" } }),
+  useFamilyChildren: () => ({ data: [] }),
+}));
 
 const mockUpdateTask = jest.fn();
 const mockDeleteTask = jest.fn();
@@ -214,6 +212,17 @@ describe("TaskEditScreen: Verwerfen-Rückfrage", () => {
     await renderScreen(<TaskEditScreen />, { queryClient: seededClient() });
     await fireEvent.changeText(screen.getByDisplayValue("Mathe Übungsblatt"), "Mathe 2");
     expect(mockPrevent).toBe(true);
+  });
+
+  it("Speichern schließt die Tastatur", async () => {
+    const dismiss = jest.spyOn(Keyboard, "dismiss");
+    await renderScreen(<TaskEditScreen />, { queryClient: seededClient() });
+    await fireEvent.changeText(screen.getByDisplayValue("Mathe Übungsblatt"), "Mathe 2");
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("hw.edit.save") }));
+
+    expect(dismiss).toHaveBeenCalled();
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    dismiss.mockRestore();
   });
 
   it("Speichern hebt die Sperre vor dem Schließen auf", async () => {

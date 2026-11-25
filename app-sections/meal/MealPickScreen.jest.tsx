@@ -3,18 +3,15 @@ import { router } from "expo-router";
 
 import type { RecipeRow } from "@/features/meals";
 
-import { useSessionStore } from "@/features/auth/session";
 import { mealKeys, normalizeRecipeFilter } from "@/features/meals";
 import { createTestQueryClient, renderScreen } from "@/testing/renderScreen";
 
 import { MealPickScreen } from "./MealPickScreen";
 
-// Abgemeldet statt der globalen Test-Sitzung: Der Screen liest nur vorbefüllte
-// Daten, mit Sitzung liefe zusätzlich `useCurrentParent` los und träfe den
-// Supabase-Stub.
-beforeEach(() => {
-  useSessionStore.setState({ session: null, initialized: true });
-});
+jest.mock("@/features/auth", () => ({
+  ...jest.requireActual<typeof import("@/features/auth")>("@/features/auth"),
+  useCurrentParent: () => ({ data: { id: "p1", family_id: null } }),
+}));
 
 const mockPlanRecipe = jest.fn();
 const mockPlanning = {
