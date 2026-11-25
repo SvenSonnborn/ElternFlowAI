@@ -7,6 +7,7 @@ import { themes } from "@/design-system";
 import { toDaySegments, useFamilyEvents } from "@/features/calendar";
 import { expandEvents } from "@/features/calendar/expand";
 import i18n from "@/features/i18n";
+import { useFamilyTasks } from "@/features/tasks";
 import { renderScreen } from "@/testing/renderScreen";
 
 import { DashboardScreen } from "./DashboardScreen";
@@ -34,7 +35,14 @@ jest.mock("@/features/meals", () => ({
 
 jest.mock("@/features/tasks", () => ({
   ...jest.requireActual<typeof import("@/features/tasks")>("@/features/tasks"),
-  useFamilyTasks: () => ({ data: [], isLoading: false, error: null }),
+  useFamilyTasks: jest.fn(() => ({
+    data: [],
+    hasData: true,
+    isLoading: false,
+    isRefetching: false,
+    error: null,
+    refetch: jest.fn(),
+  })),
 }));
 
 jest.mock("@/features/shared", () => ({
@@ -132,5 +140,32 @@ describe("DashboardScreen: Heute-Liste", () => {
     await renderScreen(<DashboardScreen />);
 
     expect(screen.getByText(i18n.t("dash.today.empty"))).toBeTruthy();
+  });
+});
+
+describe("DashboardScreen: Prep-Karte", () => {
+  const tasksResult = {
+    data: [],
+    hasData: true,
+    isLoading: false,
+    isRefetching: false,
+    error: null,
+    refetch: jest.fn(),
+  };
+
+  it("Neuladen der Aufgaben scheitert mit altem Stand → Karte bleibt", async () => {
+    jest.mocked(useFamilyEvents).mockReturnValue({ data: [], segments: [], hasData: true });
+    jest.mocked(useFamilyTasks).mockReturnValue({ ...tasksResult, error: new Error("offline") });
+    await renderScreen(<DashboardScreen />);
+
+    expect(screen.getByText(i18n.t("dash.tomorrow.empty"))).toBeTruthy();
+  });
+
+  it("Aufgaben ohne Daten → keine Karte", async () => {
+    jest.mocked(useFamilyEvents).mockReturnValue({ data: [], segments: [], hasData: true });
+    jest.mocked(useFamilyTasks).mockReturnValue({ ...tasksResult, hasData: false });
+    await renderScreen(<DashboardScreen />);
+
+    expect(screen.queryByText(i18n.t("dash.tomorrow.empty"))).toBeNull();
   });
 });
