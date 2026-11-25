@@ -1,4 +1,10 @@
-export { mapTaskError, MissingParentError, TaskConflictError, type TaskErrorKey } from "./errors";
+export {
+  mapTaskError,
+  MissingParentError,
+  TaskConflictError,
+  TaskGoneError,
+  type TaskErrorKey,
+} from "./errors";
 export {
   CHILD_ALL,
   CHILD_NONE,
@@ -14,6 +20,7 @@ export { useTaskFilterStore } from "./filterStore";
 export {
   createSupabaseTaskOps,
   deleteTask,
+  toggleTaskDone,
   updateTask,
   useCreateTask,
   useDeleteTask,
@@ -21,6 +28,7 @@ export {
   useUpdateTask,
   type CreateTaskVars,
   type DeleteTaskVars,
+  type TaskDoneChanges,
   type TaskOps,
   type ToggleTaskDoneVars,
   type UpdateTaskVars,

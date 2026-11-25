@@ -8,9 +8,9 @@ import { useCurrentParent } from "@/features/auth";
 import { supabase } from "@/features/supabase";
 
 import type { TaskChanges } from "./optimistic";
-import type { TaskRow, TaskTypeRow, TaskWithType } from "./types";
+import type { TaskRow, TaskTypeRow, TaskUpdate, TaskWithType } from "./types";
 
-import { MissingParentError, TaskConflictError, TaskForbiddenError } from "./errors";
+import { MissingParentError, TaskConflictError, TaskForbiddenError, TaskGoneError } from "./errors";
 import { applyDelete, applyToggle, applyUpdate } from "./optimistic";
 import { TASK_SELECT, taskKeys } from "./queries";
 
@@ -45,6 +45,9 @@ export interface DeleteTaskVars {
    */
   baseVersion: string;
 }
+
+/** The three completion columns — they only ever move together (CHECK). */
+export type TaskDoneChanges = Pick<TaskUpdate, "is_done" | "completed_at" | "completed_by">;
 
 export interface ToggleTaskDoneVars {
   taskId: string;
@@ -103,18 +106,15 @@ function invalidateTasks(qc: QueryClient): Promise<void> {
  * klassifiziert hat (`delete_task`); nur beim Konflikt liest `deleteTask`
  * nach.
  *
- * Nur `useUpdateTask` und `useDeleteTask` laufen hierüber. `useCreateTask`
- * und `useToggleTaskDone` bleiben bewusst beim direkten Client: Beide haben
- * kein Compare-and-Swap, das zu prüfen wäre, und sie ohne Anlass umzubauen
- * hieße, zwei Pfade anzufassen, für die niemand einen Testfall genannt hat.
- * Die Datei trägt dafür vorerst zwei Idiome.
+ * Bearbeiten, Löschen und Abhaken laufen hierüber. `useCreateTask` bleibt
+ * bewusst beim direkten Client: Ein Insert hat weder ein Compare-and-Swap noch
+ * null Zeilen, die zu klassifizieren wären. Die Datei trägt dafür vorerst zwei
+ * Idiome.
  *
- * Das ist enger als der tatsächliche Abstand zwischen den beiden Paaren:
- * „kein CAS" ist eine andere Eigenschaft als „kein 0-Zeilen-Guard", und
- * `useToggleTaskDone` fehlt **beides** — sein `.update(...).eq("id", …)` läuft
- * ohne `.select()` und meldet unter RLS oder nach einer Fremdlöschung
- * `error: null`, obwohl keine Zeile getroffen wurde. Siehe `docs/TODO.md`,
- * Abschnitt „Aufgaben / Tasks".
+ * Das Abhaken hat den 0-Zeilen-Guard, aber kein CAS: `toggleRow` liest per
+ * `.select("id")` zurück, ob eine Zeile getroffen wurde — ohne das meldet
+ * PostgREST unter RLS oder nach einer Fremdlöschung `error: null`, und der
+ * Haken spränge still zurück.
  */
 export interface TaskOps {
   /** Die Zeile samt `task_types`-Join — die Form, die `TaskConflictError` trägt. */
@@ -123,6 +123,8 @@ export interface TaskOps {
   updateRow: (taskId: string, changes: TaskChanges, seenUpdatedAt: string) => Promise<boolean>;
   /** Löscht über `delete_task` gegen den gesehenen Stand; der Server klassifiziert. */
   deleteRow: (taskId: string, seenUpdatedAt: string) => Promise<DeleteOutcome>;
+  /** `true`, wenn eine Zeile getroffen wurde; ohne CAS, DB-Fehler werfen. */
+  toggleRow: (taskId: string, changes: TaskDoneChanges) => Promise<boolean>;
 }
 
 /**
@@ -136,9 +138,9 @@ export type DeleteOutcome = "deleted" | "missing" | "forbidden" | "conflict";
 const DELETE_OUTCOMES: readonly string[] = ["deleted", "missing", "forbidden"];
 
 /**
- * Kapselt die Datenbankaufrufe von `updateTask` und `deleteTask` — und zwar
- * nur deren: `useCreateTask` und `useToggleTaskDone` sprechen weiterhin direkt
- * mit dem Modul-`supabase` (siehe {@link TaskOps}).
+ * Kapselt die Datenbankaufrufe von `updateTask`, `deleteTask` und
+ * `toggleTaskDone` — `useCreateTask` spricht weiterhin direkt mit dem
+ * Modul-`supabase` (siehe {@link TaskOps}).
  *
  * **Update:** `.eq("updated_at", …)` macht daraus ein Compare-and-Swap: Es
  * trifft die Zeile nur, solange niemand anderes sie seit dem Laden des
@@ -193,6 +195,17 @@ export function createSupabaseTaskOps(client: SupabaseClient<Database>): TaskOps
         throw new Error(`delete_task returned an unexpected value: ${String(data)}`);
       }
       return data as DeleteOutcome;
+    },
+
+    toggleRow: async (taskId, changes) => {
+      const { data, error } = await client
+        .from("tasks")
+        .update(changes)
+        .eq("id", taskId)
+        .select("id")
+        .maybeSingle();
+      if (error) throw error;
+      return data !== null;
     },
   };
 }
@@ -251,6 +264,34 @@ export async function deleteTask(vars: DeleteTaskVars, deps: TaskOps): Promise<v
   const current = await deps.fetchRow(vars.taskId);
   if (!current) return; // zwischenzeitlich gelöscht — das Ziel ist erreicht
   throw new TaskConflictError(current);
+}
+
+/**
+ * Hakt die Aufgabe ab oder wieder auf. Schreibt `is_done`, `completed_at` und
+ * `completed_by` zusammen — die CHECK `tasks_completed_consistency` ist
+ * symmetrisch und lehnt jeden Teil-Schreibzugriff ab.
+ *
+ * Trifft das Schreiben null Zeilen, wird nachgelesen, um die Ursache zu
+ * trennen: Zeile weg ({@link TaskGoneError}) oder Zeile da, aber nicht
+ * schreibbar ({@link TaskForbiddenError}, RLS). Der Normalfall kostet keinen
+ * zweiten Roundtrip.
+ */
+export async function toggleTaskDone(
+  vars: ToggleTaskDoneVars,
+  parentId: string,
+  deps: TaskOps,
+): Promise<void> {
+  const hit = await deps.toggleRow(
+    vars.taskId,
+    vars.done
+      ? { is_done: true, completed_at: new Date().toISOString(), completed_by: parentId }
+      : { is_done: false, completed_at: null, completed_by: null },
+  );
+  if (hit) return;
+
+  const current = await deps.fetchRow(vars.taskId);
+  if (!current) throw new TaskGoneError();
+  throw new TaskForbiddenError();
 }
 
 /**
@@ -331,15 +372,7 @@ export function useToggleTaskDone() {
     mutationFn: async (vars: ToggleTaskDoneVars): Promise<void> => {
       if (!parent) throw new MissingParentError();
 
-      const { error } = await supabase
-        .from("tasks")
-        .update(
-          vars.done
-            ? { is_done: true, completed_at: new Date().toISOString(), completed_by: parent.id }
-            : { is_done: false, completed_at: null, completed_by: null },
-        )
-        .eq("id", vars.taskId);
-      if (error) throw error;
+      await toggleTaskDone(vars, parent.id, createSupabaseTaskOps(supabase));
     },
     onMutate: (vars) => {
       // Without a parent the mutationFn throws MissingParentError, so there is

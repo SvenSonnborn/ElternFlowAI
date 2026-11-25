@@ -4,11 +4,17 @@ import { describe, expect, mock, test } from "bun:test";
 
 import type { Database } from "@/features/supabase/database.types";
 
-import type { DeleteOutcome, DeleteTaskVars, TaskOps, UpdateTaskVars } from "./mutations";
+import type {
+  DeleteOutcome,
+  DeleteTaskVars,
+  TaskOps,
+  ToggleTaskDoneVars,
+  UpdateTaskVars,
+} from "./mutations";
 import type { TaskChanges } from "./optimistic";
 import type { TaskWithType } from "./types";
 
-import { TaskConflictError, TaskForbiddenError, mapTaskError } from "./errors";
+import { TaskConflictError, TaskForbiddenError, TaskGoneError, mapTaskError } from "./errors";
 
 /**
  * `mutations.ts` imports `useCurrentParent` from `@/features/auth` for
@@ -42,7 +48,8 @@ void mock.module("@/features/auth", () => ({
 
 // Imported after the module mock is installed: a static import would be
 // hoisted above it and `mutations.ts` would capture the real barrel.
-const { createSupabaseTaskOps, deleteTask, updateTask } = await import("./mutations");
+const { createSupabaseTaskOps, deleteTask, toggleTaskDone, updateTask } =
+  await import("./mutations");
 
 const BASE_VERSION = "2026-06-01T00:00:00.000Z";
 const THEIR_VERSION = "2026-06-01T09:30:00.000Z";
@@ -74,6 +81,7 @@ function makeOps(overrides: Partial<TaskOps> = {}): TaskOps {
     fetchRow: mock(() => Promise.resolve(null)),
     updateRow: mock(() => Promise.resolve(true)),
     deleteRow: mock(() => Promise.resolve<DeleteOutcome>("deleted")),
+    toggleRow: mock(() => Promise.resolve(true)),
     ...overrides,
   };
 }
@@ -196,6 +204,74 @@ describe("deleteTask", () => {
   });
 });
 
+describe("toggleTaskDone", () => {
+  const DONE: ToggleTaskDoneVars = { taskId: "task-1", done: true };
+  const UNDONE: ToggleTaskDoneVars = { taskId: "task-1", done: false };
+
+  test("getroffen: schreibt einmal und liest nicht nach", async () => {
+    const ops = makeOps();
+    await toggleTaskDone(DONE, "parent-1", ops);
+    expect(ops.toggleRow).toHaveBeenCalledTimes(1);
+    expect(ops.fetchRow).not.toHaveBeenCalled();
+  });
+
+  test("done: true schickt completed_by = parentId und einen Zeitstempel", async () => {
+    const ops = makeOps();
+    await toggleTaskDone(DONE, "parent-1", ops);
+    const [taskId, changes] = (ops.toggleRow as ReturnType<typeof mock>).mock.calls[0] as [
+      string,
+      { is_done: boolean; completed_at: string; completed_by: string },
+    ];
+    expect(taskId).toBe("task-1");
+    expect(changes).toEqual({
+      is_done: true,
+      completed_by: "parent-1",
+      completed_at: expect.any(String),
+    });
+    expect(Number.isNaN(Date.parse(changes.completed_at))).toBe(false);
+  });
+
+  test("done: false setzt alle drei Felder auf null", async () => {
+    const ops = makeOps();
+    await toggleTaskDone(UNDONE, "parent-1", ops);
+    expect(ops.toggleRow).toHaveBeenCalledWith("task-1", {
+      is_done: false,
+      completed_at: null,
+      completed_by: null,
+    });
+  });
+
+  test("keine Zeile, Zeile weg → TaskGoneError", async () => {
+    const ops = makeOps({
+      toggleRow: mock(() => Promise.resolve(false)),
+      fetchRow: mock(() => Promise.resolve(null)),
+    });
+    const error = await toggleTaskDone(DONE, "parent-1", ops).catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(TaskGoneError);
+  });
+
+  test("keine Zeile, Zeile da → TaskForbiddenError", async () => {
+    const ops = makeOps({
+      toggleRow: mock(() => Promise.resolve(false)),
+      fetchRow: mock(() => Promise.resolve(makeTask())),
+    });
+    const error = await toggleTaskDone(DONE, "parent-1", ops).catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(TaskForbiddenError);
+  });
+
+  test("DB-Fehler beim Schreiben schlägt durch, ohne nachzulesen", async () => {
+    const pgError = Object.assign(new Error("connection reset"), { code: "08006" });
+    const ops = makeOps({
+      toggleRow: mock(() => {
+        throw pgError;
+      }),
+    });
+    const error = await toggleTaskDone(DONE, "parent-1", ops).catch((err: unknown) => err);
+    expect(error).toBe(pgError);
+    expect(ops.fetchRow).not.toHaveBeenCalled();
+  });
+});
+
 // ── createSupabaseTaskOps ─────────────────────────────────────────────────
 // Ohne diese Suite blieben alle Aufgaben-Tests gruen, wuerde jemand
 // `.eq("updated_at", …)` oder `.select("id")` entfernen — also genau die
@@ -269,6 +345,36 @@ describe("createSupabaseTaskOps.updateRow", () => {
       .updateRow("task-1", CHANGES, BASE_VERSION)
       .catch((err: unknown) => err);
 
+    expect(error).toBe(pgError);
+  });
+});
+
+describe("createSupabaseTaskOps.toggleRow", () => {
+  const TOGGLE = { is_done: false, completed_at: null, completed_by: null };
+
+  test("filtert auf die id und liest sie zurueck, damit null Zeilen sichtbar werden", async () => {
+    const { client, calls } = fakeUpdateClient({ data: { id: "task-1" }, error: null });
+
+    const hit = await createSupabaseTaskOps(client).toggleRow("task-1", TOGGLE);
+
+    expect(hit).toBe(true);
+    expect(calls.table).toBe("tasks");
+    expect(calls.payload).toEqual(TOGGLE);
+    expect(calls.eqCalls).toEqual([["id", "task-1"]]);
+    expect(calls.selectColumns).toBe("id");
+  });
+
+  test("null Zeilen ergeben false, nicht einen Wurf", async () => {
+    const { client } = fakeUpdateClient({ data: null, error: null });
+    expect(await createSupabaseTaskOps(client).toggleRow("task-1", TOGGLE)).toBe(false);
+  });
+
+  test("ein PostgREST-Fehler wird durchgereicht", async () => {
+    const pgError = { message: "connection reset", code: "08006" };
+    const { client } = fakeUpdateClient({ data: null, error: pgError });
+    const error = await createSupabaseTaskOps(client)
+      .toggleRow("task-1", TOGGLE)
+      .catch((err: unknown) => err);
     expect(error).toBe(pgError);
   });
 });

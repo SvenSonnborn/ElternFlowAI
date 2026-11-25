@@ -29,7 +29,9 @@ export class TaskConflictError extends Error {
 }
 
 /**
- * `delete_task` hat `'forbidden'` gemeldet: Der Aufrufer gehört zu keiner
+ * Der Server hat die Änderung verweigert, obwohl die Aufgabe noch steht:
+ * `delete_task` meldet `'forbidden'`, oder ein Abhaken trifft null Zeilen und
+ * die Zeile ist trotzdem lesbar. Beides heißt: Der Aufrufer gehört zu keiner
  * Familie (mehr), typischerweise weil er entfernt wurde, während der
  * Undo-Timer des Löschens lief. Eine eigene Klasse statt eines Konflikts, weil
  * es nichts zu vergleichen gibt — und statt eines stillen Erfolgs, weil die
@@ -38,12 +40,25 @@ export class TaskConflictError extends Error {
  */
 export class TaskForbiddenError extends Error {
   constructor() {
-    super("Not allowed to delete this task");
+    super("Not allowed to change this task");
     this.name = "TaskForbiddenError";
   }
 }
 
+/**
+ * Das Abhaken hat null Zeilen getroffen und die Aufgabe ist auch nicht mehr
+ * lesbar: Jemand hat sie gelöscht, während der Nutzer sie abgehakt hat.
+ * `mapTaskError` legt sie auf `hw.notFound`.
+ */
+export class TaskGoneError extends Error {
+  constructor() {
+    super("Task no longer exists");
+    this.name = "TaskGoneError";
+  }
+}
+
 export type TaskErrorKey =
+  | "hw.notFound"
   | "hw.error.notAuthenticated"
   | "hw.error.staleReference"
   | "hw.error.conflict"
@@ -72,6 +87,7 @@ export function mapTaskError(input: unknown): TaskErrorKey {
 
   if (err.name === "MissingParentError") return "hw.error.notAuthenticated";
   if (err.name === "TaskForbiddenError") return "hw.error.notAuthenticated";
+  if (err.name === "TaskGoneError") return "hw.notFound";
   if (err.name === "TaskConflictError") return "hw.error.conflict";
 
   // Postgres SQLSTATE codes — checked first because they're specific.
