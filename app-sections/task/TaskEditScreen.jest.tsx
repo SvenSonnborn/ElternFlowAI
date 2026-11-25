@@ -4,10 +4,10 @@ import { Alert, type AlertButton } from "react-native";
 
 import type { TaskTypeRow, TaskWithType } from "@/features/tasks";
 
-import { useToastStore } from "@/app-sections/shared";
+import { useConflictStore, useToastStore } from "@/app-sections/shared";
 import i18n from "@/features/i18n";
 import { usePendingDeleteStore } from "@/features/shared";
-import { taskKeys } from "@/features/tasks";
+import { TaskConflictError, taskKeys } from "@/features/tasks";
 import { createTestQueryClient, renderScreen } from "@/testing/renderScreen";
 
 import { TaskEditScreen } from "./TaskEditScreen";
@@ -278,5 +278,16 @@ describe("TaskEditScreen: Sperre beim Speichern", () => {
     expect(toasts).toHaveLength(1);
     expect(toasts[0].title).toBe(i18n.t("hw.edit.error.saveFailed"));
     expect(toasts[0].message).toBe(i18n.t("hw.error.network"));
+  });
+
+  it("Konflikt nach dem Verlassen öffnet den Dialog, navigiert aber nicht", async () => {
+    const { reject } = await saveWithHeldResult();
+    await screen.unmount();
+    await act(() => reject(new TaskConflictError(taskB)));
+
+    expect(useConflictStore.getState().queue).toHaveLength(1);
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
+    useConflictStore.setState({ queue: [] });
   });
 });
