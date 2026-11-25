@@ -24,14 +24,30 @@ interface TaskFormProps {
   /** Named `childOptions`, not `children` — that prop name belongs to React. */
   childOptions: MemberOption[];
   errors: TaskFormErrorText;
+  /** Speichern läuft: alle Eingaben nehmen nichts mehr an. */
+  disabled?: boolean;
 }
 
 /**
  * Every field of a task, for both the create and the edit screen. Holds no
  * data state and calls no mutation; the only thing it owns is which picker is
  * currently open, which never leaves this file.
+ *
+ * `disabled` ist der Zustand „speichert“ des Screens: Das Formular wird
+ * eingefroren, damit zwischen Absenden und Antwort nichts mehr geändert wird,
+ * was die Antwort (Erfolg oder Fehler) nicht abdeckt. Die Sperre gegen
+ * Wegwischen und „Abbrechen“ ist davon getrennt und liegt bei
+ * `useDiscardGuard(dirty, saving)`; auf Android geht das native Wischen dort
+ * trotzdem durch (ADR-050).
  */
-export function TaskForm({ state, onChange, types, childOptions, errors }: TaskFormProps) {
+export function TaskForm({
+  state,
+  onChange,
+  types,
+  childOptions,
+  errors,
+  disabled = false,
+}: TaskFormProps) {
   const { t, i18n } = useTranslation();
   const isGerman = i18n.language.startsWith("de");
   const dateLocale = isGerman ? deLocale : enLocale;
@@ -56,6 +72,7 @@ export function TaskForm({ state, onChange, types, childOptions, errors }: TaskF
         selectedId={state.typeId}
         onSelect={(id) => onChange("typeId", id)}
         error={errors.typeId}
+        disabled={disabled}
       />
 
       <MemberPicker
@@ -64,12 +81,14 @@ export function TaskForm({ state, onChange, types, childOptions, errors }: TaskF
         options={childOptions}
         selected={state.childId ? { id: state.childId, kind: "child" } : null}
         onSelect={(next) => onChange("childId", next?.id ?? null)}
+        disabled={disabled}
       />
 
       <Field
         label={t("hw.form.fieldTitle")}
         value={state.title}
         onChangeText={(text) => onChange("title", text)}
+        editable={!disabled}
         error={errors.title}
       />
 
@@ -77,6 +96,7 @@ export function TaskForm({ state, onChange, types, childOptions, errors }: TaskF
         label={t("hw.form.fieldSubject")}
         value={state.subject}
         onChangeText={(text) => onChange("subject", text)}
+        editable={!disabled}
         placeholder="—"
       />
 
@@ -90,6 +110,7 @@ export function TaskForm({ state, onChange, types, childOptions, errors }: TaskF
             }
             onPress={() => setPicker("date")}
             error={errors.dueDate}
+            editable={!disabled}
           />
         </View>
         <View className="flex-1">
@@ -98,6 +119,7 @@ export function TaskForm({ state, onChange, types, childOptions, errors }: TaskF
             iconName="clock"
             value={state.dueTime ? format(state.dueTime, "HH:mm") : "—"}
             onPress={() => setPicker("time")}
+            editable={!disabled}
           />
         </View>
       </View>
@@ -107,6 +129,7 @@ export function TaskForm({ state, onChange, types, childOptions, errors }: TaskF
           accessibilityRole="button"
           accessibilityLabel={t("hw.form.clearTime")}
           onPress={() => onChange("dueTime", null)}
+          disabled={disabled}
           // Without this there is no way back to "no time" once one is set.
           className="h-11 justify-center self-start px-1 active:opacity-70"
         >
@@ -120,6 +143,7 @@ export function TaskForm({ state, onChange, types, childOptions, errors }: TaskF
         label={t("hw.form.fieldNotes")}
         value={state.notes}
         onChangeText={(text) => onChange("notes", text)}
+        editable={!disabled}
         type="multiline"
         placeholder="—"
       />

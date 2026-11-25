@@ -29,6 +29,8 @@ interface MemberPickerProps {
   options: MemberOption[];
   selected: SelectedMember | null;
   onSelect: (next: SelectedMember | null) => void;
+  /** Keine Auswahl mehr, z. B. während des Speicherns. */
+  disabled?: boolean;
 }
 
 function isSelected(member: MemberOption, sel: SelectedMember | null): boolean {
@@ -41,6 +43,7 @@ export function MemberPicker({
   options,
   selected,
   onSelect,
+  disabled = false,
 }: MemberPickerProps) {
   const { theme } = useTheme();
   if (options.length === 0) return null;
@@ -67,6 +70,7 @@ export function MemberPicker({
               accessibilityRole="radio"
               accessibilityLabel={member.name}
               aria-checked={active}
+              disabled={disabled}
               onPress={() => onSelect({ kind: member.kind, id: member.id })}
               className="items-center active:opacity-70"
               style={{ minWidth: touchTarget.min }}
@@ -96,6 +100,7 @@ export function MemberPicker({
           accessibilityRole="radio"
           accessibilityLabel={noMemberLabel}
           aria-checked={selected === null}
+          disabled={disabled}
           onPress={() => onSelect(null)}
           // Die Pille ist per Design 36 px hoch, die Tippfläche darum 44;
           // `hitSlop` leistet das nicht, weil React Native es an den Grenzen
