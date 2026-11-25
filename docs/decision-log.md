@@ -2027,3 +2027,34 @@ Sechs Stellen des Kalenders verloren oder versteckten Daten, ohne dass es jemand
 - **Ein Master mit unbekannter Zone lässt sich nach der Zonenprüfung nicht vorwärts spalten.** Der Split-INSERT hat keine `OLD`-Zeile, der Trigger prüft die Zone der Kopie und wirft. Vor dem Ausrollen läuft deshalb eine lesende Prüfung der Live-Daten; null Zeilen machen den Fall unmöglich.
 - **Ausrollreihenfolge: Split-Migration, Zonen-Trigger, `events_in_range`.** `events_in_range` muss live sein, bevor der Client ausgeliefert wird, denn der Client lädt nur noch darüber und hat keinen Rückfallweg.
 - **Offen bleibt „Diesen und alle folgenden“ von einer verschobenen Occurrence:** Wo und mit welchen Werten die abgespaltene Serie beginnt, braucht ein eigenes Design (TODO.md).
+
+## ADR-059 — Stille Fehlschläge in Hooks und Formularen: Aufgaben-Formulare sperren beim Speichern, Sitzungs-Guard über `enabled`, 0-Zeilen-Guard beim Abhaken (2026-11-25)
+
+### Status
+
+Accepted. Schließt Schritt 2 der Roadmap ab. Spec: [2026-11-25-stille-fehlschlaege-hooks-design.md](./superpowers/specs/2026-11-25-stille-fehlschlaege-hooks-design.md).
+
+### Context
+
+Dieselbe Fehlerklasse wie in [ADR-058](#adr-058--kalender-stille-fehler-im-schreibpfad-laden-über-events_in_range-regel-occurrence-als-anker-2026-11-24), diesmal außerhalb des Kalenders: Vier Stellen schwiegen oder fragten falsch. Das Abhaken einer fremdgelöschten Aufgabe „gelang“, weil PostgREST bei null getroffenen Zeilen `error: null` meldet. Während eines laufenden Speicherns fragten „Abbrechen“ und Wischen nach „Änderungen verwerfen?“, obwohl das Speichern durchlief, und das Formular blieb bis zur Antwort editierbar. Die Familien-Queries fragten ohne Sitzung anonym ab und blieben nach einem schnellen Wieder-Login im `42501`-Fehler. Die Prep-Karte des Dashboards verschwand, wenn das Neuladen der Aufgaben scheiterte, obwohl alte Daten da waren.
+
+### Decisions
+
+1. **Aufgaben-Formulare sperren bis zur Serverantwort.** `useDiscardGuard(dirty, saving)` hält den Screen auch ohne Änderungen fest, solange gespeichert wird; statt der Rückfrage passiert nichts. `TaskForm` sperrt Felder, Picker, Datum und Uhrzeit, „Abbrechen“ ist aus, die Tastatur schließt sich. So fehlt keine Eingabe im Request, und es gibt nichts zu verwerfen. Termin-Sheets sind nicht betroffen: Sie schließen seit [ADR-027](#adr-027--optimistische-kalender-updates-ein-occurrence-overlay-auf-der-anzeige-keine-cache-patches-2026-08-31) beim Tippen auf „Speichern“, der alte TODO-Eintrag nannte `EventEditScreen` aus der Zeit davor.
+2. **Ein Fehler nach dem Verlassen kommt als Toast.** Wer das Formular während des Speicherns doch verlässt (Android-Wischen), sieht den Fehler nicht inline, sondern als Toast (`hw.create.error.saveFailed`, `hw.edit.error.saveFailed`). Der Erfolgs-Handler navigiert nur, solange der Screen steht. Die Ref `hasLeft` ersetzt `leftAfterConflict` und deckt beides ab; der Konfliktdialog öffnet auch nach dem Verlassen, damit eine Änderung nicht still verloren geht, navigiert dann aber nicht ein zweites Mal.
+3. **Der Sitzungs-Guard hängt als `enabled` an der Query.** `useIsSignedIn()` ([features/auth/session.ts](../features/auth/session.ts)) liefert, ob eine Sitzung besteht; die Familien-Queries verunden es mit ihrem bisherigen `enabled`. Ohne Sitzung ruht die Query, statt `42501` zu holen, und läuft nach dem Wieder-Login an. Importiert wird aus `@/features/auth/session`, nicht aus dem Barrel, der unter `bun test` NativeWind nachzieht.
+4. **Abhaken einer verschwundenen Aufgabe meldet `hw.notFound`.** Das Abhaken läuft als reine Funktion hinter `TaskOps` und liest beim Treffer null Zeilen nach: Ist die Aufgabe weg, wirft es `TaskGoneError`, ist sie da, `TaskForbiddenError`. Die Meldung für „verboten“ gilt nun für Löschen und Abhaken. Ein Compare-and-Swap bekommt das Abhaken nicht.
+5. **`prepPending` liest `hasData` auch für die Aufgaben.** `useFamilyTasks` meldet `hasData` wie `useFamilyEvents` ([ADR-051](#adr-051--kalender-cache-overlay-einträge-leben-bis-zur-bestätigten-serverprojektion-jeder-ansicht-2026-10-30) Decision 7); ein gescheitertes Neuladen lässt die Karte stehen.
+
+### Consequences
+
+- **Eine abgeschaltete Query hat `isLoading: false`.** Wer die Familien-Queries liest, darf „lädt nicht“ nicht als „hat geladen“ deuten; `hasData` und die Sitzung entscheiden. Ohne Sitzung zeigt ein Screen nichts, was `AuthGate` ohnehin nicht zulässt.
+- **Android-Wischen geht während des Speicherns durch.** Das native Wegwischen lässt sich nicht sperren; dafür gibt es den Toast aus Decision 2. iOS federt zurück, Android-Zurück tut nichts.
+- **Das Abhaken hat weiterhin kein Compare-and-Swap.** Wer gleichzeitig dieselbe Aufgabe abhakt, überschreibt den anderen; der Wert ist ein Schalter, kein Text, den man zusammenführen müsste.
+- **Das jest-Setup meldet eine Test-Sitzung an.** Sonst ruhten alle Familien-Queries in den Komponententests. Eine Suite, die ohne Sitzung laufen muss, setzt `session: null` lokal.
+
+### Rejected alternatives
+
+- **B2: sofort schließen und im Hintergrund speichern.** Das Formular wäre weg, bevor der Server geantwortet hat; ein Fehler hätte keinen Ort mehr und der Nutzer verlöre seine Eingabe. B1 hält den Fehler beim Formular.
+- **Nutzerbezogene Query-Keys.** Ein Key je Nutzer trennte die Caches, ließe aber die anonyme Abfrage ohne Sitzung bestehen. `enabled` verhindert sie an der Wurzel und ändert keinen Key.
+- **Das Abhaken einer verschwundenen Aufgabe still als Erfolg behandeln.** Der Nutzer erführe nicht, dass seine Aktion nichts bewirkt hat; die Zeile verschwände erst mit dem nächsten Neuladen.
