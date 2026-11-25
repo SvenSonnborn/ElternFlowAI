@@ -27,7 +27,6 @@ entscheiden oder besorgen müssen, um sie zu entblocken.
 
 | Schritt                                                                                        | Aufwand | Vorher nötig                                       |
 | ---------------------------------------------------------------------------------------------- | ------- | -------------------------------------------------- |
-| [2. Stille Fehlschläge in Hooks und Formularen](#2-stille-fehlschläge-in-hooks-und-formularen) | M       | —                                                  |
 | [3. Datenbank-Hygiene](#3-datenbank-hygiene)                                                   | M       | Grenzwerte für Name, Kürzel, Farbe                 |
 | [4. Allergen-Urteil](#4-allergen-urteil)                                                       | M       | —                                                  |
 | [5. Toast](#5-toast)                                                                           | S       | —                                                  |
@@ -65,19 +64,6 @@ entscheiden oder besorgen müssen, um sie zu entblocken.
 
 Kein Blocker. Jeder Schritt ist ein eigener Branch; die Reihenfolge folgt dem Schaden, den der
 offene Punkt heute anrichten kann.
-
-### 2. Stille Fehlschläge in Hooks und Formularen
-
-**M** · Dieselbe Fehlerklasse außerhalb des Kalenders: Ein Fehler bleibt stumm oder führt zur
-falschen Rückfrage.
-
-- [Aufgaben](./TODO.md#aufgaben--tasks-daten-layer-v1)
-  - `useToggleTaskDone` hat keinen 0-Zeilen-Guard
-  - Während eines laufenden Speicherns stimmt die Verwerfen-Rückfrage nicht
-- [Auth / Onboarding](./TODO.md#auth--onboarding)
-  - Die Familien-Queries haben keinen Sitzungs-Guard
-- [Dashboard](./TODO.md#dashboard)
-  - Die Aufgaben-Hälfte von `prepPending` blendet die Prep-Karte bei gescheitertem Refetch aus
 
 ### 3. Datenbank-Hygiene
 

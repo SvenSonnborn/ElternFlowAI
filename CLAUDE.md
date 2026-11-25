@@ -153,10 +153,11 @@ Für diese Versionen ist Trainingswissen oft veraltet — Bibliotheks-Doku über
 
 Wie Kalender, Realtime und Konflikterkennung zusammenspielen, beschreibt [docs/architecture.md](docs/architecture.md). Diese Regeln brechen still, wenn man sie übersieht:
 
-- **Termine schreiben nur über die RPC `apply_event_change`** — eine Transaktion, eine Kennung pro Absicht; eine bearbeitete Aufgabe speichert per Compare-and-Swap (Anlegen und Abhaken schreiben direkt), gelöscht wird über `delete_task`, beides hinter `TaskOps` in [features/tasks/mutations.ts](features/tasks/mutations.ts) ([ADR-044](docs/decision-log.md)).
+- **Termine schreiben nur über die RPC `apply_event_change`** — eine Transaktion, eine Kennung pro Absicht; eine bearbeitete Aufgabe speichert per Compare-and-Swap (Anlegen schreibt direkt), gelöscht wird über `delete_task`, Abhaken läuft ohne Compare-and-Swap; alle drei hinter `TaskOps` in [features/tasks/mutations.ts](features/tasks/mutations.ts) ([ADR-044](docs/decision-log.md), [ADR-059](docs/decision-log.md)).
 - **Die Identität einer Occurrence ist `occurrenceKey`** (Zone des Termins), nicht `occurrenceDate` (Anzeige, Zone des Lesers). Versionsvergleich, React-Keys, Route-Parameter `occ` und Schreibpfad schlüsseln darauf ([ADR-034](docs/decision-log.md)).
 - **Serien rechnen in Wandzeit** über [features/calendar/rrule.ts](features/calendar/rrule.ts), nie über `rrule`s `tzid`. Jeder Termin trägt seine Zone in `events.timezone`; neue Termine bekommen sie von `deviceTimeZone()` ([ADR-033](docs/decision-log.md)).
 - **Der Vertrag von `event_exceptions.override`** lebt in [features/calendar/override.ts](features/calendar/override.ts) — dort erweitern, nicht daneben ([ADR-035](docs/decision-log.md)).
+- **Eine neue Familien-Query trägt `enabled: useIsSignedIn()`** aus `@/features/auth/session` (nicht aus dem Barrel), sonst fragt sie ohne Sitzung anonym ab und bleibt im `42501`-Fehler ([ADR-059](docs/decision-log.md)).
 - **Realtime läuft über Broadcast** auf dem privaten Topic `family:<familyId>`, nicht über die Publikation `supabase_realtime`; der eine Mountpunkt ist `useFamilyRealtime()` ([ADR-030](docs/decision-log.md)).
 
 ## MCP-Server
@@ -203,7 +204,7 @@ Path alias `@/*` → repo root (see [tsconfig.json](tsconfig.json)).
 
 **Kein `Alert.alert` außerhalb von [confirmDialog.ts](app-sections/shared/confirmDialog.ts).** react-native-web implementiert `Alert` als No-op — jeder Ablauf, der auf eine Antwort wartet, endet dort stumm. Bestätigen über `confirmDestructive`, Hinweise über `showAlert` (beide aus `@/app-sections/shared`, `body` optional); eine ESLint-Regel hält das ([ADR-039](docs/decision-log.md)).
 
-**Formular-Sheets melden „geändert" an `useDiscardGuard`** ([ADR-050](docs/decision-log.md)). Jeder programmatische Schließweg nach Speichern oder Löschen ruft `allowLeave()` zuerst auf, sonst fragt die App nach dem Speichern „Änderungen verwerfen?".
+**Formular-Sheets melden „geändert" an `useDiscardGuard`** ([ADR-050](docs/decision-log.md)). Jeder programmatische Schließweg nach Speichern oder Löschen ruft `allowLeave()` zuerst auf, sonst fragt die App nach dem Speichern „Änderungen verwerfen?". Ein Formular, das bis zur Antwort offen bleibt, meldet zusätzlich „speichert“ (zweites Argument) und sperrt sich ([ADR-059](docs/decision-log.md)).
 
 **Tippflächen über die Box, nicht über `hitSlop` — und das Maß als Zahl.** Ein Bedienelement, das kleiner als 44×44 aussehen soll, bekommt ein `Pressable` mit `touchTarget.min` aus `@/design-system` im `style` und trägt seine Optik in einer inneren `View` — Vorbild: [FilterChipRow.tsx](app-sections/shared/FilterChipRow.tsx). `hitSlop` wirkt auf Web gar nicht, React Native beschneidet es an den Grenzen des Elternteils, und eine ESLint-Regel verbietet es. `h-11` ist kein Ersatz für die Zahl: `touchTarget.min` ist die eine Quelle für 44, eine rem-Klasse hängt an `inlineRem` in `metro.config.js`, das neben dem `Pressable` niemand sieht ([ADR-041](docs/decision-log.md), [ADR-054](docs/decision-log.md)).
 

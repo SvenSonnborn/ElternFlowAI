@@ -127,7 +127,9 @@ eine lokale Supabase im Docker als Testumgebung — gleich in Schema und Konfigu
 ([supabase/SETUP.md](../supabase/SETUP.md) §7, [ADR-044](./decision-log.md)).
 
 `anon` hat auf keiner Tabelle in `public` ein Recht, eine Abfrage ohne Sitzung endet mit `42501`;
-`authenticated` hat höchstens `select`, `insert`, `update` und `delete`, oft enger. Für neue
+`authenticated` hat höchstens `select`, `insert`, `update` und `delete`, oft enger. Die
+Familien-Queries hängen deshalb `enabled` an `useIsSignedIn()` und fragen ohne Sitzung gar nicht erst
+ab ([ADR-059](./decision-log.md)). Für neue
 Tabellen, die `postgres` anlegt, gilt dasselbe über die Default-ACLs. Ein pg_cron-Job
 (`purge-expired-invitations`) löscht nachts abgelaufene, unbenutzte Einladungen über
 `private.purge_expired_invitations()` ([ADR-053](./decision-log.md)).
@@ -219,9 +221,10 @@ Formular → applyEditScope → Schritte → apply_event_change(Kennung, Termin,
 
 Der Server vergleicht die Version, bevor er etwas schreibt (`EF409` → Nachlese → Konfliktdialog),
 und beantwortet eine schon verbuchte Kennung mit `already_applied`. Eine bearbeitete
-Aufgabe speichert per Compare-and-Swap mit Nachlese ([ADR-036](./decision-log.md)), Anlegen und
-Abhaken schreiben direkt; gelöscht wird über
-`public.delete_task`, beides hinter dem injizierbaren `TaskOps`-Schnitt in
+Aufgabe speichert per Compare-and-Swap mit Nachlese ([ADR-036](./decision-log.md)), Anlegen
+schreibt direkt; gelöscht wird über `public.delete_task`, Abhaken läuft ohne Compare-and-Swap, aber
+mit 0-Zeilen-Guard ([ADR-059](./decision-log.md)). Bearbeiten, Löschen und Abhaken stehen hinter dem
+injizierbaren `TaskOps`-Schnitt in
 [features/tasks/mutations.ts](../features/tasks/mutations.ts); ein Löschkonflikt meldet sich als
 Toast mit „Trotzdem löschen". Beide Funktionen laufen mit den Rechten des Aufrufers; RLS bleibt die
 Grenze. Getestet wird die Datenbankseite gegen eine lokale Supabase
