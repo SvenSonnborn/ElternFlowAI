@@ -71,6 +71,11 @@ export async function fetchFamilyTasks(doneSince: string): Promise<TaskWithType[
 
 interface UseFamilyTasksResult {
   data: TaskWithType[];
+  /**
+   * Ob die Query je Serverdaten hatte (`query.data !== undefined`). Warum das
+   * mehr ist als „nicht lädt, kein Fehler“: siehe `UseFamilyEventsResult.hasData`.
+   */
+  hasData: boolean;
   isLoading: boolean;
   /** True while a pull-to-refresh (or any background refetch) is in flight. */
   isRefetching: boolean;
@@ -109,6 +114,7 @@ export function useFamilyTasks(): UseFamilyTasksResult {
 
   return {
     data,
+    hasData: query.data !== undefined,
     isLoading: query.isLoading,
     isRefetching: query.isRefetching,
     error: query.error,

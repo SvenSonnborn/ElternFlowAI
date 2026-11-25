@@ -64,7 +64,7 @@ import { buildTomorrowPrep } from "./tomorrowPrep";
  *   (ADR-018, ADR-019). Für die Heute-Liste gilt das nur ohne Serverdaten
  *   (`hasData`): Scheitert ein Neuladen, zeigt sie den letzten Stand weiter —
  *   ein belegter Stand ist keine Behauptung ins Blaue. Dasselbe gilt für die
- *   Termin-Hälfte der Prep-Karte (`prepPending`). Dieselbe Zurückhaltung trägt
+ *   Prep-Karte (`prepPending`), für Termine wie Aufgaben. Dieselbe Zurückhaltung trägt
  *   die Fortsetzen-Karte (ADR-023), nur über den Zustand des Accounts statt
  *   über den Tag.
  */
@@ -158,7 +158,7 @@ export function DashboardScreen() {
   // Aus dem Objekt gelöst, damit TypeScript die Null-Prüfung bis in den
   // `onPress`-Closure trägt.
   const { overflowTarget } = prep;
-  const prepPending = !hasData || tasks.isLoading || !!tasks.error;
+  const prepPending = !hasData || !tasks.hasData;
 
   return (
     <Screen scroll>
@@ -330,8 +330,8 @@ export function DashboardScreen() {
       <SectionHeader title={t("dash.section.tomorrow")} />
       {/*
        * Dieselbe Zurückhaltung wie bei der Terminliste: „nichts vorzubereiten"
-       * ist eine Aussage über morgen, und die lässt sich weder vor der Antwort
-       * beider Queries noch nach einem Fehler belegen.
+       * ist eine Aussage über morgen, und die lässt sich ohne je geladene Daten
+       * beider Queries nicht belegen. Ein gescheitertes Neuladen behält den Stand.
        */}
       {prepPending ? null : prep.visible.length === 0 ? (
         <Card className="items-center py-6">
