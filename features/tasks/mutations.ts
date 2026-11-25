@@ -47,7 +47,9 @@ export interface DeleteTaskVars {
 }
 
 /** The three completion columns — they only ever move together (CHECK). */
-export type TaskDoneChanges = Pick<TaskUpdate, "is_done" | "completed_at" | "completed_by">;
+export type TaskDoneChanges = Required<
+  Pick<TaskUpdate, "is_done" | "completed_at" | "completed_by">
+>;
 
 export interface ToggleTaskDoneVars {
   taskId: string;
@@ -273,8 +275,10 @@ export async function deleteTask(vars: DeleteTaskVars, deps: TaskOps): Promise<v
  *
  * Trifft das Schreiben null Zeilen, wird nachgelesen, um die Ursache zu
  * trennen: Zeile weg ({@link TaskGoneError}) oder Zeile da, aber nicht
- * schreibbar ({@link TaskForbiddenError}, RLS). Der Normalfall kostet keinen
- * zweiten Roundtrip.
+ * schreibbar ({@link TaskForbiddenError}). Das Zweite ist heute nur ein Netz:
+ * SELECT- und UPDATE-Policy tragen denselben USING-Ausdruck, ein aus der
+ * Familie Entfernter sieht deshalb `TaskGoneError`. Der Normalfall kostet
+ * keinen zweiten Roundtrip.
  */
 export async function toggleTaskDone(
   vars: ToggleTaskDoneVars,
