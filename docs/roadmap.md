@@ -27,7 +27,6 @@ entscheiden oder besorgen müssen, um sie zu entblocken.
 
 | Schritt                                                                                        | Aufwand | Vorher nötig                                       |
 | ---------------------------------------------------------------------------------------------- | ------- | -------------------------------------------------- |
-| [4. Allergen-Urteil](#4-allergen-urteil)                                                       | M       | —                                                  |
 | [5. Toast](#5-toast)                                                                           | S       | —                                                  |
 | [6. Barrierefreiheit und Theming ohne Designer](#6-barrierefreiheit-und-theming-ohne-designer) | M       | —                                                  |
 | [7. Kalender-Komfort](#7-kalender-komfort)                                                     | M       | —                                                  |
@@ -63,16 +62,6 @@ entscheiden oder besorgen müssen, um sie zu entblocken.
 
 Kein Blocker. Jeder Schritt ist ein eigener Branch; die Reihenfolge folgt dem Schaden, den der
 offene Punkt heute anrichten kann.
-
-### 4. Allergen-Urteil
-
-**M** · Ein falsches Allergie-Urteil ist der teuerste Fehler, den die App einer Familie machen kann.
-Beide Punkte gehen ohne den gustar.io-Korpus; das Nachschärfen der Begriffslisten nicht
-(Schritt 30).
-
-- [Essen](./TODO.md#essen--meal-planner-daten-layer-v1)
-  - Ein negiertes Schlüsselwort räumt den Key nicht ab
-  - Ein geprüftes Rezept ohne Fund hat keine saubere Ausdrucksform
 
 ### 5. Toast
 
