@@ -143,7 +143,29 @@ describe("scanText — Selbstbezeichnungen", () => {
 
   // Kein Begriff und kein Ausschluss enthält ein Trennwort als ganzes Wort (Spec §5A)
   test("Trennwörter zerschneiden keinen Begriff", () => {
-    const SPLIT = ["oder", "or", "und", "and", "bzw"];
+    const SPLIT = [
+      "oder",
+      "or",
+      "und",
+      "and",
+      "bzw",
+      "mit",
+      "with",
+      "wahlweise",
+      "alternativ",
+      "alternatively",
+      "ersatzweise",
+      "optional",
+      "optionally",
+      "statt",
+      "anstatt",
+      "anstelle",
+      "instead",
+      "ggf",
+      "evtl",
+      "eventuell",
+      "gegebenenfalls",
+    ];
     for (const spec of FOLDED_SPECS)
       for (const text of [...spec.terms.map((t) => t.text), ...spec.exclude])
         expect(text.split(" ").filter((w) => SPLIT.includes(w))).toEqual([]);
@@ -157,6 +179,7 @@ describe("scanText — Selbstbezeichnungen", () => {
     ["Nudeln ohne Gluten", "gluten"],
     ["milchfreier Käse", "milk"],
     ["nussfreie Mandelcreme", "nuts"], // gewollter Preis (Spec §4)
+    ["eifreie Nudeln mit Tomatensoße", "eggs"],
   ];
   const KEPT: [string, AllergenKey][] = [
     ["laktosefreie Milch", "milk"],
@@ -166,10 +189,29 @@ describe("scanText — Selbstbezeichnungen", () => {
     ["Milch & milchfreier Drink", "milk"],
     ["Milch, milchfreie Alternative", "milk"],
     ["Vollmilch, milchfrei", "milk"],
+    // Beide Fälle trennt `mit` in zwei Teilstücke; die Bedingungen 1 und 2 prüfen
+    // die Tests ohne Trennwort darunter ("Mandelschokolade", "Walnussschokolade").
     ["haselnussfreie Schokolade mit Mandeln", "nuts"],
-    // Sichert Bedingung 2 (unverneintes `nuss` in "walnuss"), nicht Bedingung 1.
     ["haselnussfreie Schokolade mit Walnusskernen", "nuts"],
     ["thunfischfreie Pasta mit Lachs", "fish"],
+    // Bedingung 1 (Wortanfang): `nuss` ist verneint, aber nicht am Wortanfang.
+    ["haselnussfreie Mandelschokolade", "nuts"],
+    ["thunfischfreie Lachspasta", "fish"],
+    // Bedingung 2 (kein unverneinter Selbstbegriff): `nuss` in "walnuss" ist unverneint.
+    ["nussfreie Walnussschokolade", "nuts"],
+    // Wahl- und Bezugswörter trennen, "nicht"/"not" sperrt das Abräumen.
+    ["Spaghetti, wahlweise glutenfrei", "gluten"],
+    ["Weizenmehl, alternativ glutenfreies Mehl", "gluten"],
+    ["Weizennudeln, ersatzweise glutenfreie Nudeln", "gluten"],
+    ["Weizenmehl (statt glutenfreiem Mehl)", "gluten"],
+    ["wheat flour, optionally gluten free", "gluten"],
+    ["Pasta (optional gluten free)", "gluten"],
+    ["Nudeln mit glutenfreier Soße", "gluten"],
+    ["Pasta with gluten-free sauce", "gluten"],
+    ["Haferflocken (nicht glutenfrei)", "gluten"],
+    ["Nudeln, nicht glutenfrei", "gluten"],
+    ["regular pasta, not gluten free", "gluten"],
+    ["Weizenmehl + glutenfreies Mehl", "gluten"],
     ["gluten- und laktosefreie Nudeln", "gluten"], // bekannte Grenze (Spec §5A)
     ["Weizennudeln/glutenfreie Nudeln", "gluten"],
     ["Weizennudeln & glutenfreie Nudeln", "gluten"],

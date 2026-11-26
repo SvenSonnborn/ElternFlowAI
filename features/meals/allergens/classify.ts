@@ -77,16 +77,43 @@ function isNegated(haystack: string, start: number, end: number): boolean {
   return (NEGATION_PREFIXES as readonly string[]).includes(lastWord);
 }
 
-const SEGMENT_WORDS = new Set(["oder", "or", "und", "and", "bzw"]);
+// Wahl- und Bezugswörter trennen wie "oder": was nach "mit", "wahlweise" oder
+// "statt" folgt, bezeichnet eine andere Zutat als der Teil davor. Nie aufnehmen:
+// Wörter, die Negationspräfix oder -suffix sind ("alternative", "ersatz") — ein
+// Trennwort darf keine Negation sein (Spec §5A).
+const SEGMENT_WORDS = new Set([
+  "oder",
+  "or",
+  "und",
+  "and",
+  "bzw",
+  "mit",
+  "with",
+  "wahlweise",
+  "alternativ",
+  "alternatively",
+  "ersatzweise",
+  "optional",
+  "optionally",
+  "statt",
+  "anstatt",
+  "anstelle",
+  "instead",
+  "ggf",
+  "evtl",
+  "eventuell",
+  "gegebenenfalls",
+]);
 
 /**
- * Zerlegt den Text an `/` und `&` (vor `fold()`, das beide Zeichen zu Leerzeichen
- * macht) und danach an den ganzen Wörtern oder/or/und/and/bzw. Komma und Klammern
- * trennen bewusst nicht: "Nudeln, glutenfrei" ist eine Aussage.
+ * Zerlegt den Text an `/`, `&` und `+` (vor `fold()`, das diese Zeichen zu
+ * Leerzeichen macht) und danach an den ganzen Wörtern aus `SEGMENT_WORDS`
+ * (oder/und/bzw, mit, wahlweise, statt, ggf …). Komma und Klammern trennen
+ * bewusst nicht: "Nudeln, glutenfrei" ist eine Aussage.
  */
 function segments(text: string): string[] {
   const out: string[] = [];
-  for (const part of text.split(/[/&]/)) {
+  for (const part of text.split(/[/&+]/)) {
     let current: string[] = [];
     for (const word of fold(part).split(" ")) {
       if (SEGMENT_WORDS.has(word)) {
@@ -102,23 +129,26 @@ function segments(text: string): string[] {
 }
 
 /** Trifft der Key in diesem Teilstück? Regel: siehe `scanText`. */
-function scanSegment(h: string, spec: FoldedSpec): boolean {
+function scanSegment(haystack: string, spec: FoldedSpec): boolean {
   const occurrences = (self: boolean | null) =>
     spec.terms
       .filter((term) => self === null || term.self === self)
       .flatMap((term) =>
-        indicesOf(h, term.text)
+        indicesOf(haystack, term.text)
           .map((start) => ({ start, end: start + term.text.length }))
           .filter(({ start, end }) => {
-            if (term.mode === "word" && !isWordBoundary(h, start, end)) return false;
-            return !isExcluded(h, start, end, spec.exclude);
+            if (term.mode === "word" && !isWordBoundary(haystack, start, end)) return false;
+            return !isExcluded(haystack, start, end, spec.exclude);
           }),
       );
 
   const selfs = occurrences(true);
-  const negated = (v: { start: number; end: number }) => isNegated(h, v.start, v.end);
-  const atWordStart = (v: { start: number }) => v.start === 0 || h[v.start - 1] === " ";
-  if (selfs.some((v) => negated(v) && atWordStart(v)) && selfs.every(negated)) return false;
+  const negated = (v: { start: number; end: number }) => isNegated(haystack, v.start, v.end);
+  const atWordStart = (v: { start: number }) => v.start === 0 || haystack[v.start - 1] === " ";
+  // "nicht"/"not" sperrt das Abräumen: "Nudeln, nicht glutenfrei" widerruft die Verneinung.
+  const revoked = haystack.split(" ").some((word) => word === "nicht" || word === "not");
+  if (!revoked && selfs.some((v) => negated(v) && atWordStart(v)) && selfs.every(negated))
+    return false;
 
   return occurrences(null).some((v) => !negated(v));
 }
@@ -126,18 +156,21 @@ function scanSegment(h: string, spec: FoldedSpec): boolean {
 /**
  * Die Keys, die ein einzelner Text auslöst. Exportiert, weil die Tests darauf zielen.
  *
- * Der Text wird in Teilstücke zerlegt (`segments`), jedes einzeln bewertet, die
- * Treffer vereinigt: "Weizennudeln oder glutenfreie Nudeln" meldet Gluten, weil
- * die Verneinung der zweiten Alternative die erste nicht entlastet.
+ * Der Text wird in Teilstücke zerlegt (`segments`: `/ & +` und die Wörter aus
+ * `SEGMENT_WORDS`), jedes einzeln bewertet, die Treffer vereinigt: "Weizennudeln
+ * oder glutenfreie Nudeln" und "Spaghetti, wahlweise glutenfrei" melden Gluten,
+ * weil die Verneinung der Alternative den anderen Teil nicht entlastet. Im
+ * Zweifel bleibt der Treffer (Spec).
  *
  * Im Teilstück fällt ein Key weg, wenn (1) ein verneinter Selbstbegriff
  * (`Term.self`) am Wortanfang steht und (2) kein Selbstbegriff-Vorkommen
- * unverneint ist. Zu (1): "haselnussfreie Schokolade" darf `nuss` in der Mitte
- * von "haselnuss" nicht als Selbstbegriff räumen lassen, sonst verlöre
- * "haselnussfreie Schokolade mit Mandeln" den Treffer auf `mandel` (ebenso
- * "thunfischfreie Pasta mit Lachs" den auf `lachs`). Zu (2): jede Stelle zählt, auch
- * mitten im Wort — "Vollmilch, milchfrei" bleibt `milk`, weil `milch` in
- * "vollmilch" unverneint steht.
+ * unverneint ist. Zu (1): "haselnussfreie Mandelschokolade" darf `nuss` in der
+ * Mitte von "haselnuss" nicht als Selbstbegriff räumen lassen, sonst verlöre sie
+ * den Treffer auf `mandel` (ebenso "thunfischfreie Lachspasta" den auf `lachs`).
+ * Zu (2): jede Stelle zählt, auch mitten im Wort — "Vollmilch, milchfrei" bleibt
+ * `milk`, weil `milch` in "vollmilch" unverneint steht. Enthält das Teilstück das
+ * ganze Wort "nicht" oder "not", räumt nichts ab: "Nudeln, nicht glutenfrei" ist
+ * keine Entwarnung.
  *
  * Bekannte Grenze: "gluten- und laktosefreie Nudeln" zerfällt an `und` in
  * "gluten" und "laktosefreie nudeln"; `gluten` ohne Negation trifft. Das ist die
