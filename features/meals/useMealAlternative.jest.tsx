@@ -21,6 +21,7 @@ function recipe(id: string): RecipeRow {
     ingredients: [],
     instructions: [],
     contains_allergens: [],
+    allergens_classified_at: null,
   } as unknown as RecipeRow;
 }
 

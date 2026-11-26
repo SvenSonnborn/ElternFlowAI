@@ -431,6 +431,7 @@ export type Database = {
       };
       recipes: {
         Row: {
+          allergens_classified_at: string | null;
           contains_allergens: string[];
           created_at: string;
           created_by_family_id: string | null;
@@ -452,6 +453,7 @@ export type Database = {
           title: Json;
         };
         Insert: {
+          allergens_classified_at?: string | null;
           contains_allergens?: string[];
           created_at?: string;
           created_by_family_id?: string | null;
@@ -473,6 +475,7 @@ export type Database = {
           title: Json;
         };
         Update: {
+          allergens_classified_at?: string | null;
           contains_allergens?: string[];
           created_at?: string;
           created_by_family_id?: string | null;

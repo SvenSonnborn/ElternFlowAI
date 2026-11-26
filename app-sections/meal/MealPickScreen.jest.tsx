@@ -38,6 +38,7 @@ const nudeln: RecipeRow = {
   ingredients: [],
   instructions: [],
   contains_allergens: [],
+  allergens_classified_at: null,
   created_at: "2026-09-01T00:00:00.000Z",
   created_by_family_id: null,
   diet_tags: [],
