@@ -2058,3 +2058,36 @@ Dieselbe Fehlerklasse wie in [ADR-058](#adr-058--kalender-stille-fehler-im-schre
 - **B2: sofort schließen und im Hintergrund speichern.** Das Formular wäre weg, bevor der Server geantwortet hat; ein Fehler hätte keinen Ort mehr und der Nutzer verlöre seine Eingabe. B1 hält den Fehler beim Formular.
 - **Nutzerbezogene Query-Keys.** Ein Key je Nutzer trennte die Caches, ließe aber die anonyme Abfrage ohne Sitzung bestehen. `enabled` verhindert sie an der Wurzel und ändert keinen Key.
 - **Das Abhaken einer verschwundenen Aufgabe still als Erfolg behandeln.** Der Nutzer erführe nicht, dass seine Aktion nichts bewirkt hat; die Zeile verschwände erst mit dem nächsten Neuladen.
+
+## ADR-060 — Datenbank-Hygiene: Grenzen für Name, Kürzel und Farbe, `updated_at`-Trigger, Fremdschlüssel- und Rezept-Indizes, Default-ACL für Funktionen und Sequenzen (2026-11-26)
+
+### Status
+
+Accepted. Schließt Schritt 3 der Roadmap ab. Spec: [2026-11-25-datenbank-hygiene-design.md](./superpowers/specs/2026-11-25-datenbank-hygiene-design.md).
+
+### Context
+
+Vier Lücken lagen in der Datenbank offen: Name, Kürzel und Farbe hatten serverseitig keine Grenzen, `updated_at` auf `families`, `parents` und `children` wurde nie fortgeschrieben, mehrere Fremdschlüssel und der Rezept-Query-Pfad hatten keinen Index, und neue Funktionen und Sequenzen bekamen `anon` über die Default-ACL von `postgres`. Eine Migration schließt alle vier; der Client begrenzt Namensfelder auf dieselbe Länge.
+
+### Decisions
+
+1. **Grenzen als validierte CHECK-Constraints.** Namen (`families_name_length`, `parents_name_length`, `children_name_length`): nicht leer und höchstens 50 Zeichen. Kürzel (`parents_short_length`): nicht leer und höchstens 3. Farbe (`parents_color_hex`, `children_color_hex`): Format `#RRGGBB`. Der Server zählt Code-Points (`char_length`), der Client mit `maxLength` UTF-16-Einheiten und ist damit nie großzügiger als der Server. `NAME_MAX_LENGTH` in [avatarColor.ts](../features/auth/avatarColor.ts) verweist auf die Migration. Das Minimum ist serverseitig ein nicht-leeres Zeichen; die Farbe wird als Format geprüft, nicht gegen die Palette.
+2. **Leer heißt: nur Leerzeichen.** `btrim` entfernt ausschließlich Leerzeichen; ein Name aus Tabs oder Zeilenumbrüchen besteht die Prüfung. Das ist bewusst: Die Grenze soll leere und überlange Werte abfangen, nicht jede Form von Unsichtbarkeit.
+3. **`updated_at` wird per Trigger gestempelt.** `families_set_updated_at`, `parents_set_updated_at` und `children_set_updated_at` rufen `public.set_updated_at()` vor jedem Update auf; ein vom Client mitgeschickter Wert wird überschrieben.
+4. **Fremdschlüssel-Indizes nach der Regel des Advisors.** Jeder Fremdschlüssel in `public` ist von einem Index abgedeckt, Spalten in Fremdschlüssel-Reihenfolge. Die drei einspaltigen `events`-Indizes (`events_child_id_idx`, `events_parent_id_idx`, `events_created_by_idx`) sind durch zweispaltige ersetzt, weil sie nur eine Spalte ihres zweispaltigen Fremdschlüssels deckten. Teilindizes zählen in der Abdeckungsprüfung des pgTAP-Tests mit.
+5. **Rezept-Query-Pfad mit Trigram-Ausdrucksindizes.** `title` ist `jsonb`, PostgREST erzeugt `title->>'de'`; die Indizes liegen deshalb auf genau diesen Ausdrücken (`recipes_title_de_trgm_idx`, `recipes_title_en_trgm_idx`), dazu `recipes_created_at_id_idx` für die Sortierung. `pg_trgm` liegt im Schema `extensions`.
+6. **Default-ACL für Funktionen und Sequenzen.** `execute` auf künftigen Funktionen von `postgres` geht von `PUBLIC` weg und an `authenticated` und `service_role`; in `public` entzieht eine zweite Anweisung `anon` zusätzlich Funktionen und Sequenzen.
+7. **Unbenutzte Indizes bleiben.** Der Advisor meldet sie bei der heutigen Datenmenge, aber „nie benutzt“ sagt bei so wenig Zeilen wenig; der offene Eintrag in [TODO.md](./TODO.md) hält das fest.
+
+### Consequences
+
+- **Der globale Entzug trifft jedes Mitglied von `PUBLIC`, nicht nur `anon`.** `supabase_auth_admin`, `storage_admin`, `realtime_admin` und `authenticator` verlieren `execute` auf künftige Funktionen von `postgres`. Ein künftiger Auth-Hook oder eine Trigger-Funktion auf `auth.*` oder `storage.*`, die eine neue Funktion aufruft, braucht ein ausdrückliches `grant`.
+- **Die Default-ACL gilt nur für `public`, `private` und `pg_temp`.** Das Schema `storage` behält seine eigene Default-ACL, die `anon` weiter bedient. Bestehende Objekte bleiben unberührt; für sie gelten weiter das Inventar in `security.test.sql` und der Entzug je Migration.
+- **Ein Name aus Tabs besteht die Prüfung** (Decision 2). Wer das ändern will, braucht einen Regex statt `btrim`.
+- **Ein Aufrufer, der die Grenze überschreitet, scheitert mit `23514`**, nicht still. Der Client ist nie großzügiger als der Server; das trifft nur fremde Aufrufer.
+
+### Rejected alternatives
+
+- **Default-ACL nur für `anon` entziehen.** Ginge ohne den Nebeneffekt auf die Systemrollen, ließe aber `PUBLIC` als Weg offen: Jede neue Funktion wäre weiter für jede Rolle ausführbar, die `PUBLIC` erbt.
+- **Constraints als `NOT VALID`.** Ungeprüfte Constraints sicherten nur neue Zeilen; die Grenzen sollen für jede Zeile gelten.
+- **Die unbenutzten Indizes entfernen.** Bei so wenig Zeilen ist die Statistik wertlos; ein Index, der Löschen und Joins trägt, fiele ohne Last nicht auf.

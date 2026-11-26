@@ -130,7 +130,9 @@ eine lokale Supabase im Docker als Testumgebung — gleich in Schema und Konfigu
 `authenticated` hat höchstens `select`, `insert`, `update` und `delete`, oft enger. Die
 Familien-Queries hängen deshalb `enabled` an `useIsSignedIn()` und fragen ohne Sitzung gar nicht erst
 ab ([ADR-059](./decision-log.md)). Für neue
-Tabellen, die `postgres` anlegt, gilt dasselbe über die Default-ACLs. Ein pg_cron-Job
+Tabellen, die `postgres` anlegt, gilt dasselbe über die Default-ACLs; neue Funktionen und Sequenzen
+in `public`, `private` und `pg_temp` sind für `anon` ebenfalls nicht erreichbar, `authenticated` und
+`service_role` führen Funktionen aus ([ADR-060](./decision-log.md)). Ein pg_cron-Job
 (`purge-expired-invitations`) löscht nachts abgelaufene, unbenutzte Einladungen über
 `private.purge_expired_invitations()` ([ADR-053](./decision-log.md)).
 
