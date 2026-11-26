@@ -138,6 +138,7 @@ function makeDbRecipe(overrides: Partial<DbRecipeRow> = {}): DbRecipeRow {
     ingredients: [],
     instructions: [],
     contains_allergens: [],
+    allergens_classified_at: null,
     diet_tags: [],
     keywords: [],
     recipe_dedup_hash: "hash-1",
