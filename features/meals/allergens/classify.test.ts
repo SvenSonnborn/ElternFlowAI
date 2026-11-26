@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
 import type { Ingredient } from "../types";
+import type { AllergenKey } from "./keys";
 
 import { scanIngredients, scanText } from "./classify";
 import { ALLERGEN_KEYS } from "./keys";
-import { ALLERGEN_SPECS, keysForDeclaredCode } from "./terms";
+import { ALLERGEN_SPECS, FOLDED_SPECS, keysForDeclaredCode } from "./terms";
 
 function ing(de: string, en?: string): Ingredient {
   return { amount: null, unit: null, name: en ? { de, en } : { de } };
@@ -114,21 +115,77 @@ describe("scanText — Negation", () => {
     expect(scanText("glutenfreies Mehl")).not.toContain("gluten");
     expect(scanText("laktosefreier Joghurt")).toContain("milk");
   });
+});
 
-  test.todo("ein negiertes Schlüsselwort räumt den ganzen Key ab", () => {
-    // "glutenfreie Nudeln" meldet aktuell `gluten`: der Term `gluten` wird
-    // negiert, aber `nudeln` trifft unabhängig davon. Das ist ein False
-    // Positive — also die sichere Richtung —, aber bei einem so verbreiteten
-    // Produkt störend.
-    //
-    // Der Fix ist nicht "Negation gilt für den ganzen Key": genau daran hängt
-    // der laktosefrei-Fall, wo `milch` stehen bleiben MUSS. Die Trennlinie
-    // verläuft anders — `gluten` ist der Name des Allergens selbst, `laktose`
-    // dagegen nur ein Begleitstoff der Milch. Nötig wäre ein `selfTerms`-Feld
-    // je Spec: wird ein Term negiert, der das Allergen selbst benennt, fällt
-    // der ganze Key. Siehe docs/TODO.md.
-    expect(scanText("glutenfreie Nudeln")).not.toContain("gluten");
+describe("scanText — Selbstbezeichnungen", () => {
+  // Markierung genau wie Spec §5A, Reihenfolge wie in terms.ts
+  test("markierte Selbstbezeichnungen je Key", () => {
+    const selfTerms = Object.fromEntries(
+      ALLERGEN_SPECS.map((s) => [s.key, s.terms.filter((t) => t.self).map((t) => t.text)]),
+    );
+    expect(selfTerms).toEqual({
+      gluten: ["gluten"],
+      crustaceans: ["krebs"],
+      eggs: ["ei", "eier", "egg", "eggs"],
+      fish: ["fisch"],
+      peanuts: ["erdnuss", "erdnuesse", "peanut"],
+      soy: ["soja", "soy", "soya"],
+      milk: ["milch", "milk"],
+      nuts: ["nuss", "nut"],
+      celery: ["sellerie", "celery"],
+      mustard: ["senf", "mustard"],
+      sesame: ["sesam", "sesame"],
+      sulphites: ["sulfit", "sulphite", "sulfite"],
+      lupin: ["lupine", "lupin"],
+      molluscs: [],
+    });
   });
+
+  // Kein Begriff und kein Ausschluss enthält ein Trennwort als ganzes Wort (Spec §5A)
+  test("Trennwörter zerschneiden keinen Begriff", () => {
+    const SPLIT = ["oder", "or", "und", "and", "bzw"];
+    for (const spec of FOLDED_SPECS)
+      for (const text of [...spec.terms.map((t) => t.text), ...spec.exclude])
+        expect(text.split(" ").filter((w) => SPLIT.includes(w))).toEqual([]);
+  });
+
+  const CLEARED: [string, AllergenKey][] = [
+    ["glutenfreie Nudeln", "gluten"],
+    ["Nudeln, glutenfrei", "gluten"],
+    ["Nudeln (glutenfrei)", "gluten"],
+    ["gluten free pasta", "gluten"],
+    ["Nudeln ohne Gluten", "gluten"],
+    ["milchfreier Käse", "milk"],
+    ["nussfreie Mandelcreme", "nuts"], // gewollter Preis (Spec §4)
+  ];
+  const KEPT: [string, AllergenKey][] = [
+    ["laktosefreie Milch", "milk"],
+    ["Weizennudeln oder glutenfreie Nudeln", "gluten"],
+    ["Butter und milchfreie Margarine", "milk"],
+    ["Milch / milchfreier Drink", "milk"],
+    ["Milch & milchfreier Drink", "milk"],
+    ["Milch, milchfreie Alternative", "milk"],
+    ["Vollmilch, milchfrei", "milk"],
+    ["haselnussfreie Schokolade mit Mandeln", "nuts"],
+    ["haselnussfreie Schokolade mit Walnusskernen", "nuts"],
+    ["thunfischfreie Pasta mit Lachs", "fish"],
+    ["gluten- und laktosefreie Nudeln", "gluten"], // bekannte Grenze (Spec §5A)
+    ["Weizennudeln/glutenfreie Nudeln", "gluten"],
+    ["Weizennudeln & glutenfreie Nudeln", "gluten"],
+    ["Mandeln, glutenfrei", "nuts"],
+    ["Milch /", "milk"],
+  ];
+  test.each(CLEARED)("%s meldet kein %s", (text, key) => expect(scanText(text)).not.toContain(key));
+  test.each(KEPT)("%s meldet %s", (text, key) => expect(scanText(text)).toContain(key));
+
+  test("Mandeln, glutenfrei räumt Gluten ab", () =>
+    expect(scanText("Mandeln, glutenfrei")).not.toContain("gluten"));
+  test("nur Trennwörter ergeben nichts", () => expect(scanText("oder")).toEqual([]));
+  test("räumt nur eine Sprache ab, bleibt die andere", () =>
+    expect(scanIngredients([ing("glutenfreie Nudeln", "pasta")])).toContainEqual({
+      key: "gluten",
+      evidence: "pasta",
+    }));
 });
 
 describe("scanIngredients", () => {
