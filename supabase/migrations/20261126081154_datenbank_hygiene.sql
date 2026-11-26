@@ -5,6 +5,7 @@
 --   A. Grenzen für Name, Kürzel und Farbe (CHECK-Constraints)
 --   B. updated_at-Trigger auf families, parents und children
 --   C. Indizes: Fremdschlüssel und Rezept-Suche
+--   D. Default-ACL: neue Funktionen und Sequenzen nicht mehr für anon
 
 -- ============================================================
 -- A. Grenzen für Name, Kürzel und Farbe
@@ -93,3 +94,29 @@ create index recipes_title_de_trgm_idx on public.recipes
 create index recipes_title_en_trgm_idx on public.recipes
   using gin ((title->>'en') extensions.gin_trgm_ops);
 create index recipes_created_at_id_idx on public.recipes (created_at desc, id);
+
+-- ============================================================
+-- D. Default-ACL für neue Funktionen und Sequenzen
+-- ============================================================
+-- Als letzter Abschnitt, damit alles oben (etwa die Funktionen von pg_trgm) noch unter der
+-- alten Vorgabe entsteht. Bestehende Objekte bleiben unberührt; für sie gilt weiter das
+-- Inventar in security.test.sql und der Entzug je Migration.
+--
+-- Ein Entzug auf Schema-Ebene allein reicht bei Funktionen nicht: `execute` für PUBLIC kommt
+-- aus der eingebauten globalen Vorgabe, `anon` ist Mitglied von PUBLIC, und eine
+-- Schema-Vorgabe kann der globalen nur etwas hinzufügen, nichts wegnehmen. Deshalb Zeile 1
+-- global.
+--
+-- Zeile 2 gibt `authenticated` und `service_role` zurück, was sie bisher über PUBLIC hatten.
+-- Ohne sie wären neue Funktionen nur noch für ihren Besitzer ausführbar: pg_temp-Helfer der
+-- Tests und Funktionen in `private` (RLS-Policies) scheiterten mit 42501.
+--
+-- Zeile 3 entzieht `anon` die Schema-Vorgabe, die Supabase in `public` ausdrücklich setzt;
+-- Zeile 4 dasselbe für Sequenzen (dort gibt es keine globale PUBLIC-Vorgabe).
+--
+-- Ein künftiger Auth-Hook braucht ein ausdrückliches `grant execute … to supabase_auth_admin`.
+
+alter default privileges for role postgres revoke execute on functions from public;
+alter default privileges for role postgres grant execute on functions to authenticated, service_role;
+alter default privileges for role postgres in schema public revoke execute on functions from anon;
+alter default privileges for role postgres in schema public revoke usage, select, update on sequences from anon;

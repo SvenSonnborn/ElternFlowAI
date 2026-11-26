@@ -10,6 +10,8 @@
 --   3. Indizes: jeder Fremdschlüssel in `public` ist abgedeckt (Katalogabfrage wie der
 --      Supabase-Advisor `unindexed_foreign_keys`), die Rezept-Indizes sind da, die drei
 --      ersetzten `events`-Indizes sind weg.
+--   4. Default-ACL: neue Funktionen (public, private, pg_temp) sind für `anon` nicht ausführbar,
+--      für `authenticated` schon; neue Sequenzen in public sind für `anon` unbenutzbar.
 --
 -- Feste Kennungen (Seed-IDs siehe Kopf von supabase/seed.sql):
 --   Testfamilie / Elternteil A / Kind Mia   f1f1f1f1-…-01 / aaaaaaaa-…-11 / c1c1c1c1-…-01
@@ -19,7 +21,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(42);
+select plan(49);
 
 -- ── Helfer ──────────────────────────────────────────────────────────────────
 
@@ -133,6 +135,25 @@ select has_index('public', 'recipes', 'recipes_created_at_id_idx'::name, 'recipe
 select hasnt_index('public', 'events', 'events_child_id_idx'::name, 'events_child_id_idx ist durch (family_id, child_id) ersetzt');
 select hasnt_index('public', 'events', 'events_parent_id_idx'::name, 'events_parent_id_idx ist durch (family_id, parent_id) ersetzt');
 select hasnt_index('public', 'events', 'events_created_by_idx'::name, 'events_created_by_idx ist durch (family_id, created_by) ersetzt');
+
+-- ── Teil 4: Default-ACL ─────────────────────────────────────────────────────
+-- Die Probeobjekte entstehen als `postgres` und damit unter der Default-ACL dieser Rolle;
+-- die Transaktion rollt am Ende zurück, nichts bleibt in der Datenbank.
+
+create function public.hygiene_probe() returns int language sql as 'select 1';
+create function private.hygiene_probe() returns int language sql as 'select 1';
+create function pg_temp.hygiene_probe() returns int language sql as 'select 1';
+create sequence public.hygiene_probe_seq;
+
+select ok(not has_function_privilege('anon', 'public.hygiene_probe()', 'execute'), 'neue Funktion in public: anon darf nicht ausführen');
+select ok(not has_function_privilege('anon', 'private.hygiene_probe()', 'execute'), 'neue Funktion in private: anon darf nicht ausführen');
+select ok(not has_function_privilege('anon', 'pg_temp.hygiene_probe()', 'execute'), 'neue Funktion in pg_temp: anon darf nicht ausführen');
+
+select ok(has_function_privilege('authenticated', 'public.hygiene_probe()', 'execute'), 'neue Funktion in public: authenticated darf ausführen');
+select ok(has_function_privilege('authenticated', 'private.hygiene_probe()', 'execute'), 'neue Funktion in private: authenticated darf ausführen');
+select ok(has_function_privilege('authenticated', 'pg_temp.hygiene_probe()', 'execute'), 'neue Funktion in pg_temp: authenticated darf ausführen');
+
+select ok(not has_sequence_privilege('anon', 'public.hygiene_probe_seq', 'usage, select, update'), 'neue Sequenz in public: anon hat kein usage, select, update');
 
 select * from finish();
 
