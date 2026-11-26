@@ -19,7 +19,6 @@ export {
   ALLERGEN_SPECS,
   isKnownDeclaredCode,
   keysForDeclaredCode,
-  NO_ALLERGENS_CODE,
   type AllergenSpec,
   type MatchMode,
   type Term,

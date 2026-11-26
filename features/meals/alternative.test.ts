@@ -13,23 +13,30 @@ function ing(de: string): Ingredient {
  * Typung wie `JudgeableRecipe` in `allergens/judge.ts`, damit ein Test keine
  * vollständige `RecipeRow` mit zwanzig Spalten bauen muss.
  */
-function recipe(id: string, declared: string[], ingredients: string[]) {
-  return { id, contains_allergens: declared, ingredients: ingredients.map(ing) };
+function recipe(id: string, declared: string[], at: string | null, ingredients: string[]) {
+  return {
+    id,
+    contains_allergens: declared,
+    allergens_classified_at: at,
+    ingredients: ingredients.map(ing),
+  };
 }
 
-/** Deklariert und ohne Treffer — das einzige, was `judgeRecipe` `safe` nennt. */
-const SAFE_A = recipe("a", ["none"], ["Reis", "Karotte"]);
-const SAFE_B = recipe("b", ["none"], ["Kartoffel", "Lauch"]);
-const SAFE_C = recipe("c", ["none"], ["Polenta", "Zucchini"]);
+const AT = "2026-08-14T08:40:06Z";
+
+/** Geprüft (Zeitstempel) und ohne Treffer — das einzige, was `judgeRecipe` `safe` nennt. */
+const SAFE_A = recipe("a", [], AT, ["Reis", "Karotte"]);
+const SAFE_B = recipe("b", [], AT, ["Kartoffel", "Lauch"]);
+const SAFE_C = recipe("c", [], AT, ["Polenta", "Zucchini"]);
 
 /** Deklariert Milch — für eine Milch-Familie `unsafe`. */
-const UNSAFE = recipe("u", ["milk"], ["Sahne", "Nudeln"]);
+const UNSAFE = recipe("u", ["milk"], AT, ["Sahne", "Nudeln"]);
 
 /** Zutat trifft, Deklaration nicht — `caution`. */
-const CAUTION = recipe("k", ["none"], ["Butter", "Nudeln"]);
+const CAUTION = recipe("k", [], AT, ["Butter", "Nudeln"]);
 
 /** Leere Deklaration ohne Zutatentreffer — `unverified`, keine Entwarnung. */
-const UNVERIFIED = recipe("v", [], ["Reis", "Karotte"]);
+const UNVERIFIED = recipe("v", [], null, ["Reis", "Karotte"]);
 
 const MILK = ["milk"] as const;
 

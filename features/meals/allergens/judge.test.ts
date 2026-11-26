@@ -15,23 +15,29 @@ function ing(de: string): Ingredient {
   return { amount: null, unit: null, name: { de } };
 }
 
+const AT = "2026-08-14T08:40:06Z";
+
 const CARBONARA = {
   contains_allergens: ["egg", "milk", "wheat"],
+  allergens_classified_at: AT,
   ingredients: [ing("Spaghetti"), ing("Eigelb"), ing("Pecorino")],
 };
 
 const UNDECLARED_CARBONARA = {
   contains_allergens: [],
+  allergens_classified_at: null,
   ingredients: [ing("Spaghetti"), ing("Eigelb"), ing("Pecorino")],
 };
 
 const DECLARED_CLEAN = {
   contains_allergens: ["gluten"],
+  allergens_classified_at: AT,
   ingredients: [ing("Reis"), ing("Karotte")],
 };
 
 const NOTHING_KNOWN = {
   contains_allergens: [],
+  allergens_classified_at: null,
   ingredients: [ing("Karotte"), ing("Salz")],
 };
 
@@ -81,27 +87,31 @@ describe("judgeRecipe", () => {
     // Ein Code aus einem fremden Vokabular könnte genau das gesuchte Allergen
     // benennen. Ihn als Entwarnung zu lesen wäre derselbe stille False
     // Negative, gegen den dieses Modul überhaupt gebaut ist.
-    expect(judgeRecipe({ contains_allergens: ["sesam_de"], ingredients: [] }, ["sesame"])).toEqual({
-      status: "unverified",
-    });
-  });
-
-  test("der NO_ALLERGENS_CODE gilt als verstanden und erlaubt safe", () => {
-    expect(judgeRecipe({ contains_allergens: ["none"], ingredients: [] }, ["eggs"])).toEqual({
-      status: "safe",
-    });
+    expect(
+      judgeRecipe(
+        { contains_allergens: ["sesam_de"], allergens_classified_at: AT, ingredients: [] },
+        ["sesame"],
+      ),
+    ).toEqual({ status: "unverified" });
   });
 
   test("ein unbekannter Code neben einem bekannten verhindert safe ebenfalls", () => {
     expect(
-      judgeRecipe({ contains_allergens: ["wheat", "sesam_de"], ingredients: [] }, ["eggs"]),
+      judgeRecipe(
+        { contains_allergens: ["wheat", "sesam_de"], allergens_classified_at: AT, ingredients: [] },
+        ["eggs"],
+      ),
     ).toEqual({ status: "unverified" });
   });
 
   test("ein mehrdeutiger Deklarations-Code trifft beide Gruppen", () => {
     // Vor dem Fix ergab das `safe`: `shellfish` war nur `crustaceans`
     // zugeordnet, galt damit als bekannt und ging an `molluscs` vorbei.
-    const shellfishDish = { contains_allergens: ["shellfish"], ingredients: [] };
+    const shellfishDish = {
+      contains_allergens: ["shellfish"],
+      allergens_classified_at: AT,
+      ingredients: [],
+    };
     expect(judgeRecipe(shellfishDish, ["molluscs"]).status).toBe("unsafe");
     expect(judgeRecipe(shellfishDish, ["crustaceans"]).status).toBe("unsafe");
   });
@@ -116,6 +126,38 @@ describe("judgeRecipe", () => {
     const verdict = judgeRecipe(CARBONARA, ["eggs"]);
     if (verdict.status !== "unsafe") throw new Error("unreachable");
     expect(verdict.hits.map((h) => h.key)).toEqual(["eggs"]);
+  });
+});
+
+describe("judgeRecipe und allergens_classified_at", () => {
+  const r = (codes: string[], at: string | null, names: string[] = []) => ({
+    contains_allergens: codes,
+    allergens_classified_at: at,
+    ingredients: names.map((n) => ing(n)),
+  });
+
+  test("leeres Array mit Zeitstempel ist geprüft ohne Fund → safe", () => {
+    expect(judgeRecipe(r([], AT), ["eggs"])).toEqual({ status: "safe" });
+  });
+
+  test("leeres Array ohne Zeitstempel → unverified", () => {
+    expect(judgeRecipe(r([], null), ["eggs"])).toEqual({ status: "unverified" });
+  });
+
+  test("'none' ist ein unbekannter Code → unverified, auch mit Zeitstempel", () => {
+    expect(judgeRecipe(r(["none"], AT), ["eggs"])).toEqual({ status: "unverified" });
+  });
+
+  test("bekannte Codes ohne Zeitstempel → unverified", () => {
+    expect(judgeRecipe(r(["wheat"], null), ["eggs"])).toEqual({ status: "unverified" });
+  });
+
+  test("deklarierter Treffer ohne Zeitstempel → unsafe", () => {
+    expect(judgeRecipe(r(["egg"], null), ["eggs"]).status).toBe("unsafe");
+  });
+
+  test("Zutaten-Treffer mit Zeitstempel → caution", () => {
+    expect(judgeRecipe(r([], AT, ["Eigelb"]), ["eggs"]).status).toBe("caution");
   });
 });
 
