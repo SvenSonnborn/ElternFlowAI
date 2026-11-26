@@ -39,7 +39,7 @@ export interface JudgeableRecipe {
 /**
  * Das Urteil über ein Rezept für die Allergien einer Familie. `safe` gibt es
  * nur für ein klassifiziertes Rezept (`allergens_classified_at`) ohne
- * unbekannten Code; `unsafe` und `caution` hängen nicht am Zeitstempel, denn
+ * unbekannten Code — außer für eine Familie ohne Allergien; `unsafe` und `caution` hängen nicht am Zeitstempel, denn
  * ein Fund gilt, auch wenn niemand ihn bestätigt hat.
  */
 export function judgeRecipe(

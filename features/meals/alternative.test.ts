@@ -35,7 +35,7 @@ const UNSAFE = recipe("u", ["milk"], AT, ["Sahne", "Nudeln"]);
 /** Zutat trifft, Deklaration nicht — `caution`. */
 const CAUTION = recipe("k", [], AT, ["Butter", "Nudeln"]);
 
-/** Leere Deklaration ohne Zutatentreffer — `unverified`, keine Entwarnung. */
+/** Ungeprüft (kein Zeitstempel) ohne Zutatentreffer — `unverified`, keine Entwarnung. */
 const UNVERIFIED = recipe("v", [], null, ["Reis", "Karotte"]);
 
 const MILK = ["milk"] as const;
