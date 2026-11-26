@@ -7,12 +7,21 @@ import { allergyCheck, planningSteps, type AllergyCheck } from "./planningSteps"
 
 const occupant = { id: "e-1", recipe_id: "r-1" } as MealPlanEntryWithRecipe;
 
-const milkRecipe: JudgeableRecipe = { contains_allergens: ["milk"], ingredients: [] };
+const milkRecipe: JudgeableRecipe = {
+  contains_allergens: ["milk"],
+  allergens_classified_at: null,
+  ingredients: [],
+};
 const butterRecipe: JudgeableRecipe = {
   contains_allergens: null,
+  allergens_classified_at: null,
   ingredients: [{ amount: null, unit: null, name: { de: "Butter", en: "Butter" } }],
 };
-const bareRecipe: JudgeableRecipe = { contains_allergens: null, ingredients: [] };
+const bareRecipe: JudgeableRecipe = {
+  contains_allergens: null,
+  allergens_classified_at: null,
+  ingredients: [],
+};
 
 describe("allergyCheck", () => {
   test("Laden hat Vorrang", () => {

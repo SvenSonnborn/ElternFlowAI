@@ -25,9 +25,23 @@ export type RecipeAllergenVerdict =
  */
 export interface JudgeableRecipe {
   readonly contains_allergens: readonly string[] | null;
+  /**
+   * Wann das Rezept klassifiziert wurde, sonst `null`. Pflichtfeld, nicht
+   * optional: ohne es ließe sich „geprüft, nichts gefunden" nicht von „nie
+   * geprüft" unterscheiden — beides ist ein leeres `contains_allergens` —, und
+   * jeder Aufrufer, der das Feld vergisst, läse still „nie geprüft". Nur der
+   * Zeitstempel erlaubt `safe`; das Array hält allein, was gefunden wurde.
+   */
+  readonly allergens_classified_at: string | null;
   readonly ingredients: readonly Ingredient[];
 }
 
+/**
+ * Das Urteil über ein Rezept für die Allergien einer Familie. `safe` gibt es
+ * nur für ein klassifiziertes Rezept (`allergens_classified_at`) ohne
+ * unbekannten Code; `unsafe` und `caution` hängen nicht am Zeitstempel, denn
+ * ein Fund gilt, auch wenn niemand ihn bestätigt hat.
+ */
 export function judgeRecipe(
   recipe: JudgeableRecipe,
   familyKeys: readonly AllergenKey[],
@@ -49,7 +63,7 @@ export function judgeRecipe(
     if (keys.length === 0) {
       // Ein Code, den wir nicht auflösen können, ist keine Entwarnung: er
       // könnte in einem fremden Vokabular genau das gesuchte Allergen
-      // benennen. `NO_ALLERGENS_CODE` ist die eine bekannte Ausnahme.
+      // benennen.
       if (!isKnownDeclaredCode(code)) hasUnknownCode = true;
       continue;
     }
@@ -66,10 +80,11 @@ export function judgeRecipe(
     .map((match): AllergenHit => ({ ...match, source: "ingredient" }));
   if (ingredientHits.length > 0) return { status: "caution", hits: ingredientHits };
 
-  // Eine vollständig verstandene Deklaration ohne Treffer ist eine echte
-  // Entwarnung. Eine leere ist keine — die Heuristik kann Anwesenheit belegen,
-  // nie Abwesenheit —, und eine mit unbekanntem Code ebenfalls nicht.
-  return declaredCodes.length > 0 && !hasUnknownCode
+  // Die Heuristik kann Anwesenheit belegen, nie Abwesenheit. `safe` braucht
+  // deshalb den Zeitstempel einer Klassifizierung — ein leeres Array allein
+  // heißt nur „nichts deklariert" — und eine Deklaration, die wir ganz
+  // verstehen: ein unbekannter Code könnte das gesuchte Allergen benennen.
+  return recipe.allergens_classified_at !== null && !hasUnknownCode
     ? { status: "safe" }
     : { status: "unverified" };
 }
