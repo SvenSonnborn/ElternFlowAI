@@ -13,6 +13,15 @@ export interface Term {
    * und "Weizen", das englische `nut` in "nutmeg" und "coconut".
    */
   readonly mode?: MatchMode;
+  /**
+   * Selbstbezeichnung: der Begriff benennt das Allergen selbst ("gluten",
+   * "milch", "nuss"), nicht eine Sorte oder einen Begleitstoff ("nudeln",
+   * "butter", "mandel"). Nur ein verneinter Selbstbegriff ("glutenfreie
+   * Nudeln") räumt den Key im Teilstück ab. `laktose` ist das Gegenbeispiel:
+   * "laktosefrei" heißt gespaltener Milchzucker, das Milcheiweiß bleibt. Regel
+   * und Grenzen: Spec §5A, später ADR-061.
+   */
+  readonly self?: boolean;
 }
 
 export interface AllergenSpec {
@@ -30,12 +39,17 @@ function t(text: string, mode?: MatchMode): Term {
   return mode ? { text, mode } : { text };
 }
 
+/** Wie `t()`, markiert den Begriff aber als Selbstbezeichnung des Allergens. */
+function ts(text: string, mode?: MatchMode): Term {
+  return { ...t(text, mode), self: true };
+}
+
 export const ALLERGEN_SPECS: readonly AllergenSpec[] = [
   {
     key: "gluten",
     declaredCodes: ["gluten", "wheat", "barley", "rye", "spelt", "oats", "cereals"],
     terms: [
-      t("gluten"),
+      ts("gluten"),
       t("weizen"),
       t("dinkel"),
       t("roggen"),
@@ -94,7 +108,7 @@ export const ALLERGEN_SPECS: readonly AllergenSpec[] = [
       t("krabbe"),
       t("hummer"),
       t("scampi"),
-      t("krebs"),
+      ts("krebs"),
       t("shrimp"),
       t("prawn"),
       t("lobster"),
@@ -107,14 +121,14 @@ export const ALLERGEN_SPECS: readonly AllergenSpec[] = [
     key: "eggs",
     declaredCodes: ["eggs", "egg"],
     terms: [
-      t("ei", "word"),
-      t("eier", "word"),
+      ts("ei", "word"),
+      ts("eier", "word"),
       t("eigelb"),
       t("eiweiss"),
       t("eiernudeln"),
       t("mayonnaise"),
-      t("egg", "word"),
-      t("eggs", "word"),
+      ts("egg", "word"),
+      ts("eggs", "word"),
       t("yolk"),
       t("albumen"),
     ],
@@ -124,7 +138,7 @@ export const ALLERGEN_SPECS: readonly AllergenSpec[] = [
     key: "fish",
     declaredCodes: ["fish"],
     terms: [
-      t("fisch"),
+      ts("fisch"),
       t("lachs"),
       t("thunfisch"),
       t("kabeljau"),
@@ -145,20 +159,20 @@ export const ALLERGEN_SPECS: readonly AllergenSpec[] = [
   {
     key: "peanuts",
     declaredCodes: ["peanuts", "peanut"],
-    terms: [t("erdnuss"), t("erdnuesse"), t("peanut"), t("groundnut"), t("arachis")],
+    terms: [ts("erdnuss"), ts("erdnuesse"), ts("peanut"), t("groundnut"), t("arachis")],
     exclude: [],
   },
   {
     key: "soy",
     declaredCodes: ["soy", "soya", "soybeans"],
     terms: [
-      t("soja"),
+      ts("soja"),
       t("tofu"),
       t("edamame"),
       t("miso"),
       t("tempeh"),
-      t("soy"),
-      t("soya"),
+      ts("soy"),
+      ts("soya"),
       t("soybean"),
     ],
     exclude: [],
@@ -167,7 +181,7 @@ export const ALLERGEN_SPECS: readonly AllergenSpec[] = [
     key: "milk",
     declaredCodes: ["milk", "dairy", "lactose"],
     terms: [
-      t("milch"),
+      ts("milch"),
       t("butter"),
       t("sahne"),
       t("quark"),
@@ -182,7 +196,7 @@ export const ALLERGEN_SPECS: readonly AllergenSpec[] = [
       t("molke"),
       t("laktose"),
       t("ghee"),
-      t("milk"),
+      ts("milk"),
       t("cream"),
       t("cheese"),
       t("yogurt"),
@@ -217,14 +231,14 @@ export const ALLERGEN_SPECS: readonly AllergenSpec[] = [
       t("pekan"),
       t("macadamia"),
       t("paranuss"),
-      t("nuss"),
+      ts("nuss"),
       t("hazelnut"),
       t("walnut"),
       t("almond"),
       t("pistachio"),
       t("pecan"),
       t("brazil nut"),
-      t("nut", "word"),
+      ts("nut", "word"),
     ],
     // Erdnuss ist eine Hülsenfrucht, Kokos- und Muskatnuss sind keine
     // Schalenfrüchte im Sinne der EU-Kennzeichnung.
@@ -242,31 +256,31 @@ export const ALLERGEN_SPECS: readonly AllergenSpec[] = [
   {
     key: "celery",
     declaredCodes: ["celery"],
-    terms: [t("sellerie"), t("celery"), t("celeriac")],
+    terms: [ts("sellerie"), ts("celery"), t("celeriac")],
     exclude: [],
   },
   {
     key: "mustard",
     declaredCodes: ["mustard"],
-    terms: [t("senf"), t("dijon"), t("mustard")],
+    terms: [ts("senf"), t("dijon"), ts("mustard")],
     exclude: [],
   },
   {
     key: "sesame",
     declaredCodes: ["sesame", "sesame_seeds"],
-    terms: [t("sesam"), t("tahin"), t("hummus"), t("sesame"), t("tahini")],
+    terms: [ts("sesam"), t("tahin"), t("hummus"), ts("sesame"), t("tahini")],
     exclude: [],
   },
   {
     key: "sulphites",
     declaredCodes: ["sulphites", "sulfites", "sulphur_dioxide"],
     terms: [
-      t("sulfit"),
+      ts("sulfit"),
       t("schwefeldioxid"),
       t("trockenfruechte"),
       t("wein"),
-      t("sulphite"),
-      t("sulfite"),
+      ts("sulphite"),
+      ts("sulfite"),
       t("wine", "word"),
     ],
     // "Schweinefleisch" enthält den Term `wein`.
@@ -275,7 +289,7 @@ export const ALLERGEN_SPECS: readonly AllergenSpec[] = [
   {
     key: "lupin",
     declaredCodes: ["lupin"],
-    terms: [t("lupine"), t("lupinenmehl"), t("lupin")],
+    terms: [ts("lupine"), t("lupinenmehl"), ts("lupin")],
     exclude: [],
   },
   {
@@ -301,6 +315,8 @@ export const ALLERGEN_SPECS: readonly AllergenSpec[] = [
 export interface FoldedTerm {
   readonly text: string;
   readonly mode: MatchMode;
+  /** Siehe `Term.self`. */
+  readonly self: boolean;
 }
 
 export interface FoldedSpec {
@@ -316,7 +332,11 @@ export interface FoldedSpec {
  */
 export const FOLDED_SPECS: readonly FoldedSpec[] = ALLERGEN_SPECS.map((spec) => ({
   key: spec.key,
-  terms: spec.terms.map((term) => ({ text: fold(term.text), mode: term.mode ?? "substring" })),
+  terms: spec.terms.map((term) => ({
+    text: fold(term.text),
+    mode: term.mode ?? "substring",
+    self: term.self ?? false,
+  })),
   exclude: spec.exclude.map(fold),
 }));
 
