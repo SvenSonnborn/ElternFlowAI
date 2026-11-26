@@ -129,9 +129,10 @@ export async function fetchRecipeById(id: string): Promise<RecipeRow | null> {
  * UI-Badges, `contains_allergens` ist die Quelle der Wahrheit. `not(…, "ov", …)`
  * heißt "überlappt nicht" — eine *negierte* Overlap-Bedingung ist aber nicht
  * indexierbar, `recipes_contains_allergens_gin` bedient nur `&&`/`@>`/`<@`, also
- * scannt Postgres hier sequenziell. Dasselbe gilt für die beiden anderen
- * Prädikate unten: `ilike '%…%'` hat keinen Trigram-Index, `created_at` gar
- * keinen (docs/TODO.md — kein Problem, solange der Pool leer ist).
+ * scannt Postgres hier sequenziell. Die beiden anderen Teile des Query-Pfads
+ * haben Indizes: die Titelsuche (`title->>de` und `title->>en`, je `ilike`)
+ * nutzt die Trigram-Indizes `recipes_title_de_trgm_idx` und
+ * `recipes_title_en_trgm_idx`, die Sortierung `recipes_created_at_id_idx`.
  */
 export async function fetchRecipes(filter: NormalizedRecipeFilter): Promise<RecipeRow[]> {
   let query = supabase.from("recipes").select("*");
