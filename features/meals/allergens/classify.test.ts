@@ -165,6 +165,8 @@ describe("scanText — Selbstbezeichnungen", () => {
       "evtl",
       "eventuell",
       "gegebenenfalls",
+      "in",
+      "im",
     ];
     for (const spec of FOLDED_SPECS)
       for (const text of [...spec.terms.map((t) => t.text), ...spec.exclude])
@@ -183,6 +185,9 @@ describe("scanText — Selbstbezeichnungen", () => {
     // Ein kürzerer Selbstbegriff im längeren ("soy" in "soya") blockiert das Abräumen nicht.
     ["soya-free chocolate", "soy"],
     ["sesame-free bread", "sesame"],
+    // "in"/"im" trennen; das Teilstück dahinter hat hier keinen Treffer.
+    ["glutenfreie Nudeln in Tomatensoße", "gluten"],
+    ["glutenfreie Nudeln im Gemüsesud", "gluten"],
   ];
   const KEPT: [string, AllergenKey][] = [
     ["laktosefreie Milch", "milk"],
@@ -215,6 +220,10 @@ describe("scanText — Selbstbezeichnungen", () => {
     ["Nudeln, nicht glutenfrei", "gluten"],
     ["regular pasta, not gluten free", "gluten"],
     ["Weizenmehl + glutenfreies Mehl", "gluten"],
+    // "in"/"im" trennen: die verneinte Brühe räumt die Nudeln davor nicht ab.
+    ["Spaghetti in glutenfreier Brühe", "gluten"],
+    ["Pasta in gluten-free broth", "gluten"],
+    ["Nudeln im glutenfreien Gemüsesud", "gluten"],
     // Die Sperre gilt für den ganzen Text, nicht nur das eigene Teilstück.
     ["Nudeln, glutenfrei oder nicht", "gluten"],
     ["Pasta, gluten-free or not", "gluten"],
