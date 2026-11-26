@@ -73,15 +73,15 @@ insert into public.families (id, name) values
 
 insert into public.parents (id, auth_user_id, family_id, name, short, color) values
   ('aaaaaaaa-0000-4000-8000-000000000011', 'aaaaaaaa-0000-4000-8000-000000000001',
-   'f1f1f1f1-0000-4000-8000-000000000001', 'Anna Test', 'A', 'primary'),
+   'f1f1f1f1-0000-4000-8000-000000000001', 'Anna Test', 'A', '#7DB6A8'),
   ('bbbbbbbb-0000-4000-8000-000000000011', 'bbbbbbbb-0000-4000-8000-000000000001',
-   'f1f1f1f1-0000-4000-8000-000000000001', 'Ben Test', 'B', 'accent'),
+   'f1f1f1f1-0000-4000-8000-000000000001', 'Ben Test', 'B', '#E8A56A'),
   ('cccccccc-0000-4000-8000-000000000011', 'cccccccc-0000-4000-8000-000000000001',
-   'f2f2f2f2-0000-4000-8000-000000000001', 'Carla Fremd', 'C', 'primary');
+   'f2f2f2f2-0000-4000-8000-000000000001', 'Carla Fremd', 'C', '#7DB6A8');
 
 insert into public.children (id, family_id, name, birthday, color) values
   ('c1c1c1c1-0000-4000-8000-000000000001', 'f1f1f1f1-0000-4000-8000-000000000001',
-   'Mia', '2018-05-14', 'primary');
+   'Mia', '2018-05-14', '#A78BFA');
 
 -- Termine. Die Typen kommen aus type_lookups (global, family_id is null). Zeiten in UTC;
 -- im November gilt in Berlin MEZ (UTC+1), 16:00 Wandzeit = 15:00 UTC.
