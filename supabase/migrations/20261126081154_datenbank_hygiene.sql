@@ -98,9 +98,8 @@ create index recipes_created_at_id_idx on public.recipes (created_at desc, id);
 -- ============================================================
 -- D. Default-ACL für neue Funktionen und Sequenzen
 -- ============================================================
--- Als letzter Abschnitt, damit alles oben (etwa die Funktionen von pg_trgm) noch unter der
--- alten Vorgabe entsteht. Bestehende Objekte bleiben unberührt; für sie gilt weiter das
--- Inventar in security.test.sql und der Entzug je Migration.
+-- Bestehende Objekte bleiben unberührt; für sie gilt weiter das Inventar in
+-- security.test.sql und der Entzug je Migration.
 --
 -- Ein Entzug auf Schema-Ebene allein reicht bei Funktionen nicht: `execute` für PUBLIC kommt
 -- aus der eingebauten globalen Vorgabe, `anon` ist Mitglied von PUBLIC, und eine
