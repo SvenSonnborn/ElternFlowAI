@@ -84,7 +84,10 @@ export function judgeRecipe(
   // deshalb den Zeitstempel einer Klassifizierung — ein leeres Array allein
   // heißt nur „nichts deklariert" — und eine Deklaration, die wir ganz
   // verstehen: ein unbekannter Code könnte das gesuchte Allergen benennen.
-  return recipe.allergens_classified_at !== null && !hasUnknownCode
+  // `typeof` statt `!== null`: ein Objekt aus einer Datenbank ohne die Spalte
+  // trägt `undefined`, und das muss geschlossen scheitern (unverified), nie
+  // offen (safe).
+  return typeof recipe.allergens_classified_at === "string" && !hasUnknownCode
     ? { status: "safe" }
     : { status: "unverified" };
 }

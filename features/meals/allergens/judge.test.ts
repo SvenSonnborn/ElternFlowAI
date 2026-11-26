@@ -156,6 +156,13 @@ describe("judgeRecipe und allergens_classified_at", () => {
     expect(judgeRecipe(r(["egg"], null), ["eggs"]).status).toBe("unsafe");
   });
 
+  test("fehlt das Feld ganz (Schema ohne Spalte) → unverified, nie safe", () => {
+    const noColumn = { contains_allergens: [], ingredients: [] } as unknown as Parameters<
+      typeof judgeRecipe
+    >[0];
+    expect(judgeRecipe(noColumn, ["eggs"])).toEqual({ status: "unverified" });
+  });
+
   test("Zutaten-Treffer mit Zeitstempel → caution", () => {
     expect(judgeRecipe(r([], AT, ["Eigelb"]), ["eggs"]).status).toBe("caution");
   });
