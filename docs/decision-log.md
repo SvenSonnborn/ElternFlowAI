@@ -2084,7 +2084,7 @@ Vier Lücken lagen in der Datenbank offen: Name, Kürzel und Farbe hatten server
 - **Der globale Entzug trifft jedes Mitglied von `PUBLIC`, nicht nur `anon`.** `supabase_auth_admin`, `storage_admin`, `realtime_admin` und `authenticator` verlieren `execute` auf künftige Funktionen von `postgres`. Ein künftiger Auth-Hook oder eine Trigger-Funktion auf `auth.*` oder `storage.*`, die eine neue Funktion aufruft, braucht ein ausdrückliches `grant`.
 - **Getestet ist „neue Funktionen sind für `anon` nicht erreichbar“ in `public`, `private` und `pg_temp`, „neue Sequenzen“ in `public`.** Das Schema `storage` hat einen eigenen Schema-Default, der `anon` weiter bedient. Bestehende Objekte bleiben unberührt; für sie gelten weiter das Inventar in `security.test.sql` und der Entzug je Migration.
 - **Ein Name aus Tabs besteht die Prüfung** (Decision 2). Wer das ändern will, braucht einen Regex statt `btrim`.
-- **Ein Aufrufer, der die Grenze überschreitet, scheitert mit `23514`**, nicht still. Der Client ist nie großzügiger als der Server; das trifft nur fremde Aufrufer.
+- **Ein Aufrufer, der die Grenze überschreitet, scheitert mit `23514`**, nicht still. Der Client ab diesem Stand ist nie großzügiger als der Server; treffen kann es fremde Aufrufer und ältere App-Stände ohne `maxLength`. Daten gehen dabei nicht verloren, das Speichern schlägt fehl.
 
 ### Rejected alternatives
 
