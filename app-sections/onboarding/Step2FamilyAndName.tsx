@@ -13,6 +13,7 @@ import {
   clearPendingInviteToken,
   deriveShort,
   mapAuthError,
+  NAME_MAX_LENGTH,
   useAcceptInvitation,
   useCreateFamily,
   usePendingInviteStore,
@@ -121,6 +122,7 @@ export function Step2FamilyAndName() {
             value={familyName}
             onChangeText={setFamilyName}
             placeholder={t("onb.s2.familyPlaceholder")}
+            maxLength={NAME_MAX_LENGTH}
           />
         ) : null}
         <Field
@@ -129,6 +131,7 @@ export function Step2FamilyAndName() {
           value={parentName}
           onChangeText={setParentName}
           placeholder={t("onb.s2.parentName.placeholder")}
+          maxLength={NAME_MAX_LENGTH}
         />
         <View>
           <Text

@@ -1,6 +1,7 @@
 import { fireEvent, screen } from "@testing-library/react-native";
 
 import { touchTarget } from "@/design-system";
+import { NAME_MAX_LENGTH } from "@/features/auth";
 import i18n from "@/features/i18n";
 import { renderScreen } from "@/testing/renderScreen";
 
@@ -40,6 +41,11 @@ jest.mock("expo-router", () => ({
 const box = { minWidth: touchTarget.min, minHeight: touchTarget.min };
 
 describe("ChildProfileScreen: Tippflächen im Inhalt", () => {
+  it("das Namensfeld nimmt höchstens NAME_MAX_LENGTH Zeichen an", async () => {
+    await renderScreen(<ChildProfileScreen />);
+    expect(screen.getByLabelText(i18n.t("child.name")).props.maxLength).toBe(NAME_MAX_LENGTH);
+  });
+
   it("Tag-Pillen sind Knöpfe mit Namen aus dem Text und 44er-Box", async () => {
     await renderScreen(<ChildProfileScreen />);
     expect(screen.getByRole("button", { name: "Nudeln" })).toHaveStyle(box);

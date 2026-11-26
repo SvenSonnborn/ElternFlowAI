@@ -36,6 +36,8 @@ export interface FieldProps {
   autoCorrect?: boolean;
   autoComplete?: TextInputProps["autoComplete"];
   textContentType?: TextInputProps["textContentType"];
+  /** UTF-16-Einheiten, wie `TextInput.maxLength`; ohne Angabe unbegrenzt. */
+  maxLength?: number;
 }
 
 /**
@@ -62,6 +64,7 @@ export function Field({
   autoCorrect,
   autoComplete,
   textContentType,
+  maxLength,
 }: FieldProps) {
   const { theme } = useTheme();
   const multiline = type === "multiline";
@@ -95,6 +98,7 @@ export function Field({
         autoCorrect={autoCorrect}
         autoComplete={autoComplete}
         textContentType={textContentType}
+        maxLength={maxLength}
         // Einzeilig ohne `text-base`: dessen Zeilenhöhe 24 setzt die Glyphen auf
         // iOS an den Fuß der Zeile, im gestreckten Feld rutscht der Text tiefer.
         className={multiline ? "flex-1 text-base" : "flex-1"}

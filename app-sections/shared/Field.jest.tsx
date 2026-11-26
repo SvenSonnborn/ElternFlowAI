@@ -5,6 +5,16 @@ import { renderScreen } from "@/testing/renderScreen";
 import { Field } from "./Field";
 
 describe("Field: das Label ist der Name des Eingabefelds", () => {
+  it("reicht maxLength an das Eingabefeld durch", async () => {
+    await renderScreen(<Field label="Name" value="" onChangeText={() => {}} maxLength={50} />);
+    expect(screen.getByLabelText("Name").props.maxLength).toBe(50);
+  });
+
+  it("ohne maxLength bleibt das Eingabefeld unbegrenzt", async () => {
+    await renderScreen(<Field label="Name" value="" onChangeText={() => {}} />);
+    expect(screen.getByLabelText("Name").props.maxLength).toBeUndefined();
+  });
+
   it("beschriftet das TextInput mit dem Label", async () => {
     await renderScreen(<Field label="Titel" value="" onChangeText={() => {}} />);
     expect(screen.getByLabelText("Titel")).toBeTruthy();

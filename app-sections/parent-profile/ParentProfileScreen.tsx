@@ -13,6 +13,7 @@ import {
   capShort,
   deriveShort,
   mapAuthError,
+  NAME_MAX_LENGTH,
   normalizeShort,
   useCurrentParent,
   useParent,
@@ -198,6 +199,7 @@ export function ParentProfileScreen() {
               }
               editable={isSelf}
               placeholder={t("parent.namePlaceholder")}
+              maxLength={NAME_MAX_LENGTH}
               error={nameError}
               autoCapitalize="words"
             />
