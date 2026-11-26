@@ -73,13 +73,13 @@ describe("judgeRecipe", () => {
     expect(judgeRecipe(CARBONARA, ["eggs", "milk"]).status).toBe("unsafe");
   });
 
-  test("kein Treffer bei befüllter Deklaration ergibt safe", () => {
+  test("kein Treffer bei klassifiziertem Rezept ergibt safe", () => {
     expect(judgeRecipe(DECLARED_CLEAN, ["eggs"])).toEqual({ status: "safe" });
   });
 
-  test("kein Treffer bei leerer Deklaration ergibt unverified, nicht safe", () => {
+  test("kein Treffer ohne Zeitstempel ergibt unverified, nicht safe", () => {
     // Der Kern des Modells: die Heuristik kann Anwesenheit belegen, niemals
-    // Abwesenheit. Eine leere Deklaration wird nie zu Grün.
+    // Abwesenheit. Ein ungeprüftes Rezept wird nie zu Grün.
     expect(judgeRecipe(NOTHING_KNOWN, ["eggs"])).toEqual({ status: "unverified" });
   });
 
@@ -116,10 +116,12 @@ describe("judgeRecipe", () => {
     expect(judgeRecipe(shellfishDish, ["crustaceans"]).status).toBe("unsafe");
   });
 
-  test("null in contains_allergens verhält sich wie leer", () => {
-    expect(judgeRecipe({ ...NOTHING_KNOWN, contains_allergens: null }, ["eggs"])).toEqual({
-      status: "unverified",
-    });
+  test("null in contains_allergens mit Zeitstempel ist ein klassifiziertes Rezept ohne deklariertes Allergen", () => {
+    expect(
+      judgeRecipe({ ...NOTHING_KNOWN, contains_allergens: null, allergens_classified_at: AT }, [
+        "eggs",
+      ]),
+    ).toEqual({ status: "safe" });
   });
 
   test("meldet nur Keys, die die Familie betreffen", () => {
