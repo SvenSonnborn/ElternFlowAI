@@ -77,8 +77,10 @@ function isNegated(haystack: string, start: number, end: number): boolean {
   return (NEGATION_PREFIXES as readonly string[]).includes(lastWord);
 }
 
-// Wahl- und Bezugswörter trennen wie "oder": was nach "mit", "wahlweise" oder
-// "statt" folgt, bezeichnet eine andere Zutat als der Teil davor. Nie aufnehmen:
+// Wahl- und Bezugswörter trennen wie "oder": was nach "mit", "in", "wahlweise"
+// oder "statt" folgt, bezeichnet eine andere Zutat als der Teil davor
+// ("Spaghetti in glutenfreier Brühe"). "aus" trennt nicht: "Nudeln aus
+// glutenfreiem Mehl" beschreibt dieselbe Zutat. Nie aufnehmen:
 // Wörter, die Negationspräfix oder -suffix sind ("alternative", "ersatz") — ein
 // Trennwort darf keine Negation sein (Spec §5A).
 const SEGMENT_WORDS = new Set([
@@ -103,12 +105,14 @@ const SEGMENT_WORDS = new Set([
   "evtl",
   "eventuell",
   "gegebenenfalls",
+  "in",
+  "im",
 ]);
 
 /**
  * Zerlegt den Text an `/`, `&` und `+` (vor `fold()`, das diese Zeichen zu
  * Leerzeichen macht) und danach an den ganzen Wörtern aus `SEGMENT_WORDS`
- * (oder/und/bzw, mit, wahlweise, statt, ggf …). Komma und Klammern trennen
+ * (oder/und/bzw, mit, in/im, wahlweise, statt, ggf …). Komma und Klammern trennen
  * bewusst nicht: "Nudeln, glutenfrei" ist eine Aussage.
  */
 function segments(text: string): string[] {
