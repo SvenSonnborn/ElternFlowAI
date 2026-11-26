@@ -2076,18 +2076,19 @@ Vier Lücken lagen in der Datenbank offen: Name, Kürzel und Farbe hatten server
 3. **`updated_at` wird per Trigger gestempelt.** `families_set_updated_at`, `parents_set_updated_at` und `children_set_updated_at` rufen `public.set_updated_at()` vor jedem Update auf; ein vom Client mitgeschickter Wert wird überschrieben.
 4. **Fremdschlüssel-Indizes nach der Regel des Advisors.** Jeder Fremdschlüssel in `public` ist von einem Index abgedeckt, Spalten in Fremdschlüssel-Reihenfolge. Die drei einspaltigen `events`-Indizes (`events_child_id_idx`, `events_parent_id_idx`, `events_created_by_idx`) sind durch zweispaltige ersetzt, weil sie nur eine Spalte ihres zweispaltigen Fremdschlüssels deckten. Teilindizes zählen in der Abdeckungsprüfung des pgTAP-Tests mit.
 5. **Rezept-Query-Pfad mit Trigram-Ausdrucksindizes.** `title` ist `jsonb`, PostgREST erzeugt `title->>'de'`; die Indizes liegen deshalb auf genau diesen Ausdrücken (`recipes_title_de_trgm_idx`, `recipes_title_en_trgm_idx`), dazu `recipes_created_at_id_idx` für die Sortierung. `pg_trgm` liegt im Schema `extensions`.
-6. **Default-ACL für Funktionen und Sequenzen.** `execute` auf künftigen Funktionen von `postgres` geht von `PUBLIC` weg und an `authenticated` und `service_role`; in `public` entzieht eine zweite Anweisung `anon` zusätzlich Funktionen und Sequenzen.
+6. **Default-ACL für Funktionen und Sequenzen, vier Anweisungen.** (1) `execute` für `PUBLIC` wird global entzogen: Das Recht stammt aus dem eingebauten globalen Default, `anon` ist Mitglied von `PUBLIC`, und ein Schema-Default kann zum globalen nur hinzufügen, nie abziehen. (2) `authenticated` und `service_role` bekommen zurück, was sie über `PUBLIC` hatten; ohne das liefen neue Funktionen nur für ihren Besitzer, und `pg_temp`-Helfer sowie Funktionen in `private` (RLS-Policies) scheiterten mit `42501`. (3) In `public` entfällt der Schema-Default, den Supabase ausdrücklich für `anon` setzt. (4) Dasselbe für Sequenzen, die keinen globalen `PUBLIC`-Default haben.
 7. **Unbenutzte Indizes bleiben.** Der Advisor meldet sie bei der heutigen Datenmenge, aber „nie benutzt“ sagt bei so wenig Zeilen wenig; der offene Eintrag in [TODO.md](./TODO.md) hält das fest.
 
 ### Consequences
 
 - **Der globale Entzug trifft jedes Mitglied von `PUBLIC`, nicht nur `anon`.** `supabase_auth_admin`, `storage_admin`, `realtime_admin` und `authenticator` verlieren `execute` auf künftige Funktionen von `postgres`. Ein künftiger Auth-Hook oder eine Trigger-Funktion auf `auth.*` oder `storage.*`, die eine neue Funktion aufruft, braucht ein ausdrückliches `grant`.
-- **Die Default-ACL gilt nur für `public`, `private` und `pg_temp`.** Das Schema `storage` behält seine eigene Default-ACL, die `anon` weiter bedient. Bestehende Objekte bleiben unberührt; für sie gelten weiter das Inventar in `security.test.sql` und der Entzug je Migration.
+- **Zugesichert und getestet ist „neue Funktionen und Sequenzen sind für `anon` nicht erreichbar“ für `public`, `private` und `pg_temp`.** Das Schema `storage` hat einen eigenen Schema-Default, der `anon` weiter bedient. Bestehende Objekte bleiben unberührt; für sie gelten weiter das Inventar in `security.test.sql` und der Entzug je Migration.
 - **Ein Name aus Tabs besteht die Prüfung** (Decision 2). Wer das ändern will, braucht einen Regex statt `btrim`.
 - **Ein Aufrufer, der die Grenze überschreitet, scheitert mit `23514`**, nicht still. Der Client ist nie großzügiger als der Server; das trifft nur fremde Aufrufer.
 
 ### Rejected alternatives
 
-- **Default-ACL nur für `anon` entziehen.** Ginge ohne den Nebeneffekt auf die Systemrollen, ließe aber `PUBLIC` als Weg offen: Jede neue Funktion wäre weiter für jede Rolle ausführbar, die `PUBLIC` erbt.
+- **Ein gemeinsamer Postgres-Typ (`domain`) für Namen.** Das Projekt nutzt keine Domains, die erzeugten TypeScript-Typen zeigen sie nicht, die RPC-Parameter blieben `text`; bei drei Spalten spart das zu wenig.
+- **Aufteilen auf mehrere Branches.** Das hieße mehrere Live-Einspielungen für Änderungen, die sich nicht gegenseitig blockieren.
 - **Constraints als `NOT VALID`.** Ungeprüfte Constraints sicherten nur neue Zeilen; die Grenzen sollen für jede Zeile gelten.
 - **Die unbenutzten Indizes entfernen.** Bei so wenig Zeilen ist die Statistik wertlos; ein Index, der Löschen und Joins trägt, fiele ohne Last nicht auf.

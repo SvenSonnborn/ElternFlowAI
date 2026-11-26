@@ -2,7 +2,7 @@
 
 **Datum:** 2026-11-25 · **Branch:** `chore/datenbank-hygiene` · **Status:** zur Abnahme
 
-Grundlage: fünf Einträge in [docs/TODO.md](../../TODO.md) und [Roadmap Schritt 3](../../roadmap.md#3-datenbank-hygiene)
+Grundlage: fünf Einträge in [docs/TODO.md](../../TODO.md) und [Roadmap Schritt 3](../../roadmap.md)
 („Eine Migration, ein `test:db`-Lauf").
 
 ## 1. Worum es geht
