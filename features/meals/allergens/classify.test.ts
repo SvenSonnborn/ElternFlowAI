@@ -180,6 +180,9 @@ describe("scanText — Selbstbezeichnungen", () => {
     ["milchfreier Käse", "milk"],
     ["nussfreie Mandelcreme", "nuts"], // gewollter Preis (Spec §4)
     ["eifreie Nudeln mit Tomatensoße", "eggs"],
+    // Ein kürzerer Selbstbegriff im längeren ("soy" in "soya") blockiert das Abräumen nicht.
+    ["soya-free chocolate", "soy"],
+    ["sesame-free bread", "sesame"],
   ];
   const KEPT: [string, AllergenKey][] = [
     ["laktosefreie Milch", "milk"],
@@ -212,6 +215,10 @@ describe("scanText — Selbstbezeichnungen", () => {
     ["Nudeln, nicht glutenfrei", "gluten"],
     ["regular pasta, not gluten free", "gluten"],
     ["Weizenmehl + glutenfreies Mehl", "gluten"],
+    // Die Sperre gilt für den ganzen Text, nicht nur das eigene Teilstück.
+    ["Nudeln, glutenfrei oder nicht", "gluten"],
+    ["Pasta, gluten-free or not", "gluten"],
+    ["soya tofu", "soy"],
     ["gluten- und laktosefreie Nudeln", "gluten"], // bekannte Grenze (Spec §5A)
     ["Weizennudeln/glutenfreie Nudeln", "gluten"],
     ["Weizennudeln & glutenfreie Nudeln", "gluten"],

@@ -128,8 +128,8 @@ function segments(text: string): string[] {
   return out.filter(Boolean);
 }
 
-/** Trifft der Key in diesem Teilstück? Regel: siehe `scanText`. */
-function scanSegment(haystack: string, spec: FoldedSpec): boolean {
+/** Trifft der Key in diesem Teilstück? Regel und `revoked`: siehe `scanText`. */
+function scanSegment(haystack: string, spec: FoldedSpec, revoked: boolean): boolean {
   const occurrences = (self: boolean | null) =>
     spec.terms
       .filter((term) => self === null || term.self === self)
@@ -142,11 +142,17 @@ function scanSegment(haystack: string, spec: FoldedSpec): boolean {
           }),
       );
 
-  const selfs = occurrences(true);
+  // Ein Selbstbegriff, der in einem längeren steckt ("soy" in "soya"), zählt nicht
+  // eigens: sein Folgewort wäre der Wortrest "a", und "soya-free" bliebe `soy`.
+  const allSelfs = occurrences(true);
+  const selfs = allSelfs.filter(
+    (v) =>
+      !allSelfs.some(
+        (w) => w.start <= v.start && v.end <= w.end && w.end - w.start > v.end - v.start,
+      ),
+  );
   const negated = (v: { start: number; end: number }) => isNegated(haystack, v.start, v.end);
   const atWordStart = (v: { start: number }) => v.start === 0 || haystack[v.start - 1] === " ";
-  // "nicht"/"not" sperrt das Abräumen: "Nudeln, nicht glutenfrei" widerruft die Verneinung.
-  const revoked = haystack.split(" ").some((word) => word === "nicht" || word === "not");
   if (!revoked && selfs.some((v) => negated(v) && atWordStart(v)) && selfs.every(negated))
     return false;
 
@@ -168,9 +174,10 @@ function scanSegment(haystack: string, spec: FoldedSpec): boolean {
  * Mitte von "haselnuss" nicht als Selbstbegriff räumen lassen, sonst verlöre sie
  * den Treffer auf `mandel` (ebenso "thunfischfreie Lachspasta" den auf `lachs`).
  * Zu (2): jede Stelle zählt, auch mitten im Wort — "Vollmilch, milchfrei" bleibt
- * `milk`, weil `milch` in "vollmilch" unverneint steht. Enthält das Teilstück das
- * ganze Wort "nicht" oder "not", räumt nichts ab: "Nudeln, nicht glutenfrei" ist
- * keine Entwarnung.
+ * `milk`, weil `milch` in "vollmilch" unverneint steht. Enthält der Text irgendwo
+ * das ganze Wort "nicht" oder "not", räumt kein Teilstück ab: "Nudeln, nicht
+ * glutenfrei" ist keine Entwarnung, und "Nudeln, glutenfrei oder nicht" auch nicht,
+ * obwohl `oder` das "nicht" in ein eigenes Teilstück trennt.
  *
  * Bekannte Grenze: "gluten- und laktosefreie Nudeln" zerfällt an `und` in
  * "gluten" und "laktosefreie nudeln"; `gluten` ohne Negation trifft. Das ist die
@@ -178,7 +185,10 @@ function scanSegment(haystack: string, spec: FoldedSpec): boolean {
  */
 export function scanText(text: string): AllergenKey[] {
   const parts = segments(text);
-  return FOLDED_SPECS.filter((spec) => parts.some((part) => scanSegment(part, spec))).map(
+  const revoked = fold(text)
+    .split(" ")
+    .some((word) => word === "nicht" || word === "not");
+  return FOLDED_SPECS.filter((spec) => parts.some((part) => scanSegment(part, spec, revoked))).map(
     (spec) => spec.key,
   );
 }
