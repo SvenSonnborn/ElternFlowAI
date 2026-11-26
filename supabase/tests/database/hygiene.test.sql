@@ -1,7 +1,8 @@
 -- pgTAP: Datenbank-Hygiene — Grenzen, updated_at, Fremdschlüssel-Indizes, Default-ACL.
 -- Spec: docs/superpowers/specs/2026-11-25-datenbank-hygiene-design.md (§5, §6)
 --
--- Läuft in einer Transaktion und rollt am Ende zurück; die Seed-Daten bleiben unberührt.
+-- Schreibt nur in eigene Zeilen (Nutzer, Familie, Elternteil, Kind), die in der Transaktion
+-- entstehen; Seed-Zeilen bleiben unberührt. Das `rollback` am Ende räumt sie auch bei Fehlschlag ab.
 --
 -- Teile:
 --   1. Grenzen für Name, Kürzel und Farbe: jede Regel an beiden Rändern, dazu beide
@@ -13,9 +14,9 @@
 --   4. Default-ACL: neue Funktionen (public, private, pg_temp) sind für `anon` nicht ausführbar,
 --      für `authenticated` schon; neue Sequenzen in public sind für `anon` unbenutzbar.
 --
--- Feste Kennungen (Seed-IDs siehe Kopf von supabase/seed.sql):
---   Testfamilie / Elternteil A / Kind Mia   f1f1f1f1-…-01 / aaaaaaaa-…-11 / c1c1c1c1-…-01
---   Nutzer ohne Elternzeile (create_family) 0e000000-0000-4000-8000-000000000001
+-- Feste Kennungen:
+--   eigene Zeilen: Nutzer / Familie / Elternteil / Kind   60000000-…-01 / -11 / -21 / -31
+--   Seed-Nutzer ohne Elternzeile (create_family)          0e000000-0000-4000-8000-000000000001
 
 begin;
 
@@ -23,18 +24,27 @@ create extension if not exists pgtap with schema extensions;
 
 select plan(49);
 
--- ── Helfer ──────────────────────────────────────────────────────────────────
+-- ── Eigene Zeilen und Helfer ────────────────────────────────────────────────
 
--- Setzt eine Spalte der Seed-Zeile auf einen Wert; Aufruf als `postgres` (umgeht RLS).
+insert into auth.users (id) values ('60000000-0000-4000-8000-000000000001');
+insert into public.families (id, name) values ('60000000-0000-4000-8000-000000000011', 'Hygiene');
+insert into public.parents (id, auth_user_id, family_id, name, short, color) values
+  ('60000000-0000-4000-8000-000000000021', '60000000-0000-4000-8000-000000000001',
+   '60000000-0000-4000-8000-000000000011', 'Hygiene', 'H', '#7DB6A8');
+insert into public.children (id, family_id, name, birthday, color) values
+  ('60000000-0000-4000-8000-000000000031', '60000000-0000-4000-8000-000000000011',
+   'Hygiene', '2020-01-01', '#7DB6A8');
+
+-- Setzt eine Spalte der eigenen Zeile auf einen Wert; Aufruf als `postgres` (umgeht RLS).
 create function pg_temp.set_col(p_table text, p_col text, p_val text)
 returns void
 language plpgsql
 as $$
 declare
   v_id uuid := case p_table
-    when 'families' then 'f1f1f1f1-0000-4000-8000-000000000001'
-    when 'parents'  then 'aaaaaaaa-0000-4000-8000-000000000011'
-    when 'children' then 'c1c1c1c1-0000-4000-8000-000000000001'
+    when 'families' then '60000000-0000-4000-8000-000000000011'
+    when 'parents'  then '60000000-0000-4000-8000-000000000021'
+    when 'children' then '60000000-0000-4000-8000-000000000031'
   end;
 begin
   execute format('update public.%I set %I = %L where id = %L', p_table, p_col, p_val, v_id);
@@ -87,8 +97,8 @@ select throws_ok($$ select pg_temp.set_col('children', 'color', '#GGGGGG') $$, '
 
 -- Beide Schreibwege.
 set local role authenticated;
-set local request.jwt.claims to '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}';
-select throws_ok($$ update public.parents set name = repeat('x', 51) where id = 'aaaaaaaa-0000-4000-8000-000000000011' $$,
+set local request.jwt.claims to '{"sub":"60000000-0000-4000-8000-000000000001","role":"authenticated"}';
+select throws_ok($$ update public.parents set name = repeat('x', 51) where id = '60000000-0000-4000-8000-000000000021' $$,
   '23514', null, 'Direkter Update als authenticated: 51 Zeichen scheitern');
 reset role;
 
@@ -102,19 +112,19 @@ reset role;
 
 -- `now()` ist in der Transaktion konstant, `set_updated_at()` setzt `now()`.
 select pg_temp.set_col('families', 'updated_at', '2000-01-01');
-select is((select updated_at from public.families where id = 'f1f1f1f1-0000-4000-8000-000000000001'), now(),
+select is((select updated_at from public.families where id = '60000000-0000-4000-8000-000000000011'), now(),
   'families: Trigger stempelt updated_at');
 select pg_temp.set_col('parents', 'updated_at', '2000-01-01');
-select is((select updated_at from public.parents where id = 'aaaaaaaa-0000-4000-8000-000000000011'), now(),
+select is((select updated_at from public.parents where id = '60000000-0000-4000-8000-000000000021'), now(),
   'parents: Trigger stempelt updated_at');
 select pg_temp.set_col('children', 'updated_at', '2000-01-01');
-select is((select updated_at from public.children where id = 'c1c1c1c1-0000-4000-8000-000000000001'), now(),
+select is((select updated_at from public.children where id = '60000000-0000-4000-8000-000000000031'), now(),
   'children: Trigger stempelt updated_at');
 
 -- ── 3. Indizes ──────────────────────────────────────────────────────────────
 
 -- Spiegelt den Advisor `unindexed_foreign_keys`: Reihenfolge der führenden Spalten zählt,
--- Teilindizes zählen. Beim Scheitern listet `is_empty` die fehlenden Fremdschlüssel.
+-- Teilindizes zählen, INCLUDE-Spalten nicht (`indnkeyatts`). Beim Scheitern listet `is_empty` die fehlenden Fremdschlüssel.
 select is_empty($$
   select c.conrelid::regclass::text, c.conname
     from pg_constraint c
@@ -124,6 +134,7 @@ select is_empty($$
        select 1 from pg_index i
         where i.indrelid = c.conrelid
           and i.indisvalid
+          and i.indnkeyatts >= cardinality(c.conkey)
           and (string_to_array(i.indkey::text, ' ')::smallint[])[1:cardinality(c.conkey)] = c.conkey
      )
 $$, 'jeder Fremdschlüssel in public hat einen Index mit passenden führenden Spalten');
