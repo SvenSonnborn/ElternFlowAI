@@ -19,7 +19,7 @@ export interface Term {
    * "butter", "mandel"). Nur ein verneinter Selbstbegriff ("glutenfreie
    * Nudeln") räumt den Key im Teilstück ab. `laktose` ist das Gegenbeispiel:
    * "laktosefrei" heißt gespaltener Milchzucker, das Milcheiweiß bleibt. Regel
-   * und Grenzen: Spec §5A, später ADR-061.
+   * und Grenzen: ADR-061.
    */
   readonly self?: boolean;
 }

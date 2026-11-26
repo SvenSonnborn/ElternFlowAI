@@ -134,7 +134,8 @@ function scanSegment(h: string, spec: FoldedSpec): boolean {
  * (`Term.self`) am Wortanfang steht und (2) kein Selbstbegriff-Vorkommen
  * unverneint ist. Zu (1): "haselnussfreie Schokolade" darf `nuss` in der Mitte
  * von "haselnuss" nicht als Selbstbegriff räumen lassen, sonst verlöre
- * "Walnusskerne" im selben Teilstück den Treffer. Zu (2): jede Stelle zählt, auch
+ * "haselnussfreie Schokolade mit Mandeln" den Treffer auf `mandel` (ebenso
+ * "thunfischfreie Pasta mit Lachs" den auf `lachs`). Zu (2): jede Stelle zählt, auch
  * mitten im Wort — "Vollmilch, milchfrei" bleibt `milk`, weil `milch` in
  * "vollmilch" unverneint steht.
  *

@@ -167,6 +167,7 @@ describe("scanText — Selbstbezeichnungen", () => {
     ["Milch, milchfreie Alternative", "milk"],
     ["Vollmilch, milchfrei", "milk"],
     ["haselnussfreie Schokolade mit Mandeln", "nuts"],
+    // Sichert Bedingung 2 (unverneintes `nuss` in "walnuss"), nicht Bedingung 1.
     ["haselnussfreie Schokolade mit Walnusskernen", "nuts"],
     ["thunfischfreie Pasta mit Lachs", "fish"],
     ["gluten- und laktosefreie Nudeln", "gluten"], // bekannte Grenze (Spec §5A)
