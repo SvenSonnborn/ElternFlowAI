@@ -27,7 +27,6 @@ entscheiden oder besorgen müssen, um sie zu entblocken.
 
 | Schritt                                                                                        | Aufwand | Vorher nötig                                       |
 | ---------------------------------------------------------------------------------------------- | ------- | -------------------------------------------------- |
-| [3. Datenbank-Hygiene](#3-datenbank-hygiene)                                                   | M       | Grenzwerte für Name, Kürzel, Farbe                 |
 | [4. Allergen-Urteil](#4-allergen-urteil)                                                       | M       | —                                                  |
 | [5. Toast](#5-toast)                                                                           | S       | —                                                  |
 | [6. Barrierefreiheit und Theming ohne Designer](#6-barrierefreiheit-und-theming-ohne-designer) | M       | —                                                  |
@@ -64,24 +63,6 @@ entscheiden oder besorgen müssen, um sie zu entblocken.
 
 Kein Blocker. Jeder Schritt ist ein eigener Branch; die Reihenfolge folgt dem Schaden, den der
 offene Punkt heute anrichten kann.
-
-### 3. Datenbank-Hygiene
-
-**M** · Eine Migration, ein `test:db`-Lauf. Steht vor dem Live-Sync (Schritt 8), weil der auf
-denselben Tabellen aufsetzt.
-
-**Vorher nötig:** Grenzwerte für Name, Kürzel und Farbe. Ich leite einen Vorschlag aus den
-Client-Regeln ab, du bestätigst ihn.
-
-- [Conflict-Detection](./TODO.md#conflict-detection-siehe-adr-031)
-  - `families`, `parents` und `children` tragen dasselbe tote `updated_at`
-- [Familie](./TODO.md#familie--child-profile-live-daten-v1)
-  - Name, Kürzel und Farbe haben serverseitig keine Grenzen
-- [Essen](./TODO.md#essen--meal-planner-daten-layer-v1)
-  - Kein Index bedient den Rezept-Query-Pfad
-- [Weitere](./TODO.md#weitere-out-of-scope-items)
-  - Der Performance-Advisor meldet Fremdschlüssel ohne Index und nie benutzte Indizes
-  - Neue Funktionen und Sequenzen in `public` bekommen `anon` weiter über die Default-ACL
 
 ### 4. Allergen-Urteil
 
@@ -556,6 +537,8 @@ Keine Arbeit, solange der Auslöser nicht eintritt.
 - **Die Git-Hooks laufen im Sync-Workflow mit**
   ([Renovate](./TODO.md#renovate--dependencies-siehe-adr-013)) — sobald jemand den Pre-Push-Hook
   wieder aktiviert
+- **Der Performance-Advisor meldet nie benutzte Indizes**
+  ([Weitere](./TODO.md#weitere-out-of-scope-items)) — sobald echte Last da ist
 - **Das Lade-Prädikat lädt jeden vergangenen Einzeltermin der Familie**
   ([Calendar](./TODO.md#calendar-v1--siehe-adr-008)) — sobald eine Familie so viele vergangene
   Einzeltermine hat, dass ein Fensterwechsel spürbar langsam wird
