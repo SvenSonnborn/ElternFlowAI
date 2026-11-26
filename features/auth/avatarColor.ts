@@ -66,7 +66,7 @@ export function deriveShort(name: string): string {
  * Longest family, parent or child name the client accepts.
  *
  * Mirrors the server constraints `families_name_length`, `parents_name_length`
- * and `children_name_length` (`supabase/migrations/20261126081154_datenbank_hygiene.sql`, section A),
+ * and `children_name_length` (`supabase/migrations/20261126113717_datenbank_hygiene.sql`, section A),
  * which count code points via `char_length`. `TextInput.maxLength` counts UTF-16
  * units — never fewer than code points — so a client limit of 50 can never let
  * through a name the server rejects. The price: an emoji name can be shorter in
