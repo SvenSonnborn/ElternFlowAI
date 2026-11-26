@@ -12,6 +12,7 @@ import {
   AVATAR_COLOR_NAMES,
   AVATAR_COLORS,
   mapAuthError,
+  NAME_MAX_LENGTH,
   useCreateChild,
   useCurrentParent,
 } from "@/features/auth";
@@ -177,6 +178,7 @@ export function Step4FirstChild() {
           value={name}
           onChangeText={setName}
           placeholder={t("onb.s4.namePlaceholder")}
+          maxLength={NAME_MAX_LENGTH}
         />
 
         <Field

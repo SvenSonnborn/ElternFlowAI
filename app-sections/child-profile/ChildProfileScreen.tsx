@@ -22,6 +22,7 @@ import {
   AVATAR_COLOR_NAMES,
   AVATAR_COLORS,
   mapAuthError,
+  NAME_MAX_LENGTH,
   useChild,
   useCreateChild,
   useCurrentParent,
@@ -344,6 +345,7 @@ export function ChildProfileScreen() {
               value={name}
               onChangeText={setName}
               placeholder={t("child.namePlaceholder")}
+              maxLength={NAME_MAX_LENGTH}
             />
 
             <Field

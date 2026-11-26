@@ -4,6 +4,7 @@ export {
   AVATAR_COLORS,
   capShort,
   deriveShort,
+  NAME_MAX_LENGTH,
   normalizeShort,
 } from "./avatarColor";
 export {
