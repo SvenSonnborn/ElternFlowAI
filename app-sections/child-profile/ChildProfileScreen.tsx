@@ -12,8 +12,8 @@ import {
   Icon,
   Pill,
   SelectionPressable,
-  showAlert,
   TopBar,
+  useToast,
 } from "@/app-sections/shared";
 import { fontFamily, touchTarget } from "@/design-system";
 import { useTheme } from "@/design-system/ThemeProvider";
@@ -145,6 +145,7 @@ function TagEditor({
 
 export function ChildProfileScreen() {
   const { t } = useTranslation();
+  const { show } = useToast();
   const { theme } = useTheme();
   const params = useLocalSearchParams<{ id?: string }>();
   const isEdit = Boolean(params.id);
@@ -219,7 +220,7 @@ export function ChildProfileScreen() {
       } else {
         await createChild.mutateAsync({ familyId, ...payload });
       }
-      showAlert({ title: t("child.saved") });
+      show({ title: t("child.saved"), variant: "success" });
       router.back();
     } catch {
       /* error rendered below */

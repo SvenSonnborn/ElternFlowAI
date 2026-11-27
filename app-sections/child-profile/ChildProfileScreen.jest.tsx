@@ -1,5 +1,7 @@
 import { fireEvent, screen } from "@testing-library/react-native";
+import { router } from "expo-router";
 
+import { useToastStore } from "@/app-sections/shared";
 import { touchTarget } from "@/design-system";
 import { NAME_MAX_LENGTH } from "@/features/auth";
 import i18n from "@/features/i18n";
@@ -82,5 +84,26 @@ describe("ChildProfileScreen: Tippflächen im Inhalt", () => {
   it("das Tag-Feld füllt die Zeilenhöhe, damit die ganze Zeile antippbar ist", async () => {
     await renderScreen(<ChildProfileScreen />);
     expect(screen.getByLabelText(i18n.t("child.likes"))).toHaveStyle({ alignSelf: "stretch" });
+  });
+});
+
+describe("ChildProfileScreen: Speichern", () => {
+  beforeEach(() => {
+    useToastStore.getState().clear();
+    jest.clearAllMocks();
+    mockMutation.mutateAsync.mockResolvedValue(undefined);
+  });
+
+  it("meldet das Speichern als success-Toast und geht zurück", async () => {
+    await renderScreen(<ChildProfileScreen />);
+    await fireEvent.press(screen.getByRole("button", { name: i18n.t("action.save") }));
+    const { toasts } = useToastStore.getState();
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]).toMatchObject({
+      title: i18n.t("child.saved"),
+      variant: "success",
+      position: "top",
+    });
+    expect(router.back).toHaveBeenCalledTimes(1);
   });
 });

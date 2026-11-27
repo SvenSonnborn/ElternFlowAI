@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Field, showAlert } from "@/app-sections/shared";
+import { Field, useToast } from "@/app-sections/shared";
 import { Button, Text } from "@/design-system/ui";
 import { mapAuthError, passwordStrength, useSignOut, useUpdatePassword } from "@/features/auth";
 
@@ -12,6 +12,7 @@ import { StrengthMeter } from "./StrengthMeter";
 
 export function NewPasswordScreen() {
   const { t } = useTranslation();
+  const { show } = useToast();
   const update = useUpdatePassword();
   const signOut = useSignOut();
   const [password, setPassword] = useState("");
@@ -41,7 +42,7 @@ export function NewPasswordScreen() {
     } catch {
       /* signOut error surfaced via errorKey; still proceed to login */
     }
-    showAlert({ title: t("auth.newPassword.saved") });
+    show({ title: t("auth.newPassword.saved"), variant: "success" });
     router.replace("/(auth)/login");
   }
 
