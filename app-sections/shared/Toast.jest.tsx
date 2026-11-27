@@ -109,13 +109,17 @@ describe("Toast: Hülle beim Ausblenden", () => {
       await tapClose();
       await advance(60);
       // Mitten im Ausblenden: Die Höhe läuft, sie springt nicht.
-      expect(hullStyle().height).toBeGreaterThan(0);
-      expect(hullStyle().height).toBeLessThan(72);
+      // Bei 60 ms von 120 ms: ease-in (quad) lässt 72 · (1 − 0,5²) = 54 px
+      // stehen, linear 36 px, ease-in über 200 ms 72 · (1 − 0,3²) ≈ 65,5 px.
+      // Das Fenster 45 bis 60 trennt die Kurve und die Dauer; das Ende pinnt
+      // die Dauer unten zusätzlich.
+      expect(hullStyle().height).toBeGreaterThan(45);
+      expect(hullStyle().height).toBeLessThan(60);
       // Den nativen Fade beendet das Schein-Modul des Jest-Presets schon nach
       // 16 ms; `onDismiss` wartet trotzdem auf das Schrumpfen.
       expect(onDismiss).not.toHaveBeenCalled();
 
-      await advance(200);
+      await advance(70);
       expect(hullStyle().height).toBe(0);
       expect(hullStyle().marginBottom).toBe(-DS.components.toast.stack.gap);
       expect(onDismiss).toHaveBeenCalledTimes(1);
