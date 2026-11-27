@@ -27,7 +27,6 @@ entscheiden oder besorgen müssen, um sie zu entblocken.
 
 | Schritt                                                                                        | Aufwand | Vorher nötig                                       |
 | ---------------------------------------------------------------------------------------------- | ------- | -------------------------------------------------- |
-| [5. Toast](#5-toast)                                                                           | S       | —                                                  |
 | [6. Barrierefreiheit und Theming ohne Designer](#6-barrierefreiheit-und-theming-ohne-designer) | M       | —                                                  |
 | [7. Kalender-Komfort](#7-kalender-komfort)                                                     | M       | —                                                  |
 | [8. Live-Sync des Essensplans](#8-live-sync-des-essensplans)                                   | L       | —                                                  |
@@ -62,15 +61,6 @@ entscheiden oder besorgen müssen, um sie zu entblocken.
 
 Kein Blocker. Jeder Schritt ist ein eigener Branch; die Reihenfolge folgt dem Schaden, den der
 offene Punkt heute anrichten kann.
-
-### 5. Toast
-
-**S** · Klein, und danach melden Web und nativ Erfolge gleich.
-
-- [Weitere](./TODO.md#weitere-out-of-scope-items)
-  - Toast statt `showAlert` für Erfolgsmeldungen
-- [Toast](./TODO.md#toast)
-  - Das Ausblenden kollabiert die Höhe nicht
 
 ### 6. Barrierefreiheit und Theming ohne Designer
 
