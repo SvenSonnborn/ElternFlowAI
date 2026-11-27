@@ -105,12 +105,17 @@ export function Toast({ entry, onDismiss }: ToastProps) {
   const close = useCallback(() => {
     if (leaving.current) return;
     leaving.current = true;
+    // Fade und Schrumpfen teilen das Timing (Spec: „in derselben Zeit wie das
+    // Ausblenden“, 120 ms, ease-in).
+    const exit = {
+      duration: 120,
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- RN-Typen führen Easing-Funktionen als Methoden; Easing.js benutzt kein `this`
+      easing: Easing.in(Easing.quad),
+    };
     const animations = [
       Animated.timing(progress, {
+        ...exit,
         toValue: 0,
-        duration: 120,
-        // eslint-disable-next-line @typescript-eslint/unbound-method -- RN-Typen führen Easing-Funktionen als Methoden; Easing.js benutzt kein `this`
-        easing: Easing.in(Easing.quad),
         useNativeDriver: true,
       }),
     ];
@@ -122,10 +127,8 @@ export function Toast({ entry, onDismiss }: ToastProps) {
       setCollapseFrom(from);
       animations.push(
         Animated.timing(collapse, {
+          ...exit,
           toValue: 1,
-          duration: 120,
-          // eslint-disable-next-line @typescript-eslint/unbound-method -- RN-Typen führen Easing-Funktionen als Methoden; Easing.js benutzt kein `this`
-          easing: Easing.in(Easing.quad),
           useNativeDriver: false,
         }),
       );
