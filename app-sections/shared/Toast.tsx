@@ -121,8 +121,9 @@ export function Toast({ entry, onDismiss }: ToastProps) {
     ];
     // Ohne Messung (Schließen vor dem ersten Layout) gibt es keinen Startwert;
     // dann bleibt es beim Fade, wie bei „Bewegung reduzieren“, wo das Pattern
-    // das Schrumpfen ausdrücklich ausschließt.
-    const from = reduceMotion === true ? null : measured.current;
+    // das Schrumpfen ausdrücklich ausschließt. Eine noch offene Abfrage
+    // (`null`) zählt wie „reduzieren“: Der Dismiss-Timer wartet nicht auf sie.
+    const from = reduceMotion === false ? measured.current : null;
     if (from != null) {
       setCollapseFrom(from);
       animations.push(

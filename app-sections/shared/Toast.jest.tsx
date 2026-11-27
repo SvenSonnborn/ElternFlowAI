@@ -190,4 +190,22 @@ describe("Toast: Hülle beim Ausblenden", () => {
     expect(hullStyle().height).toBeUndefined();
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
+
+  it("Bewegungs-Abfrage offen: Auto-Dismiss blendet nur aus, ohne Schrumpfen", async () => {
+    // Der Dismiss-Timer läuft ab dem Einhängen, unabhängig von der Abfrage.
+    // Solange sie offen ist, kann „Bewegung reduzieren“ an sein.
+    jest
+      .spyOn(AccessibilityInfo, "isReduceMotionEnabled")
+      .mockReturnValue(new Promise<boolean>(() => {}));
+    const onDismiss = jest.fn();
+    await renderScreen(<Toast entry={{ ...entry(), durationMs: 4000 }} onDismiss={onDismiss} />);
+    await measure(72);
+
+    await advance(4000);
+    expect(hullStyle().height).toBeUndefined();
+
+    await advance(200);
+    expect(hullStyle().height).toBeUndefined();
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
 });
