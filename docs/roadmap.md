@@ -125,6 +125,8 @@ und 18.
   - Die Slot-Leiste ist mit vier Tabs am Gerät ungeprüft
 - [Realtime](./TODO.md#realtime-siehe-adr-030)
   - Debug-Screen: Dark-Theme auf iOS und jede Ansicht auf Android stehen noch aus
+- [Toast](./TODO.md#toast)
+  - Der Toast wirft auf iOS auch im Ruhezustand keinen Schatten
 
 ### 11. E2E-Lauf mit Konto
 
